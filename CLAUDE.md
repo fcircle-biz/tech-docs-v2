@@ -2,8 +2,8 @@
 
 このファイルは、このリポジトリのコードを扱う際の Claude Code (claude.ai/code) 向けガイダンスを提供します。
 
-> **注記（Astro 移行ブランチ）**: 本リポジトリは静的 HTML 教材から **Astro ベースへの移行**を予定しています（`feature/astro-support` ブランチで作業中）。
-> Astro 固有の構成（`src/`、`astro.config.*`、Astro 依存パッケージ等）は**まだ未導入**で、本書は**移行前の現状構成**を記述します。移行の設計・実装が進むのに合わせて本書も更新してください。
+> **注記（Astro 構成）**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`feature/astro-support` ブランチ）。
+> Astro プロジェクト一式は **`astro-system/`** 配下にあり（`astro.config.mjs`・`src/`・`public/` 等）、`astro-system/` で `npm run build` を実行すると GitHub Pages 公開用の **`/docs/`（リポジトリ直下）** へ出力されます。構成変更に合わせて本書も更新してください。
 
 ## コミュニケーションスタイル
 
@@ -14,25 +14,26 @@
 
 IT・ソフトウェア開発のトピックを扱う、体系化された学習教材を収録した日本語の技術ドキュメントリポジトリ。コンテンツは静的な HTML/Markdown で、テンプレート標準に基づいて検証される。
 
-ビルド/Lint/テストのフレームワークは（現状）無し。`package.json` には教材生成スキルが利用する補助ライブラリ（`marked`、`puppeteer`）のみが含まれる。
+ビルドは **Astro**（`astro-system/` 配下）で行う。`astro-system/` で `npm run build` を実行すると、リポジトリ直下の `/docs/`（GitHub Pages 公開ディレクトリ）へ静的 HTML が出力される。Lint/テストのフレームワークは無し。
 
 ## コンテンツアーキテクチャ
 
 ### ディレクトリ構成（現状）
 
-- `/docs/guide/` - 体系的な学習ガイド（理論重視）。**現状は `development-processes/` 配下の以下 2 件のみ**が作成済み:
+- `/astro-system/` - **Astro プロジェクト一式（コンテンツのソース）**。`astro.config.mjs`・`package.json`・`tsconfig.json`・`scripts/` と、`src/`（レイアウト `src/layouts/`、動的ルート `src/pages/`、技術別データ `src/data/guides/`、本文断片 `src/chapters/`）・`public/`（静的アセット）を含む。
+- `/docs/` - **Astro のビルド出力＝GitHub Pages 公開ディレクトリ**（`astro-system/` からのビルドで生成。直接編集しない）。`docs/guide/` に学習ガイドが出力される。**現状は `development-processes/` 配下の以下 2 件のみ**:
   - `development-processes/claude-code/` - Claude Code 入門学習ガイド（全14章）
   - `development-processes/codex/` - Codex 入門学習ガイド（全14章）
+- `/docs_backup/` - 移行前の静的 HTML 一式のバックアップ（参照用、配信対象外）。
 - `/templates/v3/` - HTML/CSS テンプレート標準（現行）。
 - `/tech-knowledge-map.md` - 9分類体系（後述）の定義ドキュメント。
 - `/.claude/skills/` - コンテンツ自動生成・運用補助用の Claude スキル定義（スラッシュコマンドで呼び出し）。
-- `/package.json` - 一部スキルが利用する Node 依存（`marked`、`puppeteer`）。
 
 > **補足**: 旧 `tech_docs`（v1 リポジトリ）に存在した `tutorial/`、`practice/`、`assignment/`、`slide/`、`cheatsheet/`、`specs/`、`work_pdf/` 等のフォルダ、および対応する creator スキルは**本リポジトリには存在しない**。これらを前提にしないこと。
 
 ### 9分類体系（tech-knowledge-map.md より）
 
-ガイドの配置に用いる分類体系。`/docs/guide/[category]/...` の形でカテゴリ別に配置する（現状は `development-processes` のみ使用）。
+ガイドの配置に用いる分類体系。出力は `/docs/guide/[category]/...`、ソースは `astro-system/src/`（`src/data/guides/[category]/` ＋ `src/chapters/[category]/`）にカテゴリ別に配置する（現状は `development-processes` のみ使用）。
 
 1. プログラミング言語 (`programming-languages/[ecosystem]/`)
 2. Web技術 (`web-technologies/`)
@@ -206,6 +207,6 @@ flowchart TD
 
 ## GitHub Pages URL
 
-形式: `https://fcircle-biz.github.io/tech_docs/[content-type]/[category-path]/[filename].html`
+形式: `https://fcircle-biz.github.io/tech-docs-v2/guide/[category-path]/[filename].html`（base path は `/tech-docs-v2/`）
 
-例: `https://fcircle-biz.github.io/tech_docs/guide/development-processes/claude-code/claude-code-learning-material-01.html`
+例: `https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/claude-code/claude-code-learning-material-01.html`

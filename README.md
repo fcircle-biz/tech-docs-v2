@@ -2,7 +2,7 @@
 
 ソフトウェア開発およびIT関連トピックに関する学習ガイドをHTML形式で提供する技術文書集です。
 
-> **注記（Astro 移行ブランチ）**: 本リポジトリは静的 HTML 教材から **Astro ベースへの移行**を予定しています（`feature/astro-support` ブランチで作業中）。Astro 固有の構成（`src/`、`astro.config.*` 等）はまだ未導入で、本書は**移行前の現状構成**を記述します。移行の進行に応じてフォルダ構成・公開方法・本目次は変更される予定です。
+> **現状**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`feature/astro-support` ブランチ）。Astro プロジェクト一式は `astro-system/` に配置され、ビルド出力は GitHub Pages 公開用の `/docs/`（リポジトリ直下）に生成されます。
 
 ## 📋 目次
 
@@ -39,7 +39,7 @@
 
 ## 🔗 リンク
 
-- [GitHub Pages](https://fcircle-biz.github.io/tech_docs/)
-- [リポジトリ](https://github.com/fcircle-biz/tech_docs)
+- [GitHub Pages](https://fcircle-biz.github.io/tech-docs-v2/)
+- [リポジトリ](https://github.com/fcircle-biz/tech-docs-v2)
 
 ------------------------------------------------------------------------

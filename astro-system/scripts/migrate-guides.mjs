@@ -16,9 +16,11 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// このスクリプトは astro-system/scripts/ にあり、ROOT は astro-system/。
+// docs_backup/ はリポジトリ直下（astro-system の 1 階層上）にある。
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_CATEGORY = 'development-processes';
-const SRC_BASE = join(ROOT, 'docs_backup/guide', SRC_CATEGORY);
+const SRC_BASE = join(ROOT, '..', 'docs_backup/guide', SRC_CATEGORY);
 const WRAPPER = 'max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6';
 
 const techs = readdirSync(SRC_BASE, { withFileTypes: true })
