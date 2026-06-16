@@ -11,4 +11,6 @@ export default defineConfig({
   srcDir: './src',
   publicDir: './public',
   outDir: './docs',
+  // 旧来の静的 HTML と同じ URL（*.html）を維持するためファイル形式で出力する。
+  build: { format: 'file' },
 });
