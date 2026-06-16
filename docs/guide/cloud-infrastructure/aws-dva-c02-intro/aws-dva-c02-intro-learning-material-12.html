@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS DVA-C02入門 第12章 - 監視とデバッグ - CloudWatch、X-Ray</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS DVA-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約18時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS DVA-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">監視とデバッグ - CloudWatch、X-Ray</h1>
+                    <p class="text-slate-600">アプリケーションの監視、ログ分析、分散トレーシングを習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CloudWatch Logsへのログ出力と構造化ログ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CloudWatch Logs Insightsによるクエリ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>カスタムメトリクスの発行</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CloudWatchアラームとアクション</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>AWS X-Rayによる分散トレーシング</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>X-Ray SDKの組み込み</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サービスマップとトレース分析</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Lambda、API Gateway、ECSのトレース</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 CloudWatch Logs - ログ管理の基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CloudWatch Logsは、AWSアプリケーションのログを一元管理し、リアルタイムで監視・分析するためのサービスです。Lambda関数、ECSコンテナ、EC2インスタンスなど、さまざまなAWSリソースからログを収集できます。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart LR
+    subgraph sources["ログソース"]
+        direction TB
+        L[Lambda関数]
+        E[ECSタスク]
+        A[API Gateway]
+        EC[EC2インスタンス]
+    end
+
+    subgraph cw["CloudWatch Logs"]
+        direction TB
+        LG1[ログストリーム 1]
+        LG2[ログストリーム 2]
+        LG3[ログストリーム 3]
+        LGN[ロググループ]
+        LGN --> LG1
+        LGN --> LG2
+        LGN --> LG3
+    end
+
+    subgraph analysis["分析・活用"]
+        direction TB
+        LI[Logs Insights]
+        AL[アラーム]
+        S3[S3エクスポート]
+    end
+
+    L --> LGN
+    E --> LGN
+    A --> LGN
+    EC --> LGN
+    LGN --> LI
+    LGN --> AL
+    LGN --> S3
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">ロググループとログストリーム</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>ロググループ</strong>: 関連するログストリームをまとめる論理的なコンテナ（例: /aws/lambda/my-function）</li>
+                        <li><strong>ログストリーム</strong>: 同じソースからの一連のログイベント（例: Lambda関数の各実行インスタンス）</li>
+                        <li><strong>ログイベント</strong>: タイムスタンプとメッセージを含む個別のログエントリ</li>
+                        <li><strong>保持期間</strong>: ログの保存期間（1日〜無期限、デフォルトは無期限）</li>
+                    </ul>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    Lambda関数は自動的にCloudWatch Logsにログを出力します。関数にCloudWatch Logs書き込み権限（logs:CreateLogGroup、logs:CreateLogStream、logs:PutLogEvents）を持つIAMロールをアタッチする必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 構造化ログとJSON形式
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        構造化ログ（JSON形式）を使用することで、CloudWatch Logs Insightsでのクエリが容易になり、ログ分析の効率が大幅に向上します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda関数での構造化ログ実装（Python）</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">Python</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import json
+import logging
+
+# 構造化ログの設定
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def lambda_handler(event, context):
+    # 構造化ログ（JSON形式）で出力
+    log_entry = {
+        "level": "INFO",
+        "message": "処理開始",
+        "request_id": context.request_id,
+        "user_id": event.get("userId"),
+        "action": "process_order"
+    }
+    logger.info(json.dumps(log_entry))
+
+    try:
+        # 処理実行
+        result = process_order(event)
+
+        # 成功ログ
+        success_log = {
+            "level": "INFO",
+            "message": "処理成功",
+            "request_id": context.request_id,
+            "order_id": result["order_id"]
+        }
+        logger.info(json.dumps(success_log))
+
+        return {"statusCode": 200, "body": json.dumps(result)}
+    except Exception as e:
+        # エラーログ
+        error_log = {
+            "level": "ERROR",
+            "message": "処理失敗",
+            "request_id": context.request_id,
+            "error": str(e)
+        }
+        logger.error(json.dumps(error_log))
+        raise</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ヒント: 構造化ログのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    JSON形式のログは、CloudWatch Logs Insightsで簡単にフィルタ・集計できます。例えば、特定のuser_idやerrorレベルだけを抽出するクエリが書けます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 CloudWatch Logs Insights - ログクエリ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CloudWatch Logs Insightsは、大量のログデータから必要な情報を素早く検索・分析できる強力なクエリ機能です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">よく使うクエリパターン</h3>
+
+                    <div class="bg-purple-50 border border-purple-200 rounded-xl overflow-hidden mb-4">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h4 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-search"></i>
+                                エラーログの抽出
+                            </h4>
+                        </div>
+                        <div class="p-6">
+                            <div class="code-block-wrapper mb-3">
+                                <div class="code-header">
+                                    <span class="text-xs font-medium text-slate-400">CloudWatch Logs Insights Query</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre><code class="language-sql">fields @timestamp, @message
+| filter @message like /ERROR/
+| sort @timestamp desc
+| limit 100</code></pre>
+                            </div>
+                            <p class="text-purple-800 text-sm">
+                                直近100件のエラーログを時系列で表示します。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden mb-4">
+                        <div class="bg-blue-100 px-6 py-3 border-b border-blue-200">
+                            <h4 class="font-semibold text-blue-800 flex items-center gap-2">
+                                <i class="fas fa-chart-line"></i>
+                                レスポンスタイムの統計
+                            </h4>
+                        </div>
+                        <div class="p-6">
+                            <div class="code-block-wrapper mb-3">
+                                <div class="code-header">
+                                    <span class="text-xs font-medium text-slate-400">CloudWatch Logs Insights Query</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre><code class="language-sql">fields @timestamp, @duration
+| stats avg(@duration) as avg_duration,
+        max(@duration) as max_duration,
+        pct(@duration, 95) as p95_duration
+by bin(5m)</code></pre>
+                            </div>
+                            <p class="text-blue-800 text-sm">
+                                5分間隔で平均、最大、95パーセンタイルのレスポンスタイムを計算します。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl overflow-hidden mb-4">
+                        <div class="bg-emerald-100 px-6 py-3 border-b border-emerald-200">
+                            <h4 class="font-semibold text-emerald-800 flex items-center gap-2">
+                                <i class="fas fa-filter"></i>
+                                特定ユーザーの操作履歴
+                            </h4>
+                        </div>
+                        <div class="p-6">
+                            <div class="code-block-wrapper mb-3">
+                                <div class="code-header">
+                                    <span class="text-xs font-medium text-slate-400">CloudWatch Logs Insights Query</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre><code class="language-sql">fields @timestamp, user_id, action, order_id
+| filter user_id = "user123"
+| sort @timestamp desc
+| limit 50</code></pre>
+                            </div>
+                            <p class="text-emerald-800 text-sm">
+                                特定ユーザーの直近50件の操作履歴を取得します（構造化ログが前提）。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 CloudWatchメトリクスとアラーム
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CloudWatchメトリクスは、AWSリソースのパフォーマンスデータを収集し、可視化します。カスタムメトリクスを発行することで、アプリケーション固有のメトリクスも監視できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">カスタムメトリクスの発行（Python）</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">Python</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import boto3
+
+# CloudWatchクライアント
+cloudwatch = boto3.client('cloudwatch')
+
+def publish_custom_metric(metric_name, value, unit='Count'):
+    """
+    カスタムメトリクスをCloudWatchに発行
+    """
+    cloudwatch.put_metric_data(
+        Namespace='MyApp/Orders',  # カスタム名前空間
+        MetricData=[
+            {
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': unit,
+                'Dimensions': [
+                    {
+                        'Name': 'Environment',
+                        'Value': 'Production'
+                    }
+                ]
+            }
+        ]
+    )
+
+# 使用例: 注文完了数を記録
+publish_custom_metric('OrdersCompleted', 1, 'Count')</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">CloudWatchアラームの作成</h3>
+                    <div class="mermaid mb-6">
+flowchart LR
+    M[メトリクス] --> A{しきい値<br/>超過?}
+    A -->|Yes| AL[アラーム状態]
+    A -->|No| OK[OK状態]
+    AL --> SN[SNS通知]
+    AL --> AS[Auto Scaling]
+    AL --> LM[Lambda実行]
+    SN --> E[Email]
+    SN --> S[Slack]
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">AWS CLI</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># Lambda関数のエラー率が10%を超えたら通知
+aws cloudwatch put-metric-alarm \
+  --alarm-name lambda-error-rate \
+  --alarm-description "Lambda error rate > 10%" \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --statistic Average \
+  --period 300 \
+  --threshold 0.1 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 2 \
+  --alarm-actions arn:aws:sns:ap-northeast-1:123456789012:alerts</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 AWS X-Ray - 分散トレーシングの基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWS X-Rayは、マイクロサービスやサーバーレスアーキテクチャにおいて、リクエストの流れを可視化し、ボトルネックやエラーを特定するための分散トレーシングサービスです。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart LR
+    C[クライアント] -->|1. リクエスト| AG[API Gateway]
+    AG -->|2. 呼び出し| L1[Lambda 1]
+    L1 -->|3. クエリ| DB[DynamoDB]
+    L1 -->|4. 呼び出し| L2[Lambda 2]
+    L2 -->|5. 送信| SQS[SQS]
+
+    subgraph xray["X-Ray トレース"]
+        direction TB
+        T1[セグメント: API Gateway]
+        T2[サブセグメント: Lambda 1]
+        T3[サブセグメント: DynamoDB]
+        T4[サブセグメント: Lambda 2]
+        T5[サブセグメント: SQS]
+        T1 --> T2
+        T2 --> T3
+        T2 --> T4
+        T4 --> T5
+    end
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">X-Rayの主要概念</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>トレース</strong>: エンドツーエンドのリクエストの流れ全体</li>
+                        <li><strong>セグメント</strong>: 各サービスでの処理単位（Lambda関数、API Gateway等）</li>
+                        <li><strong>サブセグメント</strong>: セグメント内の詳細な処理（DynamoDBクエリ、HTTP呼び出し等）</li>
+                        <li><strong>アノテーション</strong>: フィルタリング可能なキーバリューペア（indexed: true）</li>
+                        <li><strong>メタデータ</strong>: 追加情報（indexed: false）</li>
+                    </ul>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    Lambda関数でX-Rayを有効化するには、関数の設定で「アクティブトレーシングを有効化」をオンにし、実行ロールに「AWSXRayDaemonWriteAccess」ポリシーをアタッチする必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 X-Ray SDKの組み込み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Lambda関数にX-Ray SDKを組み込むことで、詳細なトレース情報を収集できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda関数へのX-Ray SDK組み込み（Python）</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">Python</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import boto3
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch_all
+
+# AWSサービスのSDKをパッチ（自動トレース）
+patch_all()
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('Orders')
+
+def lambda_handler(event, context):
+    # カスタムサブセグメントの作成
+    with xray_recorder.capture('ProcessOrder'):
+        order_id = event['order_id']
+
+        # DynamoDBクエリ（自動的にトレース）
+        response = table.get_item(Key={'order_id': order_id})
+
+        # アノテーション追加（検索可能）
+        xray_recorder.put_annotation('order_id', order_id)
+        xray_recorder.put_annotation('status', 'success')
+
+        # メタデータ追加（詳細情報）
+        xray_recorder.put_metadata('order_details', response['Item'])
+
+    return {"statusCode": 200, "body": "Success"}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">API GatewayでのX-Ray有効化</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">AWS CLI</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># API GatewayステージでX-Rayトレースを有効化
+aws apigateway update-stage \
+  --rest-api-id abc123 \
+  --stage-name prod \
+  --patch-operations op=replace,path=/tracingEnabled,value=true</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 サービスマップとトレース分析
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        X-Rayコンソールのサービスマップは、アプリケーションの全体像を視覚的に表示し、各サービスの健全性、レスポンスタイム、エラー率を一目で確認できます。
+                    </p>
+
+                    <div class="mermaid mb-6">
+graph LR
+    subgraph ServiceMap["X-Ray サービスマップ"]
+        CL[クライアント<br/>100 req/min]
+        AG[API Gateway<br/>99% success<br/>50ms avg]
+        L1[Lambda: OrderService<br/>98% success<br/>120ms avg]
+        DB[DynamoDB<br/>100% success<br/>10ms avg]
+        L2[Lambda: NotifyService<br/>95% success<br/>200ms avg]
+
+        CL --> AG
+        AG --> L1
+        L1 --> DB
+        L1 --> L2
+
+        style L2 fill:#ffcccc
+    end
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">トレース分析のポイント</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>レスポンスタイム分布</strong>: 遅いリクエストを特定してボトルネックを発見</li>
+                        <li><strong>エラー率</strong>: どのサービスでエラーが発生しているか可視化</li>
+                        <li><strong>スロットリング</strong>: DynamoDBやAPI Gatewayのスロットリングを検出</li>
+                        <li><strong>フィルタ</strong>: アノテーションを使用して特定条件のトレースのみ表示</li>
+                    </ul>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ヒント: トレースフィルタの活用</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    X-Rayコンソールで「annotation.status = "error"」のようなフィルタ式を使用すると、エラーが発生したリクエストのみを抽出できます。パフォーマンス調査に非常に有効です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.8 ECSでのX-Ray有効化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ECSタスクでX-Rayを使用する場合、X-Rayデーモンをサイドカーコンテナとして起動する必要があります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">ECSタスク定義（JSON）</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-header">
+                            <span class="text-xs font-medium text-slate-400">JSON</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-json">{
+  "family": "my-app-task",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "my-app:latest",
+      "environment": [
+        {
+          "name": "AWS_XRAY_DAEMON_ADDRESS",
+          "value": "xray-daemon:2000"
+        }
+      ]
+    },
+    {
+      "name": "xray-daemon",
+      "image": "amazon/aws-xray-daemon",
+      "cpu": 32,
+      "memoryReservation": 256,
+      "portMappings": [
+        {
+          "containerPort": 2000,
+          "protocol": "udp"
+        }
+      ]
+    }
+  ]
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: CloudWatch LogsとX-Rayの統合</h3>
+                            <ol class="space-y-3 text-purple-900">
+                                <li class="break-words">
+                                    <strong>1. Lambda関数の作成</strong><br>
+                                    <span class="text-sm text-purple-800">構造化ログ（JSON）を出力するLambda関数を作成します。</span>
+                                </li>
+                                <li class="break-words">
+                                    <strong>2. X-Ray有効化</strong><br>
+                                    <span class="text-sm text-purple-800">Lambda関数の設定でアクティブトレーシングを有効化し、X-Ray SDKを組み込みます。</span>
+                                </li>
+                                <li class="break-words">
+                                    <strong>3. CloudWatch Logs Insightsクエリ</strong><br>
+                                    <span class="text-sm text-purple-800">エラーログを抽出するクエリを実行します。</span>
+                                </li>
+                                <li class="break-words">
+                                    <strong>4. X-Rayサービスマップ確認</strong><br>
+                                    <span class="text-sm text-purple-800">X-Rayコンソールでサービスマップとトレースを確認します。</span>
+                                </li>
+                                <li class="break-words">
+                                    <strong>5. CloudWatchアラーム作成</strong><br>
+                                    <span class="text-sm text-purple-800">エラー率が10%を超えた場合にSNS通知を送るアラームを作成します。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. CloudWatch Logsで構造化ログ（JSON形式）を使用するメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>CloudWatch Logs Insightsで効率的にクエリできること</strong><br>
+                                            JSON形式のログは、フィールド名を指定してフィルタ・集計が可能です。例えば「user_id = "user123"」のように特定条件でログを抽出でき、分析が容易になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. X-Rayのアノテーションとメタデータの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>アノテーションは検索可能、メタデータは検索不可</strong><br>
+                                            アノテーションはX-Rayコンソールでフィルタリングに使用できるキーバリューペア（indexed: true）です。一方、メタデータは追加の詳細情報を保存しますが検索には使用できません（indexed: false）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Lambda関数でX-Rayを有効化するために必要な設定は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>アクティブトレーシングの有効化とIAMロールへのポリシーアタッチ</strong><br>
+                                            Lambda関数の設定で「アクティブトレーシングを有効化」をオンにし、実行ロールに「AWSXRayDaemonWriteAccess」ポリシーをアタッチする必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-dva-c02-intro-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第11章: 開発者ツールとCI/CD</span>
+                        </div>
+                    </a>
+                    <div class="text-center">
+                        <span class="text-sm text-slate-500 block">最終章完了!</span>
+                        <span class="font-medium text-primary-600">お疲れ様でした</span>
+                    </div>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

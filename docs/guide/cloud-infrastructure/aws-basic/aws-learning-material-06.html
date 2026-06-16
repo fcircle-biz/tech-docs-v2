@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS基礎学習教材 第6章 - インターネットの通り道を作ろう - ネットワーク入門</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS オレンジ系カラー
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS基礎学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウドインフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約11.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">インターネットの通り道を作ろう - ネットワーク入門</h1>
+                    <p class="text-slate-600">サーバーがインターネットとつながるためには「ネットワーク」の設定が必要です。VPCという仕組みを使って、安全な通信環境を作ります。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ネットワークは「通信の道路」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>VPCは「自分専用の敷地」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブネットは「敷地内の区画」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>インターネットゲートウェイは「正門」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>セキュリティグループは「警備員」</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 ネットワークとは何か？
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ネットワーク</strong>とは、複数のコンピュータやサーバーが情報をやり取りするための<strong>「通信の道路」</strong>です。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">身近な例え</h3>
+                                <p class="text-blue-900 text-sm">ネットワーク = <strong>道路網</strong>（車が通るための道）<br>
+                                サーバー = <strong>家や建物</strong>（道でつながっている）<br>
+                                データ = <strong>車や宅配便</strong>（道路を通って届く）</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWSでは、サーバー（EC2）を起動しても、ネットワークが正しく設定されていないとインターネットに接続できません。
+                        この章では、AWSのネットワーク設定の基本を学びます。
+                    </p>
+                </section>
+
+                <!-- セクション6.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 VPCとは？ - 自分専用の敷地を作る
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>VPC（Virtual Private Cloud）</strong>は、AWS上に作る<strong>「自分専用の仮想ネットワーク空間」</strong>です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    VPCは「塀で囲まれた自分の家の敷地」のようなもの。外からは見えず、中に何を置くか自由に決められます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mermaid図: VPCの概念 -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            VPCの概念図
+                        </h4>
+                        <div class="mermaid">
+graph TB
+    subgraph VPC["VPC（自分専用の敷地）"]
+        A["サブネットA<br/>家"]
+        B["サブネットB<br/>庭"]
+        C["サブネットC<br/>車庫"]
+    end
+
+    D["インターネット<br/>（公道）"]
+    E["インターネットゲートウェイ<br/>（正門）"]
+
+    VPC --> E
+    E --> D
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">VPCの主な特徴</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-shield-alt text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-purple-800">分離された空間</h4>
+                            </div>
+                            <p class="text-purple-900 text-sm">他の人のVPCとは完全に分離されているので安全です。</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-cog text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-blue-800">自由にカスタマイズ</h4>
+                            </div>
+                            <p class="text-blue-900 text-sm">IPアドレス範囲、サブネット構成などを自分で設定できます。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 サブネットとは？ - 敷地内の区画を作る
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>サブネット</strong>は、VPC内をさらに細かく区切った<strong>「区画」</strong>のことです。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    サブネット = 敷地内の「家」「庭」「車庫」のような区画分け。用途ごとに分けて管理します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">サブネットの種類</h3>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list-ul text-primary-500"></i>
+                            パブリックサブネット vs プライベートサブネット
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-emerald-100 rounded-lg p-4">
+                                <h5 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-globe text-emerald-600"></i>
+                                    パブリックサブネット
+                                </h5>
+                                <p class="text-emerald-900 text-sm mb-2">インターネットからアクセスできる区画</p>
+                                <p class="text-emerald-800 text-xs">例：Webサーバー、APIサーバー</p>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <h5 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-lock text-purple-600"></i>
+                                    プライベートサブネット
+                                </h5>
+                                <p class="text-purple-900 text-sm mb-2">インターネットから直接アクセスできない区画</p>
+                                <p class="text-purple-800 text-xs">例：データベースサーバー、内部処理サーバー</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mermaid図: パブリック/プライベートサブネット -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            サブネットの役割分担
+                        </h4>
+                        <div class="mermaid">
+graph LR
+    A["インターネット"] --> B["インターネット<br/>ゲートウェイ"]
+
+    subgraph VPC["VPC"]
+        B --> C["パブリックサブネット<br/>（Webサーバー）"]
+        C --> D["プライベートサブネット<br/>（データベース）"]
+    end
+
+    style C fill:#d4edda
+    style D fill:#e2d5f1
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 インターネットゲートウェイ - 外の世界への門
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>インターネットゲートウェイ（IGW）</strong>は、VPCとインターネットをつなぐ<strong>「正門」</strong>です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    インターネットゲートウェイがないと、VPC内のサーバーはインターネットに接続できません。正門がないと敷地から外に出られないのと同じです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">インターネットゲートウェイの設定手順</h3>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-tasks text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3">設定ステップ</h3>
+                                <ol class="space-y-3 text-purple-900 list-decimal list-inside">
+                                    <li><strong>IGWを作成</strong> - VPCコンソールから「インターネットゲートウェイ」を作成</li>
+                                    <li><strong>VPCにアタッチ</strong> - 作成したIGWを自分のVPCに接続</li>
+                                    <li><strong>ルートテーブルに設定</strong> - パブリックサブネットからインターネット宛の通信がIGWを通るよう設定</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 セキュリティグループ - 通信を守る警備員
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>セキュリティグループ</strong>は、サーバーへの通信を制御する<strong>「仮想ファイアウォール」</strong>です。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">身近な例え</h3>
+                                <p class="text-blue-900 text-sm">セキュリティグループ = <strong>玄関の警備員</strong><br>
+                                「誰が（どのIPアドレス）」「どこに（どのポート番号）」アクセスできるかをチェックします。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">セキュリティグループのルール</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セキュリティグループには、<strong>インバウンドルール（受信）</strong>と<strong>アウトバウンドルール（送信）</strong>があります。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-shield-alt text-primary-500"></i>
+                            よく使うルールの例
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-700">タイプ</th>
+                                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-700">プロトコル</th>
+                                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-700">ポート</th>
+                                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-700">送信元</th>
+                                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-700">用途</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-slate-700">HTTP</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">TCP</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">80</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">0.0.0.0/0</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">Webサイト公開</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-slate-700">HTTPS</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">TCP</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">443</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">0.0.0.0/0</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">暗号化Web</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-slate-700">SSH</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">TCP</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">22</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">自宅IP</td>
+                                        <td class="px-4 py-2 text-sm text-slate-700">サーバー管理</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">注意事項</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    すべてのIPアドレス（0.0.0.0/0）を許可すると、世界中から接続できるようになります。セキュリティリスクがあるため、本番環境では特定のIPのみに制限しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.6 IPアドレスとは？ - インターネット上の住所
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>IPアドレス</strong>は、インターネット上での<strong>「住所」</strong>のようなものです。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    IPアドレス = 「〒123-4567 東京都〇〇区...」のような住所<br>
+                                    データはこの住所を頼りに正しい場所へ届けられます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">IPアドレスの種類</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-globe text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-emerald-800">パブリックIP</h4>
+                            </div>
+                            <p class="text-emerald-900 text-sm mb-2">インターネットからアクセスできる住所</p>
+                            <p class="text-emerald-800 text-xs">例: 203.0.113.10</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-purple-800">プライベートIP</h4>
+                            </div>
+                            <p class="text-purple-900 text-sm mb-2">VPC内だけで使える住所</p>
+                            <p class="text-purple-800 text-xs">例: 10.0.1.50</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        初心者は詳細な数値を覚える必要はありません。「インターネットからアクセスするにはパブリックIPが必要」ということだけ理解しておけば十分です。
+                    </p>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3">実習: デフォルトVPCを確認しよう</h3>
+                            <p class="text-purple-900 mb-4">
+                                AWSアカウントを作成すると、各リージョンに「デフォルトVPC」が自動的に作成されています。まずはこれを確認してみましょう。
+                            </p>
+                            <ol class="space-y-3 text-purple-900">
+                                <li class="flex items-start gap-2">
+                                    <span class="font-semibold text-purple-600 flex-shrink-0">1.</span>
+                                    <span>AWSマネジメントコンソールにログイン</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="font-semibold text-purple-600 flex-shrink-0">2.</span>
+                                    <span>検索バーに「VPC」と入力してサービスを開く</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="font-semibold text-purple-600 flex-shrink-0">3.</span>
+                                    <span>左メニューから「VPC」を選択し、デフォルトVPCを確認</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="font-semibold text-purple-600 flex-shrink-0">4.</span>
+                                    <span>「サブネット」メニューから、デフォルトサブネットの数を確認（通常3〜4個）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="font-semibold text-purple-600 flex-shrink-0">5.</span>
+                                    <span>「インターネットゲートウェイ」メニューから、デフォルトIGWが接続されていることを確認</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 動作確認カード -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-check-circle text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">動作確認</h3>
+                            <p class="text-emerald-900 mb-3">以下の項目が確認できればOKです：</p>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>VPCコンソールが開ける</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>デフォルトVPCが1つ表示されている</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブネットが複数（3〜4個）表示されている</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>インターネットゲートウェイが表示されている</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-wrench text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-3">トラブルシューティング</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="font-medium text-orange-900 mb-1">Q. デフォルトVPCが見つからない</p>
+                                    <p class="text-orange-800 text-sm">
+                                        A. リージョンを確認してください。東京リージョン（ap-northeast-1）が選択されているか確認しましょう。
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-orange-900 mb-1">Q. VPCの設定を間違えて変更してしまった</p>
+                                    <p class="text-orange-800 text-sm">
+                                        A. デフォルトVPCは削除して再作成できます。VPCコンソールの「アクション」→「デフォルトVPCを作成」で復元できます。
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-orange-900 mb-1">Q. サブネットの数字の意味がわからない</p>
+                                    <p class="text-orange-800 text-sm">
+                                        A. 最初は気にしなくてOKです。AWSが自動的に適切な設定をしています。慣れてきたら学習しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q1. VPCを身近なもので例えると何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            塀で囲まれた自分の家の敷地。外からは見えず、中に何を置くか自由に決められる空間です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q2. パブリックサブネットとプライベートサブネットの違いは？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            パブリックサブネット: インターネットからアクセスできる（Webサーバーなど）<br>
+                                            プライベートサブネット: インターネットから直接アクセスできない（データベースなど）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q3. セキュリティグループの役割は？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            サーバーへの通信を制御する仮想ファイアウォール。玄関の警備員のように、「誰が」「どこに」アクセスできるかをチェックします。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>ネットワークは「通信の道路」。サーバー同士がデータをやり取りするために必要。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>VPCは「自分専用の敷地」。AWS上に作る仮想ネットワーク空間。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>サブネットは「敷地内の区画」。パブリック（外部アクセス可）とプライベート（内部専用）がある。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>インターネットゲートウェイは「正門」。VPCとインターネットをつなぐ。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>セキュリティグループは「警備員」。通信を制御して安全を守る。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>デフォルトVPCは自動作成されるので、初心者はそれを使えばOK。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第5章: S3入門</span>
+                        </div>
+                    </a>
+                    <a href="aws-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第7章: RDS入門</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

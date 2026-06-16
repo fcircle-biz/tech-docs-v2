@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Struts 1.x学習教材 第9章 - セッション管理とログイン機能の実装</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-java text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Struts 1.x学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Java / Webフレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約21時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/programming-languages/java-ecosystem/struts/" class="hover:text-primary-600 transition-colors">Struts 1.x</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">セッション管理とログイン機能の実装</h1>
+                    <p class="text-slate-600">HTTPセッションを活用したユーザー認証とログイン状態の管理方法を理解しましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ActionFormのスコープ（request/session）を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ログイン認証機能を実装できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>セッションにユーザー情報を保存・取得できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ログインチェック処理を実装できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: HTTPセッションの基礎 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 HTTPセッションの基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">HTTPセッション</strong>とは、サーバー側でユーザーごとの状態を保持する仕組みです。
+                        HTTPプロトコルは本来ステートレス（状態を持たない）ですが、セッションを使うことでログイン状態や買い物カゴの内容などをユーザー単位で管理できます。
+                    </p>
+
+                    <!-- HTTPセッション概念図 -->
+                    <div class="my-6 bg-white border border-slate-200 rounded-xl p-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-project-diagram text-primary-500"></i>
+                            HTTPセッションの仕組み
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant User as ユーザー<br/>ブラウザ
+    participant Server as Webサーバー
+    participant Session as セッションストア
+
+    User->>Server: ログインリクエスト
+    Server->>Session: セッション作成
+    Session-->>Server: セッションID発行
+    Server-->>User: レスポンス + Cookie<br/>セッションID
+    Note over User: 以降のリクエストで<br/>セッションIDを送信
+    User->>Server: 2回目のリクエスト<br/>セッションID付き
+    Server->>Session: セッションID照合
+    Session-->>Server: ユーザー情報取得
+    Server-->>User: 認証済みとして処理
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">セッションIDとCookie</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    セッションIDはCookieに保存され、ブラウザが自動的に毎回送信します。サーバーはこのIDを使ってセッションストアから
+                                    ユーザー固有のデータを取り出します。JavaではHttpSessionオブジェクトとして扱います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: ActionFormのスコープ設定 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 ActionFormのスコープ設定（request vs session）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ActionFormには<strong>スコープ（保存範囲）</strong>を指定できます。
+                        リクエストスコープ（request）とセッションスコープ（session）の違いを理解し、適切に使い分けることが重要です。
+                    </p>
+
+                    <!-- スコープ比較表 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-4">
+                        <h3 class="font-semibold text-slate-800 mb-4">スコープの比較</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-200 text-slate-700">
+                                        <th class="px-4 py-2 text-left">項目</th>
+                                        <th class="px-4 py-2 text-left">requestスコープ</th>
+                                        <th class="px-4 py-2 text-left">sessionスコープ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white">
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-2 font-medium">保持期間</td>
+                                        <td class="px-4 py-2">1回のリクエスト～レスポンスまで</td>
+                                        <td class="px-4 py-2">セッション終了まで（通常30分程度）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-2 font-medium">用途</td>
+                                        <td class="px-4 py-2">1画面完結の入力フォーム</td>
+                                        <td class="px-4 py-2">複数画面にまたがるウィザード形式</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-2 font-medium">メモリ使用量</td>
+                                        <td class="px-4 py-2">少ない（すぐ解放される）</td>
+                                        <td class="px-4 py-2">多め（セッション終了まで保持）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-2 font-medium">設定例</td>
+                                        <td class="px-4 py-2"><code class="text-xs">scope="request"</code></td>
+                                        <td class="px-4 py-2"><code class="text-xs">scope="session"</code></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- struts-config.xmlでのスコープ指定例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">struts-config.xml</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;!-- リクエストスコープの例: 検索フォーム --&gt;
+&lt;form-bean name="searchForm"
+           type="com.example.form.SearchForm"/&gt;
+
+&lt;action path="/search"
+        type="com.example.action.SearchAction"
+        name="searchForm"
+        scope="request"&gt;
+    &lt;forward name="success" path="/result.jsp"/&gt;
+&lt;/action&gt;
+
+&lt;!-- セッションスコープの例: ウィザード形式 --&gt;
+&lt;form-bean name="wizardForm"
+           type="com.example.form.WizardForm"/&gt;
+
+&lt;action path="/wizard/step1"
+        type="com.example.action.WizardStep1Action"
+        name="wizardForm"
+        scope="session"&gt;
+    &lt;forward name="success" path="/wizard_step2.jsp"/&gt;
+&lt;/action&gt;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">使い分けの基準</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4">
+                                    <li class="break-words">迷ったら<strong>requestスコープ</strong>を選ぶ（メモリ節約）</li>
+                                    <li class="break-words">ログインフォームはrequestでOK（1回で完結）</li>
+                                    <li class="break-words">ユーザー情報はsessionに保存（ログイン中ずっと使う）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ログイン機能の実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 ログイン機能の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログイン機能を実装するには、ログインフォーム（LoginForm）とログイン処理を行うAction（LoginAction）が必要です。
+                        認証成功時にセッションへユーザー情報を保存します。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 9-1: ログインフォームとActionの作成</h3>
+                                <p class="text-purple-900 mb-4 break-words">IDとパスワードで認証するログイン機能を実装します。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">LoginFormクラスを作成（username, passwordプロパティ）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">LoginActionクラスを作成し、認証ロジックを実装</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">struts-config.xmlに設定を追加</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">login.jspを作成してフォームを実装</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LoginForm.javaコード例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LoginForm.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.form;
+
+import org.apache.struts.action.ActionForm;
+
+public class LoginForm extends ActionForm {
+    // ユーザー名
+    private String username;
+    // パスワード
+    private String password;
+
+    // Getter/Setter
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- LoginAction.javaコード例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LoginAction.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.action;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.struts.action.*;
+import com.example.form.LoginForm;
+
+public class LoginAction extends Action {
+    @Override
+    public ActionForward execute(
+        ActionMapping mapping,
+        ActionForm form,
+        HttpServletRequest request,
+        HttpServletResponse response) throws Exception {
+
+        LoginForm loginForm = (LoginForm) form;
+        String username = loginForm.getUsername();
+        String password = loginForm.getPassword();
+
+        // 簡易認証（実際はDBで照合）
+        if ("admin".equals(username) && "pass123".equals(password)) {
+            // セッション取得
+            HttpSession session = request.getSession();
+            // ユーザー情報をセッションに保存
+            session.setAttribute("loginUser", username);
+            // ホーム画面へ
+            return mapping.findForward("success");
+        } else {
+            // エラーメッセージ設定
+            ActionErrors errors = new ActionErrors();
+            errors.add(ActionErrors.GLOBAL_MESSAGE,
+                new ActionMessage("error.login.failed"));
+            saveErrors(request, errors);
+            // ログイン画面に戻る
+            return mapping.findForward("failure");
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">セキュリティの注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    上記のコードは学習用の簡易版です。本番環境ではパスワードのハッシュ化（bcrypt等）、
+                                    SQLインジェクション対策、HTTPS通信の使用が必須です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: セッションへのユーザー情報保存 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 セッションへのユーザー情報の保存と取得
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログイン成功後、ユーザー情報をセッションに保存することで、以降のリクエストで「誰がログインしているか」を判別できます。
+                    </p>
+
+                    <!-- セッション操作のコード例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">セッションへの保存と取得</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// セッションオブジェクトを取得
+HttpSession session = request.getSession();
+
+// ユーザー情報を保存（キーは任意の名前）
+session.setAttribute("loginUser", username);
+session.setAttribute("userId", userId);
+session.setAttribute("userRole", role);
+
+// セッションから取得（別のActionで）
+String loginUser = (String) session.getAttribute("loginUser");
+if (loginUser != null) {
+    // ログイン済み
+    System.out.println("ログイン中: " + loginUser);
+} else {
+    // 未ログイン
+    System.out.println("ログインしていません");
+}
+
+// セッションから削除（ログアウト時）
+session.removeAttribute("loginUser");
+// またはセッション全体を破棄
+session.invalidate();</code></pre>
+                    </div>
+
+                    <!-- ユーザー情報Beanの作成 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">より実践的な方法: UserBeanの活用</h3>
+                                <p class="text-blue-900 text-sm">
+                                    複数の情報をまとめて管理したい場合は、UserBeanなどのクラスを作成してセッションに保存すると便利です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">UserBean.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.bean;
+
+import java.io.Serializable;
+
+// セッションに保存するためSerializableを実装
+public class UserBean implements Serializable {
+    private Integer userId;
+    private String username;
+    private String email;
+    private String role;
+
+    // コンストラクタ
+    public UserBean(Integer userId, String username,
+                    String email, String role) {
+        this.userId = userId;
+        this.username = username;
+        this.email = email;
+        this.role = role;
+    }
+
+    // Getter/Setter (省略)
+    // ...
+}</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">UserBeanをセッションに保存</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ログイン成功時
+UserBean user = new UserBean(1, "admin", "admin@example.com", "ADMIN");
+session.setAttribute("loginUser", user);
+
+// 別のActionで取得
+UserBean loginUser = (UserBean) session.getAttribute("loginUser");
+if (loginUser != null) {
+    String role = loginUser.getRole();
+    // 権限チェックなどに使用
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: ログインチェック処理の実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 ログインチェック処理の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログインが必要なページでは、セッションをチェックして未ログインユーザーをログイン画面にリダイレクトする必要があります。
+                        実装方法は主に2つあります。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-blue-100 rounded-lg p-4 border border-blue-200">
+                            <h4 class="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                                <i class="fas fa-1 text-blue-600"></i>
+                                方法1: BaseActionクラス
+                            </h4>
+                            <p class="text-blue-900 text-sm">
+                                全Actionで継承する共通クラスを作成し、executeメソッド実行前にログインチェックを行う。
+                            </p>
+                        </div>
+                        <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                            <h4 class="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+                                <i class="fas fa-2 text-emerald-600"></i>
+                                方法2: Filterクラス
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                Servlet Filterを作成し、リクエスト到達前に認証チェックを行う（より汎用的）。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- BaseActionでのログインチェック -->
+                    <h3 class="font-semibold text-slate-800 mt-6 mb-3">方法1: BaseActionでのログインチェック</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">BaseAction.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.action;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.struts.action.*;
+
+public abstract class BaseAction extends Action {
+    @Override
+    public final ActionForward execute(
+        ActionMapping mapping, ActionForm form,
+        HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+
+        // ログインチェック
+        HttpSession session = request.getSession();
+        Object loginUser = session.getAttribute("loginUser");
+
+        if (loginUser == null) {
+            // 未ログイン → ログイン画面へ
+            return mapping.findForward("login");
+        }
+
+        // ログイン済み → 各Actionの処理を実行
+        return doExecute(mapping, form, request, response);
+    }
+
+    // 継承先で実装するメソッド
+    protected abstract ActionForward doExecute(
+        ActionMapping mapping, ActionForm form,
+        HttpServletRequest request, HttpServletResponse response)
+        throws Exception;
+}</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">HomeAction.java（BaseActionを継承）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.action;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.struts.action.*;
+
+// BaseActionを継承
+public class HomeAction extends BaseAction {
+    @Override
+    protected ActionForward doExecute(
+        ActionMapping mapping, ActionForm form,
+        HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+
+        // ログイン済みのユーザーのみこの処理が実行される
+        return mapping.findForward("success");
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- Filterでのログインチェック -->
+                    <h3 class="font-semibold text-slate-800 mt-6 mb-3">方法2: Filterでのログインチェック</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LoginCheckFilter.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.filter;
+
+import java.io.IOException;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class LoginCheckFilter implements Filter {
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res,
+                         FilterChain chain)
+        throws IOException, ServletException {
+
+        HttpServletRequest request = (HttpServletRequest) req;
+        HttpServletResponse response = (HttpServletResponse) res;
+        HttpSession session = request.getSession();
+
+        String path = request.getServletPath();
+
+        // ログイン画面へのアクセスはチェック不要
+        if (path.startsWith("/login")) {
+            chain.doFilter(req, res);
+            return;
+        }
+
+        // セッションチェック
+        if (session.getAttribute("loginUser") == null) {
+            // 未ログイン → ログイン画面へ
+            response.sendRedirect(
+                request.getContextPath() + "/login.do");
+            return;
+        }
+
+        // ログイン済み → 次の処理へ
+        chain.doFilter(req, res);
+    }
+
+    @Override
+    public void init(FilterConfig config) {}
+
+    @Override
+    public void destroy() {}
+}</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">web.xml（Filter設定）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;filter&gt;
+    &lt;filter-name&gt;LoginCheckFilter&lt;/filter-name&gt;
+    &lt;filter-class&gt;com.example.filter.LoginCheckFilter&lt;/filter-class&gt;
+&lt;/filter&gt;
+&lt;filter-mapping&gt;
+    &lt;filter-name&gt;LoginCheckFilter&lt;/filter-name&gt;
+    &lt;url-pattern&gt;*.do&lt;/url-pattern&gt;
+&lt;/filter-mapping&gt;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">推奨はFilterパターン</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    FilterはAction以外のリソース（JSP直アクセスなど）も保護できるため、より強固なセキュリティを実現できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: ログアウト機能の実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 ログアウト機能の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログアウト機能は、セッションを破棄してログイン画面に戻す処理です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LogoutAction.java</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.action;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.struts.action.*;
+
+public class LogoutAction extends Action {
+    @Override
+    public ActionForward execute(
+        ActionMapping mapping, ActionForm form,
+        HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            // セッション全体を破棄
+            session.invalidate();
+        }
+
+        // ログイン画面へリダイレクト
+        return mapping.findForward("login");
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                                <p class="text-emerald-900 mb-4 break-words">以下の流れで動作確認を行います。</p>
+                                <ol class="space-y-2 text-emerald-900 text-sm list-decimal list-inside">
+                                    <li>ログイン画面にアクセスして、正しい認証情報を入力</li>
+                                    <li>ログイン成功後、ホーム画面に遷移することを確認</li>
+                                    <li>ブラウザのアドレスバーから直接ホーム画面URLにアクセス（セッション継続確認）</li>
+                                    <li>ログアウトボタンをクリック</li>
+                                    <li>再度ホーム画面URLにアクセス → ログイン画面にリダイレクトされることを確認</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden mb-6">
+                    <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                        <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                            <i class="fas fa-tools"></i>
+                            トラブルシューティング
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">ログイン後もログイン画面に戻されてしまう</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> セッションへの保存がうまくいっていない可能性があります。</p>
+                                <p><strong>解決方法:</strong> LoginActionで<code class="text-sm">session.setAttribute()</code>が正しく実行されているか確認。
+                                デバッグログで<code class="text-sm">session.getAttribute("loginUser")</code>の値を出力してチェックしましょう。</p>
+                            </div>
+                        </details>
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">セッションがすぐに切れてしまう</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> セッションタイムアウトの設定が短すぎる可能性があります。</p>
+                                <p><strong>解決方法:</strong> web.xmlで<code class="text-sm">&lt;session-timeout&gt;30&lt;/session-timeout&gt;</code>（分単位）を設定します。</p>
+                            </div>
+                        </details>
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">Filterが動作しない</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> web.xmlのurl-patternが正しくない、またはFilter定義の順序の問題。</p>
+                                <p><strong>解決方法:</strong> url-patternを<code class="text-sm">*.do</code>や<code class="text-sm">/*</code>に修正。
+                                また、Filterは定義順に実行されるため、LoginCheckFilterを適切な位置に配置しましょう。</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. requestスコープとsessionスコープの主な違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>requestスコープ</strong>は1回のリクエスト～レスポンスまでの間だけデータを保持します。
+                                            一方、<strong>sessionスコープ</strong>はセッション終了（ログアウトやタイムアウト）までデータを保持します。
+                                            メモリ使用量を考えると、通常はrequestスコープを優先し、必要な場合のみsessionを使います。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. セッションにユーザー情報を保存するメソッドと、取得するメソッドの名前を答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            保存: <code>session.setAttribute("キー", オブジェクト)</code><br>
+                                            取得: <code>Object obj = session.getAttribute("キー")</code><br>
+                                            削除: <code>session.removeAttribute("キー")</code><br>
+                                            セッション破棄: <code>session.invalidate()</code>
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ログインチェックの実装方法として、BaseActionとFilterのどちらがより推奨されますか？その理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>Filter</strong>の方が推奨されます。理由は、FilterはAction以外のリソース（JSP直アクセス、静的ファイル等）も
+                                            保護できるため、より包括的なセキュリティを実現できるからです。BaseActionはAction経由のリクエストしか
+                                            チェックできないため、JSPへの直接アクセスを許してしまう可能性があります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        第9章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>HTTPセッション</strong>はユーザーごとの状態を保持する仕組みで、セッションIDをCookieで管理する</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ActionFormの<strong>スコープ</strong>はrequestとsessionがあり、データの保持期間とメモリ使用量が異なる</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>ログイン機能</strong>はLoginFormとLoginActionで実装し、認証成功時にセッションへユーザー情報を保存する</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>ログインチェック</strong>はBaseActionまたはFilterで実装し、未ログインユーザーをログイン画面にリダイレクトする</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>ログアウト</strong>は<code>session.invalidate()</code>でセッションを破棄して実現する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="struts-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第8章: メッセージ管理</span>
+                        </div>
+                    </a>
+                    <a href="struts-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: データベース連携</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

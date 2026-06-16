@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>SQLModel学習教材 第10章 - パフォーマンスの基礎知識</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Python Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">SQLModel学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Python ORM</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.html" class="hover:text-primary-600 transition-colors">Python Ecosystem</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="README.html" class="hover:text-primary-600 transition-colors">SQLModel</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">パフォーマンスの基礎知識</h1>
+                    <p class="text-slate-600">データ量が増えた時の対処法、効率的なクエリの書き方、インデックスの基本概念を学びます。よくあるパフォーマンス問題と解決方法を実例を通じて理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>データベースのパフォーマンスが遅くなる主な原因を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>インデックスの基本概念と、適切な使い方を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>N+1問題とその解決方法を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>効率的なクエリの書き方とベストプラクティスを習得する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: パフォーマンス問題の基礎 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 データベースのパフォーマンスとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アプリケーションの開発中は少量のデータで動作確認を行うため、パフォーマンス問題に気づきにくいことがあります。
+                        しかし、<strong>実際の運用環境では数千、数万件のデータを扱う</strong>ため、パフォーマンスを考慮した設計が重要になります。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">パフォーマンスの指標</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    データベースのパフォーマンスは主に「クエリの実行時間」と「データベースへのアクセス回数」で評価されます。
+                                    レスポンスタイムが0.1秒以内であれば、ユーザーにとって快適な体験になると言われています。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">よくあるパフォーマンス問題</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-red-800">N+1問題</h4>
+                            </div>
+                            <p class="text-red-900 text-sm">
+                                リレーションを持つデータを取得する際、メインのクエリ1回+関連データごとにN回のクエリが発行され、大量のアクセスが発生する問題です。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-orange-800">全件スキャン</h4>
+                            </div>
+                            <p class="text-orange-900 text-sm">
+                                インデックスがない列で検索を行うと、全てのレコードを1件ずつチェックする必要があり、データ量が増えると著しく遅くなります。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-repeat text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-purple-800">過剰なクエリ実行</h4>
+                            </div>
+                            <p class="text-purple-900 text-sm">
+                                ループ内でクエリを実行すると、同じデータを何度も取得することになり、パフォーマンスが低下します。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-memory text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-blue-800">大量データの一括取得</h4>
+                            </div>
+                            <p class="text-blue-900 text-sm">
+                                必要以上に多くのデータを一度に取得すると、メモリ使用量が増え、アプリケーション全体が遅くなります。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: インデックスの基礎 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 インデックスとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>インデックス</strong>は、データベースの検索を高速化するための仕組みです。
+                        本の「索引」と同じで、特定のデータを素早く見つけるための目印となります。
+                    </p>
+
+                    <div class="mermaid bg-white border border-slate-200 rounded-lg p-4 my-6">
+flowchart LR
+    A[検索クエリ] --> B{インデックスの有無}
+    B -- あり --> C[インデックスを使用<br/>高速検索]
+    B -- なし --> D[全件スキャン<br/>低速]
+
+    C --> E[対象レコードへ直接アクセス]
+    D --> F[全レコードを順次チェック]
+
+    style A fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff
+    style C fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff
+    style D fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
+    style E fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style F fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">インデックスの仕組み</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        例えば、10,000人のユーザーの中から「email」で特定のユーザーを検索する場合を考えてみましょう。
+                    </p>
+
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden my-6">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">検索方法</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">処理内容</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">処理時間の目安</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-slate-700">インデックスなし</td>
+                                    <td class="px-4 py-3 text-slate-600">10,000件すべてを順番にチェック</td>
+                                    <td class="px-4 py-3 text-red-600 font-medium">約10秒</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-slate-700">インデックスあり</td>
+                                    <td class="px-4 py-3 text-slate-600">索引から目的のデータへ直接アクセス</td>
+                                    <td class="px-4 py-3 text-emerald-600 font-medium">約0.01秒</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">インデックスを作成すべき列</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    <strong>WHERE句でよく使う列</strong>：ユーザーID、メールアドレスなど検索条件として頻繁に使われる列<br>
+                                    <strong>外部キー</strong>：他のテーブルとの関連付けに使用される列<br>
+                                    <strong>ORDER BYで使う列</strong>：並び替えに使用される列
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">SQLModelでインデックスを作成する</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">models.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import SQLModel, Field
+
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    email: str = Field(index=True)  # インデックスを作成
+    name: str
+    age: int = Field(index=True)  # 年齢でもよく検索するのでインデックス作成</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">インデックスの注意点</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    インデックスは検索を高速化しますが、<strong>データ追加・更新時にインデックスも更新する必要があるため、書き込み処理が遅くなります</strong>。
+                                    すべての列にインデックスを作成すると逆効果になることがあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: N+1問題 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 N+1問題とその解決方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>N+1問題</strong>は、ORMを使う際に最も頻繁に遭遇するパフォーマンス問題です。
+                        関連データを取得する際、気づかないうちに大量のクエリが発行されてしまいます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">N+1問題が起きる例</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">悪い例（N+1問題あり）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># ユーザー一覧を取得（1回目のクエリ）
+users = session.exec(select(User)).all()
+
+# 各ユーザーの投稿を取得（ユーザー数分のクエリが発行される！）
+for user in users:
+    posts = session.exec(
+        select(Post).where(Post.user_id == user.id)
+    ).all()
+    print(f"{user.name}: {len(posts)}件の投稿")</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">何が問題なのか？</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    100人のユーザーがいる場合、最初のクエリで1回、各ユーザーの投稿取得で100回の<strong>合計101回</strong>のクエリが発行されます。
+                                    これが「1 + N = N+1」の由来です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mermaid bg-white border border-slate-200 rounded-lg p-4 my-6">
+sequenceDiagram
+    autonumber
+    participant App as アプリケーション
+    participant DB as データベース
+
+    App->>DB: SELECT * FROM users (1回目)
+    DB-->>App: 100件のユーザー
+
+    loop 100回繰り返し
+        App->>DB: SELECT * FROM posts WHERE user_id = X
+        DB-->>App: 該当する投稿
+    end
+
+    Note over App,DB: 合計101回のクエリ！
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">解決方法：Joinを使う</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">良い例（Joinで一度に取得）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import select
+
+# Joinを使って一度のクエリで取得
+statement = (
+    select(User, Post)
+    .join(Post)
+    .where(User.id == Post.user_id)
+)
+
+results = session.exec(statement).all()
+
+# グループ化して表示
+user_posts = {}
+for user, post in results:
+    if user.id not in user_posts:
+        user_posts[user.id] = {"name": user.name, "posts": []}
+    user_posts[user.id]["posts"].append(post)
+
+for data in user_posts.values():
+    print(f"{data['name']}: {len(data['posts'])}件の投稿")</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">改善効果</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    クエリの実行回数が<strong>101回から1回に削減</strong>されました。
+                                    データ量が増えるほど、この違いは大きくなります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: 効率的なクエリの書き方 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 効率的なクエリの書き方
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">1. 必要な列だけを取得する</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">悪い例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># すべての列を取得（大きなテキストや画像データも含む）
+users = session.exec(select(User)).all()</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">良い例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 必要な列だけを指定して取得
+statement = select(User.id, User.name, User.email)
+users = session.exec(statement).all()</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">2. ページネーションを使う</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        大量のデータを一度に取得せず、必要な分だけを取得します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ページネーション実装</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">page = 1  # 現在のページ
+per_page = 20  # 1ページあたりの件数
+
+statement = (
+    select(User)
+    .offset((page - 1) * per_page)  # スキップする件数
+    .limit(per_page)  # 取得する件数
+)
+
+users = session.exec(statement).all()
+print(f"ページ{page}: {len(users)}件のユーザー")</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">3. 集計はデータベース側で行う</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">悪い例（Pythonで集計）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 全データを取得してからPythonで集計
+users = session.exec(select(User)).all()
+adult_count = len([u for u in users if u.age >= 20])</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">良い例（データベースで集計）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import func
+
+# データベース側で集計（高速）
+statement = select(func.count(User.id)).where(User.age >= 20)
+adult_count = session.exec(statement).one()
+print(f"成人ユーザー数: {adult_count}件")</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: パフォーマンス測定 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 パフォーマンスの測定方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        パフォーマンス改善を行う際は、まず現状を測定し、改善後の効果を確認することが重要です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">実行時間の測定</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">performance_test.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import time
+from sqlmodel import select
+
+# 測定開始
+start_time = time.time()
+
+# 処理を実行
+users = session.exec(select(User).limit(100)).all()
+
+# 測定終了
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+print(f"実行時間: {elapsed_time:.4f}秒")</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">SQLログの確認</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SQLログを有効化</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import create_engine
+
+# エンジン作成時にecho=Trueを指定
+engine = create_engine(
+    "sqlite:///database.db",
+    echo=True  # 実行されるSQLをコンソールに出力
+)
+
+# これにより、どんなSQLが実行されているか確認できる</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">開発中のヒント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    開発中は<code>echo=True</code>を有効にして、どんなSQLが実行されているか確認しましょう。
+                                    N+1問題やその他のパフォーマンス問題を早期に発見できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 10-1: パフォーマンス改善を体験する</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                実際にN+1問題を体験し、改善前後のパフォーマンスを比較してみましょう。
+                            </p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">モデルを定義（User、Post）し、リレーションを設定します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">100人のユーザーと、各ユーザーごとに10件の投稿を作成します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">N+1問題が発生するコードを書き、実行時間を測定します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">Joinを使った改善版を作成し、実行時間を測定します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">改善前後の実行時間の差を確認します</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden mb-6">
+                    <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                        <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                            <i class="fas fa-tools"></i>
+                            トラブルシューティング
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">インデックスを作成したのに速くならない</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> WHERE句で関数を使うとインデックスが利用されません。</p>
+                                <p class="mb-2"><strong>悪い例:</strong> <code>WHERE LOWER(email) = 'test@example.com'</code></p>
+                                <p><strong>良い例:</strong> <code>WHERE email = 'test@example.com'</code></p>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">データ取得は速いが表示が遅い</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> 大量のデータを一度にメモリに読み込んでいる可能性があります。</p>
+                                <p><strong>解決方法:</strong> ページネーションを使って少しずつ取得しましょう。</p>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">Joinを使うと重複したデータが返ってくる</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> 1対多の関連で、多側のレコード分だけ主側が重複します。</p>
+                                <p><strong>解決方法:</strong> Pythonのコードでグループ化するか、distinct()を使用してください。</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. インデックスの主な目的は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>データベースの検索を高速化すること</strong>です。
+                                            インデックスは本の索引のように、特定のデータを素早く見つけるための仕組みで、
+                                            全件スキャンを避けて目的のレコードに直接アクセスできるようにします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. N+1問題とは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>関連データを取得する際に、メインのクエリ1回+関連データごとにN回のクエリが発行されてしまう問題</strong>です。
+                                            例えば、100人のユーザーとその投稿を取得する際、ユーザー取得で1回、各ユーザーの投稿取得で100回、
+                                            合計101回のクエリが実行されてしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. インデックスを作成する際の注意点は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>書き込み処理が遅くなる</strong>という点です。
+                                            インデックスは検索を高速化しますが、データの追加・更新時にインデックスも更新する必要があるため、
+                                            すべての列にインデックスを作成すると逆効果になることがあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. N+1問題を解決するにはどうすればよいですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>Joinを使って一度のクエリで関連データを取得する</strong>ことで解決できます。
+                                            これにより、クエリの実行回数を大幅に削減でき、パフォーマンスが向上します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-600">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-xs text-slate-400 mt-1.5"></i>
+                            <span><strong>インデックス</strong>は検索を高速化する仕組みで、検索条件によく使う列に作成すると効果的です</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-xs text-slate-400 mt-1.5"></i>
+                            <span><strong>N+1問題</strong>は関連データ取得時によく発生し、Joinを使って解決できます</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-xs text-slate-400 mt-1.5"></i>
+                            <span><strong>必要な列だけを取得</strong>し、ページネーションを使うことでパフォーマンスが向上します</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-xs text-slate-400 mt-1.5"></i>
+                            <span><strong>集計はデータベース側で行う</strong>方が効率的です</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-xs text-slate-400 mt-1.5"></i>
+                            <span>開発中は<code>echo=True</code>でSQLログを確認し、パフォーマンス問題を早期に発見しましょう</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 学習完了メッセージ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6 my-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-trophy text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-emerald-800 mb-2">SQLModel学習教材を完了しました！</h3>
+                            <p class="text-emerald-900 mb-4">
+                                おめでとうございます！この学習教材を通じて、SQLModelの基礎から実践的な使い方まで習得しました。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-4 mb-4">
+                                <h4 class="font-semibold text-emerald-800 mb-2">習得したスキル</h4>
+                                <ul class="space-y-1 text-emerald-900 text-sm">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>データベースとORMの基礎概念</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>SQLModelの環境構築とモデル定義</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>CRUD操作とデータの検索・絞り込み</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>複数テーブルの関連付けとリレーション</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>FastAPIとの統合とWeb API開発</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>エラー処理とバリデーション</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-600 mt-1"></i>
+                                        <span>パフォーマンス最適化の基礎</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <h4 class="font-semibold text-emerald-800 mb-2">次のステップ</h4>
+                            <p class="text-emerald-900 text-sm mb-2">
+                                さらにスキルアップするために、以下のリソースもご活用ください：
+                            </p>
+                            <ul class="space-y-2 text-sm">
+                                <li>
+                                    <a href="https://fcircle-biz.github.io/tech_docs/guide/programming-languages/python-ecosystem/fastapi/README.html"
+                                       class="text-emerald-700 hover:text-emerald-800 font-medium underline">
+                                        FastAPI入門ガイドライン - Web API開発をさらに深く学ぶ
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="https://fcircle-biz.github.io/tech_docs/guide/data-ai-category/databases/postgresql/README.html"
+                                       class="text-emerald-700 hover:text-emerald-800 font-medium underline">
+                                        PostgreSQL入門ガイドライン - より本格的なデータベースを学ぶ
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="https://fcircle-biz.github.io/tech_docs/guide/programming-languages/python-ecosystem/sqlalchemy/README.html"
+                                       class="text-emerald-700 hover:text-emerald-800 font-medium underline">
+                                        SQLAlchemy学習ガイド - より高度なORM機能を学ぶ
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <!-- 前章 -->
+                    <a href="sqlmodel-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第9章: エラー処理とバリデーション</span>
+                        </div>
+                    </a>
+                    <!-- 次章（なし） -->
+                    <div class="w-1/2"></div>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

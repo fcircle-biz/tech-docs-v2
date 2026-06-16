@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Docker学習教材 第7章 - データを保存しよう - ボリュームの基本</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Docker カラーテーマ (sky)
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-docker text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Docker学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-server text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約11時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">クラウド・インフラ</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">Docker入門</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">データを保存しよう - ボリュームの基本</h1>
+                    <p class="text-slate-600">コンテナを削除するとデータが消えてしまう問題を理解し、データを永続化する方法(ボリューム)を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンテナのデータ消失問題と永続化の必要性を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ボリュームとバインドマウントの違いと使い分けを学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>MySQLコンテナでデータ永続化を実践する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: コンテナのデータ問題 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 コンテナを削除するとデータが消える問題
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        これまで学んできたように、コンテナは起動・停止・削除が簡単にできます。しかし、<strong>コンテナを削除すると、その中に保存されていたデータもすべて消えてしまいます</strong>。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">コンテナのデータは一時的</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    データベースコンテナを削除すると、登録したユーザー情報や投稿データもすべて失われます。これではアプリケーションとして使えません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- データ消失の図解 -->
+                    <div class="my-8">
+                        <pre class="mermaid">
+flowchart LR
+    A["コンテナ起動<br/>(データあり)"] --> B["コンテナ削除"]
+    B --> C["データも消失<br/>❌"]
+
+    style A fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style B fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+</pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        この問題を解決するのが<strong>ボリューム(Volume)</strong>という仕組みです。ボリュームを使えば、コンテナを削除してもデータは残り続けます。
+                    </p>
+                </section>
+
+                <!-- セクション2: ボリュームとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 ボリュームとは - データを保存するUSBメモリのようなもの
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        <strong>ボリューム</strong>は、コンテナの外にデータを保存する仕組みです。USBメモリを例に考えてみましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">USBメモリの例え</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    パソコン(コンテナ)が壊れても、USBメモリ(ボリューム)に保存したデータは無事です。別のパソコンに差し替えても、同じデータを使えます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ボリュームの仕組み図 -->
+                    <div class="my-8">
+                        <pre class="mermaid">
+flowchart TB
+    subgraph HOST["ホストマシン"]
+        VOL["ボリューム<br/>(永続データ)"]
+    end
+
+    subgraph C1["コンテナ 1"]
+        APP1["アプリ"]
+    end
+
+    subgraph C2["コンテナ 2"]
+        APP2["アプリ"]
+    end
+
+    C1 -.->|マウント| VOL
+    C2 -.->|マウント| VOL
+
+    style VOL fill:#bae6fd,stroke:#0ea5e9,stroke-width:3px
+    style C1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style C2 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</pre>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-database text-primary-500"></i>
+                            ボリュームの特徴
+                        </h3>
+                        <ul class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>永続性</strong>: コンテナを削除してもデータは残る
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>共有可能</strong>: 複数のコンテナで同じボリュームを使える
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>Docker管理</strong>: Dockerが保存場所を自動管理してくれる
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション3: ボリュームの基本コマンド -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 ボリュームの基本コマンド
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        ボリュームを操作する基本的なコマンドを覚えましょう。
+                    </p>
+
+                    <!-- ボリューム作成 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">ボリュームを作成する</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">コマンド</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># my-dataという名前のボリュームを作成
+docker volume create my-data</code></pre>
+                    </div>
+
+                    <!-- ボリューム一覧 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ボリューム一覧を確認する</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">コマンド</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># 作成済みのボリュームを一覧表示
+docker volume ls</code></pre>
+                    </div>
+
+                    <!-- ボリューム詳細 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ボリュームの詳細情報を確認する</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">コマンド</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># ボリュームの詳細情報(保存場所など)を表示
+docker volume inspect my-data</code></pre>
+                    </div>
+
+                    <!-- ボリューム削除 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ボリュームを削除する</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">コマンド</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># ボリュームを削除(使用中のボリュームは削除できません)
+docker volume rm my-data</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: 実習 - MySQLでボリュームを使う -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 実習: MySQLコンテナでデータを永続化しよう
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        実際にMySQLデータベースのコンテナを起動し、ボリュームを使ってデータを永続化してみましょう。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-hands-helping text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: MySQLでボリュームを使う</h3>
+
+                                <div class="space-y-4">
+                                    <!-- ステップ1 -->
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <p class="font-medium text-purple-900 mb-2">ステップ1: ボリュームを作成</p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">コマンド</span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># MySQLのデータ保存用ボリュームを作成
+docker volume create mysql-data</code></pre>
+                                        </div>
+                                    </div>
+
+                                    <!-- ステップ2 -->
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <p class="font-medium text-purple-900 mb-2">ステップ2: MySQLコンテナをボリューム付きで起動</p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">コマンド</span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># -v でボリュームをマウント
+# mysql-data:/var/lib/mysql は「ボリューム名:コンテナ内のパス」
+docker run -d \
+  --name my-mysql \
+  -e MYSQL_ROOT_PASSWORD=mypassword \
+  -v mysql-data:/var/lib/mysql \
+  mysql:8.0</code></pre>
+                                        </div>
+                                        <p class="text-purple-800 text-sm mt-2 break-words">
+                                            <i class="fas fa-info-circle"></i> <code>-v mysql-data:/var/lib/mysql</code> でボリュームをコンテナにマウントしています
+                                        </p>
+                                    </div>
+
+                                    <!-- ステップ3 -->
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <p class="font-medium text-purple-900 mb-2">ステップ3: データベースを作成</p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">コマンド</span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># MySQLコンテナに接続
+docker exec -it my-mysql mysql -uroot -pmypassword
+
+# MySQLコンソールで実行
+CREATE DATABASE testdb;
+SHOW DATABASES;
+exit;</code></pre>
+                                        </div>
+                                    </div>
+
+                                    <!-- ステップ4 -->
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <p class="font-medium text-purple-900 mb-2">ステップ4: コンテナを削除して確認</p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">コマンド</span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># コンテナを停止・削除
+docker stop my-mysql
+docker rm my-mysql
+
+# 同じボリュームで再起動
+docker run -d \
+  --name my-mysql-new \
+  -e MYSQL_ROOT_PASSWORD=mypassword \
+  -v mysql-data:/var/lib/mysql \
+  mysql:8.0
+
+# データが残っているか確認
+docker exec -it my-mysql-new mysql -uroot -pmypassword
+SHOW DATABASES;</code></pre>
+                                        </div>
+                                        <p class="text-purple-800 text-sm mt-2 break-words">
+                                            <i class="fas fa-check-circle"></i> testdbが残っていれば成功です！
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: バインドマウントとの違い -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 ボリュームとバインドマウントの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        データを永続化する方法には、<strong>ボリューム(Volume)</strong>と<strong>バインドマウント(Bind Mount)</strong>の2種類があります。
+                    </p>
+
+                    <!-- 比較図 -->
+                    <div class="my-8">
+                        <pre class="mermaid">
+flowchart TB
+    subgraph VOL_WAY["ボリューム"]
+        direction TB
+        V1["Dockerが管理する<br/>専用領域"]
+        V2["場所を意識しない"]
+        V3["本番環境向き"]
+    end
+
+    subgraph BIND_WAY["バインドマウント"]
+        direction TB
+        B1["ホストの任意の<br/>フォルダを指定"]
+        B2["ファイル編集が<br/>すぐ反映"]
+        B3["開発環境向き"]
+    end
+
+    style VOL_WAY fill:#e0f2fe,stroke:#0ea5e9,stroke-width:2px
+    style BIND_WAY fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+</pre>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4">比較表</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-300">
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">項目</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">ボリューム</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">バインドマウント</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-600">
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">保存場所</td>
+                                        <td class="py-2 px-3">Dockerが自動管理</td>
+                                        <td class="py-2 px-3">ホストの任意パス</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">指定方法</td>
+                                        <td class="py-2 px-3"><code>-v ボリューム名:パス</code></td>
+                                        <td class="py-2 px-3"><code>-v 絶対パス:パス</code></td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">編集しやすさ</td>
+                                        <td class="py-2 px-3">直接編集は難しい</td>
+                                        <td class="py-2 px-3 text-emerald-700 font-medium">エディタで直接編集可</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">バックアップ</td>
+                                        <td class="py-2 px-3 text-emerald-700 font-medium">Dockerコマンドで簡単</td>
+                                        <td class="py-2 px-3">通常のファイル操作</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-medium">おすすめ用途</td>
+                                        <td class="py-2 px-3 text-emerald-700 font-medium">DBデータなど本番環境</td>
+                                        <td class="py-2 px-3 text-emerald-700 font-medium">ソースコード、開発環境</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- バインドマウントの例 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">バインドマウントの使用例</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        開発中のHTMLファイルをリアルタイムでNginxコンテナに反映させたい場合は、バインドマウントが便利です。
+                    </p>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">コマンド</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># カレントディレクトリの html フォルダをマウント
+# $(pwd) は現在のディレクトリの絶対パスを取得
+docker run -d -p 8080:80 \
+  -v $(pwd)/html:/usr/share/nginx/html \
+  nginx
+
+# htmlフォルダ内のファイルを編集すると即座に反映される</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション6: よくある使い分け -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 ボリュームとバインドマウントの使い分け
+                    </h2>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- ボリュームを使う場合 -->
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-database text-blue-600 mt-1"></i>
+                                <div>
+                                    <h3 class="text-blue-900 font-semibold mb-2">ボリュームを使う場合</h3>
+                                    <ul class="text-blue-800 text-sm space-y-1">
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>データベースのデータ保存</span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>本番環境でのデータ永続化</span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>複数コンテナでのデータ共有</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- バインドマウントを使う場合 -->
+                        <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-code text-amber-600 mt-1"></i>
+                                <div>
+                                    <h3 class="text-amber-900 font-semibold mb-2">バインドマウントを使う場合</h3>
+                                    <ul class="text-amber-800 text-sm space-y-1">
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>開発中のソースコード</span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>設定ファイルの直接編集</span>
+                                        </li>
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-circle text-[6px] mt-1.5"></i>
+                                            <span>ログファイルの確認</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. コンテナを削除したときにデータを残すためには何を使いますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> ボリューム(Volume)を使います。ボリュームはコンテナの外にデータを保存するため、コンテナを削除してもデータは残り続けます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ボリュームとバインドマウントの主な違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> ボリュームはDockerが保存場所を自動管理し、本番環境でのデータ永続化に適しています。バインドマウントはホストの任意のフォルダを指定でき、開発中のソースコードなどファイルを直接編集したい場合に便利です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. MySQLコンテナでボリュームを使う場合、マウント先のパスはどこですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> <code>/var/lib/mysql</code> です。MySQLはこのディレクトリにデータベースファイルを保存するため、ここにボリュームをマウントします。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第7章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>コンテナを削除するとデータも消えるため、データ永続化にはボリュームが必要</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>ボリュームはDockerが管理する専用領域で、本番環境のデータ保存に適している</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>バインドマウントはホストのフォルダを直接使うため、開発中のファイル編集に便利</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>用途に応じてボリュームとバインドマウントを使い分けることが重要</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="docker-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第6章: Dockerfileを書いてみよう</span>
+                        </div>
+                    </a>
+                    <a href="docker-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: Docker Composeで複数のコンテナを管理</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

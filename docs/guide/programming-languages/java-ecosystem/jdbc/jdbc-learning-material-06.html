@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>JDBC学習教材 第6章 - トランザクション処理と例外処理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Java/JDBC - Orange
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-java text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">JDBC学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>プログラミング言語</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約9.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JDBC</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクション処理と例外処理</h1>
+                    <p class="text-slate-600">データの整合性を保つためのトランザクション制御（commit、rollback）、自動コミットの設定、try-catch-finallyを使った適切な例外処理とリソース管理を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションとは何か、なぜ必要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>commit（確定）とrollback（取り消し）の使い方を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>自動コミットの設定とその影響を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>try-catch-finallyを使った適切な例外処理とリソース管理を習得する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 トランザクションとは？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>トランザクション</strong>とは、複数のデータベース操作を「1つのまとまった処理」として扱う仕組みです。すべての操作が成功したときだけデータベースに反映し、途中で1つでも失敗したら全体を取り消します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        例えば、銀行の送金処理を考えてみましょう。「Aさんの口座から1万円引き出す」「Bさんの口座に1万円入金する」という2つの操作があります。もし片方だけ成功してしまったら、お金が消えたり増えたりして大変ですよね。トランザクションを使えば、両方成功したときだけ確定し、片方が失敗したら両方とも取り消すことができます。
+                    </p>
+
+                    <!-- トランザクションの概念図 -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-4">トランザクションの動作イメージ</h3>
+                        <pre class="mermaid bg-transparent border-0">
+graph TB
+    Start[トランザクション開始]
+    Op1[操作1: Aさんの口座から1万円引き出し]
+    Op2[操作2: Bさんの口座に1万円入金]
+    Check{すべて成功?}
+    Commit[commit: データベースに確定]
+    Rollback[rollback: すべて取り消し]
+    End[処理終了]
+
+    Start --> Op1
+    Op1 --> Op2
+    Op2 --> Check
+    Check -->|成功| Commit
+    Check -->|失敗| Rollback
+    Commit --> End
+    Rollback --> End
+
+    style Start fill:#fff7ed,stroke:#f97316,stroke-width:2px
+    style Commit fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Rollback fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style End fill:#f3f4f6,stroke:#6b7280,stroke-width:2px
+                        </pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">トランザクションの4つの性質（ACID）</p>
+                                <ul class="text-emerald-900 space-y-1 text-sm">
+                                    <li><strong>原子性（Atomicity）</strong>: すべて成功か、すべて失敗か。中途半端な状態にならない</li>
+                                    <li><strong>一貫性（Consistency）</strong>: データベースの整合性が保たれる</li>
+                                    <li><strong>独立性（Isolation）</strong>: 複数のトランザクションが干渉しない</li>
+                                    <li><strong>永続性（Durability）</strong>: 確定した内容は失われない</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 自動コミットの設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JDBCのConnectionは、デフォルトで<strong>自動コミット（Auto-Commit）モード</strong>が有効になっています。自動コミットがONの場合、SQL文を1つ実行するたびに自動的にcommitされます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        複数の操作をまとめて1つのトランザクションとして扱いたい場合は、自動コミットをOFFにする必要があります。
+                    </p>
+
+                    <!-- 自動コミットの設定コード -->
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">自動コミットの設定</span>
+                            <button class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-java">import java.sql.Connection;
+import java.sql.DriverManager;
+
+public class TransactionExample {
+    public static void main(String[] args) {
+        Connection conn = null;
+
+        try {
+            // データベースに接続
+            conn = DriverManager.getConnection(
+                "jdbc:h2:~/test", "sa", ""
+            );
+
+            // 自動コミットをOFFにする（トランザクション開始）
+            conn.setAutoCommit(false);
+
+            // ここで複数のSQL文を実行...
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">初心者向けヒント</p>
+                                <p class="text-blue-900 text-sm">
+                                    <code>setAutoCommit(false)</code>にすると、明示的に<code>commit()</code>を呼ぶまでデータベースに反映されません。エラーが発生したら<code>rollback()</code>で取り消すことができます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 commitとrollbackの使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        トランザクション内のすべての操作が成功したら<strong>commit()</strong>を呼んでデータベースに確定します。途中でエラーが発生したら<strong>rollback()</strong>を呼んですべての操作を取り消します。
+                    </p>
+
+                    <!-- commitとrollbackの実装例 -->
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">トランザクション制御の実装例</span>
+                            <button class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-java">import java.sql.*;
+
+public class BankTransferExample {
+    public static void main(String[] args) {
+        Connection conn = null;
+        PreparedStatement pstmt1 = null;
+        PreparedStatement pstmt2 = null;
+
+        try {
+            // データベース接続
+            conn = DriverManager.getConnection("jdbc:h2:~/test", "sa", "");
+
+            // 自動コミットOFF（トランザクション開始）
+            conn.setAutoCommit(false);
+
+            // 操作1: Aさんの口座から1万円引き出し
+            String sql1 = "UPDATE accounts SET balance = balance - ? WHERE name = ?";
+            pstmt1 = conn.prepareStatement(sql1);
+            pstmt1.setInt(1, 10000);  // 引き出し額
+            pstmt1.setString(2, "Aさん");
+            pstmt1.executeUpdate();
+
+            // 操作2: Bさんの口座に1万円入金
+            String sql2 = "UPDATE accounts SET balance = balance + ? WHERE name = ?";
+            pstmt2 = conn.prepareStatement(sql2);
+            pstmt2.setInt(1, 10000);  // 入金額
+            pstmt2.setString(2, "Bさん");
+            pstmt2.executeUpdate();
+
+            // すべて成功したのでコミット（確定）
+            conn.commit();
+            System.out.println("送金が完了しました");
+
+        } catch (SQLException e) {
+            // エラー発生時はロールバック（取り消し）
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                    System.out.println("エラーが発生したため送金を取り消しました");
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">重要な注意点</p>
+                                <p class="text-red-900 text-sm">
+                                    <code>commit()</code>を呼ぶ前にConnectionをcloseしてしまうと、未確定の変更は自動的にrollbackされてしまいます。必ず<code>commit()</code>を先に呼んでからcloseしましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 try-catch-finallyを使った例外処理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JDBCを使う際は、必ず<strong>例外処理</strong>を行う必要があります。データベース接続エラー、SQL構文エラー、ネットワークエラーなど、さまざまなエラーが発生する可能性があるためです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>try-catch-finally</code>文を使って、適切にエラー処理とリソース解放を行いましょう。
+                    </p>
+
+                    <!-- try-catch-finallyの構造図 -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-4">try-catch-finallyの処理フロー</h3>
+                        <pre class="mermaid bg-transparent border-0">
+graph TB
+    Try[try ブロック<br/>データベース操作]
+    Success{エラー発生?}
+    Normal[正常処理<br/>commit]
+    Catch[catch ブロック<br/>エラー処理・rollback]
+    Finally[finally ブロック<br/>リソース解放]
+    End[処理終了]
+
+    Try --> Success
+    Success -->|なし| Normal
+    Success -->|あり| Catch
+    Normal --> Finally
+    Catch --> Finally
+    Finally --> End
+
+    style Try fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style Normal fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style Catch fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style Finally fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+                        </pre>
+                    </div>
+
+                    <!-- try-catch-finallyの実装例 -->
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">完全な例外処理とリソース管理の例</span>
+                            <button class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-java">import java.sql.*;
+
+public class ProperExceptionHandling {
+    public static void main(String[] args) {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+
+        try {
+            // データベース接続
+            conn = DriverManager.getConnection("jdbc:h2:~/test", "sa", "");
+            conn.setAutoCommit(false);  // トランザクション開始
+
+            // SQL実行
+            String sql = "UPDATE products SET stock = stock - ? WHERE id = ?";
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, 5);
+            pstmt.setInt(2, 1);
+            pstmt.executeUpdate();
+
+            // 成功したのでコミット
+            conn.commit();
+
+        } catch (SQLException e) {
+            // エラー発生時はロールバック
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+
+        } finally {
+            // リソースを必ず解放（finallyブロック）
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">finallyブロックの重要性</p>
+                                <p class="text-emerald-900 text-sm">
+                                    <code>finally</code>ブロックは、tryブロックで例外が発生してもしなくても必ず実行されます。データベース接続やStatementなどのリソースは、使い終わったら必ず解放する必要があるため、finallyブロックで確実にclose処理を行います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 try-with-resourcesを使った簡潔な書き方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Java 7以降では、<strong>try-with-resources文</strong>を使うことで、リソースの解放を自動的に行うことができます。これにより、finallyブロックを書かなくてもConnectionやStatementが自動的にcloseされます。
+                    </p>
+
+                    <!-- try-with-resourcesの実装例 -->
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">try-with-resourcesを使った実装例</span>
+                            <button class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-java">import java.sql.*;
+
+public class TryWithResourcesExample {
+    public static void main(String[] args) {
+        // try-with-resources: リソースを自動的にcloseする
+        try (
+            Connection conn = DriverManager.getConnection("jdbc:h2:~/test", "sa", "");
+            PreparedStatement pstmt = conn.prepareStatement(
+                "UPDATE products SET stock = stock - ? WHERE id = ?"
+            )
+        ) {
+            // 自動コミットOFF
+            conn.setAutoCommit(false);
+
+            // SQL実行
+            pstmt.setInt(1, 5);
+            pstmt.setInt(2, 1);
+            pstmt.executeUpdate();
+
+            // コミット
+            conn.commit();
+
+        } catch (SQLException e) {
+            // エラー処理
+            e.printStackTrace();
+        }
+        // ConnectionとPreparedStatementは自動的にcloseされる
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">try-with-resourcesのメリット</p>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>コードが短く、読みやすくなる</li>
+                                    <li>close忘れを防げる</li>
+                                    <li>例外が発生しても確実にリソースが解放される</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習：トランザクションを使った商品購入処理</h3>
+                            <p class="text-purple-900 mb-4">
+                                トランザクションを使って、商品の在庫を減らし、注文履歴に記録する処理を実装してみましょう。
+                            </p>
+
+                            <div class="bg-white/80 rounded-lg p-4 mb-4">
+                                <p class="font-semibold text-purple-900 mb-2">実装する処理：</p>
+                                <ol class="list-decimal list-inside space-y-1 text-sm text-purple-900">
+                                    <li>商品テーブル（products）の在庫数を1減らす</li>
+                                    <li>注文テーブル（orders）に注文履歴を追加する</li>
+                                    <li>両方成功したらcommit、失敗したらrollback</li>
+                                </ol>
+                            </div>
+
+                            <div class="bg-white/80 rounded-lg p-4">
+                                <p class="font-semibold text-purple-900 mb-2">ヒント：</p>
+                                <ul class="list-disc list-inside space-y-1 text-sm text-purple-900">
+                                    <li><code>setAutoCommit(false)</code>でトランザクション開始</li>
+                                    <li>2つのUPDATE/INSERT文を実行</li>
+                                    <li>成功したら<code>commit()</code>、エラー時は<code>rollback()</code></li>
+                                    <li>try-with-resourcesを使ってリソース管理</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. トランザクションとは何ですか？なぜ必要なのでしょうか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            トランザクションは、複数のデータベース操作を「1つのまとまった処理」として扱う仕組みです。すべての操作が成功したときだけデータベースに反映し、途中で1つでも失敗したら全体を取り消すことで、データの整合性を保つために必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. commit()とrollback()の違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>commit()</strong>: トランザクション内の変更をデータベースに確定する（反映する）<br>
+                                            <strong>rollback()</strong>: トランザクション内の変更をすべて取り消す（元に戻す）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. setAutoCommit(false)の役割は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            自動コミットを無効にして、複数のSQL文を1つのトランザクションとして扱えるようにします。これにより、明示的に<code>commit()</code>を呼ぶまでデータベースに反映されず、エラー時には<code>rollback()</code>で取り消すことができます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. try-with-resources文を使うメリットを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            1. コードが短く、読みやすくなる<br>
+                                            2. close忘れを防げる<br>
+                                            3. 例外が発生しても確実にリソースが解放される
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-300 rounded-xl p-6 my-8">
+                    <h3 class="flex items-center gap-2 text-lg font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>トランザクション</strong>は、複数の操作をまとめて扱い、すべて成功したときだけ確定する仕組み</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><code>setAutoCommit(false)</code>で自動コミットを無効にし、トランザクションを開始</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><code>commit()</code>で確定、<code>rollback()</code>で取り消し</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><code>try-catch-finally</code>で例外処理とリソース解放を確実に行う</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><code>try-with-resources</code>を使えば、リソースの自動解放が可能</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jdbc-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">PreparedStatementの活用</span>
+                        </div>
+                    </a>
+                    <a href="jdbc-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">DAOパターン</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <script src="sidebar-content.js"></script>
+    <script src="main.js"></script>
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

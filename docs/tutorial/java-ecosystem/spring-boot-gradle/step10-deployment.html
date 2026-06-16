@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot + Gradle チュートリアル Step 10 - デプロイメントと運用設定</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts - Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #4caf50; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #4caf50; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #4caf50; padding-bottom: 0.5rem; }
+        .section-title { color: #66bb6a; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #4caf50; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #4caf50 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Spring Boot + Gradle チュートリアル</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="step1-environment-setup.html">Step 1: 環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step2-docker-postgresql.html">Step 2: PostgreSQL環境</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step3-spring-mvc-web.html">Step 3: Webコントローラー</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step4-spring-data-jpa.html">Step 4: データベースアクセス</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step5-user-registration.html">Step 5: ユーザー登録機能</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step6-thymeleaf-ui.html">Step 6: 画面実装</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step7-user-list-detail.html">Step 7: 一覧・詳細機能</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step8-user-update-delete.html">Step 8: 更新・削除機能</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step9-security-error.html">Step 9: セキュリティ基礎</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="step10-deployment.html">Step 10: デプロイメント</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Step 10: デプロイメントと運用設定</h1>
+                </div>
+
+                <div id="step10">
+                    <h2 class="chapter-title">デプロイメントと運用設定</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>アプリケーションプロパティの外部化</li>
+                            <li>プロファイル別設定（開発/本番）</li>
+                            <li>実行可能JARの作成</li>
+                            <li>Dockerイメージの作成</li>
+                            <li>ヘルスチェックエンドポイント</li>
+                            <li>アプリケーションメトリクス</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">10.1 プロファイル別設定</h3>
+                    <p>開発環境と本番環境で異なる設定を使用できるようにします。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-1: 環境別設定ファイル</h5>
+                        <p>開発、テスト、本番環境用の設定ファイルを作成します。</p>
+                        <h6>application-dev.properties（開発環境）</h6>
+                        <pre class="code-block"><code class="language-ini"># 開発環境設定
+spring.profiles.active=dev
+
+# データベース設定
+spring.datasource.url=jdbc:postgresql://localhost:5432/userdb
+spring.datasource.username=dbuser
+spring.datasource.password=dbpass
+
+# JPA設定
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# ログレベル
+logging.level.com.example.usermanagement=DEBUG
+logging.level.org.springframework.web=DEBUG
+
+# Thymeleaf設定
+spring.thymeleaf.cache=false
+
+# DevTools設定
+spring.devtools.restart.enabled=true</code></pre>
+                        <h6>application-prod.properties（本番環境）</h6>
+                        <pre class="code-block"><code class="language-ini"># 本番環境設定
+spring.profiles.active=prod
+
+# データベース設定（環境変数から取得）
+spring.datasource.url=${DATABASE_URL:jdbc:postgresql://localhost:5432/userdb}
+spring.datasource.username=${DATABASE_USERNAME:dbuser}
+spring.datasource.password=${DATABASE_PASSWORD:dbpass}
+
+# JPA設定
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=false
+
+# ログレベル
+logging.level.com.example.usermanagement=INFO
+logging.level.org.springframework.web=WARN
+
+# Thymeleaf設定
+spring.thymeleaf.cache=true
+
+# セキュリティ設定
+server.servlet.session.cookie.secure=true
+server.servlet.session.cookie.http-only=true
+
+# アクチュエーター設定
+management.endpoints.web.exposure.include=health,info,metrics</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.2 実行可能JARの作成</h3>
+                    <p>アプリケーションをスタンドアロンで実行できるJARファイルを作成します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-2: JARファイルのビルド</h5>
+                        <p>Gradleを使用してデプロイ用のJARファイルを作成します。</p>
+                        <h6>build.gradle（本番用設定追加）</h6>
+                        <pre class="code-block"><code class="language-bash">plugins {
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.0'
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+sourceCompatibility = '17'
+
+jar {
+    enabled = false
+    archiveClassifier = ''
+}
+
+bootJar {
+    enabled = true
+    archiveClassifier = ''
+    archiveFileName = "${project.name}-${project.version}.jar"
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    
+    runtimeOnly 'org.postgresql:postgresql'
+    
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// 本番用タスク
+tasks.register('prodBuild') {
+    group = 'build'
+    description = 'Build for production'
+    dependsOn clean, bootJar
+}</code></pre>
+                        <h6>JARファイルの作成</h6>
+                        <pre class="code-block"><code class="language-bash"># 本番用JARファイルの作成
+./gradlew clean bootJar
+
+# JARファイルの実行
+java -jar build/libs/user-management-1.0.0.jar
+
+# プロファイル指定での実行
+java -jar -Dspring.profiles.active=prod build/libs/user-management-1.0.0.jar</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.3 Dockerイメージの作成</h3>
+                    <p>アプリケーションをコンテナ化してデプロイしやすくします。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-3: Dockerfileの作成</h5>
+                        <p>アプリケーション用のDockerイメージを作成します。</p>
+                        <h6>Dockerfile</h6>
+                        <pre class="code-block"><code class="language-bash"># ベースイメージとしてOpenJDK 17を使用
+FROM openjdk:17-jdk-slim
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# アプリケーションユーザーを作成
+RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup
+
+# JARファイルをコンテナにコピー
+COPY build/libs/user-management-1.0.0.jar app.jar
+
+# ファイルの所有者を変更
+RUN chown appuser:appgroup app.jar
+
+# アプリケーションユーザーに切り替え
+USER appuser
+
+# ポート8080を公開
+EXPOSE 8080
+
+# ヘルスチェック設定
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl --fail http://localhost:8080/actuator/health || exit 1
+
+# アプリケーションを実行
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]</code></pre>
+                        <h6>Docker Compose本番用設定</h6>
+                        <pre class="code-block"><code class="language-yaml">version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/userdb
+      - DATABASE_USERNAME=dbuser
+      - DATABASE_PASSWORD=dbpass
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.4 アクチュエーター設定</h3>
+                    <p>アプリケーションの監視とヘルスチェック機能を設定します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-4: Spring Boot Actuatorの設定</h5>
+                        <p>運用監視のためのエンドポイントを設定します。</p>
+                        <h6>application.properties（アクチュエーター設定）</h6>
+                        <pre class="code-block"><code class="language-ini"># アクチュエーター設定
+management.endpoints.web.base-path=/actuator
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.endpoint.health.show-details=when-authorized
+
+# アプリケーション情報
+info.app.name=@project.name@
+info.app.description=User Management System
+info.app.version=@project.version@
+info.app.java.version=@java.version@
+
+# ヘルスチェック設定
+management.health.db.enabled=true
+management.health.diskspace.enabled=true</code></pre>
+                        <h6>カスタムヘルスインジケーター</h6>
+                        <pre class="code-block"><code class="language-java">@Component
+public class DatabaseHealthIndicator implements HealthIndicator {
+    
+    private final UserRepository userRepository;
+    
+    public DatabaseHealthIndicator(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+    
+    @Override
+    public Health health() {
+        try {
+            long userCount = userRepository.count();
+            return Health.up()
+                    .withDetail("database", "Available")
+                    .withDetail("userCount", userCount)
+                    .build();
+        } catch (Exception e) {
+            return Health.down()
+                    .withDetail("database", "Unavailable")
+                    .withDetail("error", e.getMessage())
+                    .build();
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.5 デプロイメント手順</h3>
+                    <p>実際のデプロイメント手順を確認します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-5: デプロイメント実行</h5>
+                        <p>作成したアプリケーションをデプロイします。</p>
+                        <h6>デプロイメントスクリプト</h6>
+                        <pre class="code-block"><code class="language-bash">#!/bin/bash
+
+# デプロイメントスクリプト
+set -e
+
+echo "Starting deployment process..."
+
+# 1. アプリケーションのビルド
+echo "Building application..."
+./gradlew clean bootJar
+
+# 2. Dockerイメージの作成
+echo "Building Docker image..."
+docker build -t user-management:latest .
+
+# 3. 既存のコンテナを停止
+echo "Stopping existing containers..."
+docker-compose down
+
+# 4. 新しいコンテナを起動
+echo "Starting new containers..."
+docker-compose up -d
+
+# 5. ヘルスチェック
+echo "Performing health check..."
+sleep 30
+curl --fail http://localhost:8080/actuator/health
+
+echo "Deployment completed successfully!"</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.6 運用監視</h3>
+                    <p>本番環境での監視とトラブルシューティングについて学びます。</p>
+
+                    <div class="highlight">
+                        <h5>運用時のチェックポイント</h5>
+                        <ul>
+                            <li>✅ アプリケーションの起動確認</li>
+                            <li>✅ データベース接続の確認</li>
+                            <li>✅ ログファイルの確認</li>
+                            <li>✅ メモリ使用量の監視</li>
+                            <li>✅ レスポンス時間の監視</li>
+                            <li>✅ エラー率の監視</li>
+                        </ul>
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-6: 監視コマンド</h5>
+                        <p>運用時に使用する基本的な監視コマンドです。</p>
+                        <h6>基本的な監視コマンド</h6>
+                        <pre class="code-block"><code class="language-bash"># アプリケーションの状態確認
+curl http://localhost:8080/actuator/health
+
+# アプリケーション情報の確認
+curl http://localhost:8080/actuator/info
+
+# メトリクス情報の確認
+curl http://localhost:8080/actuator/metrics
+
+# ログの確認
+docker logs user-management-app
+
+# コンテナの状態確認
+docker ps
+docker stats
+
+# データベースの接続確認
+docker exec -it user-management-postgres psql -U dbuser -d userdb -c "SELECT COUNT(*) FROM users;"</code></pre>
+                    </div>
+
+                    <div class="warning">
+                        <h5>本番環境での注意点</h5>
+                        <ul>
+                            <li><strong>セキュリティ:</strong> アクチュエーターエンドポイントへのアクセス制限を設定</li>
+                            <li><strong>バックアップ:</strong> データベースの定期バックアップを設定</li>
+                            <li><strong>ログローテーション:</strong> ログファイルのサイズ管理を実装</li>
+                            <li><strong>リソース制限:</strong> メモリやCPUの使用量制限を設定</li>
+                            <li><strong>SSL/TLS:</strong> HTTPS通信の設定</li>
+                        </ul>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>Spring Profilesの用途は何ですか？</li>
+                            <li>bootJarタスクで作成されるJARファイルの特徴は何ですか？</li>
+                            <li>Dockerのヘルスチェック機能の目的は何ですか？</li>
+                            <li>Spring Boot Actuatorが提供する主な機能は何ですか？</li>
+                            <li>本番環境でログレベルをINFOに設定する理由は何ですか？</li>
+                        </ol>
+                        <details>
+                            <summary>解答例</summary>
+                            <ol>
+                                <li>環境（開発、テスト、本番）ごとに異なる設定を使い分けるため</li>
+                                <li>すべての依存関係を含んだ実行可能なJARファイル（Fat JAR）</li>
+                                <li>コンテナの健康状態を監視し、異常時に自動復旧を行うため</li>
+                                <li>ヘルスチェック、メトリクス監視、アプリケーション情報の提供</li>
+                                <li>不要なデバッグログを抑制し、パフォーマンスを向上させるため</li>
+                            </ol>
+                        </details>
+                    </div>
+
+                    <div class="highlight">
+                        <h5>🎉 チュートリアル完了おめでとうございます！</h5>
+                        <p>このチュートリアルを通じて、Spring Boot + Gradleを使用したWebアプリケーション開発の基礎を学びました。</p>
+                        
+                        <h6>習得したスキル</h6>
+                        <ul>
+                            <li>Spring Boot プロジェクトの作成と設定</li>
+                            <li>PostgreSQL データベースとの連携</li>
+                            <li>Spring MVC による Web コントローラーの実装</li>
+                            <li>Spring Data JPA を使ったデータアクセス</li>
+                            <li>Thymeleaf による動的な画面作成</li>
+                            <li>基本的なセキュリティ対策</li>
+                            <li>アプリケーションのデプロイメント</li>
+                        </ul>
+                        
+                        <h6>次のステップ</h6>
+                        <ul>
+                            <li>Spring Security による認証・認可機能の実装</li>
+                            <li>RESTful API の開発</li>
+                            <li>マイクロサービスアーキテクチャの学習</li>
+                            <li>CI/CD パイプラインの構築</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="step9-security-error.html" class="btn btn-secondary">← 前の章 Step 9: セキュリティ基礎</a>
+                        <a href="../README.html" class="btn btn-success">チュートリアル完了 🎉</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Highlight.js 初期化 -->
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

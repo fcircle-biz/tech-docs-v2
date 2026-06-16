@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Next.js + FastAPI + PostgreSQL Todoアプリチュートリアル ステップ2 - DockerでPostgreSQLデータベースを構築</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Emerald (チュートリアル推奨カラー)
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-list-check text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Next.js + FastAPI Todoアプリ</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>フルスタック開発</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Next.js + FastAPI</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ2</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">2</span>
+                            ステップ2
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">DockerでPostgreSQLデータベースを構築</h1>
+                    <p class="text-slate-600">Dockerを使って、データを保存するためのPostgreSQLデータベースを立ち上げます。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>プロジェクトフォルダの作成</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>docker-compose.ymlファイルの作成</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>PostgreSQLとpgAdminコンテナの起動</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>pgAdminでデータベースに接続</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>Todoテーブルの作成</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>ステップ1の環境構築が完了していること</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Docker Desktopが起動していること</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: Dockerとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.1 Dockerとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        Dockerは、アプリケーションを「コンテナ」という箱の中で実行する技術です。コンテナを使うと、どのパソコンでも同じ環境を簡単に作ることができます。
+                    </p>
+
+                    <!-- Mermaid図: Dockerの概念 -->
+                    <div class="bg-white rounded-xl p-6 border border-slate-200 mb-6">
+                        <div class="mermaid">
+graph TD
+    A["あなたのパソコン<br/>（Windows）"] --> B["Docker Desktop"]
+    B --> C["PostgreSQLコンテナ<br/>（データベース）"]
+    B --> D["pgAdminコンテナ<br/>（管理ツール）"]
+
+    style A fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style B fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style C fill:#dcfce7,stroke:#10b981,stroke-width:2px
+    style D fill:#e0e7ff,stroke:#6366f1,stroke-width:2px
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="text-blue-900 font-medium">Dockerを使う利点</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• PostgreSQLを手動でインストールする必要がない</li>
+                                    <li>• コマンド一つでデータベースを起動・停止できる</li>
+                                    <li>• 環境を汚さず、削除も簡単</li>
+                                    <li>• チーム全員が同じ環境を使える</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: プロジェクトフォルダの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.2 プロジェクトフォルダの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        まず、Todoアプリのファイルを保存するフォルダを作成します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 2-1: プロジェクトフォルダの作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">作業フォルダを作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            コマンドプロンプトを開き、以下のコマンドを実行します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">コマンドプロンプト</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># ホームディレクトリに移動
+cd %USERPROFILE%
+
+# todo-appフォルダを作成
+mkdir todo-app
+
+# 作成したフォルダに移動
+cd todo-app</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">VS Codeでフォルダを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            作成したフォルダをVS Codeで開きます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">コマンドプロンプト</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-bash">code .</code></pre>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            VS Codeが起動し、<code class="bg-purple-100 px-1 rounded">todo-app</code> フォルダが開きます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: docker-compose.ymlの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.3 docker-compose.ymlファイルの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        docker-compose.ymlファイルは、Dockerコンテナの設定を記述するファイルです。このファイルを作成することで、PostgreSQLとpgAdminを一度に起動できます。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 2-2: docker-compose.ymlの作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">新しいファイルを作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            VS Codeで <strong>docker-compose.yml</strong> という名前の新しいファイルを作成します。
+                                        </p>
+                                        <p class="text-purple-900 text-sm">
+                                            左側のエクスプローラーで、「新しいファイル」アイコンをクリックし、ファイル名を「docker-compose.yml」と入力してください。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">設定を記述</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下の内容をコピーして、docker-compose.ymlファイルに貼り付けてください。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">docker-compose.yml</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-yaml">version: '3.8'
+
+services:
+  # PostgreSQLデータベース
+  postgres:
+    image: postgres:16
+    container_name: todo_postgres
+    environment:
+      POSTGRES_USER: todo_user          # データベースのユーザー名
+      POSTGRES_PASSWORD: todo_password  # データベースのパスワード
+      POSTGRES_DB: todo_db              # データベース名
+    ports:
+      - "5432:5432"                     # ポート番号（外部:内部）
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # データを保存する場所
+
+  # pgAdmin（データベース管理ツール）
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: todo_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com  # pgAdminのログインメール
+      PGADMIN_DEFAULT_PASSWORD: admin           # pgAdminのログインパスワード
+    ports:
+      - "5050:80"                               # ポート番号（外部:内部）
+    depends_on:
+      - postgres
+
+# データを永続化するためのボリューム
+volumes:
+  postgres_data:</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ファイルを保存</h4>
+                                        <p class="text-purple-900 text-sm">
+                                            <code class="bg-purple-100 px-1 rounded">Ctrl + S</code> を押して、ファイルを保存してください。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 設定の解説 -->
+                    <div class="bg-slate-100 rounded-xl p-6 mb-6">
+                        <h4 class="font-medium text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-book"></i>
+                            設定の解説
+                        </h4>
+                        <div class="space-y-4 text-slate-700 text-sm">
+                            <div>
+                                <strong class="text-slate-900">postgres:</strong>
+                                <p>PostgreSQLデータベースのコンテナです。ポート5432で接続できます。</p>
+                            </div>
+                            <div>
+                                <strong class="text-slate-900">pgadmin:</strong>
+                                <p>データベースを視覚的に管理できるツールです。ブラウザで http://localhost:5050 にアクセスして使います。</p>
+                            </div>
+                            <div>
+                                <strong class="text-slate-900">volumes:</strong>
+                                <p>データを保存する場所です。コンテナを削除してもデータは残ります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: Dockerコンテナの起動 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.4 Dockerコンテナの起動
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        作成したdocker-compose.ymlを使って、PostgreSQLとpgAdminを起動します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 2-3: Dockerコンテナの起動
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Docker Desktopが起動していることを確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            タスクバーにDockerのアイコンがあり、「Docker Desktop is running」と表示されていればOKです。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">コンテナを起動</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            VS Codeのターミナルを開き（<code class="bg-purple-100 px-1 rounded">Ctrl + `</code>）、以下のコマンドを実行します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">ターミナル</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-bash">docker-compose up -d</code></pre>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            <code class="bg-purple-100 px-1 rounded">-d</code> オプションは、バックグラウンドで起動することを意味します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">起動を確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコマンドで、コンテナが起動していることを確認します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">ターミナル</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-bash">docker-compose ps</code></pre>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            <code class="bg-purple-100 px-1 rounded">todo_postgres</code> と <code class="bg-purple-100 px-1 rounded">todo_pgadmin</code> の状態が「Up」になっていればOKです。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dockerコマンド一覧 -->
+                    <div class="bg-slate-100 rounded-xl p-6 mb-6">
+                        <h4 class="font-medium text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-terminal"></i>
+                            よく使うDockerコマンド
+                        </h4>
+                        <div class="space-y-3 text-slate-700 text-sm">
+                            <div class="flex gap-3">
+                                <code class="bg-white px-2 py-1 rounded font-mono text-xs flex-shrink-0">docker-compose up -d</code>
+                                <span>コンテナを起動（バックグラウンド）</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <code class="bg-white px-2 py-1 rounded font-mono text-xs flex-shrink-0">docker-compose down</code>
+                                <span>コンテナを停止・削除</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <code class="bg-white px-2 py-1 rounded font-mono text-xs flex-shrink-0">docker-compose ps</code>
+                                <span>コンテナの状態を確認</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <code class="bg-white px-2 py-1 rounded font-mono text-xs flex-shrink-0">docker-compose logs</code>
+                                <span>コンテナのログを表示</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: pgAdminでデータベースに接続 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.5 pgAdminでデータベースに接続
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        pgAdminを使って、PostgreSQLデータベースに接続します。pgAdminはブラウザで動作するデータベース管理ツールです。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 2-4: pgAdminでデータベースに接続
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">pgAdminを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            ブラウザで以下のURLを開きます。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4">
+                                            <p class="text-purple-900 text-sm">
+                                                <strong>URL:</strong> <a href="http://localhost:5050" target="_blank" class="text-primary-600 hover:underline">http://localhost:5050</a>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ログイン</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            docker-compose.ymlに設定した情報でログインします。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4">
+                                            <ul class="space-y-1 text-purple-900 text-sm">
+                                                <li><strong>Email:</strong> admin@example.com</li>
+                                                <li><strong>Password:</strong> admin</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">サーバーを追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            左側のメニューで「Servers」を右クリック → 「Register」 → 「Server」を選択します。
+                                        </p>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <strong>General</strong> タブで以下を入力：
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4 mb-3">
+                                            <ul class="space-y-1 text-purple-900 text-sm">
+                                                <li><strong>Name:</strong> Todo Database（任意の名前）</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <strong>Connection</strong> タブで以下を入力：
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4">
+                                            <ul class="space-y-1 text-purple-900 text-sm">
+                                                <li><strong>Host name/address:</strong> postgres</li>
+                                                <li><strong>Port:</strong> 5432</li>
+                                                <li><strong>Maintenance database:</strong> todo_db</li>
+                                                <li><strong>Username:</strong> todo_user</li>
+                                                <li><strong>Password:</strong> todo_password</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            「Save」をクリックして保存します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">接続を確認</h4>
+                                        <p class="text-purple-900 text-sm">
+                                            左側のツリーで「Todo Database」→「Databases」→「todo_db」が表示されればOKです。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="text-red-900 font-medium">注意</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    Host名は「localhost」ではなく「postgres」を指定してください。これはDockerコンテナ間の接続のためです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: Todoテーブルの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.6 Todoテーブルの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        データを保存するためのテーブルを作成します。テーブルとは、データを整理して保存する「表」のことです。
+                    </p>
+
+                    <!-- テーブル設計図 -->
+                    <div class="bg-white rounded-xl p-6 border border-slate-200 mb-6">
+                        <h4 class="font-medium text-slate-800 mb-4">Todoテーブルの設計</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-slate-200">
+                                        <th class="text-left py-2 px-3 text-slate-700">カラム名</th>
+                                        <th class="text-left py-2 px-3 text-slate-700">型</th>
+                                        <th class="text-left py-2 px-3 text-slate-700">説明</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-600">
+                                    <tr class="border-b border-slate-100">
+                                        <td class="py-2 px-3"><code class="bg-slate-100 px-1 rounded">id</code></td>
+                                        <td class="py-2 px-3">SERIAL</td>
+                                        <td class="py-2 px-3">タスクの一意なID（自動採番）</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-100">
+                                        <td class="py-2 px-3"><code class="bg-slate-100 px-1 rounded">title</code></td>
+                                        <td class="py-2 px-3">VARCHAR(200)</td>
+                                        <td class="py-2 px-3">タスクのタイトル（最大200文字）</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-100">
+                                        <td class="py-2 px-3"><code class="bg-slate-100 px-1 rounded">completed</code></td>
+                                        <td class="py-2 px-3">BOOLEAN</td>
+                                        <td class="py-2 px-3">完了フラグ（true/false）</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-100">
+                                        <td class="py-2 px-3"><code class="bg-slate-100 px-1 rounded">created_at</code></td>
+                                        <td class="py-2 px-3">TIMESTAMP</td>
+                                        <td class="py-2 px-3">作成日時</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3"><code class="bg-slate-100 px-1 rounded">updated_at</code></td>
+                                        <td class="py-2 px-3">TIMESTAMP</td>
+                                        <td class="py-2 px-3">更新日時</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 2-5: テーブルを作成するSQLを実行
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Query Toolを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            pgAdminで「Todo Database」→「Databases」→「todo_db」を右クリックし、「Query Tool」を選択します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">SQLを実行</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のSQLをコピーして、Query Toolに貼り付けて実行（▶ボタンをクリック）します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">SQL</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- Todoテーブルを作成
+CREATE TABLE todos (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">テーブル作成を確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            左側のツリーを更新し、「Schemas」→「public」→「Tables」に「todos」テーブルが表示されればOKです。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">（オプション）テストデータを挿入</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            動作確認のため、サンプルデータを追加してみましょう。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">SQL</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- サンプルデータを追加
+INSERT INTO todos (title, completed) VALUES
+('牛乳を買う', FALSE),
+('レポートを提出', TRUE),
+('部屋を掃除する', FALSE);</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 動作確認セクション -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        2.7 データベースの動作確認
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">データが正しく保存されているか確認</h3>
+                                <p class="text-emerald-900 mb-4">Query Toolで以下のSQLを実行し、データを取得してみましょう。</p>
+
+                                <div class="code-block-wrapper mb-4">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">SQL</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- すべてのTodoを取得
+SELECT * FROM todos;</code></pre>
+                                </div>
+
+                                <h4 class="font-medium text-emerald-800 mb-2">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される結果
+                                </h4>
+                                <p class="text-emerald-900 text-sm mb-2">
+                                    サンプルデータを追加していた場合、以下のような結果が表示されます：
+                                </p>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <pre class="text-emerald-900 text-sm whitespace-pre-wrap">id | title              | completed | created_at          | updated_at
+---+--------------------+-----------+---------------------+---------------------
+ 1 | 牛乳を買う         | false     | 2025-01-08 10:00:00 | 2025-01-08 10:00:00
+ 2 | レポートを提出     | true      | 2025-01-08 10:00:01 | 2025-01-08 10:00:01
+ 3 | 部屋を掃除する     | false     | 2025-01-08 10:00:02 | 2025-01-08 10:00:02</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">コンテナが起動しない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> ポート5432や5050が既に使われている可能性があります。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong></p>
+                                    <ol class="list-decimal pl-5 space-y-1 text-sm">
+                                        <li>Docker Desktopを再起動する</li>
+                                        <li>他のPostgreSQLやアプリケーションを終了する</li>
+                                        <li>docker-compose.ymlのポート番号を変更する（例: 5432 → 15432）</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">pgAdminにログインできない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> pgAdminコンテナが起動していないか、ログイン情報が間違っています。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong></p>
+                                    <ol class="list-decimal pl-5 space-y-1 text-sm">
+                                        <li><code class="bg-orange-100 px-1 rounded">docker-compose ps</code> でコンテナの状態を確認</li>
+                                        <li>Email: admin@example.com、Password: admin を正確に入力</li>
+                                        <li>コンテナを再起動: <code class="bg-orange-100 px-1 rounded">docker-compose restart</code></li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">データベースに接続できない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> 接続情報が間違っています。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong></p>
+                                    <ol class="list-decimal pl-5 space-y-1 text-sm">
+                                        <li>Host name: <strong>postgres</strong> を指定（localhostではない）</li>
+                                        <li>Username: todo_user、Password: todo_password を正確に入力</li>
+                                        <li>Port: 5432 が正しいことを確認</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <!-- エラー4 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">テーブル作成時にエラーが出る</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> 既にテーブルが存在しているか、SQL文にミスがあります。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong></p>
+                                    <ol class="list-decimal pl-5 space-y-1 text-sm">
+                                        <li>テーブルを削除してから再作成: <code class="bg-orange-100 px-1 rounded">DROP TABLE IF EXISTS todos;</code></li>
+                                        <li>SQL文をもう一度コピー&ペーストして実行</li>
+                                        <li>エラーメッセージを確認し、該当箇所を修正</li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください：</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            docker-compose.ymlファイルが作成されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            <code class="bg-blue-100 px-1 rounded">docker-compose ps</code> でコンテナが「Up」状態になっている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            pgAdminでデータベースに接続できている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            todosテーブルが作成されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            <code class="bg-blue-100 px-1 rounded">SELECT * FROM todos;</code> でデータを取得できる
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="nextjs-fastapi-todo-tutorial-01.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">開発環境の準備</span>
+                        </div>
+                    </a>
+                    <a href="nextjs-fastapi-todo-tutorial-03.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">FastAPIバックエンドの基礎</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第10章 - バックアップとリストア</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">バックアップとリストア - データを安全に守る</h1>
+                    <p class="text-slate-600">pg_dump、pg_restore、pg_basebackupを使ったバックアップとリストアの方法を学習します。論理バックアップと物理バックアップの違い、定期バックアップの自動化について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>論理バックアップと物理バックアップの違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>pg_dumpでデータベースをバックアップできるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>pg_restoreでデータを復元できるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>pg_basebackupで物理バックアップを取得する方法を知る</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>定期バックアップの自動化手法を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 バックアップの重要性
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        データベースのバックアップは、企業のデータ資産を守るための最重要施策です。
+                        ハードウェア障害、人為的ミス、サイバー攻撃など、様々な理由でデータが失われるリスクがあります。
+                        定期的なバックアップと、確実に復元できる体制を整えることで、万一の事態にも迅速に対応できます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <!-- リスク1 -->
+                        <div class="bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-red-900 font-semibold mb-1">ハードウェア障害</h3>
+                                    <p class="text-red-800 text-sm">ディスク故障、サーバーダウンによるデータ消失</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- リスク2 -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-user-times text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-orange-900 font-semibold mb-1">人為的ミス</h3>
+                                    <p class="text-orange-800 text-sm">誤ったDELETE/UPDATE操作によるデータ破損</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- リスク3 -->
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-bug text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-purple-900 font-semibold mb-1">サイバー攻撃</h3>
+                                    <p class="text-purple-800 text-sm">ランサムウェア、不正アクセスによるデータ改ざん</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">バックアップの3-2-1ルール</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    <strong>3つのコピー</strong>を、<strong>2種類の異なる媒体</strong>で保管し、<strong>1つは別の場所</strong>に保管するというルールです。
+                                    例えば、本番サーバー（1つ目）、同じサーバーの別ディスク（2つ目、異なる媒体）、クラウドストレージ（3つ目、別の場所）という構成が理想的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 論理バックアップと物理バックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQLには大きく分けて2種類のバックアップ方法があります。それぞれの特徴を理解して、用途に応じて使い分けましょう。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A[PostgreSQLのバックアップ]
+
+    subgraph Logical[論理バックアップ]
+        B1[pg_dump]
+        B2[pg_dumpall]
+        B3[SQLファイルとして出力]
+        B4[テーブル単位で復元可能]
+    end
+
+    subgraph Physical[物理バックアップ]
+        C1[pg_basebackup]
+        C2[ファイルシステムコピー]
+        C3[データベースクラスタ全体]
+        C4[高速バックアップ＆リストア]
+    end
+
+    A --> Logical
+    A --> Physical
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">項目</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">論理バックアップ</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">物理バックアップ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">主なツール</td>
+                                    <td class="px-4 py-3">pg_dump、pg_dumpall</td>
+                                    <td class="px-4 py-3">pg_basebackup</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">バックアップ内容</td>
+                                    <td class="px-4 py-3">SQLコマンド（CREATE、INSERT等）</td>
+                                    <td class="px-4 py-3">データファイル全体</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">復元の柔軟性</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 高い（テーブル単位可能）</td>
+                                    <td class="px-4 py-3 text-amber-600"><i class="fas fa-exclamation-circle"></i> 低い（全体復元のみ）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">バックアップ速度</td>
+                                    <td class="px-4 py-3 text-amber-600"><i class="fas fa-exclamation-circle"></i> 遅い（データ量に比例）</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 速い（ファイルコピー）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">バージョン互換性</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 高い（異なるバージョン間でも可能）</td>
+                                    <td class="px-4 py-3 text-amber-600"><i class="fas fa-exclamation-circle"></i> 低い（同じバージョンのみ）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">用途</td>
+                                    <td class="px-4 py-3">定期バックアップ、テーブル単位復元</td>
+                                    <td class="px-4 py-3">災害対策、サーバー移行</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 pg_dumpによる論理バックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pg_dumpは、データベースの内容をSQLコマンドとして出力するツールです。
+                        最も一般的なバックアップ方法で、テーブル単位での復元や異なるバージョン間での移行に適しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-terminal text-primary-500 mr-2"></i>基本的なpg_dumpコマンド
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>データベース全体をバックアップ</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># 平文SQLファイルで出力
+pg_dump -U postgres -d mydb -f mydb_backup.sql
+
+# 圧縮カスタム形式で出力（推奨）
+pg_dump -U postgres -d mydb -Fc -f mydb_backup.dump</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>特定のテーブルのみバックアップ</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># usersテーブルのみバックアップ
+pg_dump -U postgres -d mydb -t users -f users_backup.sql</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>スキーマのみバックアップ（データなし）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># テーブル定義のみバックアップ
+pg_dump -U postgres -d mydb --schema-only -f schema_only.sql</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-list text-primary-500 mr-2"></i>pg_dumpの主なオプション
+                    </h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">オプション</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">-Fc</td>
+                                    <td class="px-4 py-3">カスタム形式（圧縮、並列復元可能）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">-Ft</td>
+                                    <td class="px-4 py-3">tar形式（アーカイブ）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">-t テーブル名</td>
+                                    <td class="px-4 py-3">特定のテーブルのみバックアップ</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">--schema-only</td>
+                                    <td class="px-4 py-3">スキーマのみ（CREATE文のみ）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">--data-only</td>
+                                    <td class="px-4 py-3">データのみ（INSERT文のみ）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm">-Z 0-9</td>
+                                    <td class="px-4 py-3">圧縮レベル（0=なし、9=最大）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">カスタム形式（-Fc）の利点</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    カスタム形式は圧縮されているためファイルサイズが小さく、pg_restoreで並列復元や選択的復元が可能です。
+                                    特別な理由がなければ、カスタム形式を使用することを推奨します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 pg_restoreによる復元
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pg_restoreは、pg_dumpで作成したバックアップファイルからデータベースを復元するツールです。
+                        カスタム形式（-Fc）のバックアップに対して、柔軟な復元オプションを提供します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-terminal text-primary-500 mr-2"></i>基本的なpg_restoreコマンド
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>データベース全体を復元</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># 既存のデータベースに復元
+pg_restore -U postgres -d mydb mydb_backup.dump
+
+# 新しいデータベースを作成して復元
+createdb -U postgres mydb_new
+pg_restore -U postgres -d mydb_new mydb_backup.dump</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>特定のテーブルのみ復元</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># usersテーブルのみ復元
+pg_restore -U postgres -d mydb -t users mydb_backup.dump</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>並列復元（高速化）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># 4つの並列ジョブで復元（大規模DBで有効）
+pg_restore -U postgres -d mydb -j 4 mydb_backup.dump</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">復元前の注意事項</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    既存のデータがあるデータベースに復元すると、データが重複したりエラーが発生する可能性があります。
+                                    復元前に必ず現在のデータベースのバックアップを取り、テスト環境で復元を確認してから本番環境に適用しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-clipboard-list text-primary-500 mr-2"></i>バックアップファイルの内容確認
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>バックアップファイルに含まれる内容をリスト表示</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># バックアップファイルの内容を確認
+pg_restore -l mydb_backup.dump
+
+# 出力例：
+# Archive created at 2025-01-15 10:30:00 JST
+# dbname: mydb
+# 208; 1259 16385 TABLE public users postgres
+# 209; 1259 16386 TABLE public posts postgres
+# ...</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 pg_dumpallによる全データベースバックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pg_dumpallは、PostgreSQLサーバー上のすべてのデータベースとグローバルオブジェクト（ロール、テーブルスペースなど）をまとめてバックアップするツールです。
+                        サーバー移行や災害対策用のバックアップに適しています。
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>全データベースをバックアップ</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># すべてのデータベースをバックアップ
+pg_dumpall -U postgres -f all_databases.sql
+
+# ロール（ユーザー）のみバックアップ
+pg_dumpall -U postgres --roles-only -f roles.sql</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>pg_dumpallのバックアップを復元</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># psqlコマンドで復元（平文SQLのため）
+psql -U postgres -f all_databases.sql</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">pg_dumpとpg_dumpallの使い分け</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    通常のバックアップには<strong>pg_dump</strong>を使用します。
+                                    サーバー全体の移行や、グローバルオブジェクト（ロール定義など）も含めてバックアップする場合は<strong>pg_dumpall</strong>を使用します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 pg_basebackupによる物理バックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pg_basebackupは、PostgreSQLのデータディレクトリ全体をコピーする物理バックアップツールです。
+                        大規模なデータベースでも高速にバックアップでき、災害対策やスタンバイサーバーの構築に利用されます。
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>物理バックアップの取得</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># 物理バックアップを取得
+pg_basebackup -U postgres -D /backup/pgdata -Ft -z -P
+
+# オプション説明：
+# -D: バックアップ先ディレクトリ
+# -Ft: tar形式で出力
+# -z: gzip圧縮
+# -P: 進捗状況を表示</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-cog text-primary-500 mr-2"></i>物理バックアップの前提条件
+                    </h3>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        pg_basebackupを使用するには、postgresql.confで以下の設定が必要です：
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>postgresql.confの設定</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># WAL（Write-Ahead Logging）レベルを設定
+wal_level = replica
+
+# レプリケーション用の接続数を確保
+max_wal_senders = 3
+
+# WALセグメントの保持設定
+wal_keep_size = 1GB</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    A[本番PostgreSQLサーバー]
+    B[pg_basebackup実行]
+    C[物理バックアップファイル]
+    D[リストア]
+    E[新しいPostgreSQLサーバー]
+
+    A -->|データディレクトリをコピー| B
+    B -->|tar.gz形式で保存| C
+    C -->|展開して配置| D
+    D -->|起動| E
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">物理バックアップの注意点</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    物理バックアップは、同じPostgreSQLバージョン、同じアーキテクチャ（64bit/32bit）でのみ復元可能です。
+                                    また、データベース全体のバックアップであり、特定のテーブルのみを復元することはできません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.7 定期バックアップの自動化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        バックアップは定期的に実行することが重要です。
+                        Linuxのcronやタスクスケジューラーを使って、バックアップを自動化しましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-file-code text-primary-500 mr-2"></i>バックアップスクリプトの作成
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>backup_db.sh - 自動バックアップスクリプト</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash">#!/bin/bash
+# 日付を含むファイル名を生成
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/backup/postgresql"
+DB_NAME="mydb"
+
+# バックアップ実行
+pg_dump -U postgres -d $DB_NAME -Fc -f $BACKUP_DIR/${DB_NAME}_${DATE}.dump
+
+# 7日以上前のバックアップを削除
+find $BACKUP_DIR -name "*.dump" -mtime +7 -delete
+
+echo "Backup completed: ${DB_NAME}_${DATE}.dump"</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-clock text-primary-500 mr-2"></i>cronで定期実行
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>crontabの設定（毎日深夜2時に実行）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># crontab -e で編集
+0 2 * * * /path/to/backup_db.sh >> /var/log/pg_backup.log 2>&1
+
+# 説明：
+# 0 2 * * *  : 毎日2時0分に実行
+# >>         : ログファイルに追記
+# 2>&1       : エラー出力も同じファイルに出力</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">
+                        <i class="fas fa-cloud text-primary-500 mr-2"></i>クラウドストレージへの転送
+                    </h3>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>AWS S3にバックアップをアップロード</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># AWS CLIを使ってS3にアップロード
+aws s3 cp $BACKUP_DIR/${DB_NAME}_${DATE}.dump s3://my-backup-bucket/postgresql/
+
+# rsyncで別サーバーに転送
+rsync -avz $BACKUP_DIR/${DB_NAME}_${DATE}.dump backup-server:/backup/</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">バックアップ運用のベストプラクティス</p>
+                                <ul class="text-emerald-800 text-sm mt-1 space-y-1">
+                                    <li>• 定期的にバックアップが成功しているかログを確認する</li>
+                                    <li>• 定期的に復元テストを実施し、バックアップが正常に使えることを確認する</li>
+                                    <li>• バックアップファイルを別の場所（クラウドストレージ、別サーバー）にも保管する</li>
+                                    <li>• バックアップファイルの暗号化を検討する（機密データの場合）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: バックアップとリストアを試そう</h3>
+                            <ol class="space-y-3 text-purple-900">
+                                <li class="break-words">
+                                    <strong>1. テスト用データベースを作成</strong>
+                                    <div class="code-block-wrapper mt-2">
+                                        <pre><code class="language-sql">-- pgAdminまたはpsqlで実行
+CREATE DATABASE test_backup;
+\c test_backup
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100)
+);
+
+INSERT INTO users (name, email) VALUES
+    ('山田太郎', 'yamada@example.com'),
+    ('鈴木花子', 'suzuki@example.com'),
+    ('佐藤次郎', 'sato@example.com');</code></pre>
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>2. pg_dumpでバックアップを取得</strong>
+                                    <div class="code-block-wrapper mt-2">
+                                        <pre><code class="language-bash">pg_dump -U postgres -d test_backup -Fc -f test_backup.dump</code></pre>
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>3. データを削除してみる</strong>
+                                    <div class="code-block-wrapper mt-2">
+                                        <pre><code class="language-sql">-- 誤ってデータを削除したと仮定
+DELETE FROM users;</code></pre>
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>4. pg_restoreでデータを復元</strong>
+                                    <div class="code-block-wrapper mt-2">
+                                        <pre><code class="language-bash">pg_restore -U postgres -d test_backup test_backup.dump</code></pre>
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>5. データが復元されたか確認</strong>
+                                    <div class="code-block-wrapper mt-2">
+                                        <pre><code class="language-sql">SELECT * FROM users;
+-- 3件のデータが復元されているはず</code></pre>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 論理バックアップと物理バックアップの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            <strong>論理バックアップ（pg_dump）</strong>: データベースの内容をSQLコマンドとして出力。テーブル単位での復元や異なるバージョン間での移行が可能。<br>
+                                            <strong>物理バックアップ（pg_basebackup）</strong>: データファイル全体をコピー。高速だが、同じバージョンでのみ復元可能で、データベース全体の復元のみ対応。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. pg_dumpでカスタム形式（-Fc）を使うメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            1. ファイルサイズが圧縮される（ディスク容量削減）<br>
+                                            2. pg_restoreで並列復元が可能（復元時間短縮）<br>
+                                            3. 特定のテーブルのみを選択的に復元できる<br>
+                                            4. バックアップファイルの内容をリスト表示できる（pg_restore -l）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. バックアップの3-2-1ルールとは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            <strong>3つのコピー</strong>を、<strong>2種類の異なる媒体</strong>で保管し、<strong>1つは別の場所</strong>に保管するルールです。<br>
+                                            例: 本番サーバー（1つ目）、同じサーバーの別ディスク（2つ目）、クラウドストレージ（3つ目、別の場所）<br>
+                                            これにより、ハードウェア障害や災害時にもデータを保護できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第10章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>バックアップはデータ資産を守るための最重要施策。3-2-1ルールに従って保管する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>論理バックアップ（pg_dump）は柔軟性が高く、テーブル単位での復元やバージョン間移行に適している</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>物理バックアップ（pg_basebackup）は高速だが、同じバージョンでのみ復元可能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>pg_restoreで並列復元や選択的復元が可能。カスタム形式（-Fc）の使用を推奨</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>cronやスクリプトでバックアップを自動化し、定期的に復元テストを実施する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">PostgreSQLのインデックス詳解</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ユーザーと権限管理</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

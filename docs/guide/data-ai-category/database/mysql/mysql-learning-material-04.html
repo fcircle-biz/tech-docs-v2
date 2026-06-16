@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>MySQL入門 第4章 - MySQLのテーブル設計 - 制約とストレージエンジンの基礎</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">MySQL入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-database text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">MySQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">MySQLのテーブル設計 - 制約とストレージエンジンの基礎</h1>
+                    <p class="text-slate-600">MySQLでのテーブル作成と各種制約の設定方法を学習します。PRIMARY KEY、FOREIGN KEY、UNIQUE、CHECK、NOT NULLなどの制約と、InnoDB、MyISAMなどストレージエンジンの違いと選び方について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>MySQLでのテーブル作成構文とデータ型の指定方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PRIMARY KEY、FOREIGN KEY、UNIQUE、CHECK、NOT NULL制約の使い方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ストレージエンジン（InnoDB、MyISAM）の違いと選び方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>テーブル設計のベストプラクティス</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: テーブルの作成基本 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 テーブルの作成基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQLでテーブルを作成するには、CREATE TABLE文を使用します。SQL入門で学んだ基本構文に加えて、MySQLならではの設定オプションがいくつかあります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">基本的なテーブル作成構文</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- シンプルなテーブル作成例
+CREATE TABLE users (
+    user_id INT,              -- 整数型のユーザーID
+    username VARCHAR(50),     -- 最大50文字のユーザー名
+    email VARCHAR(100),       -- 最大100文字のメールアドレス
+    created_at DATETIME       -- 作成日時
+);
+
+-- データ型とデフォルト値を指定した例
+CREATE TABLE products (
+    product_id INT,
+    product_name VARCHAR(100),
+    price DECIMAL(10, 2),     -- 最大10桁、小数点以下2桁
+    stock INT DEFAULT 0,      -- デフォルト値を0に設定
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">CREATE TABLEのポイント</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>カラム名</strong> - 半角英数字とアンダースコアを使用（日本語も可能だが推奨されない）</li>
+                                    <li><strong>データ型</strong> - 適切なデータ型を選択することでストレージ容量を節約</li>
+                                    <li><strong>DEFAULT値</strong> - INSERT時に値を指定しなかった場合のデフォルト値を設定可能</li>
+                                    <li><strong>TIMESTAMP</strong> - CURRENT_TIMESTAMPで自動的に現在時刻を記録</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: PRIMARY KEY制約 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 PRIMARY KEY制約 - 主キーの設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PRIMARY KEY（主キー）は、テーブル内の各行を一意に識別するためのカラムです。MySQLでは主キーを設定すると、自動的にインデックスが作成され、検索が高速化されます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">PRIMARY KEYの設定方法</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 方法1: カラム定義時に指定
+CREATE TABLE users (
+    user_id INT PRIMARY KEY,  -- user_idを主キーに設定
+    username VARCHAR(50),
+    email VARCHAR(100)
+);
+
+-- 方法2: AUTO_INCREMENTで自動採番
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,  -- 1から自動採番
+    username VARCHAR(50),
+    email VARCHAR(100)
+);
+
+-- 方法3: テーブル制約として指定
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT,
+    username VARCHAR(50),
+    email VARCHAR(100),
+    PRIMARY KEY (user_id)     -- テーブル末尾で指定
+);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">AUTO_INCREMENTのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    AUTO_INCREMENTを使用すると、INSERT時にIDを指定する必要がなく、MySQLが自動的に連番を割り当てます。削除された行のIDは再利用されません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">複合主キー（2つ以上のカラム）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 複数のカラムを組み合わせて主キーとする
+CREATE TABLE order_details (
+    order_id INT,             -- 注文ID
+    product_id INT,           -- 商品ID
+    quantity INT,
+    PRIMARY KEY (order_id, product_id)  -- 2つの組み合わせを主キーに
+);</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション3: FOREIGN KEY制約 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 FOREIGN KEY制約 - 参照整合性の確保
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        FOREIGN KEY（外部キー）は、他のテーブルの主キーを参照するカラムです。外部キー制約を設定することで、参照整合性を保ち、存在しないデータへの参照を防ぎます。
+                    </p>
+
+                    <div class="mermaid my-6">
+erDiagram
+    USERS ||--o{ ORDERS : "places"
+    USERS {
+        int user_id PK
+        varchar username
+        varchar email
+    }
+    ORDERS {
+        int order_id PK
+        int user_id FK
+        datetime order_date
+        decimal total_amount
+    }
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">FOREIGN KEYの設定方法</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- まず親テーブル（参照される側）を作成
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
+    email VARCHAR(100)
+);
+
+-- 次に子テーブル（参照する側）を作成
+CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    order_date DATETIME,
+    total_amount DECIMAL(10, 2),
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">外部キー制約の注意点</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    外部キー制約を設定すると、親テーブルに存在しないIDを子テーブルに挿入できなくなります。また、親テーブルのレコードを削除する際も制約が働きます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">ON DELETEとON UPDATEオプション</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 親レコード削除時の動作を指定
+CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    order_date DATETIME,
+    FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE      -- 親削除時に子も削除
+        ON UPDATE CASCADE      -- 親更新時に子も更新
+);
+
+-- その他のオプション
+-- ON DELETE RESTRICT  : 親を削除できない（デフォルト）
+-- ON DELETE SET NULL  : 親削除時に子をNULLに設定
+-- ON DELETE NO ACTION : RESTRICTと同じ</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: その他の制約 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 その他の制約 - UNIQUE、NOT NULL、CHECK
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">UNIQUE制約 - 重複を許さない</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        UNIQUE制約は、カラムの値が重複しないことを保証します。例えば、メールアドレスやユーザー名など、同じ値が複数存在してはいけない場合に使用します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">UNIQUE制約の設定</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- カラム定義時に指定
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE,      -- 重複不可
+    email VARCHAR(100) UNIQUE,        -- 重複不可
+    password_hash VARCHAR(255)
+);
+
+-- テーブル制約として指定
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
+    email VARCHAR(100),
+    UNIQUE (username),
+    UNIQUE (email)
+);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">NOT NULL制約 - NULL値を許さない</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        NOT NULL制約は、カラムにNULL値（値が未設定の状態）を許さないことを指定します。必須項目に対して設定します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">NOT NULL制約の設定</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_name VARCHAR(100) NOT NULL,  -- 必須項目
+    price DECIMAL(10, 2) NOT NULL,       -- 必須項目
+    description TEXT,                    -- NULL許可（任意項目）
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">CHECK制約 - 値の範囲を制限</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CHECK制約は、カラムに格納できる値の条件を指定します。MySQL 8.0.16以降でサポートされています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">CHECK制約の設定</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 値の範囲を制限
+CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),  -- 0以上
+    stock INT CHECK (stock >= 0),                      -- 0以上
+    rating DECIMAL(2, 1) CHECK (rating >= 0.0 AND rating <= 5.0)
+);</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">制約</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">役割</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">使用例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">PRIMARY KEY</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">各行を一意に識別</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">user_id、product_id</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">FOREIGN KEY</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">他テーブルとの関連付け</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">ordersテーブルのuser_id</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">UNIQUE</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">値の重複を防ぐ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">email、username</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">NOT NULL</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">NULL値を許さない</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">氏名、価格など必須項目</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-700 font-medium">CHECK</td>
+                                    <td class="px-4 py-3 text-slate-600">値の範囲を制限</td>
+                                    <td class="px-4 py-3 text-slate-600">価格 >= 0、評価 0-5</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション5: ストレージエンジン -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 ストレージエンジン - InnoDBとMyISAMの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQLの大きな特徴の一つが、テーブルごとに異なるストレージエンジンを選択できることです。ストレージエンジンは、データの保存方法や検索方法を決定する仕組みです。
+                    </p>
+
+                    <div class="mermaid my-6">
+graph TD
+    A["MySQLテーブル"] --> B{"ストレージエンジン"}
+    B --> C["InnoDB<br/>（デフォルト）"]
+    B --> D["MyISAM"]
+    B --> E["Memory"]
+    B --> F["その他"]
+    C --> C1["トランザクション対応"]
+    C --> C2["外部キー制約対応"]
+    C --> C3["行ロック"]
+    D --> D1["高速読み取り"]
+    D --> D2["全文検索"]
+    D --> D3["テーブルロック"]
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">InnoDB - 現在の標準エンジン</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQL 5.5以降のデフォルトストレージエンジンです。トランザクション処理や外部キー制約に対応しており、データの整合性を重視する用途に適しています。
+                    </p>
+
+                    <div class="bg-blue-100 rounded-lg p-5 my-6">
+                        <h4 class="font-semibold text-blue-800 mb-3">InnoDBの特徴</h4>
+                        <ul class="text-blue-900 text-sm space-y-2">
+                            <li><strong>トランザクション対応</strong> - COMMIT、ROLLBACKが使える</li>
+                            <li><strong>外部キー制約</strong> - FOREIGN KEY制約に対応</li>
+                            <li><strong>行レベルロック</strong> - 同時アクセス時の性能が高い</li>
+                            <li><strong>クラッシュリカバリ</strong> - データの安全性が高い</li>
+                            <li><strong>ACID準拠</strong> - データの整合性を保証</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">MyISAM - 読み取り特化エンジン</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQL 5.5より前のデフォルトエンジンです。読み取り性能は高いですが、トランザクションに対応していません。現在は特別な理由がない限りInnoDBを使用することが推奨されています。
+                    </p>
+
+                    <div class="bg-orange-100 rounded-lg p-5 my-6">
+                        <h4 class="font-semibold text-orange-800 mb-3">MyISAMの特徴</h4>
+                        <ul class="text-orange-900 text-sm space-y-2">
+                            <li><strong>高速な読み取り</strong> - SELECT文の実行が速い</li>
+                            <li><strong>全文検索</strong> - FULLTEXT INDEXに対応</li>
+                            <li><strong>テーブルレベルロック</strong> - 書き込み時は全体がロック</li>
+                            <li><strong>トランザクション非対応</strong> - COMMIT/ROLLBACKが使えない</li>
+                            <li><strong>外部キー非対応</strong> - FOREIGN KEY制約が使えない</li>
+                        </ul>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">項目</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">InnoDB</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">MyISAM</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">トランザクション</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">対応</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">非対応</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">外部キー制約</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">対応</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">非対応</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">ロック単位</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">行ロック</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">テーブルロック</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">読み取り速度</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">高速</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">より高速</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">適した用途</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">一般的な用途全般</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">読み取り専用システム</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 text-slate-700 font-medium">全文検索</td>
+                                    <td class="px-4 py-3 text-slate-600">対応（5.6以降）</td>
+                                    <td class="px-4 py-3 text-slate-600">対応</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">ストレージエンジンの指定方法</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- InnoDBで作成（デフォルトなので省略可）
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50)
+) ENGINE=InnoDB;
+
+-- MyISAMで作成
+CREATE TABLE logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    log_message TEXT,
+    created_at TIMESTAMP
+) ENGINE=MyISAM;
+
+-- 既存テーブルのエンジンを変更
+ALTER TABLE users ENGINE=InnoDB;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">推奨：特別な理由がない限りInnoDBを使用</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    現在のMySQLではInnoDBがデフォルトであり、ほとんどの用途に適しています。トランザクション、外部キー制約、クラッシュリカバリなど、信頼性の高いシステムを構築できます。MyISAMは読み取り専用ログテーブルなど限定的な用途でのみ検討してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: テーブル設計のベストプラクティス -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 テーブル設計のベストプラクティス
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-key text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-blue-800 mb-2">主キーは必ず設定</h3>
+                                    <p class="text-blue-900 text-sm">すべてのテーブルにPRIMARY KEYを設定しましょう。AUTO_INCREMENTを使った連番IDが一般的です。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-link text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-emerald-800 mb-2">外部キーで整合性確保</h3>
+                                    <p class="text-emerald-900 text-sm">関連テーブル間はFOREIGN KEY制約を設定し、データの整合性を保ちましょう。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-purple-800 mb-2">適切なデータ型を選択</h3>
+                                    <p class="text-purple-900 text-sm">必要以上に大きなデータ型を使わず、ストレージ容量と検索速度を最適化しましょう。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-shield-alt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-orange-800 mb-2">制約で不正データを防ぐ</h3>
+                                    <p class="text-orange-900 text-sm">NOT NULL、UNIQUE、CHECK制約を活用し、アプリケーション側だけでなくDB側でもデータの妥当性を保証しましょう。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">ベストプラクティスを適用したテーブル例</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ユーザーテーブル
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,     -- 主キー
+    username VARCHAR(50) NOT NULL UNIQUE,       -- 必須・重複不可
+    email VARCHAR(100) NOT NULL UNIQUE,         -- 必須・重複不可
+    password_hash VARCHAR(255) NOT NULL,        -- 必須
+    is_active BOOLEAN DEFAULT TRUE,             -- デフォルト値
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+               ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;                                 -- トランザクション対応
+
+-- 注文テーブル
+CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10, 2) NOT NULL CHECK (total_amount >= 0),
+    status ENUM('pending', 'processing', 'completed', 'cancelled')
+           DEFAULT 'pending',
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+           ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">ハンズオン：制約付きテーブルを作成してみよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                これまで学んだ制約を使って、ブログシステムのテーブルを作成してみましょう。
+                            </p>
+                            <ol class="text-purple-900 space-y-3 text-sm">
+                                <li class="break-words">
+                                    <strong>1. データベース作成</strong>
+                                    <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                        <code>CREATE DATABASE blog_system;</code><br>
+                                        <code>USE blog_system;</code>
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>2. authorsテーブル作成</strong>
+                                    <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                        author_id（主キー、自動採番）、name（必須・最大50文字）、email（必須・重複不可）、created_at（現在時刻デフォルト）
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>3. articlesテーブル作成</strong>
+                                    <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                        article_id（主キー、自動採番）、author_id（外部キー）、title（必須・最大200文字）、content（TEXT型）、view_count（0以上のINT、デフォルト0）、created_at、updated_at
+                                    </div>
+                                </li>
+                                <li class="break-words">
+                                    <strong>4. データ挿入とエラー確認</strong>
+                                    <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                        正常なデータを挿入後、制約違反するデータを挿入してエラーメッセージを確認しましょう。
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. AUTO_INCREMENTの役割と利点を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            AUTO_INCREMENTは、INSERT時にIDを自動的に採番する機能です。1から始まる連番を自動割り当てし、削除された行のIDは再利用されません。開発者がIDを管理する必要がなく、重複を防げるメリットがあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. FOREIGN KEY制約のON DELETE CASCADEとON DELETE RESTRICTの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ON DELETE CASCADEは、親テーブルのレコードを削除すると、それを参照している子テーブルのレコードも自動的に削除されます。一方、ON DELETE RESTRICT（デフォルト）は、子テーブルに参照されている親レコードを削除できません。データの整合性を保つ方法が異なります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. InnoDBとMyISAMの主な違いを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. トランザクション：InnoDBは対応、MyISAMは非対応<br>
+                                            2. 外部キー制約：InnoDBは対応、MyISAMは非対応<br>
+                                            3. ロック単位：InnoDBは行ロック、MyISAMはテーブルロック<br>
+                                            現在はInnoDBがデフォルトであり、ほとんどの用途に適しています。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>CREATE TABLE文でテーブルを作成し、カラム定義でデータ型と制約を指定する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>PRIMARY KEYで主キーを設定し、AUTO_INCREMENTで自動採番できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>FOREIGN KEY制約でテーブル間の参照整合性を保ち、ON DELETE/ON UPDATEで動作を制御</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>UNIQUE、NOT NULL、CHECK制約で不正データを防ぐ</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>ストレージエンジンはInnoDBがデフォルトで、トランザクション・外部キーに対応</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>テーブル設計では主キー必須、外部キー活用、適切なデータ型選択が重要</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="mysql-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">MySQLのデータ型</span>
+                        </div>
+                    </a>
+                    <a href="mysql-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">MySQLの便利な関数</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Next.js + FastAPI + PostgreSQL Todoアプリチュートリアル ステップ4 - タスク一覧表示機能（バックエンド）</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Emerald (チュートリアル推奨カラー)
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-list-check text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Next.js + FastAPI Todoアプリ</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>フルスタック開発</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Next.js + FastAPI</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ4</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">4</span>
+                            ステップ4
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">タスク一覧表示機能（バックエンド）</h1>
+                    <p class="text-slate-600">データベースからタスクを取得して返すAPIを実装します。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>SQLModelでのデータベース接続設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>ORM（オブジェクト関係マッピング）を使ったデータ取得</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>タスク一覧取得APIの実装（GETリクエスト）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>クエリパラメータによるフィルタリング機能の追加</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>ステップ2: PostgreSQLデータベースが起動している</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>ステップ3: FastAPIプロジェクトが作成されている</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>todosテーブルが作成されている</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: SQLModelとORMの理解 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.1 SQLModelとORMの基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        SQLModel（エスキューエル モデル）は、FastAPIの作者が開発した、Pythonでデータベースとやりとりするためのライブラリです。FastAPIとの相性が良く、ORM（オブジェクト関係マッピング）という仕組みを使って、SQL文を直接書かなくてもPythonのコードでデータベース操作ができます。
+                    </p>
+
+                    <!-- ORM概念図 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-sitemap text-primary-500"></i>
+                            ORMの仕組み
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A["Pythonコード<br/>todo = Todo<br/>title='買い物'"] --> B["ORM<br/>SQLModel"]
+    B --> C["SQL文に変換<br/>INSERT INTO todos"]
+    C --> D["PostgreSQL<br/>データベース"]
+</div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="text-blue-900 font-medium">ORMを使うメリット</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• SQL文を覚えなくても、Pythonのコードだけで書ける</li>
+                                    <li>• データベースを変更してもコードの変更が少ない</li>
+                                    <li>• タイプミスや文法ミスが減る</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: database.pyの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.2 データベース接続設定の作成
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-1: database.py の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">PostgreSQLに接続するための設定ファイルを作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">backendフォルダで database.py を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            VS Codeでbackendフォルダを開き、新しいファイル <code class="bg-purple-100 px-1 rounded">database.py</code> を作成します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">データベース接続コードを記述</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコードを入力します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">backend/database.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import create_engine, Session
+
+# データベース接続URL
+# 形式: postgresql://ユーザー名:パスワード@ホスト:ポート/データベース名
+DATABASE_URL = "postgresql://todo_user:todo_password@localhost:5432/todo_db"
+
+# データベースエンジンの作成
+# エンジンは、データベースとの接続を管理する
+engine = create_engine(DATABASE_URL, echo=True)
+
+# データベースセッションを取得する関数
+def get_db():
+    """
+    データベースセッションを取得し、使用後に自動でクローズする
+    """
+    with Session(engine) as session:
+        yield session  # セッションを返す</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-slate-100 border border-slate-300 rounded-xl p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-book text-primary-500"></i>
+                            コードの解説
+                        </h4>
+                        <div class="space-y-3 text-slate-700 text-sm">
+                            <div>
+                                <strong class="text-slate-900">DATABASE_URL:</strong>
+                                データベースへの接続情報。ユーザー名、パスワード、ホスト、ポート、データベース名を含みます。
+                            </div>
+                            <div>
+                                <strong class="text-slate-900">create_engine:</strong>
+                                データベースエンジンを作成。これがデータベースとの接続を管理します。
+                            </div>
+                            <div>
+                                <strong class="text-slate-900">Session:</strong>
+                                データベースとやりとりする際に使う「セッション」。with文で自動的に開閉されます。
+                            </div>
+                            <div>
+                                <strong class="text-slate-900">get_db:</strong>
+                                セッションを取得して、使い終わったら自動でクローズする関数。
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: models.pyの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.3 Todoモデルの作成
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-2: models.py の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">Todoテーブルに対応するPythonクラスを作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">models.py を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            backendフォルダに新しいファイル <code class="bg-purple-100 px-1 rounded">models.py</code> を作成します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Todoモデルを定義</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">backend/models.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import SQLModel, Field
+from datetime import datetime
+from typing import Optional
+
+class Todo(SQLModel, table=True):
+    """
+    Todoテーブルを表すモデルクラス
+    データベースの「todos」テーブルと対応する
+    """
+    __tablename__ = "todos"  # データベースのテーブル名
+
+    # カラム定義
+    id: Optional[int] = Field(default=None, primary_key=True)  # ID（主キー）
+    title: str = Field(max_length=200)  # タイトル（必須、最大200文字）
+    completed: bool = Field(default=False)  # 完了状態（デフォルトはFalse=未完了）
+    created_at: datetime = Field(default_factory=datetime.now)  # 作成日時
+    updated_at: datetime = Field(default_factory=datetime.now)  # 更新日時</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- テーブルとモデルの対応図 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-primary-500"></i>
+                            テーブルとモデルの対応
+                        </h4>
+                        <div class="mermaid">
+classDiagram
+    class Todo {
+        +int id
+        +string title
+        +boolean completed
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class todos_table {
+        id INTEGER PRIMARY KEY
+        title VARCHAR(200)
+        completed BOOLEAN
+        created_at TIMESTAMP
+        updated_at TIMESTAMP
+    }
+
+    Todo --|> todos_table : マッピング
+</div>
+                    </div>
+                </section>
+
+                <!-- セクション4: schemas.pyの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.4 レスポンススキーマの作成
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-3: schemas.py の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">APIがクライアントに返すデータの形式を定義します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">schemas.py を作成</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">backend/schemas.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Optional
+
+class TodoBase(BaseModel):
+    """
+    Todoの基本情報
+    """
+    title: str = Field(..., min_length=1, max_length=200)  # タイトル（必須、1〜200文字）
+    completed: bool = False  # 完了状態（デフォルトはFalse）
+
+class TodoCreate(TodoBase):
+    """
+    Todo作成時のリクエスト
+    """
+    pass  # TodoBaseと同じ内容
+
+class TodoUpdate(BaseModel):
+    """
+    Todo更新時のリクエスト
+    すべてのフィールドをオプションにする
+    """
+    title: Optional[str] = Field(None, min_length=1, max_length=200)  # タイトル（任意、1〜200文字）
+    completed: Optional[bool] = None
+
+class TodoResponse(TodoBase):
+    """
+    APIレスポンス用のTodo
+    """
+    id: int  # ID
+    created_at: datetime  # 作成日時
+    updated_at: datetime  # 更新日時
+
+    class Config:
+        # ORMモード: SQLModelのモデルから自動変換できるようにする
+        from_attributes = True</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: crud.pyの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.5 タスク取得処理の実装
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-4: crud.py の作成（タスク一覧取得機能）
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">データベースからタスクを取得する処理を実装します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">crud.py を作成</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">backend/crud.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">from sqlmodel import Session, select
+from models import Todo
+from typing import Optional
+from datetime import datetime
+import schemas
+
+def get_todos(db: Session, status: Optional[str] = None):
+    """
+    タスク一覧を取得する
+
+    Args:
+        db: データベースセッション
+        status: フィルター条件（"all", "active", "completed"）
+
+    Returns:
+        Todoのリスト
+    """
+    # 基本クエリ: todosテーブルからすべてを取得
+    statement = select(Todo)
+
+    # フィルター処理
+    if status == "active":
+        # 未完了（completed=False）のみ
+        statement = statement.where(Todo.completed == False)
+    elif status == "completed":
+        # 完了済み（completed=True）のみ
+        statement = statement.where(Todo.completed == True)
+    # status=="all" または None の場合はフィルターなし（すべて）
+
+    # 作成日時の新しい順で並べ替えて返す
+    statement = statement.order_by(Todo.created_at.desc())
+    return db.exec(statement).all()</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- フィルター処理の動作図 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-filter text-primary-500"></i>
+                            フィルター処理の動作
+                        </h4>
+                        <div class="mermaid">
+flowchart TD
+    A["get_todos 呼び出し"] --> B{"status パラメータ"}
+    B -->|"all または None"| C["すべてのタスクを取得"]
+    B -->|"active"| D["completed=False<br/>未完了のみ取得"]
+    B -->|"completed"| E["completed=True<br/>完了済みのみ取得"]
+    C --> F["作成日時の降順で並び替え"]
+    D --> F
+    E --> F
+    F --> G["タスク一覧を返す"]
+</div>
+                    </div>
+                </section>
+
+                <!-- セクション6: main.pyの更新 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.6 タスク一覧APIエンドポイントの作成
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-5: main.py にタスク一覧取得APIを追加
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">main.pyを編集し、タスク一覧を取得するAPIエンドポイントを追加します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">main.py を以下の内容に更新</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">backend/main.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI, Depends, HTTPException
+from sqlmodel import Session, SQLModel
+from typing import List, Optional
+from database import get_db, engine
+from models import Todo
+import schemas
+import crud
+
+# データベースのテーブルを作成（既に存在する場合は何もしない）
+SQLModel.metadata.create_all(engine)
+
+# FastAPIアプリケーションの作成
+app = FastAPI(
+    title="Todo API",
+    description="Next.js + FastAPI Todoアプリのバックエンド",
+    version="1.0.0"
+)
+
+# ルートエンドポイント
+@app.get("/")
+def read_root():
+    """
+    ルートパス - APIの動作確認用
+    """
+    return {"message": "Todo API is running!"}
+
+# タスク一覧取得API
+@app.get("/api/todos", response_model=List[schemas.TodoResponse])
+def get_todos_api(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    タスク一覧を取得
+
+    Args:
+        status: フィルター条件（all, active, completed）
+        db: データベースセッション
+
+    Returns:
+        タスクのリスト
+    """
+    todos = crud.get_todos(db, status=status)
+    return todos</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API処理フロー -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-route text-primary-500"></i>
+                            API処理の流れ
+                        </h4>
+                        <div class="mermaid">
+sequenceDiagram
+    participant C as クライアント
+    participant A as FastAPI<br/>main.py
+    participant D as CRUD<br/>crud.py
+    participant DB as PostgreSQL
+
+    C->>A: GET /api/todos?status=active
+    A->>A: get_db() でセッション取得
+    A->>D: get_todos(db, status="active")
+    D->>DB: SELECT * FROM todos WHERE completed=false
+    DB-->>D: タスクデータ
+    D-->>A: Todoオブジェクトのリスト
+    A->>A: TodoResponseに変換
+    A-->>C: JSON形式で返す
+</div>
+                    </div>
+                </section>
+
+                <!-- セクション7: 動作確認 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.7 動作確認とテスト
+                    </h2>
+
+                    <!-- 事前準備の確認 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">動作確認の前に</h3>
+                                <p class="text-blue-900 text-sm mb-2">以下が起動していることを確認してください（ステップ2・3で設定済み）：</p>
+                                <ul class="space-y-1 text-blue-900 text-sm">
+                                    <li class="flex items-center gap-2">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span>PostgreSQLコンテナが起動中（<code class="bg-blue-100 px-1 rounded">docker-compose up -d</code>）</span>
+                                    </li>
+                                    <li class="flex items-center gap-2">
+                                        <i class="fas fa-check text-blue-500"></i>
+                                        <span>FastAPIサーバーが起動中（<code class="bg-blue-100 px-1 rounded">uvicorn main:app --reload</code>）</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">Swagger UIでAPIをテスト</h3>
+                                <p class="text-emerald-900 mb-4">ブラウザで以下のURLにアクセスします。</p>
+
+                                <div class="bg-emerald-100 rounded-lg p-4 mb-4 border border-emerald-200">
+                                    <p class="text-emerald-900 text-sm">
+                                        <strong>URL:</strong> <a href="http://localhost:8000/docs" target="_blank" class="text-primary-600 hover:underline">http://localhost:8000/docs</a>
+                                    </p>
+                                </div>
+
+                                <h4 class="font-medium text-emerald-800 mb-2">テスト手順:</h4>
+                                <ol class="list-decimal pl-5 space-y-2 text-emerald-900 text-sm">
+                                    <li><strong>GET /api/todos</strong> をクリック</li>
+                                    <li>「Try it out」をクリック</li>
+                                    <li>statusパラメータに「all」と入力</li>
+                                    <li>「Execute」をクリック</li>
+                                    <li>Response bodyに3件のタスクが表示されることを確認</li>
+                                </ol>
+
+                                <h4 class="font-medium text-emerald-800 mb-2 mt-4">フィルターのテスト:</h4>
+                                <ul class="space-y-1 text-emerald-900 text-sm">
+                                    <li>• <code class="bg-emerald-100 px-1 rounded">status=active</code> → 未完了のみ（2件）</li>
+                                    <li>• <code class="bg-emerald-100 px-1 rounded">status=completed</code> → 完了済みのみ（1件）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">期待される結果</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">JSON Response</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-json">[
+  {
+    "id": 3,
+    "title": "部屋を掃除する",
+    "completed": false,
+    "created_at": "2025-01-08T10:30:00",
+    "updated_at": "2025-01-08T10:30:00"
+  },
+  {
+    "id": 1,
+    "title": "牛乳を買う",
+    "completed": false,
+    "created_at": "2025-01-08T10:28:00",
+    "updated_at": "2025-01-08T10:28:00"
+  },
+  {
+    "id": 2,
+    "title": "レポートを提出する",
+    "completed": true,
+    "created_at": "2025-01-08T10:29:00",
+    "updated_at": "2025-01-08T10:29:00"
+  }
+]</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">「ModuleNotFoundError: No module named 'sqlmodel'」</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> SQLModelがインストールされていません。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong> 仮想環境を有効化してからインストールしてください。</p>
+                                    <div class="code-block-wrapper">
+                                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                            <span class="text-slate-400 text-sm">コマンドプロンプト</span>
+                                            <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cd backend
+venv\Scripts\activate
+pip install sqlmodel psycopg2-binary</code></pre>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">「could not connect to server」</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> PostgreSQLコンテナが起動していません。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong></p>
+                                    <div class="code-block-wrapper">
+                                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                            <span class="text-slate-400 text-sm">コマンドプロンプト</span>
+                                            <button class="copy-btn text-slate-400 hover:text-white" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">docker-compose up -d</code></pre>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">空のリスト [] が返される</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> データベースにデータが入っていません。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong> pgAdminでテストデータを追加してください。</p>
+                                </div>
+                            </details>
+
+                            <!-- エラー4 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">「relation "todos" does not exist」</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> todosテーブルが作成されていません。</p>
+                                    <p class="mb-2"><strong>解決方法:</strong> ステップ2で作成したCREATE TABLE文をpgAdminで実行してください。</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください：</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            database.py が作成され、データベースへの接続設定ができている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            models.py でTodoモデルが定義されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            schemas.py でTodoResponseスキーマが定義されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            crud.py のget_todos関数でデータベースからタスクを取得できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            GET /api/todos でタスク一覧が取得できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check6"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check6" class="text-blue-900 cursor-pointer">
+                                            statusパラメータ（all, active, completed）でフィルタリングできる
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="nextjs-fastapi-todo-tutorial-03.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">FastAPIバックエンドの基礎</span>
+                        </div>
+                    </a>
+                    <a href="nextjs-fastapi-todo-tutorial-05.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">タスク作成・更新・削除機能</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

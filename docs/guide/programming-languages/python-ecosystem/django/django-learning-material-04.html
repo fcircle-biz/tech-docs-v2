@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Django学習教材 第4章 - ビュー - リクエストを処理してレスポンスを返す</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Django/Python用カラーテーマ (Blue)
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Django学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Webフレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約21時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Django</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ビュー - リクエストを処理してレスポンスを返す</h1>
+                    <p class="text-slate-600">関数ビューとクラスベースビュー、HttpRequestとHttpResponseオブジェクト、コンテキストデータの渡し方を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューの役割とMVTアーキテクチャにおける位置づけ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>関数ベースビュー（FBV）の書き方と実装パターン</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HttpRequestとHttpResponseオブジェクトの扱い方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>テンプレートへのコンテキストデータの渡し方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>クラスベースビュー（CBV）の基礎概念</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション4.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 ビューとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">ビュー（View）</strong>は、DjangoのMVTアーキテクチャにおいて「ロジック層」を担当する重要な要素です。ユーザーからのHTTPリクエストを受け取り、必要な処理を行い、HTTPレスポンスを返すという、Webアプリケーションの中心的な役割を果たします。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        他のフレームワークでは「Controller（コントローラー）」と呼ばれることが多い部分ですが、Djangoではこれを「View」と呼びます。第1章で学んだように、Djangoでは「Template」が表示層を担当するため、名称が異なりますが役割は同じです。
+                    </p>
+
+                    <!-- ビューの役割図 -->
+                    <div class="my-6 bg-white rounded-lg border border-slate-200 p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-project-diagram text-primary-500"></i>
+                            ビューの処理フロー
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A[ユーザー] -->|1. HTTPリクエスト<br/>URL: /blog/5/| B[URLルーティング]
+    B -->|2. パラメータ渡し<br/>id=5| C[View<br/>ビュー関数]
+    C -->|3. データ要求<br/>id=5の記事| D[Model<br/>モデル]
+    D -->|4. データ返却| C
+    C -->|5. コンテキスト<br/>渡し| E[Template<br/>テンプレート]
+    E -->|6. HTMLレスポンス| A
+
+    style A fill:#e0f2fe,stroke:#0ea5e9
+    style B fill:#fef3c7,stroke:#f59e0b
+    style C fill:#dbeafe,stroke:#3b82f6
+    style D fill:#fef3c7,stroke:#f59e0b
+    style E fill:#dcfce7,stroke:#10b981
+                        </div>
+                    </div>
+
+                    <!-- ビューの責務 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ビューの主な責務</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li>• <strong>リクエストの受付</strong>: URLから渡されたパラメータを取得</li>
+                                    <li>• <strong>ビジネスロジックの実行</strong>: 必要な処理や計算を実行</li>
+                                    <li>• <strong>データの取得</strong>: Modelを通じてデータベースから情報を取得</li>
+                                    <li>• <strong>データの加工</strong>: テンプレートで表示しやすい形に整形</li>
+                                    <li>• <strong>レスポンスの生成</strong>: HTMLページやJSONデータを返却</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 関数ベースビュー（Function-Based View: FBV）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        関数ベースビューは、Pythonの通常の関数としてビューを定義する最もシンプルな方法です。初心者にとって理解しやすく、小規模なビューや単純な処理に適しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">基本的な関数ビューの構造</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        関数ビューは、<code class="bg-slate-100 px-2 py-0.5 rounded text-sm">HttpRequest</code>オブジェクトを受け取り、<code class="bg-slate-100 px-2 py-0.5 rounded text-sm">HttpResponse</code>オブジェクトを返す関数です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 最もシンプルなビュー
+from django.http import HttpResponse
+
+def hello_view(request):
+    # requestオブジェクトを受け取る
+    # HttpResponseオブジェクトを返す
+    return HttpResponse("Hello, Django!")</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">テンプレートをレンダリングするビュー</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際のWebアプリケーションでは、HTMLテンプレートをレンダリングしてレスポンスを返すことが一般的です。<code class="bg-slate-100 px-2 py-0.5 rounded text-sm">render()</code>ショートカット関数を使用します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># テンプレートをレンダリングするビュー
+from django.shortcuts import render
+
+def article_list(request):
+    # テンプレートをレンダリングしてレスポンスを返す
+    return render(request, 'blog/article_list.html')</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">URLパラメータを受け取るビュー</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        URLから渡されたパラメータを関数の引数として受け取ることができます。URLルーティングの設定と連携して動作します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># URLパラメータを受け取るビュー
+from django.shortcuts import render
+
+def article_detail(request, article_id):
+    # URLから渡された記事IDを受け取る
+    # 例: /blog/5/ → article_id = 5
+    context = {
+        'article_id': article_id
+    }
+    return render(request, 'blog/article_detail.html', context)</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">render()関数の役割</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    <code class="bg-blue-100 px-2 py-0.5 rounded text-xs">render(request, template_name, context)</code>は、テンプレートをレンダリングしてHttpResponseを返すショートカット関数です。内部では、テンプレートの読み込み、コンテキストデータの埋め込み、HttpResponseオブジェクトの生成を自動的に行います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 HttpRequestとHttpResponseオブジェクト
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DjangoのビューはHTTPプロトコルに基づいて動作します。<strong class="text-slate-800">HttpRequest</strong>オブジェクトにはクライアントからの情報が、<strong class="text-slate-800">HttpResponse</strong>オブジェクトにはサーバーからの応答情報が含まれます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">HttpRequestオブジェクト</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビュー関数の第1引数として必ず渡されるオブジェクトで、クライアントからのリクエスト情報にアクセスできます。
+                    </p>
+
+                    <!-- HttpRequest属性表 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-4">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list text-slate-500"></i>
+                            主なHttpRequest属性
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white rounded-lg overflow-hidden text-sm">
+                                <thead class="bg-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">属性</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">説明</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">例</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.method</code></td>
+                                        <td class="px-4 py-3">HTTPメソッド</td>
+                                        <td class="px-4 py-3">'GET', 'POST', 'PUT'</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.GET</code></td>
+                                        <td class="px-4 py-3">GETパラメータ</td>
+                                        <td class="px-4 py-3">?page=2 → {'page': '2'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.POST</code></td>
+                                        <td class="px-4 py-3">POSTデータ</td>
+                                        <td class="px-4 py-3">フォーム送信データ</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.path</code></td>
+                                        <td class="px-4 py-3">URLパス</td>
+                                        <td class="px-4 py-3">'/blog/5/'</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.user</code></td>
+                                        <td class="px-4 py-3">現在のユーザー</td>
+                                        <td class="px-4 py-3">User オブジェクト</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs">request.session</code></td>
+                                        <td class="px-4 py-3">セッションデータ</td>
+                                        <td class="px-4 py-3">辞書型オブジェクト</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">HttpRequestの使用例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># リクエスト情報を使用するビュー
+def search_view(request):
+    # GETパラメータを取得
+    query = request.GET.get('q', '')  # デフォルト値は空文字
+
+    # メソッドをチェック
+    if request.method == 'POST':
+        # POSTデータを処理
+        keyword = request.POST.get('keyword')
+
+    # ユーザー情報を確認
+    if request.user.is_authenticated:
+        username = request.user.username
+
+    return render(request, 'search.html')</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">HttpResponseオブジェクト</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビュー関数が返すオブジェクトで、クライアントへのレスポンス内容を定義します。通常は<code class="bg-slate-100 px-2 py-0.5 rounded text-sm">render()</code>などのショートカット関数を使いますが、直接作成することもできます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">HttpResponseの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from django.http import HttpResponse, JsonResponse
+from django.shortcuts import redirect
+
+# テキストレスポンス
+def text_view(request):
+    return HttpResponse("Plain text response")
+
+# JSONレスポンス
+def json_view(request):
+    data = {'status': 'success', 'count': 10}
+    return JsonResponse(data)
+
+# リダイレクト
+def redirect_view(request):
+    return redirect('/blog/')</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 コンテキストデータの渡し方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">コンテキスト（Context）</strong>は、ビューからテンプレートにデータを渡すための辞書オブジェクトです。テンプレート内で変数として使用できるデータを設定します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">基本的なコンテキストの渡し方</h3>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 単純なコンテキストデータ
+def greeting_view(request):
+    context = {
+        'name': '山田太郎',
+        'message': 'こんにちは',
+        'year': 2025
+    }
+    return render(request, 'greeting.html', context)</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">templates/greeting.html</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;!-- テンプレート内でコンテキスト変数を使用 --&gt;
+&lt;h1&gt;{{ message }}、{{ name }}さん！&lt;/h1&gt;
+&lt;p&gt;今年は{{ year }}年です。&lt;/p&gt;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">モデルデータを渡す</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベースから取得したモデルオブジェクトをコンテキストに含めることで、テンプレートで表示できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># モデルデータをコンテキストに渡す
+from .models import Article
+
+def article_list_view(request):
+    # データベースから記事を全件取得
+    articles = Article.objects.all()
+
+    context = {
+        'articles': articles,
+        'total_count': articles.count()
+    }
+    return render(request, 'blog/article_list.html', context)</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">templates/blog/article_list.html</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;!-- テンプレートでモデルデータを表示 --&gt;
+&lt;h1&gt;記事一覧 (全{{ total_count }}件)&lt;/h1&gt;
+&lt;ul&gt;
+  {% for article in articles %}
+    &lt;li&gt;{{ article.title }} - {{ article.author }}&lt;/li&gt;
+  {% endfor %}
+&lt;/ul&gt;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    コンテキストのキー名がテンプレート内の変数名になります。わかりやすく、一貫性のある命名を心がけましょう。複数の単語を組み合わせる場合は、スネークケース（article_list）を使用するのが一般的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 クラスベースビュー（Class-Based View: CBV）入門
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">クラスベースビュー（CBV）</strong>は、Pythonのクラスを使ってビューを定義する方法です。関数ベースビューよりも再利用性が高く、DjangoはCRUD操作などの一般的なパターンを提供しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">FBV vs CBVの比較</h3>
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-function text-blue-500"></i>
+                                    関数ベースビュー（FBV）
+                                </h4>
+                                <ul class="text-slate-700 text-sm space-y-2">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-plus text-green-600 mt-1 flex-shrink-0"></i>
+                                        <span>シンプルで理解しやすい</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-plus text-green-600 mt-1 flex-shrink-0"></i>
+                                        <span>小規模な処理に適している</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-minus text-red-600 mt-1 flex-shrink-0"></i>
+                                        <span>コードの再利用が難しい</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-minus text-red-600 mt-1 flex-shrink-0"></i>
+                                        <span>条件分岐が複雑になりがち</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-object-group text-purple-500"></i>
+                                    クラスベースビュー（CBV）
+                                </h4>
+                                <ul class="text-slate-700 text-sm space-y-2">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-plus text-green-600 mt-1 flex-shrink-0"></i>
+                                        <span>コードの再利用性が高い</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-plus text-green-600 mt-1 flex-shrink-0"></i>
+                                        <span>標準的な処理が簡潔に書ける</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-minus text-red-600 mt-1 flex-shrink-0"></i>
+                                        <span>学習コストが高い</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-minus text-red-600 mt-1 flex-shrink-0"></i>
+                                        <span>内部動作が見えにくい</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">シンプルなクラスベースビューの例</h3>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/views.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># クラスベースビューの基本
+from django.views import View
+from django.shortcuts import render
+
+class ArticleListView(View):
+    # GETリクエストの処理
+    def get(self, request):
+        return render(request, 'blog/article_list.html')
+
+    # POSTリクエストの処理
+    def post(self, request):
+        # POSTデータの処理
+        return render(request, 'blog/success.html')</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">blog/urls.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># URLパターンでCBVを使用
+from django.urls import path
+from .views import ArticleListView
+
+urlpatterns = [
+    # as_view()メソッドで関数に変換
+    path('articles/', ArticleListView.as_view(), name='article_list'),
+]</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">汎用ビュー（Generic Views）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Djangoは、よく使われる処理パターンを実装した汎用ビュークラスを提供しています。これらを継承することで、少ないコードで高機能なビューを作成できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">汎用ビューの例（ListView）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># ListViewを使った記事一覧ビュー
+from django.views.generic import ListView
+from .models import Article
+
+class ArticleListView(ListView):
+    model = Article  # 使用するモデル
+    template_name = 'blog/article_list.html'
+    context_object_name = 'articles'  # テンプレート内の変数名
+    paginate_by = 10  # ページネーション（1ページ10件）</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">学習のヒント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    初心者は、まず関数ベースビュー（FBV）で基本を理解することをお勧めします。ビューの動作原理を理解してから、クラスベースビュー（CBV）に進むと、より深く理解できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-1: 簡単なビューを作成してみよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">実際にビューを作成して、リクエストとレスポンスの流れを体験しましょう。</p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">blog/views.pyに、現在時刻を表示する関数ビューを作成する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">コンテキストに現在時刻を含め、テンプレートに渡す</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">URLパターンを設定し、ブラウザでアクセスして確認する</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ビュー関数が必ず受け取る第1引数は何ですか？また、何を返す必要がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            第1引数は<strong>HttpRequestオブジェクト</strong>（通常は<code>request</code>という名前）です。戻り値として<strong>HttpResponseオブジェクト</strong>を返す必要があります。render()関数などは内部でHttpResponseを生成して返してくれます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. テンプレートにデータを渡すために使用する辞書オブジェクトを何と呼びますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>コンテキスト（Context）</strong>と呼びます。render()関数の第3引数として渡し、そのキーがテンプレート内で変数名として使用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 関数ベースビュー（FBV）とクラスベースビュー（CBV）の主な違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            FBVは通常の関数として定義し、シンプルで理解しやすいのが特徴です。CBVはPythonクラスとして定義し、コードの再利用性が高く、継承やミックスインで機能を拡張できます。初心者はFBVから学び、慣れてからCBVに進むのが推奨されます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8 overflow-hidden">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-slate-500"></i>
+                        第4章のまとめ
+                    </h3>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>ビュー</strong>は、MVTアーキテクチャのロジック層を担当し、リクエストを受け取りレスポンスを返す「コントローラー」の役割を果たします。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>関数ベースビュー（FBV）</strong>は、シンプルで理解しやすく、初心者の学習に適しています。HttpRequestを受け取り、HttpResponseを返します。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>HttpRequestオブジェクト</strong>にはメソッド、GETパラメータ、POSTデータ、ユーザー情報など、クライアントからの情報が含まれます。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>コンテキスト</strong>は、ビューからテンプレートにデータを渡す辞書オブジェクトで、テンプレート内で変数として使用できます。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>クラスベースビュー（CBV）</strong>は、コードの再利用性が高く、Djangoの汎用ビューを使うことで効率的な開発ができます。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="django-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第3章: URLルーティング</span>
+                        </div>
+                    </a>
+                    <a href="django-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: テンプレート</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

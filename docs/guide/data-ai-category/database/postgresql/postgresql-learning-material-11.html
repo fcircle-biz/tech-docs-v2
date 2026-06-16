@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第11章 - ユーザーと権限管理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ユーザーと権限管理 - セキュリティの基礎</h1>
+                    <p class="text-slate-600">PostgreSQLのロールとユーザー管理、GRANT/REVOKEによる権限設定を学習します。本番環境で必要となるセキュリティ設定の基本と、最小権限の原則について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PostgreSQLのロールとユーザーの概念を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールの作成・変更・削除の基本操作を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GRANT/REVOKEによる権限管理を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>最小権限の原則に基づくセキュリティ設計を学ぶ</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 PostgreSQLのロールとユーザー
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLでは、<strong>ロール（Role）</strong>という概念でユーザー管理を行います。
+                        ロールは「ユーザー」と「グループ」の両方の役割を持つことができる柔軟な仕組みです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        他のRDBMSでは「ユーザー」と「ロール」が別の概念として扱われることが多いですが、PostgreSQLでは統一されています。
+                        ログイン可能なロールが「ユーザー」、権限をまとめたロールが「グループロール」として機能します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TB
+    subgraph PostgreSQL["PostgreSQLのロール体系"]
+        direction TB
+        Role[ロール全Role全]
+        LoginRole[ログイン可能ロール<br/>ユーザー相当]
+        GroupRole[グループロール<br/>権限のまとまり]
+
+        Role --> LoginRole
+        Role --> GroupRole
+    end
+
+    subgraph Example["実用例"]
+        direction TB
+        AppUser[app_user全ログイン可能全]
+        ReadOnly[readonly_group全権限集約全]
+        ReadWrite[readwrite_group全権限集約全]
+
+        AppUser -.継承.-> ReadOnly
+    end
+
+    LoginRole -.対応.-> AppUser
+    GroupRole -.対応.-> ReadOnly
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ロールの特徴</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    ロールにはLOGIN属性を付けることでログイン可能になります。
+                                    また、他のロールを継承することで権限をグループ化でき、複雑な権限管理をシンプルに実現できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 ロールの作成と管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロールの作成・変更・削除の基本操作を学びましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.2.1 ロールの作成（CREATE ROLE）</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        ロールを作成するには<code>CREATE ROLE</code>コマンドを使用します。
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 基本的なロール作成
+CREATE ROLE app_user;
+
+-- ログイン可能なロール（ユーザー）作成
+CREATE ROLE app_user WITH LOGIN PASSWORD 'password123';
+
+-- より詳細な属性を指定したロール作成
+CREATE ROLE developer WITH
+  LOGIN                    -- ログイン可能
+  PASSWORD 'dev_pass'      -- パスワード設定
+  CREATEDB                 -- データベース作成権限
+  VALID UNTIL '2025-12-31';-- パスワード有効期限</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.2.2 ロール属性の種類</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロールには様々な属性を設定できます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">属性</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">LOGIN / NOLOGIN</td>
+                                    <td class="px-4 py-3">ログイン可能/不可を設定（デフォルト: NOLOGIN）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">SUPERUSER / NOSUPERUSER</td>
+                                    <td class="px-4 py-3">スーパーユーザー権限（全ての制限を回避）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">CREATEDB / NOCREATEDB</td>
+                                    <td class="px-4 py-3">データベース作成権限</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">CREATEROLE / NOCREATEROLE</td>
+                                    <td class="px-4 py-3">ロール作成権限</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">REPLICATION / NOREPLICATION</td>
+                                    <td class="px-4 py-3">レプリケーション接続権限</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">PASSWORD 'password'</td>
+                                    <td class="px-4 py-3">ログインパスワードの設定</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.2.3 ロールの変更（ALTER ROLE）</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- パスワード変更
+ALTER ROLE app_user WITH PASSWORD 'new_password456';
+
+-- ロール属性の変更
+ALTER ROLE developer WITH NOCREATEDB;
+
+-- パスワード有効期限の延長
+ALTER ROLE app_user VALID UNTIL '2026-12-31';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.2.4 ロールの削除（DROP ROLE）</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ロールの削除
+DROP ROLE app_user;
+
+-- 所有オブジェクトがある場合は先に譲渡または削除
+REASSIGN OWNED BY app_user TO postgres;
+DROP OWNED BY app_user;
+DROP ROLE app_user;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">ロール削除の注意点</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    ロールがテーブルやビューなどのオブジェクトを所有している場合、そのままでは削除できません。
+                                    先にREASSIGN OWNEDで所有権を他のロールに譲渡するか、DROP OWNEDで所有オブジェクトを削除する必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 権限の種類と管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLでは、データベース・スキーマ・テーブルなど、様々なオブジェクトに対して細かく権限を設定できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.3.1 主な権限の種類</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- テーブル権限 -->
+                        <div class="bg-blue-100 border border-blue-200 rounded-xl p-4">
+                            <h4 class="text-blue-900 font-semibold mb-2">テーブル権限</h4>
+                            <ul class="text-blue-800 text-sm space-y-1">
+                                <li><code>SELECT</code> - データの参照</li>
+                                <li><code>INSERT</code> - データの挿入</li>
+                                <li><code>UPDATE</code> - データの更新</li>
+                                <li><code>DELETE</code> - データの削除</li>
+                                <li><code>TRUNCATE</code> - テーブルの全削除</li>
+                                <li><code>REFERENCES</code> - 外部キー作成</li>
+                            </ul>
+                        </div>
+
+                        <!-- データベース権限 -->
+                        <div class="bg-emerald-100 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="text-emerald-900 font-semibold mb-2">データベース権限</h4>
+                            <ul class="text-emerald-800 text-sm space-y-1">
+                                <li><code>CONNECT</code> - DB接続</li>
+                                <li><code>CREATE</code> - スキーマ作成</li>
+                                <li><code>TEMP</code> - 一時テーブル作成</li>
+                            </ul>
+                        </div>
+
+                        <!-- スキーマ権限 -->
+                        <div class="bg-purple-100 border border-purple-200 rounded-xl p-4">
+                            <h4 class="text-purple-900 font-semibold mb-2">スキーマ権限</h4>
+                            <ul class="text-purple-800 text-sm space-y-1">
+                                <li><code>USAGE</code> - スキーマ内オブジェクトへのアクセス</li>
+                                <li><code>CREATE</code> - オブジェクト作成</li>
+                            </ul>
+                        </div>
+
+                        <!-- その他 -->
+                        <div class="bg-amber-100 border border-amber-200 rounded-xl p-4">
+                            <h4 class="text-amber-900 font-semibold mb-2">その他の権限</h4>
+                            <ul class="text-amber-800 text-sm space-y-1">
+                                <li><code>EXECUTE</code> - 関数・プロシージャ実行</li>
+                                <li><code>USAGE</code> - シーケンス使用</li>
+                                <li><code>ALL PRIVILEGES</code> - 全権限</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 GRANT - 権限の付与
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        <code>GRANT</code>コマンドで、ロールに対して権限を付与します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.4.1 基本的なGRANT構文</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- テーブルへのSELECT権限付与
+GRANT SELECT ON products TO app_user;
+
+-- テーブルへの複数権限付与
+GRANT SELECT, INSERT, UPDATE ON orders TO app_user;
+
+-- データベース接続権限
+GRANT CONNECT ON DATABASE mydb TO app_user;
+
+-- スキーマ使用権限
+GRANT USAGE ON SCHEMA public TO app_user;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.4.2 すべてのテーブルに権限を付与</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- スキーマ内の全テーブルにSELECT権限付与
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_user;
+
+-- スキーマ内の全テーブルに読み書き権限付与
+GRANT SELECT, INSERT, UPDATE, DELETE
+ON ALL TABLES IN SCHEMA public TO app_user;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.4.3 デフォルト権限の設定</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        将来作成されるオブジェクトに対する権限を事前に設定できます。
+                    </p>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 将来作成されるテーブルへの権限設定
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT SELECT ON TABLES TO readonly_user;
+
+-- 特定ロールが作成するテーブルへの権限設定
+ALTER DEFAULT PRIVILEGES FOR ROLE developer IN SCHEMA public
+GRANT ALL ON TABLES TO app_user;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">デフォルト権限のメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    デフォルト権限を設定しておくことで、新しくテーブルを作成するたびに権限を付与する手間が省けます。
+                                    開発環境で特に便利な機能です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 REVOKE - 権限の剥奪
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        <code>REVOKE</code>コマンドで、付与した権限を取り消します。
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- テーブルのSELECT権限剥奪
+REVOKE SELECT ON products FROM app_user;
+
+-- 複数の権限を剥奪
+REVOKE INSERT, UPDATE, DELETE ON orders FROM app_user;
+
+-- 全権限の剥奪
+REVOKE ALL PRIVILEGES ON customers FROM app_user;
+
+-- スキーマ内の全テーブルから権限剥奪
+REVOKE SELECT ON ALL TABLES IN SCHEMA public FROM app_user;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">権限の継承に注意</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    ロールが他のロールを継承している場合、継承元の権限も有効になります。
+                                    特定のロールから権限を剥奪しても、継承している別のロール経由でアクセスできる可能性があることに注意しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 グループロールによる権限管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        グループロールを使うことで、権限管理を効率的に行えます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.6.1 グループロールの作成と権限付与</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 読み取り専用グループロール作成
+CREATE ROLE readonly_group NOLOGIN;
+
+-- 読み書き可能グループロール作成
+CREATE ROLE readwrite_group NOLOGIN;
+
+-- 各グループに権限付与
+GRANT CONNECT ON DATABASE mydb TO readonly_group;
+GRANT USAGE ON SCHEMA public TO readonly_group;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_group;
+
+GRANT CONNECT ON DATABASE mydb TO readwrite_group;
+GRANT USAGE ON SCHEMA public TO readwrite_group;
+GRANT SELECT, INSERT, UPDATE, DELETE
+ON ALL TABLES IN SCHEMA public TO readwrite_group;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.6.2 ユーザーにグループロールを付与</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ユーザー作成
+CREATE ROLE alice WITH LOGIN PASSWORD 'alice_pass';
+CREATE ROLE bob WITH LOGIN PASSWORD 'bob_pass';
+
+-- グループロールを付与（ロールの継承）
+GRANT readonly_group TO alice;
+GRANT readwrite_group TO bob;
+
+-- 複数のグループロールを付与することも可能
+GRANT readonly_group, readwrite_group TO admin_user;</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TB
+    subgraph Groups["グループロール"]
+        RO[readonly_group<br/>全SELECT権限全]
+        RW[readwrite_group<br/>全読み書き権限全]
+    end
+
+    subgraph Users["個別ユーザー"]
+        Alice[alice<br/>全ログイン可能全]
+        Bob[bob<br/>全ログイン可能全]
+    end
+
+    RO -.継承.-> Alice
+    RW -.継承.-> Bob
+
+    style RO fill:#dbeafe
+    style RW fill:#d1fae5
+    style Alice fill:#fef3c7
+    style Bob fill:#fef3c7
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">グループロールのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    グループロールを使うことで、「読み取り専用ユーザー」「アプリケーション用ユーザー」など、役割ごとに権限を一元管理できます。
+                                    新しいユーザーを追加する際も、グループロールを付与するだけで必要な権限がすべて設定されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.7 権限の確認方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        設定した権限が正しく反映されているか確認する方法を学びましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.7.1 ロール一覧の確認</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- すべてのロールを確認
+\du
+
+-- SQLクエリでロール確認
+SELECT rolname, rolsuper, rolinherit, rolcreaterole,
+       rolcreatedb, rolcanlogin
+FROM pg_roles
+ORDER BY rolname;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.7.2 テーブル権限の確認</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- テーブルのアクセス権限を確認
+\dp products
+
+-- SQLクエリでテーブル権限確認
+SELECT grantee, privilege_type
+FROM information_schema.table_privileges
+WHERE table_name = 'products'
+ORDER BY grantee, privilege_type;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">11.7.3 現在のロール確認</h3>
+                    <div class="code-block-wrapper my-4">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 現在のロール確認
+SELECT current_user;
+
+-- セッション情報確認
+SELECT current_user, session_user, current_database();</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.8 セキュリティのベストプラクティス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番環境でPostgreSQLを安全に運用するためのベストプラクティスを紹介します。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- 原則1 -->
+                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-shield-alt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-blue-800 mb-2">1. 最小権限の原則</h3>
+                                    <p class="text-blue-900 text-sm">
+                                        各ユーザーには業務に必要最小限の権限のみを付与します。
+                                        特にSUPERUSER権限は極力使わず、必要に応じて個別の権限を付与しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 原則2 -->
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-emerald-800 mb-2">2. 強力なパスワードポリシー</h3>
+                                    <p class="text-emerald-900 text-sm">
+                                        パスワードは十分に長く（12文字以上）、大小英字・数字・記号を組み合わせたものを使用します。
+                                        VALID UNTILで有効期限を設定し、定期的な変更を促しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 原則3 -->
+                        <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-users-cog text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-purple-800 mb-2">3. 役割ベースのアクセス制御</h3>
+                                    <p class="text-purple-900 text-sm">
+                                        グループロールを活用し、「開発者」「アプリケーション」「分析担当者」など、役割ごとに権限を管理します。
+                                        個別ユーザーへの直接的な権限付与は避けましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 原則4 -->
+                        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-user-slash text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-amber-800 mb-2">4. postgresロールの使用制限</h3>
+                                    <p class="text-amber-900 text-sm">
+                                        デフォルトのpostgresロールは管理用途のみに使用し、アプリケーションから直接接続しないようにします。
+                                        アプリケーション専用のロールを作成しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 原則5 -->
+                        <div class="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-history text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-red-800 mb-2">5. 定期的な権限の棚卸し</h3>
+                                    <p class="text-red-900 text-sm">
+                                        使われなくなったロールや不要な権限は定期的に見直し、削除します。
+                                        退職者のアカウントは即座に無効化しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習セクション -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: Webアプリケーション向けの権限設定</h3>
+                            <p class="text-purple-900 text-sm mb-4 break-words">
+                                以下のシナリオで権限管理を実践してみましょう。
+                            </p>
+                            <div class="bg-purple-100 rounded-lg p-4 mb-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">シナリオ:</p>
+                                <ul class="text-purple-800 text-sm space-y-1 list-disc list-inside">
+                                    <li>Webアプリケーション用の読み書き可能ロール（app_user）</li>
+                                    <li>分析担当者用の読み取り専用ロール（analyst）</li>
+                                    <li>バッチ処理用のロール（batch_user）</li>
+                                </ul>
+                            </div>
+                            <div class="code-block-wrapper">
+                                <div class="code-block-header">
+                                    <span>SQL</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre><code class="language-sql">-- グループロール作成
+CREATE ROLE app_role NOLOGIN;
+CREATE ROLE analyst_role NOLOGIN;
+CREATE ROLE batch_role NOLOGIN;
+
+-- 権限付与
+GRANT CONNECT ON DATABASE mydb TO app_role;
+GRANT USAGE ON SCHEMA public TO app_role;
+GRANT SELECT, INSERT, UPDATE, DELETE
+ON ALL TABLES IN SCHEMA public TO app_role;
+
+GRANT CONNECT ON DATABASE mydb TO analyst_role;
+GRANT USAGE ON SCHEMA public TO analyst_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO analyst_role;
+
+-- ユーザー作成とグループ付与
+CREATE ROLE app_user WITH LOGIN PASSWORD 'app_secure_pass123';
+CREATE ROLE analyst WITH LOGIN PASSWORD 'analyst_pass123';
+CREATE ROLE batch_user WITH LOGIN PASSWORD 'batch_pass123';
+
+GRANT app_role TO app_user;
+GRANT analyst_role TO analyst;
+GRANT batch_role TO batch_user;</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. PostgreSQLでロールとユーザーの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> PostgreSQLでは「ロール」が統一的な概念として使われます。<br>
+                                            - ログイン可能なロール（LOGIN属性あり）がユーザー相当<br>
+                                            - ログイン不可のロール（NOLOGIN）がグループロール相当<br>
+                                            他のRDBMSのように「ユーザー」と「ロール」が分かれていないのがPostgreSQLの特徴です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 最小権限の原則とは何ですか？なぜ重要ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> 最小権限の原則とは、各ユーザーに業務遂行に必要最小限の権限のみを付与する考え方です。<br>
+                                            重要な理由:<br>
+                                            - セキュリティリスクの最小化（不正アクセスの影響範囲を限定）<br>
+                                            - 誤操作による事故の防止（削除権限がなければ誤ってDELETEできない）<br>
+                                            - 監査とトラブルシューティングの容易化（誰が何をできるか明確）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. グループロールを使うメリットを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え（例）:</strong><br>
+                                            1. 権限の一元管理: 役割ごとに権限をまとめて管理でき、変更時も1箇所の修正で済む<br>
+                                            2. 新規ユーザー追加の効率化: グループロールを付与するだけで必要な権限がすべて設定される<br>
+                                            （他にも、権限設定の標準化、ヒューマンエラーの削減なども正解です）
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第11章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>PostgreSQLではロールがユーザーとグループの両方の役割を持つ</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>CREATE ROLE、ALTER ROLE、DROP ROLEでロールを管理する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>GRANTで権限を付与、REVOKEで権限を剥奪する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>グループロールを使うことで効率的な権限管理が可能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>最小権限の原則に基づくセキュリティ設計が重要</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">バックアップとリストア</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">実践！PostgreSQLでWebアプリのDBを設計しよう</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

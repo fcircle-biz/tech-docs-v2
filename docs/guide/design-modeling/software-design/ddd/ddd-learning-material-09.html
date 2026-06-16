@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>DDD学習教材 第9章 - ファクトリ - 複雑なオブジェクト生成のカプセル化</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // DDD - Indigo (設計手法用)
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-project-diagram text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">DDD学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cubes text-[9px]"></i>
+                                <span>設計・モデリング</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">設計・モデリング</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ファクトリ - 複雑なオブジェクト生成のカプセル化</h1>
+                    <p class="text-slate-600">複雑な集約や関連するオブジェクト群を生成するためのファクトリパターンを学びます。生成ロジックのカプセル化、不変条件の保証、テストのしやすさなど、ファクトリを使うメリットと実装方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ファクトリとは何か、なぜ必要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンストラクタとファクトリメソッドの使い分けを習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ファクトリの実装パターンを知り、適切に適用できるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ファクトリを使った不変条件の保護とテストのしやすさを理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: ファクトリとは何か -->
+                <section class="prose prose-slate max-w-none">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 ファクトリとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ファクトリ（Factory）</strong>は、複雑なオブジェクトの生成ロジックをカプセル化するためのパターンです。特に複雑な集約や、複数の関連オブジェクトを一度に生成する必要がある場合に有効です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        単純なオブジェクトであれば、コンストラクタで直接生成すれば十分です。しかし、以下のような場合にはファクトリが必要になります：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-cogs"></i>
+                                複雑な生成ロジック
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                複数の値オブジェクトを組み立てる、ビジネスルールに基づいた初期化が必要、外部リソースへのアクセスが必要など。
+                            </p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shield-alt"></i>
+                                不変条件の保証
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                オブジェクトを生成する段階で、ビジネスルールを満たしているか検証し、不正な状態のオブジェクトが作られないようにする。
+                            </p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-layer-group"></i>
+                                集約全体の生成
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                集約ルートだけでなく、関連する内部エンティティや値オブジェクトも一緒に生成する必要がある場合。
+                            </p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-database"></i>
+                                永続化データからの再構築
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                データベースから取得したデータをドメインオブジェクトに再構築する際、複雑な変換ロジックが必要な場合。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ファクトリの役割</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    ファクトリは「生成の専門家」です。クライアントコード（アプリケーション層など）は、ファクトリに「こういうオブジェクトが欲しい」と依頼するだけで、複雑な生成ロジックを意識する必要がなくなります。これにより、コードの可読性と保守性が向上します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: コンストラクタとファクトリメソッドの比較 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 コンストラクタ vs ファクトリメソッド
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        オブジェクトを生成する方法として、通常のコンストラクタとファクトリメソッドがあります。それぞれの特徴と使い分けを理解しましょう。
+                    </p>
+
+                    <!-- 対比図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-balance-scale text-primary-500"></i>
+                            コンストラクタとファクトリメソッドの比較
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph C[コンストラクタ]
+        C1[シンプルな生成]
+        C2[引数をそのまま代入]
+        C3[基本的な検証のみ]
+        C1 --> C2 --> C3
+    end
+
+    subgraph F[ファクトリメソッド]
+        F1[意図が明確な名前]
+        F2[複雑な変換・計算]
+        F3[ビジネスルール検証]
+        F4[複数オブジェクトの組み立て]
+        F1 --> F2 --> F3 --> F4
+    end
+
+    C3 -.単純な場合に使用.-> Simple[単純なオブジェクト]
+    F4 -.複雑な場合に使用.-> Complex[複雑なオブジェクト]
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">コンストラクタを使う場合</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Email.java (値オブジェクト)</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// シンプルな値オブジェクトはコンストラクタで十分
+public class Email {
+    private final String value;
+
+    // コンストラクタ（基本的な検証のみ）
+    public Email(String value) {
+        if (!isValid(value)) {
+            throw new IllegalArgumentException("不正なメールアドレス");
+        }
+        this.value = value;
+    }
+
+    private boolean isValid(String email) {
+        // 正規表現による基本的な検証
+        return email.matches("^[\\w.-]+@[\\w.-]+\\.\\w+$");
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ファクトリメソッドを使う場合</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Money.java (値オブジェクト)</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 複雑な生成ロジックを持つ値オブジェクト
+public class Money {
+    private final BigDecimal amount;
+    private final Currency currency;
+
+    // プライベートコンストラクタ（直接呼び出させない）
+    private Money(BigDecimal amount, Currency currency) {
+        this.amount = amount;
+        this.currency = currency;
+    }
+
+    // ファクトリメソッド: 意図が明確な名前
+    public static Money yen(int amount) {
+        return new Money(
+            new BigDecimal(amount),
+            Currency.getInstance("JPY")
+        );
+    }
+
+    public static Money dollar(double amount) {
+        return new Money(
+            BigDecimal.valueOf(amount),
+            Currency.getInstance("USD")
+        );
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ファクトリメソッドの利点</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    ファクトリメソッドは、コンストラクタと異なり「意図を表す名前」を付けられます。<code class="bg-emerald-100 px-1 rounded">Money.yen(1000)</code>は<code class="bg-emerald-100 px-1 rounded">new Money(1000, "JPY")</code>よりも読みやすく、意図が明確です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ファクトリの実装パターン -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 ファクトリの実装パターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ファクトリには、いくつかの実装パターンがあります。状況に応じて適切なパターンを選択しましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">パターン1: ファクトリメソッド（静的メソッド）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最もシンプルなパターン。クラス内に静的メソッドとして実装します。
+                    </p>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">User.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public class User {
+    private final UserId id;
+    private final UserName name;
+    private final Email email;
+
+    private User(UserId id, UserName name, Email email) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    // ファクトリメソッド: 新規ユーザー作成
+    public static User createNew(String name, String email) {
+        return new User(
+            UserId.generate(),  // IDを自動生成
+            new UserName(name),
+            new Email(email)
+        );
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">パターン2: 専用ファクトリクラス</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        生成ロジックが複雑で、外部リソース（リポジトリなど）へのアクセスが必要な場合は、専用のファクトリクラスを作成します。
+                    </p>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderFactory.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 複雑な生成ロジックを持つファクトリクラス
+public class OrderFactory {
+    private final ProductRepository productRepo;
+    private final CustomerRepository customerRepo;
+
+    public OrderFactory(ProductRepository productRepo,
+                       CustomerRepository customerRepo) {
+        this.productRepo = productRepo;
+        this.customerRepo = customerRepo;
+    }
+
+    // 注文を生成
+    public Order createOrder(CustomerId customerId,
+                            List<OrderItemData> items) {
+        // 顧客情報を取得
+        Customer customer = customerRepo.findById(customerId)
+            .orElseThrow(() -> new CustomerNotFoundException());
+
+        // 注文明細を生成
+        List<OrderItem> orderItems = items.stream()
+            .map(this::createOrderItem)
+            .collect(Collectors.toList());
+
+        // 注文を生成
+        return new Order(
+            OrderId.generate(),
+            customerId,
+            orderItems,
+            LocalDateTime.now()
+        );
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">パターン3: 再構築ファクトリ（永続化データからの復元）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベースから取得したデータをドメインオブジェクトに再構築する専用のファクトリメソッドです。
+                    </p>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Order.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public class Order {
+    // 新規作成用のファクトリメソッド
+    public static Order createNew(CustomerId customerId,
+                                  List<OrderItem> items) {
+        // ビジネスルールの検証
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("注文明細が空です");
+        }
+        // 新規注文を生成
+        return new Order(
+            OrderId.generate(),
+            customerId,
+            items,
+            OrderStatus.PENDING
+        );
+    }
+
+    // 永続化データからの再構築用ファクトリメソッド
+    public static Order reconstruct(OrderId id,
+                                   CustomerId customerId,
+                                   List<OrderItem> items,
+                                   OrderStatus status) {
+        // 検証を省略（永続化データは信頼できるため）
+        return new Order(id, customerId, items, status);
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">2つのファクトリメソッドを分ける理由</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    新規作成時はビジネスルールの検証が必要ですが、永続化データからの再構築時は検証済みのデータなので検証を省略できます。この2つを分けることで、パフォーマンスと安全性のバランスを取ります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: 実装例（ECサイトの注文生成） -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 実装例: ECサイトの注文生成ファクトリ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ECサイトの注文を生成するファクトリの完全な実装例を見てみましょう。
+                    </p>
+
+                    <!-- システム構成図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-sitemap text-primary-500"></i>
+                            注文生成の流れ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant App as アプリケーション層
+    participant Factory as OrderFactory
+    participant Repo as ProductRepository
+    participant Order as Order集約
+
+    App->>Factory: createOrder(customerId, items)
+    Factory->>Repo: 商品情報を取得
+    Repo-->>Factory: Product[]
+    Factory->>Factory: 在庫チェック
+    Factory->>Factory: 合計金額計算
+    Factory->>Order: new Order(...)
+    Order-->>Factory: Order集約
+    Factory-->>App: Order集約
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">完全な実装コード</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderFactory.java（完全版）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public class OrderFactory {
+    private final ProductRepository productRepo;
+
+    public OrderFactory(ProductRepository productRepo) {
+        this.productRepo = productRepo;
+    }
+
+    public Order createOrder(CustomerId customerId,
+                            List<OrderItemRequest> requests) {
+        // 1. 注文明細を生成
+        List<OrderItem> items = requests.stream()
+            .map(this::createOrderItem)
+            .collect(Collectors.toList());
+
+        // 2. 注文を生成（ビジネスルール検証含む）
+        return Order.createNew(customerId, items);
+    }
+
+    private OrderItem createOrderItem(OrderItemRequest req) {
+        // 商品情報を取得
+        Product product = productRepo.findById(req.productId())
+            .orElseThrow(() -> new ProductNotFoundException());
+
+        // 在庫チェック
+        if (!product.hasStock(req.quantity())) {
+            throw new InsufficientStockException();
+        }
+
+        // 注文明細を生成
+        return new OrderItem(
+            product.getId(),
+            product.getName(),
+            req.quantity(),
+            product.getPrice()
+        );
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 9-1: ファクトリメソッドを実装する</h3>
+                                <p class="text-purple-900 mb-4 break-words">ユーザー登録時に、ユーザーオブジェクトを生成するファクトリメソッドを実装してみましょう。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">要件</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">UserクラスにcreateNewファクトリメソッドを追加</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">UserIdを自動生成、登録日時を現在時刻に設定</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">メールアドレスの重複チェックを実装（UserRepositoryを使用）</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: ファクトリの配置場所 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 ファクトリの配置場所
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ファクトリをどこに配置するかは、生成ロジックの複雑性によって決まります。
+                    </p>
+
+                    <!-- レイヤー図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-layer-group text-primary-500"></i>
+                            ファクトリの配置パターン
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph Simple[シンプルな生成]
+        S1[エンティティ内の<br/>静的ファクトリメソッド]
+        S2[例: User.createNew]
+    end
+
+    subgraph Complex[複雑な生成]
+        C1[専用ファクトリクラス<br/>をドメイン層に配置]
+        C2[例: OrderFactory]
+    end
+
+    subgraph Infra[永続化層からの復元]
+        I1[リポジトリ実装内で<br/>reconstructメソッド呼び出し]
+        I2[例: OrderRepositoryImpl]
+    end
+
+    Simple --> |依存なし| Domain[ドメイン層]
+    Complex --> |リポジトリに依存| Domain
+    Infra --> |ドメインオブジェクトを生成| Domain
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-user"></i>
+                                エンティティ内
+                            </h4>
+                            <p class="text-blue-900 text-sm mb-2">
+                                <strong>配置場所</strong>: エンティティクラスの静的メソッド
+                            </p>
+                            <p class="text-blue-800 text-xs">
+                                シンプルな生成ロジック、外部依存なし
+                            </p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-cogs"></i>
+                                専用クラス
+                            </h4>
+                            <p class="text-purple-900 text-sm mb-2">
+                                <strong>配置場所</strong>: ドメイン層の専用ファクトリクラス
+                            </p>
+                            <p class="text-purple-800 text-xs">
+                                複雑な生成ロジック、リポジトリへの依存あり
+                            </p>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-database"></i>
+                                リポジトリ内
+                            </h4>
+                            <p class="text-emerald-900 text-sm mb-2">
+                                <strong>配置場所</strong>: リポジトリ実装クラス
+                            </p>
+                            <p class="text-emerald-800 text-xs">
+                                永続化データからの再構築時に使用
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意: ファクトリはドメイン層に配置</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    ファクトリは生成ロジックをカプセル化するため、ドメイン層に配置します。アプリケーション層やインフラ層に配置すると、ビジネスルールがドメイン層から漏れ出してしまいます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: テストにおけるファクトリの活用 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 テストにおけるファクトリの活用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ファクトリは、テストコードの可読性と保守性を大きく向上させます。テスト用のファクトリメソッドを用意することで、テストデータの準備が簡単になります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">テスト用ファクトリメソッド</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderTestFixture.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// テスト用のファクトリクラス
+public class OrderTestFixture {
+
+    // デフォルト値で注文を生成
+    public static Order defaultOrder() {
+        return Order.createNew(
+            new CustomerId("CUST001"),
+            List.of(defaultOrderItem())
+        );
+    }
+
+    // カスタマイズ可能な注文を生成
+    public static Order orderWithItems(OrderItem... items) {
+        return Order.createNew(
+            new CustomerId("CUST001"),
+            List.of(items)
+        );
+    }
+
+    // デフォルトの注文明細を生成
+    public static OrderItem defaultOrderItem() {
+        return new OrderItem(
+            new ProductId("PROD001"),
+            new ProductName("テスト商品"),
+            new Quantity(1),
+            Money.yen(1000)
+        );
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">テストコードでの使用例</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderTest.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">@Test
+public void 注文をキャンセルできる() {
+    // ファクトリメソッドでテストデータを簡潔に準備
+    Order order = OrderTestFixture.defaultOrder();
+
+    // テスト対象のメソッドを実行
+    order.cancel();
+
+    // 検証
+    assertEquals(OrderStatus.CANCELLED, order.getStatus());
+}
+
+@Test
+public void 複数商品の合計金額を計算できる() {
+    // 複数商品を持つ注文を簡単に生成
+    Order order = OrderTestFixture.orderWithItems(
+        new OrderItem(PROD1, NAME1, QTY1, PRICE1),
+        new OrderItem(PROD2, NAME2, QTY2, PRICE2)
+    );
+
+    Money total = order.calculateTotal();
+
+    assertEquals(Money.yen(3000), total);
+}</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">テスト用ファクトリの利点</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    テスト用ファクトリを使うと、テストコードの意図が明確になり、テストデータの準備コードが大幅に削減されます。また、テストデータの構造が変わった際も、ファクトリメソッドを修正するだけで全テストに反映できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ファクトリが必要になるのはどのような場合ですか？3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① 複雑な生成ロジック（複数の値オブジェクトを組み立てる、ビジネスルールに基づいた初期化）<br>
+                                            ② 不変条件の保証（生成段階でビジネスルールを検証）<br>
+                                            ③ 集約全体の生成（集約ルートと関連オブジェクトを一緒に生成）<br>
+                                            ④ 永続化データからの再構築（データベースからの復元）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. コンストラクタではなくファクトリメソッドを使うメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① 意図が明確な名前を付けられる（Money.yen(1000)など）<br>
+                                            ② 複雑な変換・計算ロジックをカプセル化できる<br>
+                                            ③ ビジネスルールの検証を一箇所に集約できる<br>
+                                            ④ 複数のオブジェクトを組み立てるロジックを隠蔽できる
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 新規作成用のファクトリメソッドと、永続化データからの再構築用のファクトリメソッドを分ける理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            新規作成時はビジネスルールの検証が必要ですが、永続化データからの再構築時は既に検証済みのデータなので検証を省略できます。この2つを分けることで、不要な検証を避けてパフォーマンスを向上させつつ、安全性も確保できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. ファクトリはどの層に配置すべきですか？その理由も説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ファクトリはドメイン層に配置します。生成ロジックにはビジネスルールが含まれるため、ドメイン層に置くことでビジネスロジックがドメイン層から漏れ出すのを防ぎます。アプリケーション層やインフラ層に配置すると、ドメイン知識が分散してしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ファクトリは複雑なオブジェクト生成ロジックをカプセル化するパターン</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>コンストラクタではなくファクトリメソッドを使うことで、意図が明確になり可読性が向上する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>実装パターンには、静的ファクトリメソッド、専用ファクトリクラス、再構築ファクトリがある</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ファクトリはドメイン層に配置し、生成ロジックのビジネスルールを一箇所に集約する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>テスト用ファクトリを用意することで、テストコードの可読性と保守性が向上する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="ddd-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">ドメインサービス</span>
+                        </div>
+                    </a>
+                    <a href="ddd-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">境界づけられたコンテキスト</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

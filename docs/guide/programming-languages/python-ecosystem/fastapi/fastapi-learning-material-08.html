@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>FastAPI学習教材 第8章 - 非同期処理とバックグラウンドタスク</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-bolt text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">FastAPI学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Python フレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約16時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/programming-languages/python-ecosystem/fastapi/" class="hover:text-primary-600 transition-colors">FastAPI</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">非同期処理とバックグラウンドタスク</h1>
+                    <p class="text-slate-600">async/awaitの活用、非同期データベース操作、バックグラウンドタスクの実装、WebSocketの基本、並行処理のパフォーマンス最適化を学習します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>async/awaitキーワードの基礎と非同期処理の仕組み</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>非同期データベース操作とエンコードライブラリの活用</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>BackgroundTasksを使った非ブロッキング処理の実装</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>WebSocketによるリアルタイム通信の基本</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>並行処理によるAPIパフォーマンスの最適化手法</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: 非同期処理の基礎 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 非同期処理の基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        非同期処理（Asynchronous Processing）は、I/O待機時間を効率化し、同時に複数のリクエストを処理できるようにする仕組みです。FastAPIはPythonのasync/await構文を活用して、高パフォーマンスなAPIを実現します。
+                    </p>
+
+                    <!-- Mermaid図: 同期処理と非同期処理の違い -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            同期処理 vs 非同期処理の比較
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant Client as クライアント
+    participant API as APIサーバー
+    participant DB as データベース
+    participant Ext as 外部API
+
+    Note over Client,Ext: 同期処理（順次実行）
+    Client->>API: リクエスト1
+    API->>DB: クエリ実行
+    Note right of DB: 待機中...
+    DB-->>API: 結果
+    API->>Ext: 外部API呼び出し
+    Note right of Ext: 待機中...
+    Ext-->>API: 結果
+    API-->>Client: レスポンス1
+
+    Note over Client,Ext: 非同期処理（並行実行）
+    Client->>API: リクエスト1
+    API->>DB: クエリ実行
+    API->>Ext: 外部API呼び出し
+    Note right of API: 他の処理を実行可能
+    DB-->>API: 結果
+    Ext-->>API: 結果
+    API-->>Client: レスポンス1
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">非同期処理のメリット</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    データベースクエリや外部APIの呼び出しなど、I/O待機時間がある処理を非同期化することで、その待機時間に別のリクエストを処理できます。これにより、同じリソースでより多くのリクエストを処理可能になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">async/await構文の基本</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Pythonの非同期処理は、<code class="bg-slate-200 px-1 rounded">async</code>と<code class="bg-slate-200 px-1 rounded">await</code>キーワードで制御します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">非同期関数の定義と使用</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI
+import asyncio
+import time
+
+app = FastAPI()
+
+# 同期処理の例
+def sync_slow_operation():
+    """同期的に2秒待機"""
+    time.sleep(2)
+    return {"result": "完了（同期）"}
+
+# 非同期処理の例
+async def async_slow_operation():
+    """非同期的に2秒待機"""
+    await asyncio.sleep(2)
+    return {"result": "完了（非同期）"}
+
+# 非同期エンドポイント
+@app.get("/async")
+async def async_endpoint():
+    """非同期処理を使ったエンドポイント"""
+    result = await async_slow_operation()
+    return result</code></pre>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- async -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-bolt text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-blue-800">async キーワード</h4>
+                            </div>
+                            <p class="text-blue-900 text-sm">
+                                関数定義の前に <code class="bg-blue-100 px-1 rounded">async</code> を付けると、その関数は非同期関数（コルーチン）になります。非同期関数内では <code class="bg-blue-100 px-1 rounded">await</code> を使えます。
+                            </p>
+                        </div>
+
+                        <!-- await -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-clock text-white"></i>
+                                </div>
+                                <h4 class="text-lg font-semibold text-emerald-800">await キーワード</h4>
+                            </div>
+                            <p class="text-emerald-900 text-sm">
+                                <code class="bg-emerald-100 px-1 rounded">await</code> は非同期関数の完了を待ちます。待機中、他の処理を実行できるため、ブロッキングが発生しません。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: 非同期データベース操作 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 非同期データベース操作
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベース操作を非同期化することで、クエリ実行中に他のリクエストを処理できます。encode/databasesやSQLAlchemyの非同期エンジンを使用します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">encode/databasesの導入</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 非同期データベースライブラリのインストール
+pip install databases[asyncpg] asyncpg</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">database.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from databases import Database
+
+# データベース接続URL
+DATABASE_URL = "postgresql://user:password@localhost/dbname"
+
+# データベースインスタンスの作成
+database = Database(DATABASE_URL)
+
+# 起動時にデータベースに接続
+async def connect_db():
+    """データベースに接続"""
+    await database.connect()
+    print("データベースに接続しました")
+
+# 終了時にデータベースを切断
+async def disconnect_db():
+    """データベースから切断"""
+    await database.disconnect()
+    print("データベースから切断しました")</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI
+from database import database, connect_db, disconnect_db
+
+app = FastAPI()
+
+# アプリケーション起動時にDB接続
+@app.on_event("startup")
+async def startup():
+    await connect_db()
+
+# アプリケーション終了時にDB切断
+@app.on_event("shutdown")
+async def shutdown():
+    await disconnect_db()
+
+# 非同期データベースクエリ
+@app.get("/users/{user_id}")
+async def get_user(user_id: int):
+    """ユーザー情報を非同期で取得"""
+    query = "SELECT * FROM users WHERE id = :user_id"
+    user = await database.fetch_one(query=query, values={"user_id": user_id})
+    return user</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">データベース操作メソッド</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li><code class="bg-emerald-100 px-1 rounded">fetch_one()</code>: 単一レコードを取得</li>
+                                    <li><code class="bg-emerald-100 px-1 rounded">fetch_all()</code>: 複数レコードを取得</li>
+                                    <li><code class="bg-emerald-100 px-1 rounded">execute()</code>: INSERT/UPDATE/DELETE実行</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: バックグラウンドタスク -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 バックグラウンドタスク
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        レスポンス返却後に実行したい処理（メール送信、ログ記録、データ加工など）は、BackgroundTasksを使ってバックグラウンドで実行できます。
+                    </p>
+
+                    <!-- Mermaid図: バックグラウンドタスクの流れ -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            バックグラウンドタスクの実行フロー
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant Client as クライアント
+    participant API as APIエンドポイント
+    participant BG as バックグラウンド<br/>タスク
+    participant Mail as メールサーバー
+
+    Client->>API: ユーザー登録リクエスト
+    API->>API: ユーザーをDBに保存
+    API->>BG: メール送信タスクを登録
+    API-->>Client: レスポンス返却<br/>（即座）
+    Note over Client: ユーザーは<br/>待たされない
+    BG->>Mail: ウェルカムメール送信
+    Mail-->>BG: 送信完了
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">BackgroundTasksの使い方</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI, BackgroundTasks
+import time
+
+app = FastAPI()
+
+# バックグラウンドで実行する関数
+def send_email(email: str, message: str):
+    """
+    メール送信処理（重い処理のシミュレーション）
+    """
+    print(f"メール送信開始: {email}")
+    time.sleep(5)  # メール送信に5秒かかると仮定
+    print(f"メール送信完了: {email} - {message}")
+
+# バックグラウンドタスクを使用するエンドポイント
+@app.post("/send-notification/")
+async def send_notification(
+    email: str,
+    background_tasks: BackgroundTasks
+):
+    """
+    通知を送信するエンドポイント
+    レスポンスはすぐに返し、メール送信は後で実行
+    """
+    # バックグラウンドタスクに追加
+    background_tasks.add_task(send_email, email, "登録ありがとうございます！")
+
+    # すぐにレスポンスを返す
+    return {"message": "通知を送信します"}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">BackgroundTasksの利点</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>• レスポンスタイムの短縮: ユーザーは重い処理の完了を待たなくて良い</li>
+                                    <li>• シンプルな実装: 複雑なキューシステムが不要</li>
+                                    <li>• 軽量な処理に最適: メール送信、ログ記録などに向いている</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">複数のバックグラウンドタスク</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">複数タスクの実行例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def write_log(message: str):
+    """ログファイルに書き込み"""
+    with open("log.txt", "a") as f:
+        f.write(f"{message}\n")
+
+def update_statistics():
+    """統計情報を更新"""
+    print("統計情報を更新しています...")
+    time.sleep(2)
+    print("統計情報の更新が完了しました")
+
+@app.post("/register/")
+async def register_user(
+    username: str,
+    email: str,
+    background_tasks: BackgroundTasks
+):
+    """複数のバックグラウンドタスクを実行"""
+    # タスク1: メール送信
+    background_tasks.add_task(send_email, email, "登録完了")
+    # タスク2: ログ記録
+    background_tasks.add_task(write_log, f"新規登録: {username}")
+    # タスク3: 統計更新
+    background_tasks.add_task(update_statistics)
+
+    return {"message": f"{username}が登録されました"}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: WebSocketの基本 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 WebSocketの基本
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        WebSocketは、サーバーとクライアント間で双方向のリアルタイム通信を実現するプロトコルです。チャットアプリケーション、リアルタイム通知、ライブダッシュボードなどに使用されます。
+                    </p>
+
+                    <!-- Mermaid図: HTTP vs WebSocket -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            HTTP通信とWebSocket通信の違い
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant Client as クライアント
+    participant Server as サーバー
+
+    Note over Client,Server: HTTP通信（リクエスト/レスポンス）
+    Client->>Server: リクエスト1
+    Server-->>Client: レスポンス1
+    Client->>Server: リクエスト2
+    Server-->>Client: レスポンス2
+    Note over Client: 毎回接続が必要
+
+    Note over Client,Server: WebSocket通信（双方向・永続接続）
+    Client->>Server: 接続確立
+    Server-->>Client: 接続完了
+    Server->>Client: メッセージ送信
+    Client->>Server: メッセージ送信
+    Server->>Client: メッセージ送信
+    Note over Client,Server: 接続は維持される
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">シンプルなWebSocketエンドポイント</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocketエンドポイント
+    クライアントからのメッセージをエコーバック
+    """
+    # 接続を受け入れる
+    await websocket.accept()
+
+    try:
+        while True:
+            # クライアントからのメッセージを待機
+            data = await websocket.receive_text()
+            # メッセージを送り返す
+            await websocket.send_text(f"受信: {data}")
+    except WebSocketDisconnect:
+        print("クライアントが切断しました")</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">チャットルームの実装例</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">chat.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from typing import List
+
+app = FastAPI()
+
+# 接続中のクライアントを管理
+class ConnectionManager:
+    def __init__(self):
+        # アクティブな接続のリスト
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        """新しい接続を追加"""
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        """接続を削除"""
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        """全クライアントにメッセージを送信"""
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/chat")
+async def chat_endpoint(websocket: WebSocket):
+    """チャットルームのWebSocketエンドポイント"""
+    await manager.connect(websocket)
+
+    try:
+        while True:
+            # メッセージを受信
+            data = await websocket.receive_text()
+            # 全クライアントにブロードキャスト
+            await manager.broadcast(f"メッセージ: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast("ユーザーが退出しました")</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: パフォーマンス最適化 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 パフォーマンス最適化のベストプラクティス
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        非同期処理を効果的に活用し、APIのパフォーマンスを最大化するためのベストプラクティスを紹介します。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- 1 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-blue-800">I/O処理の非同期化</h3>
+                            </div>
+                            <p class="text-blue-900 text-sm">
+                                データベースクエリ、外部API呼び出し、ファイル読み書きなど、待機時間が発生する処理は必ず非同期化しましょう。
+                            </p>
+                        </div>
+
+                        <!-- 2 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-layer-group text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-emerald-800">コネクションプール</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm">
+                                データベース接続は再利用可能なプールで管理し、接続の確立・切断のオーバーヘッドを削減します。
+                            </p>
+                        </div>
+
+                        <!-- 3 -->
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-tasks text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-purple-800">並行処理の活用</h3>
+                            </div>
+                            <p class="text-purple-900 text-sm">
+                                複数の独立した非同期処理は<code class="bg-purple-100 px-1 rounded">asyncio.gather()</code>で並行実行し、合計待機時間を短縮します。
+                            </p>
+                        </div>
+
+                        <!-- 4 -->
+                        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-tachometer-alt text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-amber-800">重い処理の分離</h3>
+                            </div>
+                            <p class="text-amber-900 text-sm">
+                                画像処理やデータ集計などCPU集約的な処理は、BackgroundTasksやCeleryなどで分離し、APIの応答性を保ちます。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">並行処理の実装例</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">並行実行でパフォーマンス向上</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import asyncio
+from fastapi import FastAPI
+
+app = FastAPI()
+
+async def fetch_user_data(user_id: int):
+    """ユーザーデータを取得（仮想）"""
+    await asyncio.sleep(1)  # DB問い合わせをシミュレート
+    return {"user_id": user_id, "name": "田中太郎"}
+
+async def fetch_order_history(user_id: int):
+    """注文履歴を取得（仮想）"""
+    await asyncio.sleep(1)  # DB問い合わせをシミュレート
+    return [{"order_id": 1, "total": 3000}]
+
+async def fetch_recommendations(user_id: int):
+    """おすすめ商品を取得（仮想）"""
+    await asyncio.sleep(1)  # 外部API呼び出しをシミュレート
+    return [{"product_id": 101, "name": "商品A"}]
+
+# 逐次実行版（遅い）
+@app.get("/dashboard/sequential/{user_id}")
+async def dashboard_sequential(user_id: int):
+    """逐次実行: 合計3秒かかる"""
+    user = await fetch_user_data(user_id)
+    orders = await fetch_order_history(user_id)
+    recommendations = await fetch_recommendations(user_id)
+
+    return {
+        "user": user,
+        "orders": orders,
+        "recommendations": recommendations
+    }
+
+# 並行実行版（速い）
+@app.get("/dashboard/concurrent/{user_id}")
+async def dashboard_concurrent(user_id: int):
+    """並行実行: 約1秒で完了"""
+    # 3つの処理を同時に実行
+    user, orders, recommendations = await asyncio.gather(
+        fetch_user_data(user_id),
+        fetch_order_history(user_id),
+        fetch_recommendations(user_id)
+    )
+
+    return {
+        "user": user,
+        "orders": orders,
+        "recommendations": recommendations
+    }</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-rocket text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">パフォーマンスの比較</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    逐次実行では1秒 + 1秒 + 1秒 = <strong>3秒</strong>かかりますが、並行実行では3つの処理が同時に実行されるため、最も遅い処理の<strong>1秒</strong>で完了します。これにより、レスポンスタイムが大幅に短縮されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                実習 8-1: バックグラウンドタスクの実装
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                ユーザー登録後にウェルカムメールを送信するエンドポイントを作成し、バックグラウンドタスクで処理しましょう。
+                            </p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">メール送信をシミュレートする関数を作成します（5秒の待機処理）</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">/register</code>エンドポイントを作成し、BackgroundTasksを使用します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">レスポンスがすぐに返ることを確認し、ターミナルでメール送信ログを確認します</span>
+                                </li>
+                            </ol>
+
+                            <h4 class="font-medium text-purple-800 mb-2">期待される動作</h4>
+                            <ul class="text-purple-900 text-sm space-y-1 mb-4">
+                                <li>• エンドポイントにリクエストを送ると、即座にレスポンスが返る</li>
+                                <li>• 5秒後にターミナルに「メール送信完了」のログが出力される</li>
+                                <li>• ユーザーは5秒待たされない</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 動作確認カード -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-check-circle text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認 8-1: WebSocketのテスト</h3>
+                            <p class="text-emerald-900 mb-4 break-words">
+                                簡単なWebSocketエコーサーバーを作成し、ブラウザのコンソールからテストしてみましょう。
+                            </p>
+
+                            <h4 class="font-medium text-emerald-800 mb-2">テスト手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-emerald-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-emerald-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">FastAPIアプリを起動します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-emerald-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-emerald-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ブラウザの開発者ツールを開き、コンソールに以下のコードを入力します</span>
+                                </li>
+                            </ol>
+
+                            <div class="code-block-wrapper mb-4">
+                                <button onclick="copyCode(this)" class="copy-btn px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+                                    <i class="fas fa-copy mr-1"></i>コピー
+                                </button>
+                                <pre class="!bg-slate-800 !rounded-lg overflow-x-auto"><code class="language-javascript">// WebSocket接続を確立
+const ws = new WebSocket("ws://localhost:8000/ws");
+
+// 接続確立時
+ws.onopen = () => {
+    console.log("接続しました");
+    ws.send("こんにちは！");
+};
+
+// メッセージ受信時
+ws.onmessage = (event) => {
+    console.log("受信:", event.data);
+};</code></pre>
+                            </div>
+
+                            <p class="text-emerald-900 text-sm">
+                                コンソールに「受信: こんにちは！」と表示されれば成功です。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 非同期処理のメリットを3つ挙げ、それぞれ説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. <strong>スループットの向上</strong>: I/O待機中に他のリクエストを処理できるため、同時処理数が増加します<br>
+                                            2. <strong>リソース効率の改善</strong>: ブロッキングが減り、少ないスレッド/プロセスで多くのリクエストを処理できます<br>
+                                            3. <strong>レスポンスタイムの短縮</strong>: 並行処理により、複数の独立した処理を同時実行できます
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. BackgroundTasksを使用すべき処理と、使用すべきでない処理を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>使用すべき処理</strong>: メール送信、ログ記録、簡単な統計更新など、軽量で失敗しても再試行が容易な処理<br>
+                                            <strong>使用すべきでない処理</strong>: 重いデータ処理、長時間かかる処理、確実な実行が必要な処理。これらはCeleryなどの専用タスクキューを使用すべきです
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. WebSocketとHTTPの違いを説明し、WebSocketが適している用途を挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>違い</strong>: HTTPはリクエスト/レスポンス型で毎回接続を確立しますが、WebSocketは双方向の永続接続を維持し、サーバーからもクライアントへ自由に送信できます<br>
+                                            <strong>適した用途</strong>: チャットアプリ、リアルタイム通知、ライブダッシュボード、オンラインゲーム、共同編集ツールなど
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. <code class="bg-blue-100 px-1 rounded">asyncio.gather()</code>を使用する利点と、使用例を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>利点</strong>: 複数の非同期処理を並行実行し、すべての処理が完了するのを待ちます。逐次実行と比べて合計待機時間を大幅に短縮できます<br>
+                                            <strong>使用例</strong>: ユーザーデータ、注文履歴、おすすめ商品を3つのデータベースから取得する場合、<code>gather()</code>を使えば3秒→1秒に短縮できます
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-wrench text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">トラブルシューティング</h3>
+
+                            <div class="space-y-4">
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        非同期関数内で同期処理を使ってしまう
+                                    </h4>
+                                    <p class="text-orange-800 text-sm mb-2">
+                                        <code class="bg-orange-200 px-1 rounded">time.sleep()</code>や同期ライブラリを<code class="bg-orange-200 px-1 rounded">async</code>関数内で使うと、非同期のメリットが失われます。
+                                    </p>
+                                    <p class="text-orange-900 text-sm font-medium">解決策:</p>
+                                    <p class="text-orange-800 text-sm">
+                                        非同期版を使用: <code class="bg-orange-200 px-1 rounded">asyncio.sleep()</code>、<code class="bg-orange-200 px-1 rounded">httpx.AsyncClient</code>など
+                                    </p>
+                                </div>
+
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        WebSocketで接続が切れる
+                                    </h4>
+                                    <p class="text-orange-800 text-sm mb-2">
+                                        タイムアウトやネットワークエラーで接続が切断されることがあります。
+                                    </p>
+                                    <p class="text-orange-900 text-sm font-medium">解決策:</p>
+                                    <p class="text-orange-800 text-sm">
+                                        <code class="bg-orange-200 px-1 rounded">WebSocketDisconnect</code>例外をキャッチし、適切に処理します。定期的なping/pongで接続を維持することも有効です。
+                                    </p>
+                                </div>
+
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        BackgroundTasksが実行されない
+                                    </h4>
+                                    <p class="text-orange-800 text-sm mb-2">
+                                        エンドポイントがエラーを返すと、BackgroundTasksは実行されません。
+                                    </p>
+                                    <p class="text-orange-900 text-sm font-medium">解決策:</p>
+                                    <p class="text-orange-800 text-sm">
+                                        レスポンスが正常に返されることを確認します。重要な処理はCeleryなどの専用キューを使用することを検討してください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-slate-600"></i>
+                        第8章のまとめ
+                    </h2>
+                    <div class="space-y-3 text-slate-700">
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>async/awaitを使った非同期処理により、I/O待機時間を有効活用し、高いスループットを実現できます</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>encode/databasesやSQLAlchemyの非同期エンジンで、データベース操作を非同期化できます</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>BackgroundTasksを使用すると、レスポンス返却後に処理を実行し、ユーザー体験を向上できます</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>WebSocketにより、サーバーとクライアント間でリアルタイム双方向通信が可能になります</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>asyncio.gather()による並行処理で、複数の非同期処理を同時実行し、レスポンスタイムを短縮できます</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="fastapi-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">CORSとミドルウェア</span>
+                        </div>
+                    </a>
+                    <a href="fastapi-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">テストとドキュメント</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

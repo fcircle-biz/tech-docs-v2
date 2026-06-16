@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot + Gradle チュートリアル Step 9 - セキュリティとエラーハンドリング</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts - Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #4caf50; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #4caf50; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #4caf50; padding-bottom: 0.5rem; }
+        .section-title { color: #66bb6a; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #4caf50; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #4caf50 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Spring Boot + Gradle チュートリアル</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="step1-environment-setup.html">Step 1: 環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step2-docker-postgresql.html">Step 2: PostgreSQL環境</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step3-spring-mvc-web.html">Step 3: Webコントローラー</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step4-spring-data-jpa.html">Step 4: データベースアクセス</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step5-user-registration.html">Step 5: ユーザー登録機能</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step6-thymeleaf-ui.html">Step 6: 画面実装</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step7-user-list-detail.html">Step 7: 一覧・詳細機能</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step8-user-update-delete.html">Step 8: 更新・削除機能</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="step9-security-error.html">Step 9: セキュリティ基礎</a></li>
+                        <li class="nav-item"><a class="nav-link" href="step10-deployment.html">Step 10: デプロイメント</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Step 9: セキュリティとエラーハンドリング</h1>
+                </div>
+
+                <div id="step9">
+                    <h2 class="chapter-title">セキュリティとエラーハンドリング</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>基本的な入力値検証</li>
+                            <li>SQLインジェクション対策の基礎</li>
+                            <li>簡単なエラーページの作成</li>
+                            <li>基本的なログ出力</li>
+                            <li>セキュリティの基本概念</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">9.1 入力値検証の強化</h3>
+                    <p>プログラミング初心者でも理解しやすい基本的なセキュリティ対策を実装します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-1: 基本的な入力値検証</h5>
+                        <p>悪意のある入力から アプリケーションを守る基本的な方法を学びます。</p>
+                        <h6>InputValidationUtil.java</h6>
+                        <pre class="code-block"><code class="language-java">@Component
+public class InputValidationUtil {
+    
+    // 危険な文字列パターン
+    private static final List<String> DANGEROUS_PATTERNS = Arrays.asList(
+        "<script", "javascript:", "onload=", "onerror=", 
+        "DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE SET"
+    );
+    
+    /**
+     * 基本的なXSS対策：HTMLタグを無効化
+     */
+    public String sanitizeHtml(String input) {
+        if (input == null) return null;
+        
+        return input.replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&#x27;")
+                   .replace("&", "&amp;");
+    }
+    
+    /**
+     * 危険なパターンをチェック
+     */
+    public boolean containsDangerousPattern(String input) {
+        if (input == null) return false;
+        
+        String lowerInput = input.toLowerCase();
+        return DANGEROUS_PATTERNS.stream()
+                .anyMatch(lowerInput::contains);
+    }
+    
+    /**
+     * 文字列の長さをチェック
+     */
+    public boolean isValidLength(String input, int maxLength) {
+        return input != null && input.length() <= maxLength;
+    }
+    
+    /**
+     * メールアドレスの簡単な形式チェック
+     */
+    public boolean isValidEmail(String email) {
+        if (email == null) return false;
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.2 カスタムエラーページの作成</h3>
+                    <p>ユーザーにとって分かりやすいエラーページを作成します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-2: エラーハンドラーの実装</h5>
+                        <p>アプリケーション全体のエラーを統一的に処理します。</p>
+                        <h6>GlobalExceptionHandler.java</h6>
+                        <pre class="code-block"><code class="language-java">@ControllerAdvice
+public class GlobalExceptionHandler {
+    
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    
+    /**
+     * 404エラー（ページが見つからない）
+     */
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public String handleNotFound(NoHandlerFoundException e, Model model) {
+        logger.warn("ページが見つかりません: {}", e.getRequestURL());
+        
+        model.addAttribute("errorTitle", "ページが見つかりません");
+        model.addAttribute("errorMessage", "お探しのページは存在しないか、移動した可能性があります。");
+        model.addAttribute("errorCode", "404");
+        
+        return "error/404";
+    }
+    
+    /**
+     * 一般的なエラー
+     */
+    @ExceptionHandler(Exception.class)
+    public String handleGeneralError(Exception e, Model model) {
+        logger.error("予期しないエラーが発生しました", e);
+        
+        model.addAttribute("errorTitle", "システムエラー");
+        model.addAttribute("errorMessage", "申し訳ありません。システムでエラーが発生しました。");
+        model.addAttribute("errorCode", "500");
+        
+        return "error/general";
+    }
+    
+    /**
+     * データベースエラー
+     */
+    @ExceptionHandler(DataAccessException.class)
+    public String handleDatabaseError(DataAccessException e, Model model) {
+        logger.error("データベースエラーが発生しました", e);
+        
+        model.addAttribute("errorTitle", "データベースエラー");
+        model.addAttribute("errorMessage", "データベースとの通信でエラーが発生しました。");
+        
+        return "error/database";
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.3 ログ出力の実装</h3>
+                    <p>アプリケーションの動作を記録するログ機能を実装します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-3: ログ設定</h5>
+                        <p>適切なログレベルでアプリケーションの動作を記録します。</p>
+                        <h6>logback-spring.xml</h6>
+                        <pre class="code-block"><code class="language-xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;configuration&gt;
+    &lt;!-- コンソール出力設定 --&gt;
+    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+    
+    &lt;!-- ファイル出力設定 --&gt;
+    &lt;appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
+        &lt;file&gt;logs/user-management.log&lt;/file&gt;
+        &lt;rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"&gt;
+            &lt;fileNamePattern&gt;logs/user-management.%d{yyyy-MM-dd}.%i.log&lt;/fileNamePattern&gt;
+            &lt;maxFileSize&gt;10MB&lt;/maxFileSize&gt;
+            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
+        &lt;/rollingPolicy&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+    
+    &lt;!-- パッケージ別ログレベル --&gt;
+    &lt;logger name="com.example.usermanagement" level="INFO" /&gt;
+    &lt;logger name="org.springframework.web" level="DEBUG" /&gt;
+    &lt;logger name="org.hibernate.SQL" level="DEBUG" /&gt;
+    
+    &lt;root level="INFO"&gt;
+        &lt;appender-ref ref="CONSOLE" /&gt;
+        &lt;appender-ref ref="FILE" /&gt;
+    &lt;/root&gt;
+&lt;/configuration&gt;</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.4 セキュリティ設定の基礎</h3>
+                    <p>基本的なセキュリティ設定を実装します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-4: 基本セキュリティ設定</h5>
+                        <p>CSRF対策などの基本的なセキュリティを設定します。</p>
+                        <h6>application.properties（セキュリティ設定追加）</h6>
+                        <pre class="code-block"><code class="language-ini"># セキュリティ設定
+server.error.include-stacktrace=never
+server.error.include-message=always
+
+# セッション設定
+server.servlet.session.timeout=30m
+server.servlet.session.cookie.http-only=true
+server.servlet.session.cookie.secure=false
+
+# HTTPヘッダーセキュリティ
+server.servlet.session.cookie.same-site=strict
+
+# データベース接続プール設定
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.connection-timeout=20000</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.5 エラーページの作成</h3>
+                    <p>ユーザーフレンドリーなエラーページを作成します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-5: エラーページHTML</h5>
+                        <p>統一されたデザインのエラーページを作成します。</p>
+                        <h6>error/general.html</h6>
+                        <pre class="code-block"><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html xmlns:th="http://www.thymeleaf.org"&gt;
+&lt;head th:replace="fragments/layout :: head('エラー')"&gt;&lt;/head&gt;
+&lt;body&gt;
+    &lt;nav th:replace="fragments/layout :: navbar"&gt;&lt;/nav&gt;
+    
+    &lt;div class="container mt-5"&gt;
+        &lt;div class="row justify-content-center"&gt;
+            &lt;div class="col-md-6"&gt;
+                &lt;div class="card border-danger"&gt;
+                    &lt;div class="card-header bg-danger text-white text-center"&gt;
+                        &lt;h4 class="mb-0"&gt;
+                            &lt;i class="bi bi-exclamation-triangle"&gt;&lt;/i&gt; 
+                            &lt;span th:text="${errorTitle} ?: 'エラー'"&gt;エラー&lt;/span&gt;
+                        &lt;/h4&gt;
+                    &lt;/div&gt;
+                    &lt;div class="card-body text-center"&gt;
+                        &lt;div class="alert alert-danger"&gt;
+                            &lt;p th:text="${errorMessage} ?: '予期しないエラーが発生しました。'"&gt;
+                                エラーメッセージ
+                            &lt;/p&gt;
+                        &lt;/div&gt;
+                        
+                        &lt;div class="mt-4"&gt;
+                            &lt;h6&gt;解決方法&lt;/h6&gt;
+                            &lt;ul class="list-unstyled"&gt;
+                                &lt;li&gt;• ページを再読み込みしてください&lt;/li&gt;
+                                &lt;li&gt;• しばらく時間をおいてから再度お試しください&lt;/li&gt;
+                                &lt;li&gt;• 問題が続く場合は管理者にお問い合わせください&lt;/li&gt;
+                            &lt;/ul&gt;
+                        &lt;/div&gt;
+                        
+                        &lt;div class="mt-4"&gt;
+                            &lt;a href="/" class="btn btn-primary me-2"&gt;
+                                &lt;i class="bi bi-house"&gt;&lt;/i&gt; ホームに戻る
+                            &lt;/a&gt;
+                            &lt;a href="/users" class="btn btn-secondary"&gt;
+                                &lt;i class="bi bi-people"&gt;&lt;/i&gt; ユーザー一覧
+                            &lt;/a&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    
+    &lt;footer th:replace="fragments/layout :: footer"&gt;&lt;/footer&gt;
+    &lt;div th:replace="fragments/layout :: scripts"&gt;&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.6 基本的なセキュリティチェック</h3>
+                    <p>開発したアプリケーションのセキュリティを確認します。</p>
+
+                    <div class="highlight">
+                        <h5>セキュリティチェックリスト</h5>
+                        <ul>
+                            <li>✅ 入力値の検証が実装されている</li>
+                            <li>✅ HTMLエスケープが適切に行われている</li>
+                            <li>✅ エラーメッセージに機密情報が含まれていない</li>
+                            <li>✅ データベースクエリでパラメータ化クエリを使用</li>
+                            <li>✅ ログに機密情報が記録されていない</li>
+                            <li>✅ セッション設定が適切に行われている</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning">
+                        <h5>セキュリティの注意点</h5>
+                        <ul>
+                            <li><strong>パスワード管理:</strong> 実際のアプリケーションではパスワードのハッシュ化が必須です</li>
+                            <li><strong>HTTPS:</strong> 本番環境では必ずHTTPS通信を使用してください</li>
+                            <li><strong>定期的な更新:</strong> フレームワークやライブラリを定期的に更新してください</li>
+                            <li><strong>ログの管理:</strong> ログファイルには機密情報を記録しないでください</li>
+                        </ul>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>XSSとは何の略で、どのような攻撃ですか？</li>
+                            <li>SQLインジェクションを防ぐ基本的な方法は何ですか？</li>
+                            <li>ログに記録してはいけない情報は何ですか？</li>
+                            <li>HTTPSが重要な理由は何ですか？</li>
+                            <li>セッションタイムアウトを設定する理由は何ですか？</li>
+                        </ol>
+                        <details>
+                            <summary>解答例</summary>
+                            <ol>
+                                <li>Cross-Site Scripting。悪意のあるスクリプトをWebページに埋め込む攻撃</li>
+                                <li>パラメータ化クエリ（プリペアドステートメント）を使用する</li>
+                                <li>パスワード、個人情報、APIキーなどの機密情報</li>
+                                <li>通信内容を暗号化し、盗聴や改ざんを防ぐため</li>
+                                <li>セッションハイジャック攻撃のリスクを軽減するため</li>
+                            </ol>
+                        </details>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="step8-user-update-delete.html" class="btn btn-secondary">← 前の章 Step 8: 更新・削除機能</a>
+                        <a href="step10-deployment.html" class="btn btn-primary">次の章 → Step 10: デプロイメント</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Highlight.js 初期化 -->
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

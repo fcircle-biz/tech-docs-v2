@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Node.js入門 第11章 - REST APIサーバーを構築しよう</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-node-js text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Node.js入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>サーバーサイド JavaScript</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約19時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Node.js入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">REST APIサーバーを構築しよう</h1>
+                    <p class="text-slate-600">Expressを使ってREST APIサーバーを構築します。CRUD操作、JSONデータの送受信、エラーハンドリングを実装します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>REST APIの基本概念とRESTful設計の原則を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPメソッド（GET、POST、PUT、DELETE）を使い分けられるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CRUD操作を実装し、JSONデータの送受信を実践する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>適切なHTTPステータスコードを使い、エラーハンドリングを実装する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 11.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 REST APIとは何か
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">APIの基本概念</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">API</strong>（Application Programming Interface）とは、<strong>アプリケーション間で情報をやり取りするための窓口</strong>です。レストランで例えると、お客さん（クライアント）が直接キッチン（サーバー）に入って料理を作ることはできません。代わりに、ウェイター（API）に注文を伝えて、料理を受け取ります。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant C as クライアント全文Webアプリ、モバイルアプリ全文
+    participant API as REST API
+    participant S as サーバー全文データベース全文
+
+    C->>API: HTTPリクエスト全文GET /books全文
+    API->>S: データ取得処理
+    S-->>API: データ
+    API-->>C: HTTPレスポンス全文JSON全文
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">RESTとは</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong class="text-slate-800">REST</strong>（REpresentational State Transfer）は、<strong>Webサービスを設計するためのアーキテクチャスタイル</strong>です。RESTに従って設計されたAPIを「RESTful API」と呼びます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">RESTの核心的な考え方</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    すべてのデータを「リソース（資源）」として扱い、それぞれに一意のURL（エンドポイント）を割り当てます。HTTPメソッド（GET、POST、PUT、DELETE）を使って、そのリソースに対する操作を表現します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">RESTの6つの制約</h3>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <ol class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                                <div>
+                                    <p class="font-semibold">クライアント・サーバー</p>
+                                    <p class="text-sm text-slate-600">UI（クライアント）とデータ処理（サーバー）を分離する</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                                <div>
+                                    <p class="font-semibold">ステートレス</p>
+                                    <p class="text-sm text-slate-600">各リクエストは独立していて、サーバーはクライアントの状態を保持しない</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">3</span>
+                                <div>
+                                    <p class="font-semibold">キャッシュ可能</p>
+                                    <p class="text-sm text-slate-600">レスポンスはキャッシュ可能かどうか明示する</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">4</span>
+                                <div>
+                                    <p class="font-semibold">統一インターフェース</p>
+                                    <p class="text-sm text-slate-600">すべてのリソースに対して統一的な方法でアクセスできる</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">5</span>
+                                <div>
+                                    <p class="font-semibold">階層化システム</p>
+                                    <p class="text-sm text-slate-600">クライアントとサーバーの間に複数の層を配置できる</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">6</span>
+                                <div>
+                                    <p class="font-semibold">コードオンデマンド（任意）</p>
+                                    <p class="text-sm text-slate-600">必要に応じてサーバーからクライアントにコードを送信できる</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                </section>
+
+                <!-- セクション 11.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 RESTful設計の原則
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">リソース指向設計</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RESTful APIでは、すべてのデータを「リソース」として扱います。リソースは<strong>名詞</strong>で表現し、URLで識別します。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">リソースの例</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">リソース</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">URL（エンドポイント）</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-600">書籍のコレクション</td>
+                                        <td class="px-4 py-3"><code class="bg-slate-200 px-2 py-1 rounded text-xs">/books</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-600">特定の書籍</td>
+                                        <td class="px-4 py-3"><code class="bg-slate-200 px-2 py-1 rounded text-xs">/books/123</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-600">ユーザーのコレクション</td>
+                                        <td class="px-4 py-3"><code class="bg-slate-200 px-2 py-1 rounded text-xs">/users</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-600">特定のユーザー</td>
+                                        <td class="px-4 py-3"><code class="bg-slate-200 px-2 py-1 rounded text-xs">/users/456</code></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">HTTPメソッドの使い分け</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPメソッドを使って、リソースに対する操作（CRUD）を表現します。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">CRUD操作とHTTPメソッドの対応</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">操作</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">HTTPメソッド</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">エンドポイント例</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">説明</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">Create</td>
+                                        <td class="px-4 py-3"><code class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">POST</code></td>
+                                        <td class="px-4 py-3 text-slate-600"><code class="text-xs">POST /books</code></td>
+                                        <td class="px-4 py-3 text-slate-600">新しい書籍を作成</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">Read</td>
+                                        <td class="px-4 py-3"><code class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">GET</code></td>
+                                        <td class="px-4 py-3 text-slate-600"><code class="text-xs">GET /books<br/>GET /books/123</code></td>
+                                        <td class="px-4 py-3 text-slate-600">書籍一覧または特定の書籍を取得</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">Update</td>
+                                        <td class="px-4 py-3"><code class="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold">PUT</code></td>
+                                        <td class="px-4 py-3 text-slate-600"><code class="text-xs">PUT /books/123</code></td>
+                                        <td class="px-4 py-3 text-slate-600">特定の書籍を更新</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">Delete</td>
+                                        <td class="px-4 py-3"><code class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">DELETE</code></td>
+                                        <td class="px-4 py-3 text-slate-600"><code class="text-xs">DELETE /books/123</code></td>
+                                        <td class="px-4 py-3 text-slate-600">特定の書籍を削除</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    URLには動詞（create、delete等）を含めません。HTTPメソッドが操作を表すため、URLはリソース（名詞）のみで構成します。例: <code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">POST /books</code> ○、<code class="bg-red-100 px-2 py-0.5 rounded text-red-900">POST /createBook</code> ×
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">エンドポイント設計のベストプラクティス</h3>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <ul class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>複数形を使用</strong>: <code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/books</code>（○）、<code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/book</code>（△）</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>階層構造を表現</strong>: <code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/users/123/orders</code>（ユーザー123の注文一覧）</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>小文字とハイフンを使用</strong>: <code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/order-items</code>（○）、<code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/OrderItems</code>（×）</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>クエリパラメータでフィルタリング</strong>: <code class="bg-slate-200 px-2 py-0.5 rounded text-xs">/books?category=fiction&sort=title</code></span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション 11.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 HTTPステータスコードの理解
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPステータスコードは、リクエストの結果を数値で表します。適切なステータスコードを返すことで、クライアントが結果を正しく処理できるようになります。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A[HTTPリクエスト] --> B{処理結果}
+    B -->|成功| C[2xx Success]
+    B -->|クライアントエラー| D[4xx Client Error]
+    B -->|サーバーエラー| E[5xx Server Error]
+
+    C --> C1["200 OK"]
+    C --> C2["201 Created"]
+    C --> C3["204 No Content"]
+
+    D --> D1["400 Bad Request"]
+    D --> D2["404 Not Found"]
+    D --> D3["401 Unauthorized"]
+
+    E --> E1["500 Internal Server Error"]
+    E --> E2["503 Service Unavailable"]
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">よく使うステータスコード一覧</h3>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <div class="space-y-6">
+                            <!-- 2xx Success -->
+                            <div>
+                                <h4 class="font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                                    <span class="px-3 py-1 bg-emerald-100 rounded-lg text-sm">2xx</span>
+                                    成功
+                                </h4>
+                                <ul class="space-y-2 text-sm">
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold flex-shrink-0">200</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">OK</p>
+                                            <p class="text-slate-600">リクエスト成功（GET、PUT、DELETEで使用）</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold flex-shrink-0">201</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Created</p>
+                                            <p class="text-slate-600">新しいリソースが作成された（POSTで使用）</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold flex-shrink-0">204</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">No Content</p>
+                                            <p class="text-slate-600">成功したがレスポンスボディなし（DELETEで使用）</p>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- 4xx Client Error -->
+                            <div>
+                                <h4 class="font-semibold text-red-700 mb-3 flex items-center gap-2">
+                                    <span class="px-3 py-1 bg-red-100 rounded-lg text-sm">4xx</span>
+                                    クライアントエラー
+                                </h4>
+                                <ul class="space-y-2 text-sm">
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-red-100 text-red-700 px-2 py-1 rounded font-bold flex-shrink-0">400</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Bad Request</p>
+                                            <p class="text-slate-600">リクエストが不正（バリデーションエラー等）</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-red-100 text-red-700 px-2 py-1 rounded font-bold flex-shrink-0">401</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Unauthorized</p>
+                                            <p class="text-slate-600">認証が必要、または認証に失敗</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-red-100 text-red-700 px-2 py-1 rounded font-bold flex-shrink-0">404</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Not Found</p>
+                                            <p class="text-slate-600">リソースが見つからない</p>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- 5xx Server Error -->
+                            <div>
+                                <h4 class="font-semibold text-orange-700 mb-3 flex items-center gap-2">
+                                    <span class="px-3 py-1 bg-orange-100 rounded-lg text-sm">5xx</span>
+                                    サーバーエラー
+                                </h4>
+                                <ul class="space-y-2 text-sm">
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold flex-shrink-0">500</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Internal Server Error</p>
+                                            <p class="text-slate-600">サーバー内部でエラーが発生</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3">
+                                        <code class="bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold flex-shrink-0">503</code>
+                                        <div>
+                                            <p class="font-medium text-slate-700">Service Unavailable</p>
+                                            <p class="text-slate-600">サーバーが一時的に利用不可</p>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 書籍管理APIの実装（CRUD操作）
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際に書籍管理APIを構築して、CRUD操作を実装しましょう。まずはメモリ上にデータを保持する簡単な実装から始めます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">プロジェクトのセットアップ</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># プロジェクトフォルダを作成
+mkdir book-api
+cd book-api
+
+# package.jsonを作成
+npm init -y
+
+# Expressをインストール
+npm install express</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">基本的なサーバーの構築</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">const express = require('express');
+const app = express();
+
+// JSONデータを扱えるようにする
+app.use(express.json());
+
+// メモリ上にデータを保持（本来はデータベースを使用）
+let books = [
+  { id: 1, title: 'JavaScript入門', author: '山田太郎', year: 2023 },
+  { id: 2, title: 'Node.js実践', author: '佐藤花子', year: 2024 }
+];
+
+// IDの自動採番用
+let nextId = 3;
+
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`サーバーがポート${PORT}で起動しました`);
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">READ: 書籍一覧の取得（GET /books）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// すべての書籍を取得
+app.get('/books', (req, res) => {
+  // 200 OKとともに書籍一覧を返す
+  res.status(200).json({
+    success: true,
+    data: books
+  });
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">READ: 特定の書籍を取得（GET /books/:id）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 特定の書籍を取得
+app.get('/books/:id', (req, res) => {
+  // URLパラメータからIDを取得（文字列なので数値に変換）
+  const id = parseInt(req.params.id);
+
+  // 該当する書籍を検索
+  const book = books.find(b => b.id === id);
+
+  if (!book) {
+    // 見つからない場合は404を返す
+    return res.status(404).json({
+      success: false,
+      message: '書籍が見つかりません'
+    });
+  }
+
+  // 見つかった場合は200とデータを返す
+  res.status(200).json({
+    success: true,
+    data: book
+  });
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">CREATE: 新しい書籍を作成（POST /books）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 新しい書籍を作成
+app.post('/books', (req, res) => {
+  // リクエストボディからデータを取得
+  const { title, author, year } = req.body;
+
+  // バリデーション（必須項目チェック）
+  if (!title || !author) {
+    return res.status(400).json({
+      success: false,
+      message: 'タイトルと著者は必須です'
+    });
+  }
+
+  // 新しい書籍オブジェクトを作成
+  const newBook = {
+    id: nextId++,
+    title,
+    author,
+    year: year || new Date().getFullYear()
+  };
+
+  // 配列に追加
+  books.push(newBook);
+
+  // 201 Createdとともに作成されたデータを返す
+  res.status(201).json({
+    success: true,
+    data: newBook
+  });
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">UPDATE: 書籍を更新（PUT /books/:id）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 書籍を更新
+app.put('/books/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { title, author, year } = req.body;
+
+  // 該当する書籍を検索
+  const bookIndex = books.findIndex(b => b.id === id);
+
+  if (bookIndex === -1) {
+    return res.status(404).json({
+      success: false,
+      message: '書籍が見つかりません'
+    });
+  }
+
+  // データを更新
+  books[bookIndex] = {
+    id,
+    title: title || books[bookIndex].title,
+    author: author || books[bookIndex].author,
+    year: year || books[bookIndex].year
+  };
+
+  res.status(200).json({
+    success: true,
+    data: books[bookIndex]
+  });
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">DELETE: 書籍を削除（DELETE /books/:id）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 書籍を削除
+app.delete('/books/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  // 該当する書籍を検索
+  const bookIndex = books.findIndex(b => b.id === id);
+
+  if (bookIndex === -1) {
+    return res.status(404).json({
+      success: false,
+      message: '書籍が見つかりません'
+    });
+  }
+
+  // 配列から削除
+  books.splice(bookIndex, 1);
+
+  // 204 No Content（削除成功、レスポンスボディなし）
+  res.status(204).send();
+});</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション 11.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 APIのテスト
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作成したAPIをテストする方法を学びましょう。ブラウザではGETリクエストしか送信できないため、専用のツールを使います。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">サーバーの起動</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">node app.js</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">curlコマンドでテスト</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ターミナルから<code class="bg-slate-200 px-2 py-0.5 rounded text-sm">curl</code>コマンドを使ってAPIをテストできます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル（別のターミナルを開く）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 書籍一覧を取得
+curl http://localhost:3000/books
+
+# 特定の書籍を取得
+curl http://localhost:3000/books/1
+
+# 新しい書籍を作成
+curl -X POST http://localhost:3000/books \
+  -H "Content-Type: application/json" \
+  -d '{"title":"TypeScript入門","author":"鈴木一郎","year":2024}'
+
+# 書籍を更新
+curl -X PUT http://localhost:3000/books/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title":"JavaScript応用"}'
+
+# 書籍を削除
+curl -X DELETE http://localhost:3000/books/1</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">VS Code拡張機能（REST Client）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        VS Codeの「REST Client」拡張機能を使うと、GUIでAPIをテストできます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test.http</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">### 書籍一覧を取得
+GET http://localhost:3000/books
+
+### 特定の書籍を取得
+GET http://localhost:3000/books/1
+
+### 新しい書籍を作成
+POST http://localhost:3000/books
+Content-Type: application/json
+
+{
+  "title": "React入門",
+  "author": "田中次郎",
+  "year": 2024
+}
+
+### 書籍を更新
+PUT http://localhost:3000/books/1
+Content-Type: application/json
+
+{
+  "title": "JavaScript完全ガイド"
+}
+
+### 書籍を削除
+DELETE http://localhost:3000/books/2</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    「Send Request」というリンクをクリックすると、APIリクエストが送信され、レスポンスが表示されます。とても便利なので、ぜひ試してみてください！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 エラーハンドリングの実装
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        より堅牢なAPIにするため、エラーハンドリングを追加しましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">バリデーションミドルウェア</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（改良版）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// バリデーション関数
+function validateBook(req, res, next) {
+  const { title, author } = req.body;
+
+  if (!title || !author) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'タイトルと著者は必須です',
+        details: {
+          title: !title ? '必須項目です' : undefined,
+          author: !author ? '必須項目です' : undefined
+        }
+      }
+    });
+  }
+
+  next();
+}
+
+// POSTリクエストでバリデーションを使用
+app.post('/books', validateBook, (req, res) => {
+  // バリデーション通過後の処理
+  // ...
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">エラーハンドリングミドルウェア</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app.js（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 404エラーハンドリング（すべてのルートの後に配置）
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: 'エンドポイントが見つかりません'
+    }
+  });
+});
+
+// サーバーエラーハンドリング（最後に配置）
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    error: {
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'サーバー内部でエラーが発生しました'
+    }
+  });
+});</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    エラーレスポンスの形式を統一することで、クライアント側でエラー処理がしやすくなります。<code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">success</code>フラグと<code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">error</code>オブジェクトを含めるのがベストプラクティスです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 mb-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 11-1: 書籍管理APIの完成とテスト</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                この章で学んだ内容をすべて実装して、完全な書籍管理APIを構築しましょう。
+                            </p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">プロジェクトフォルダを作成し、Expressをインストールする</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">app.jsにCRUD操作のエンドポイントをすべて実装する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">バリデーションとエラーハンドリングを追加する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">curlまたはREST Clientですべてのエンドポイントをテストする</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">エラーケース（存在しないID、バリデーションエラー等）も確認する</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. REST APIにおいて、新しいリソースを作成する際に使用すべきHTTPメソッドとステータスコードは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            HTTPメソッド: <strong>POST</strong>、ステータスコード: <strong>201 Created</strong>。POSTメソッドで新しいリソースを作成し、成功時には201ステータスコードと作成されたリソースのデータを返すのがRESTfulな設計です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. URLに動詞を含めない理由は何ですか？良い例と悪い例を挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            HTTPメソッド自体が操作（動詞）を表すため、URLはリソース（名詞）のみで構成すべきです。<br>
+                                            <strong>良い例</strong>: POST /books（書籍を作成）、DELETE /books/123（書籍を削除）<br>
+                                            <strong>悪い例</strong>: POST /createBook、GET /getBooks
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ステータスコード 404、400、500 の違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <div class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <ul class="list-disc pl-5 space-y-1">
+                                                <li><strong>404 Not Found</strong>: リクエストされたリソースが存在しない（クライアントエラー）</li>
+                                                <li><strong>400 Bad Request</strong>: リクエストの内容が不正（バリデーションエラー等、クライアントエラー）</li>
+                                                <li><strong>500 Internal Server Error</strong>: サーバー側で予期しないエラーが発生（サーバーエラー）</li>
+                                            </ul>
+                                        </div>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="flex items-center gap-2 text-lg font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>REST APIはリソース指向設計で、HTTPメソッドを使ってCRUD操作を表現する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>エンドポイントURLは名詞（リソース）のみで構成し、動詞を含めない</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>HTTPステータスコードを適切に使い分けることで、処理結果を明確に伝える</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>express.json()ミドルウェアでJSONデータの送受信が可能になる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>バリデーションとエラーハンドリングでAPIの堅牢性を高める</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="nodejs-beginner-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">Expressフレームワーク入門</span>
+                        </div>
+                    </a>
+                    <a href="nodejs-beginner-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">タスク管理APIを作ろう（総合演習）</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

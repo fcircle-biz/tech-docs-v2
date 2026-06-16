@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第6章 - JSONデータの操作</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">JSONデータの操作 - モダンなデータ形式を扱う</h1>
+                    <p class="text-slate-600">PostgreSQLの強力なJSON/JSONB型の活用方法を学習します。JSONデータの格納、検索、更新、JSONパス式による要素の抽出など、Webアプリケーション開発で頻出するJSONデータの操作を実践します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSON型とJSONB型の違いと使い分けを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSONデータの格納と基本的な検索操作を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSON演算子とJSONパス式を使った要素の抽出ができる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSONデータの更新・削除・結合など応用操作を実践する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 JSON型とJSONB型の違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLは、JSONデータを格納するために「JSON型」と「JSONB型」の2種類のデータ型を提供しています。
+                        どちらもJSONデータを扱えますが、内部的な処理方法やパフォーマンス特性が異なります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">項目</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">JSON型</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">JSONB型</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">保存形式</td>
+                                    <td class="px-4 py-3">テキストとして保存（入力そのまま）</td>
+                                    <td class="px-4 py-3">バイナリ形式で保存（解析済み）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">挿入速度</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 高速（変換不要）</td>
+                                    <td class="px-4 py-3 text-amber-600"><i class="fas fa-exclamation-circle"></i> やや低速（変換処理あり）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">検索速度</td>
+                                    <td class="px-4 py-3 text-amber-600"><i class="fas fa-exclamation-circle"></i> やや低速（毎回解析）</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 高速（解析済み）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">インデックス</td>
+                                    <td class="px-4 py-3">未対応</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-star"></i> GINインデックス対応</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">キーの順序</td>
+                                    <td class="px-4 py-3">保持される</td>
+                                    <td class="px-4 py-3">保持されない（再構築）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">推奨用途</td>
+                                    <td class="px-4 py-3">書き込み重視、順序保持が必要</td>
+                                    <td class="px-4 py-3">検索重視、一般的な用途</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">推奨: JSONB型を使おう</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    ほとんどの場合、検索パフォーマンスとインデックス対応の点でJSONB型の使用が推奨されます。
+                                    キーの順序保持が必須の場合や、書き込みが極端に多い場合のみJSON型を検討しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 JSONデータの格納
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        まずはテーブルを作成し、JSONBデータを格納してみましょう。
+                        ここでは、商品情報を管理するテーブルを例として使用します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>テーブル作成とデータ挿入
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- 商品テーブルの作成
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    details JSONB  -- 商品詳細情報をJSONB型で格納
+);
+
+-- データの挿入
+INSERT INTO products (name, details) VALUES
+('ノートパソコン', '{
+    "brand": "TechCorp",
+    "price": 120000,
+    "specs": {
+        "cpu": "Intel Core i7",
+        "memory": "16GB",
+        "storage": "512GB SSD"
+    },
+    "tags": ["PC", "ビジネス", "携帯"]
+}'::JSONB);
+
+INSERT INTO products (name, details) VALUES
+('ワイヤレスマウス', '{
+    "brand": "MouseTech",
+    "price": 3500,
+    "specs": {
+        "type": "Bluetooth",
+        "battery": "単3×2本"
+    },
+    "tags": ["マウス", "周辺機器"]
+}'::JSONB);</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">::JSONB によるキャスト</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    JSONテキストをJSONB型に変換するには、文字列の後に「::JSONB」を付けます。
+                                    これにより、PostgreSQLが文字列をJSONB形式として解析・保存します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 JSON演算子による要素の取得
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLには、JSONデータから特定の要素を取り出すための便利な演算子が用意されています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">演算子</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">例</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">結果の型</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">-></td>
+                                    <td class="px-4 py-3">キーでJSONオブジェクトを取得</td>
+                                    <td class="px-4 py-3 font-mono text-xs">details->'brand'</td>
+                                    <td class="px-4 py-3">JSON/JSONB</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">->></td>
+                                    <td class="px-4 py-3">キーでテキストを取得</td>
+                                    <td class="px-4 py-3 font-mono text-xs">details->>'brand'</td>
+                                    <td class="px-4 py-3">TEXT</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">#></td>
+                                    <td class="px-4 py-3">パスでJSONオブジェクトを取得</td>
+                                    <td class="px-4 py-3 font-mono text-xs">details#>'{specs,cpu}'</td>
+                                    <td class="px-4 py-3">JSON/JSONB</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">#>></td>
+                                    <td class="px-4 py-3">パスでテキストを取得</td>
+                                    <td class="px-4 py-3 font-mono text-xs">details#>>'{specs,cpu}'</td>
+                                    <td class="px-4 py-3">TEXT</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono">@></td>
+                                    <td class="px-4 py-3">JSONが指定の値を含むか判定</td>
+                                    <td class="px-4 py-3 font-mono text-xs">details@>'{"brand":"TechCorp"}'</td>
+                                    <td class="px-4 py-3">BOOLEAN</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>JSON演算子の使用例
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- ブランド名を取得（JSON型として）
+SELECT name, details->'brand' AS brand_json FROM products;
+-- 結果: "TechCorp" （ダブルクォート付き）
+
+-- ブランド名を取得（テキスト型として）
+SELECT name, details->>'brand' AS brand_text FROM products;
+-- 結果: TechCorp （ダブルクォートなし）
+
+-- ネストした値を取得（CPU名）
+SELECT name, details#>>'{specs,cpu}' AS cpu FROM products;
+-- 結果: Intel Core i7
+
+-- 特定のブランドを検索
+SELECT name FROM products
+WHERE details @> '{"brand": "TechCorp"}'::JSONB;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A["JSON演算子の選び方"] --> B{結果の型は?}
+    B -->|JSON型| C{パスは?}
+    B -->|TEXT型| D{パスは?}
+    C -->|単一キー| E["-> 演算子"]
+    C -->|複数階層| F["#> 演算子<br/>全パス指定全"]
+    D -->|単一キー| G["->> 演算子"]
+    D -->|複数階層| H["#>> 演算子<br/>全パス指定全"]
+
+    style E fill:#dbeafe
+    style F fill:#dbeafe
+    style G fill:#bfdbfe
+    style H fill:#bfdbfe
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 JSONデータの検索と条件指定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        JSONデータに対して、様々な条件での検索が可能です。
+                        値の比較、配列要素の検索、部分一致検索など、実践的な例を見ていきましょう。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>検索の実例
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- 価格が10万円以下の商品を検索
+SELECT name, details->>'price' AS price FROM products
+WHERE (details->>'price')::INTEGER <= 100000;
+
+-- 配列にタグ「PC」を含む商品を検索
+SELECT name FROM products
+WHERE details->'tags' @> '["PC"]'::JSONB;
+
+-- ブランド名が「Tech」で始まる商品を検索
+SELECT name, details->>'brand' AS brand FROM products
+WHERE details->>'brand' LIKE 'Tech%';
+
+-- CPUが存在する商品を検索
+SELECT name FROM products
+WHERE details#>'{specs,cpu}' IS NOT NULL;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">注意: 型変換が必要な場合</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    ->> 演算子で取得した値はTEXT型です。数値として比較する場合は ::INTEGER や ::NUMERIC で型変換が必要です。
+                                    型変換を忘れると、文字列として比較されるため意図しない結果になります（例: "9" > "10" が TRUE になる）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: JSON検索を試してみよう</h3>
+                            <ol class="space-y-3 text-purple-900">
+                                <li class="break-words">
+                                    <strong>1. テーブル作成:</strong> 上記のproductsテーブルを作成し、サンプルデータを挿入してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>2. 基本検索:</strong> すべての商品のブランド名を取得するクエリを実行してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>3. 価格検索:</strong> 価格が5000円以下の商品を検索してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>4. タグ検索:</strong> タグに「周辺機器」を含む商品を検索してください。
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 JSONデータの更新
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLには、JSONデータを部分的に更新するための関数が用意されています。
+                        全体を置き換えずに、特定のキーだけを更新できます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">関数</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">使用例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">jsonb_set</td>
+                                    <td class="px-4 py-3">指定パスの値を設定</td>
+                                    <td class="px-4 py-3 font-mono text-xs">jsonb_set(data, '{key}', '"value"')</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono">||</td>
+                                    <td class="px-4 py-3">JSONオブジェクトをマージ</td>
+                                    <td class="px-4 py-3 font-mono text-xs">data || '{"key":"value"}'</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono">-</td>
+                                    <td class="px-4 py-3">指定キーを削除</td>
+                                    <td class="px-4 py-3 font-mono text-xs">data - 'key'</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>JSON更新の実例
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- 価格を更新（jsonb_setを使用）
+UPDATE products
+SET details = jsonb_set(details, '{price}', '98000')
+WHERE name = 'ノートパソコン';
+
+-- 新しいキーを追加（||演算子を使用）
+UPDATE products
+SET details = details || '{"warranty": "3年保証"}'::JSONB
+WHERE name = 'ノートパソコン';
+
+-- ネストした値を更新
+UPDATE products
+SET details = jsonb_set(details, '{specs,memory}', '"32GB"')
+WHERE name = 'ノートパソコン';
+
+-- キーを削除
+UPDATE products
+SET details = details - 'warranty'
+WHERE name = 'ノートパソコン';</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">jsonb_setの注意点</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    jsonb_setの第3引数（設定する値）は、JSONB型である必要があります。
+                                    文字列を設定する場合は '"value"' のようにダブルクォートで囲んだ上でシングルクォートで囲みます。
+                                    数値の場合は '100' のようにします。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.6 JSON関数の活用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLには、JSONデータを扱うための豊富な関数が用意されています。
+                        配列の展開、キーの一覧取得、型判定など、便利な関数を紹介します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>便利なJSON関数
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- JSON配列を行に展開
+SELECT name, jsonb_array_elements_text(details->'tags') AS tag
+FROM products
+WHERE details ? 'tags';
+
+-- すべてのキーを取得
+SELECT name, jsonb_object_keys(details) AS keys
+FROM products;
+
+-- キーの存在確認（?演算子）
+SELECT name FROM products WHERE details ? 'warranty';
+
+-- JSON型の判定
+SELECT
+    name,
+    jsonb_typeof(details->'price') AS price_type,
+    jsonb_typeof(details->'tags') AS tags_type
+FROM products;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- 関数1 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-list text-primary-500"></i>
+                                <h3 class="font-semibold text-slate-800">jsonb_array_elements</h3>
+                            </div>
+                            <p class="text-slate-600 text-sm">
+                                JSON配列の各要素を個別の行として展開します。
+                                タグやカテゴリのような配列データを検索する際に便利です。
+                            </p>
+                        </div>
+
+                        <!-- 関数2 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-key text-primary-500"></i>
+                                <h3 class="font-semibold text-slate-800">jsonb_object_keys</h3>
+                            </div>
+                            <p class="text-slate-600 text-sm">
+                                JSONオブジェクトのすべてのキーを取得します。
+                                動的なスキーマを持つJSONデータの構造を調べる際に有用です。
+                            </p>
+                        </div>
+
+                        <!-- 関数3 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-question-circle text-primary-500"></i>
+                                <h3 class="font-semibold text-slate-800">? 演算子</h3>
+                            </div>
+                            <p class="text-slate-600 text-sm">
+                                指定したキーがJSONオブジェクト内に存在するかを判定します。
+                                オプショナルなフィールドの有無で条件分岐する際に使用します。
+                            </p>
+                        </div>
+
+                        <!-- 関数4 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-tag text-primary-500"></i>
+                                <h3 class="font-semibold text-slate-800">jsonb_typeof</h3>
+                            </div>
+                            <p class="text-slate-600 text-sm">
+                                JSON要素の型（object、array、string、number、boolean、null）を返します。
+                                動的なデータの型チェックに使用します。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.7 JSONインデックスの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        JSONB型のデータには、GINインデックスを作成することで検索パフォーマンスを大幅に改善できます。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>GINインデックスの作成
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- JSONB全体に対するGINインデックス
+CREATE INDEX idx_products_details ON products USING GIN (details);
+
+-- 特定のパスに対するインデックス
+CREATE INDEX idx_products_brand
+ON products ((details->>'brand'));
+
+-- 配列要素に対するインデックス
+CREATE INDEX idx_products_tags
+ON products USING GIN ((details->'tags'));</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    A[JSONBデータ] --> B{検索パターンは?}
+    B -->|全体検索<br/>全@>演算子全| C["GINインデックス<br/>全カラム全体全"]
+    B -->|特定キー検索<br/>全->>演算子全| D["B-treeインデックス<br/>全式指定全"]
+    B -->|配列要素検索| E["GINインデックス<br/>全配列要素全"]
+
+    C --> F[高速検索]
+    D --> F
+    E --> F
+
+    style C fill:#dbeafe
+    style D fill:#dbeafe
+    style E fill:#dbeafe
+    style F fill:#86efac
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">インデックスのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    GINインデックスを作成すると、@>、?、?&、?| などの演算子を使った検索が高速化されます。
+                                    大量のJSONデータを扱う場合、インデックスの有無で数十倍〜数百倍の性能差が出ることもあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: JSON更新とインデックスを試してみよう</h3>
+                            <ol class="space-y-3 text-purple-900">
+                                <li class="break-words">
+                                    <strong>1. 価格更新:</strong> ノートパソコンの価格を110000円に更新してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>2. キー追加:</strong> ワイヤレスマウスに "color": "ブラック" を追加してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>3. 配列展開:</strong> すべての商品のタグを1行ずつ展開して表示してください。
+                                </li>
+                                <li class="break-words">
+                                    <strong>4. インデックス作成:</strong> detailsカラムにGINインデックスを作成してください。
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.8 実践例: ユーザー設定管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        JSONBを活用した実践的な例として、ユーザーごとの設定情報を管理するテーブルを作成してみましょう。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-slate-700">
+                                <i class="fas fa-code mr-2"></i>ユーザー設定テーブルの例
+                            </span>
+                            <button class="copy-btn text-xs px-3 py-1 rounded bg-slate-600 text-white hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <div class="code-block-wrapper">
+                            <pre><code class="language-sql">-- ユーザー設定テーブルの作成
+CREATE TABLE user_settings (
+    user_id INTEGER PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    preferences JSONB DEFAULT '{}'::JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- インデックスの作成
+CREATE INDEX idx_user_preferences
+ON user_settings USING GIN (preferences);
+
+-- データの挿入
+INSERT INTO user_settings (user_id, username, preferences) VALUES
+(1, 'tanaka', '{
+    "theme": "dark",
+    "language": "ja",
+    "notifications": {
+        "email": true,
+        "push": false
+    },
+    "display": {
+        "itemsPerPage": 20,
+        "fontSize": "medium"
+    }
+}'::JSONB);
+
+-- テーマがダークモードのユーザーを検索
+SELECT username FROM user_settings
+WHERE preferences->>'theme' = 'dark';
+
+-- メール通知を有効にしているユーザーを検索
+SELECT username FROM user_settings
+WHERE preferences#>>'{notifications,email}' = 'true';</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">JSONBを使うメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    ユーザー設定のような、項目が頻繁に追加・変更される可能性のあるデータは、JSONB型で管理すると便利です。
+                                    新しい設定項目を追加する際に、テーブル構造を変更（ALTER TABLE）する必要がなく、柔軟に対応できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. JSON型とJSONB型の主な違いを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え（例）:</strong><br>
+                                            1. 保存形式 - JSON型はテキストとして保存、JSONB型はバイナリ形式で保存される<br>
+                                            2. インデックス - JSONB型はGINインデックスに対応しているが、JSON型は未対応<br>
+                                            （他にも、検索速度、挿入速度、キーの順序保持なども正解です）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 演算子 -> と ->> の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            -> はJSON/JSONB型を返し、->> はTEXT型を返します。<br>
+                                            -> で取得した値はさらにJSON演算子でアクセスできますが、->> で取得した値は文字列として扱われます。<br>
+                                            数値として比較する場合は ->> で取得後に ::INTEGER などで型変換が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. JSONB型のカラムに作成すべきインデックスの種類は何ですか？また、どのような検索で効果がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            GINインデックスを作成します。<br>
+                                            効果がある検索: @>（包含チェック）、?（キー存在チェック）、?&（複数キーすべて存在）、?|（複数キーいずれか存在）などの演算子を使った検索で高速化されます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-wrench text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">よくあるエラーと対処法</h3>
+                            <div class="space-y-4 text-orange-900">
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <p class="font-medium mb-2 break-words">
+                                        <i class="fas fa-exclamation-circle mr-2"></i>
+                                        ERROR: invalid input syntax for type json
+                                    </p>
+                                    <p class="text-sm break-words">
+                                        <strong>原因:</strong> JSON形式が正しくありません。<br>
+                                        <strong>対処法:</strong> キーと値を必ずダブルクォートで囲む、カンマの位置を確認する、最後の要素にカンマをつけないなど、JSON形式を確認してください。
+                                    </p>
+                                </div>
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <p class="font-medium mb-2 break-words">
+                                        <i class="fas fa-exclamation-circle mr-2"></i>
+                                        ERROR: operator does not exist: jsonb = text
+                                    </p>
+                                    <p class="text-sm break-words">
+                                        <strong>原因:</strong> JSONB型と文字列を直接比較しようとしています。<br>
+                                        <strong>対処法:</strong> ->> 演算子でTEXT型に変換するか、比較する値を ::JSONB でキャストしてください。
+                                    </p>
+                                </div>
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <p class="font-medium mb-2 break-words">
+                                        <i class="fas fa-exclamation-circle mr-2"></i>
+                                        数値比較が文字列として比較される
+                                    </p>
+                                    <p class="text-sm break-words">
+                                        <strong>原因:</strong> ->> で取得した値はTEXT型です。<br>
+                                        <strong>対処法:</strong> ::INTEGER や ::NUMERIC で型変換してから比較してください。<br>
+                                        例: (details->>'price')::INTEGER > 10000
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第6章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>JSONB型は検索パフォーマンスとインデックス対応の点でJSON型より優れている</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>->、->>、#>、#>> などの演算子でJSON要素にアクセスできる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>jsonb_set、||、- などを使ってJSONデータを部分的に更新できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>GINインデックスを作成することでJSON検索を高速化できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ユーザー設定など動的なスキーマにはJSONBが適している</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">PostgreSQLの便利な関数</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ビューとマテリアライズドビュー</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

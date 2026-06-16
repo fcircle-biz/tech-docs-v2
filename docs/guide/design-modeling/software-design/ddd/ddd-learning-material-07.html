@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>DDD学習教材 第7章 - リポジトリ - 集約の永続化と取得</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // DDD - Indigo (設計手法用)
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-project-diagram text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">DDD学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cubes text-[9px]"></i>
+                                <span>設計・モデリング</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">設計・モデリング</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間15分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">リポジトリ - 集約の永続化と取得</h1>
+                    <p class="text-slate-600">集約をデータベースに保存し、取得するためのリポジトリパターンを学びます。永続化の詳細をドメイン層から隠蔽し、ドメインモデルの純粋性を保つ方法を習得します。インターフェースの設計、実装の分離、テスタビリティの向上について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リポジトリパターンとは何か、その役割を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リポジトリのインターフェース設計と実装の分離の重要性を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>集約単位でのデータ永続化と取得方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リポジトリを活用したテスタビリティの向上方法を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: リポジトリとは何か -->
+                <section class="prose prose-slate max-w-none">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 リポジトリとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>リポジトリ（Repository）</strong>は、集約の永続化と取得を担当するオブジェクトです。データベースへのアクセス方法をカプセル化し、ドメイン層からインフラストラクチャ層の詳細を隠蔽します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリは、<strong>「コレクション風のインターフェース」</strong>を提供します。ドメイン層のコードからは、あたかもメモリ上のコレクション（ListやSetなど）を操作しているかのように見えますが、実際にはデータベースに対する永続化操作が行われます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">リポジトリの役割</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    リポジトリは集約ごとに1つ定義します。例えば、注文集約には「OrderRepository」、顧客集約には「CustomerRepository」を用意します。これにより、集約の境界が明確になり、データアクセスのロジックが整理されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- リポジトリのイメージ図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-layer-group text-primary-500"></i>
+                            リポジトリの位置づけ
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph Domain[ドメイン層]
+        Agg[集約ルート<br/>Order]
+        RepoInt[リポジトリ<br/>インターフェース<br/>IOrderRepository]
+    end
+
+    subgraph Infra[インフラストラクチャ層]
+        RepoImpl[リポジトリ実装<br/>OrderRepositoryImpl]
+        DB[(データベース)]
+    end
+
+    Agg -.依存.-> RepoInt
+    RepoImpl -.実装.-> RepoInt
+    RepoImpl --> DB
+
+    style Domain fill:#c7d2fe,stroke:#6366f1
+    style Infra fill:#e0e7ff,stroke:#818cf8
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: なぜリポジトリが必要なのか -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 なぜリポジトリが必要なのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリパターンを使わずにドメイン層から直接データベースにアクセスすると、以下のような問題が発生します：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題①: ドメインロジックの汚染
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                SQL文やORM固有のコードがドメインモデルに混入し、ビジネスルールが見えにくくなります。ドメインモデルの純粋性が失われます。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題②: テストが困難
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                ドメインロジックのテストにデータベースが必須になり、テストの実行速度が遅くなります。また、テストデータの準備が煩雑になります。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題③: 技術的依存関係
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                特定のデータベースやORMに強く依存し、技術スタックの変更が困難になります。例えば、PostgreSQLからMySQLへの移行などが難しくなります。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題④: 重複コード
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                同じデータアクセスロジックが複数箇所に散らばり、保守性が低下します。変更時に修正漏れが発生しやすくなります。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-star text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2 break-words">リポジトリのメリット</h3>
+                                <ul class="space-y-2 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>ドメインモデルの純粋性</strong>: ドメイン層がインフラストラクチャの詳細に依存せず、ビジネスロジックに集中できます</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>テスタビリティの向上</strong>: モックやスタブを使って、データベースなしでドメインロジックをテストできます</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>柔軟な実装変更</strong>: 永続化技術を変更してもドメイン層への影響がありません</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>データアクセスの一元管理</strong>: 集約へのアクセスロジックが1箇所に集約され、保守性が向上します</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: リポジトリのインターフェース設計 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 リポジトリのインターフェース設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリのインターフェースは、<strong>ドメイン層</strong>に配置します。これにより、ドメイン層がインフラストラクチャ層に依存することなく、必要なデータアクセス機能を定義できます。
+                    </p>
+
+                    <!-- コードブロック: リポジトリインターフェース -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">IOrderRepository.java (ドメイン層)</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ドメイン層に配置するインターフェース
+public interface IOrderRepository {
+    // IDによる検索
+    Optional&lt;Order&gt; findById(OrderId id);
+
+    // 顧客IDによる検索
+    List&lt;Order&gt; findByCustomerId(CustomerId customerId);
+
+    // 保存（新規作成・更新どちらも対応）
+    void save(Order order);
+
+    // 削除
+    void delete(OrderId id);
+
+    // 次のID取得（採番）
+    OrderId nextId();
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">インターフェース設計のポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    リポジトリのメソッドは、<strong>ドメインの言葉</strong>で定義します。「SELECT文を実行する」ではなく「顧客IDで注文を検索する」のように、ビジネスの意図が明確になる命名を心がけましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">基本的なメソッド</h3>
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-5 mb-6">
+                        <ul class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                <div>
+                                    <strong class="text-slate-900">findById</strong>: IDを指定して集約を取得します。存在しない場合は<code class="bg-slate-200 px-1 rounded text-sm">Optional.empty()</code>を返します。
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                <div>
+                                    <strong class="text-slate-900">save</strong>: 集約を永続化します。新規作成と更新を区別せず、同じメソッドで処理します（Upsert）。
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                <div>
+                                    <strong class="text-slate-900">delete</strong>: 集約を削除します。IDを指定して削除対象を特定します。
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                <div>
+                                    <strong class="text-slate-900">検索メソッド</strong>: ビジネスで必要な検索条件に応じたメソッドを定義します（例: findByCustomerId、findByStatus）。
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション4: リポジトリの実装 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 リポジトリの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリの実装クラスは、<strong>インフラストラクチャ層</strong>に配置します。ここで初めてデータベースアクセスの具体的な処理を記述します。
+                    </p>
+
+                    <!-- コードブロック: リポジトリ実装 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderRepositoryImpl.java (インフラ層)</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// インフラストラクチャ層の実装
+public class OrderRepositoryImpl implements IOrderRepository {
+    private final EntityManager entityManager;
+
+    @Override
+    public Optional&lt;Order&gt; findById(OrderId id) {
+        // JPAを使った検索
+        Order order = entityManager.find(Order.class, id.getValue());
+        return Optional.ofNullable(order);
+    }
+
+    @Override
+    public List&lt;Order&gt; findByCustomerId(CustomerId customerId) {
+        // JPQLで条件検索
+        return entityManager
+            .createQuery("SELECT o FROM Order o WHERE o.customerId = :customerId", Order.class)
+            .setParameter("customerId", customerId)
+            .getResultList();
+    }
+
+    @Override
+    public void save(Order order) {
+        // 新規か更新かを自動判定
+        if (entityManager.contains(order)) {
+            entityManager.merge(order);
+        } else {
+            entityManager.persist(order);
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意: 集約境界の尊重</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    リポジトリは常に<strong>集約ルート単位</strong>で保存・取得します。集約内部のエンティティ（例: 注文明細）を個別に保存するメソッドは作りません。これにより、集約の整合性が保証されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実装パターンの比較図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-code-branch text-primary-500"></i>
+                            実装パターンの選択肢
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    Repo[リポジトリ実装]
+
+    Repo --> ORM[ORM使用<br/>JPA/Hibernate]
+    Repo --> SQL[生SQL<br/>JDBC]
+    Repo --> NoSQL[NoSQLデータベース<br/>MongoDB等]
+    Repo --> InMem[インメモリ<br/>テスト用]
+
+    ORM -.メリット.-> M1[オブジェクト<br/>マッピング自動]
+    SQL -.メリット.-> M2[細かい制御<br/>高速化可能]
+    NoSQL -.メリット.-> M3[柔軟な<br/>スキーマ]
+    InMem -.メリット.-> M4[高速テスト<br/>実行]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: テスタビリティの向上 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 テスタビリティの向上
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリパターンの大きなメリットの1つが、<strong>テスタビリティの向上</strong>です。インターフェースと実装を分離することで、テスト用の実装（モックやスタブ）を簡単に差し替えられます。
+                    </p>
+
+                    <!-- コードブロック: テスト用実装 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">InMemoryOrderRepository.java (テスト用)</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// テスト用のインメモリ実装
+public class InMemoryOrderRepository implements IOrderRepository {
+    // メモリ上にデータを保持
+    private final Map&lt;OrderId, Order&gt; orders = new HashMap&lt;&gt;();
+
+    @Override
+    public Optional&lt;Order&gt; findById(OrderId id) {
+        return Optional.ofNullable(orders.get(id));
+    }
+
+    @Override
+    public void save(Order order) {
+        // メモリ上のMapに保存（高速）
+        orders.put(order.getId(), order);
+    }
+
+    // テスト用の便利メソッド
+    public void clear() {
+        orders.clear();
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- コードブロック: テストコード例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">OrderServiceTest.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public class OrderServiceTest {
+    private IOrderRepository orderRepository;
+    private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        // インメモリ実装を使用（DBなしでテスト可能）
+        orderRepository = new InMemoryOrderRepository();
+        orderService = new OrderService(orderRepository);
+    }
+
+    @Test
+    void testOrderCreation() {
+        // 高速にテストを実行できる
+        Order order = orderService.createOrder(...);
+
+        // 検証
+        Order saved = orderRepository.findById(order.getId()).get();
+        assertEquals(OrderStatus.PENDING, saved.getStatus());
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">テストの高速化</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    インメモリ実装を使うことで、データベース接続やトランザクション処理が不要になり、テストが数秒から数ミリ秒に短縮されます。これにより、TDD（テスト駆動開発）のサイクルを高速に回せます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: リポジトリ設計のベストプラクティス -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 リポジトリ設計のベストプラクティス
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">1. 集約ごとに1つのリポジトリ</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリは<strong>集約単位</strong>で定義します。集約内部のエンティティに対して個別のリポジトリは作りません。
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-emerald-600"></i>
+                                良い設計
+                            </h4>
+                            <ul class="space-y-2 text-emerald-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>IOrderRepository（注文集約用）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>ICustomerRepository（顧客集約用）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>IProductRepository（商品集約用）</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-times-circle text-red-600"></i>
+                                悪い設計
+                            </h4>
+                            <ul class="space-y-2 text-red-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>IOrderLineRepository（注文明細は集約内部）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>IAddressRepository（住所は値オブジェクト）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>IGenericRepository（汎用リポジトリは避ける）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">2. ドメインの言葉でメソッドを命名</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        技術的な用語ではなく、<strong>ビジネスの言葉</strong>でメソッド名を付けます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">良い命名例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ビジネスの意図が明確
+List&lt;Order&gt; findByCustomerId(CustomerId customerId);
+List&lt;Order&gt; findPendingOrders();
+List&lt;Order&gt; findOrdersShippedIn(DateRange dateRange);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">3. 検索条件はドメインオブジェクトで表現</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        複雑な検索条件は、専用のクラス（仕様パターン）でカプセル化します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">仕様パターンの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 検索条件を表すクラス
+public class OrderSearchCriteria {
+    private CustomerId customerId;
+    private OrderStatus status;
+    private DateRange orderDateRange;
+    // ゲッター・セッター等
+}
+
+// リポジトリで使用
+public interface IOrderRepository {
+    List&lt;Order&gt; findByCriteria(OrderSearchCriteria criteria);
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">4. トランザクション管理は外部で行う</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リポジトリ内部でトランザクションを開始・コミットせず、呼び出し側（アプリケーション層のサービス）で管理します。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">トランザクション境界</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    複数のリポジトリ操作を1つのトランザクションでまとめる必要がある場合、アプリケーションサービスでトランザクション境界を定義します。リポジトリはその中で動作する部品として設計します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 7-1: リポジトリの実装</h3>
+                            <p class="text-purple-900 mb-4 break-words">ECサイトの注文集約に対するリポジトリを実装してみましょう。</p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">IOrderRepositoryインターフェースを定義します（findById、save、deleteメソッド）</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">InMemoryOrderRepositoryクラスを実装します（HashMap使用）</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">テストコードを書いて、保存・取得が正しく動作することを確認します</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. リポジトリパターンの主な目的は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            永続化の詳細をドメイン層から隠蔽し、データアクセスロジックをカプセル化することです。これにより、ドメインモデルの純粋性を保ち、テスタビリティを向上させ、永続化技術の変更を容易にします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. リポジトリのインターフェースはどの層に配置しますか？また、実装クラスはどの層に配置しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            インターフェースは<strong>ドメイン層</strong>に配置します。実装クラスは<strong>インフラストラクチャ層</strong>に配置します。これにより、ドメイン層がインフラストラクチャ層に依存することなく、依存性逆転の原則を実現できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. なぜ集約内部のエンティティに対して個別のリポジトリを作ってはいけないのですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            集約は整合性の境界を表しており、常に集約ルート経由でアクセスする必要があります。集約内部のエンティティに個別のリポジトリを作ると、集約の不変条件を守れなくなり、データの整合性が崩れる可能性があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. テスト用にインメモリリポジトリを実装するメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            データベース接続が不要になり、テストの実行速度が大幅に向上します（数秒→数ミリ秒）。また、テストデータの準備や後処理が簡単になり、TDDのサイクルを高速に回せるようになります。さらに、インターフェースが正しく定義されているかの検証にもなります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>リポジトリは集約の永続化と取得を担当し、データアクセスの詳細をドメイン層から隠蔽する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>インターフェースをドメイン層、実装をインフラ層に配置することで依存性を逆転させる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>集約ごとに1つのリポジトリを定義し、集約境界を尊重する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>テスト用のインメモリ実装を用意することで、テスタビリティが大幅に向上する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>メソッド名はドメインの言葉で表現し、ビジネスの意図を明確にする</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="ddd-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">集約</span>
+                        </div>
+                    </a>
+                    <a href="ddd-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ドメインサービス</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

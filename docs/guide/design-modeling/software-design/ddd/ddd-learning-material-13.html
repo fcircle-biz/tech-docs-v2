@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>DDD学習教材 第13章 - ドメインイベント - システム内外への変更の通知</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // DDD - Indigo (設計手法用)
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-project-diagram text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">DDD学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cubes text-[9px]"></i>
+                                <span>設計・モデリング</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">設計・モデリング</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第13章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第13章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間15分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ドメインイベント - システム内外への変更の通知</h1>
+                    <p class="text-slate-600">「注文が確定された」「在庫が減少した」など、ドメインで発生した重要な出来事を表現するドメインイベントを学びます。イベントの設計、発行、購読の方法を理解し、疎結合なシステム設計への応用を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ドメインイベントとは何か、なぜ必要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ドメインイベントの設計方法と命名規則を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>イベントの発行（Publish）と購読（Subscribe）パターンを実装できるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>疎結合なシステムを実現するイベント駆動設計の基礎を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: ドメインイベントとは何か -->
+                <section class="prose prose-slate max-w-none">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.1 ドメインイベントとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ドメインイベント（Domain Event）</strong>は、ドメインで発生した<strong>重要な出来事</strong>を表現するオブジェクトです。ビジネス的に意味のある何かが起こったことを他の部分に伝えるための仕組みです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        例えば、ECサイトでは以下のような出来事が重要です：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bolt"></i>
+                                注文ドメインでのイベント例
+                            </h4>
+                            <ul class="space-y-1 text-purple-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span>注文が確定された（OrderPlaced）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span>注文がキャンセルされた（OrderCancelled）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span>支払いが完了した（PaymentCompleted）</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bolt"></i>
+                                在庫ドメインでのイベント例
+                            </h4>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>在庫が減少した（StockDecreased）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>在庫切れが発生した（OutOfStock）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>在庫が補充された（StockReplenished）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">イベントは「過去形」で命名する</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    ドメインイベントは「既に起きたこと」を表現するため、過去形（～された、～が完了した）で命名します。これにより、イベントが発生した時点で状態変更が完了していることが明確になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: なぜドメインイベントが必要か -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.2 なぜドメインイベントが必要なのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインイベントを使うことで、以下のようなメリットが得られます：
+                    </p>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-star text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2 break-words">ドメインイベントのメリット</h3>
+                                <ul class="space-y-2 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>疎結合化</strong>: イベント発行側と購読側が直接依存しないため、システムが柔軟になる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>ビジネスロジックの明確化</strong>: 重要な出来事がコードで明示的に表現される</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>監査・ログ記録</strong>: 何が起こったかを時系列で記録できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>非同期処理</strong>: イベントをキューに入れて後で処理できる</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- イベントなしの問題例 -->
+                    <h3 class="font-semibold text-slate-800 mb-3 mt-6">イベントを使わない場合の問題</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        イベントを使わずに直接処理を呼び出すと、以下のような問題が発生します：
+                    </p>
+
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle text-red-500"></i>
+                            密結合な設計の例（問題あり）
+                        </h4>
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// 注文確定時に様々な処理を直接呼び出す
+public class Order {
+    public void place() {
+        // 注文確定
+        this.status = OrderStatus.PLACED;
+
+        // 在庫サービスを直接呼び出し
+        inventoryService.decreaseStock(this.items);
+
+        // 配送サービスを直接呼び出し
+        shippingService.createShipment(this);
+
+        // メール通知サービスを直接呼び出し
+        emailService.sendOrderConfirmation(this);
+
+        // ポイントサービスを直接呼び出し
+        pointService.addPoints(this.customerId);
+    }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="bg-red-50 border-l-4 border-red-500 p-4 mt-4 rounded-r-lg overflow-hidden">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-times-circle text-red-600 mt-1"></i>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-red-900 font-medium break-words">この設計の問題点</p>
+                                    <ul class="text-red-800 text-sm mt-2 space-y-1 ml-4 list-disc break-words">
+                                        <li>注文クラスが多数のサービスに依存している（密結合）</li>
+                                        <li>新しい処理を追加するたびに注文クラスを変更する必要がある</li>
+                                        <li>各サービスの処理が失敗した時のエラーハンドリングが複雑</li>
+                                        <li>テストが困難（すべてのサービスをモック化する必要がある）</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- イベントありの解決例 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-check-circle text-emerald-500"></i>
+                            イベント駆動な設計の例（改善版）
+                        </h4>
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// 注文確定時にイベントを発行するだけ
+public class Order {
+    public void place() {
+        // 注文確定
+        this.status = OrderStatus.PLACED;
+
+        // イベントを発行（他のサービスへの依存なし）
+        DomainEventPublisher.publish(
+            new OrderPlacedEvent(this.orderId, this.customerId, this.items)
+        );
+    }
+}
+
+// 各サービスは独立してイベントを購読
+@EventHandler
+public class InventoryEventHandler {
+    public void handle(OrderPlacedEvent event) {
+        inventoryService.decreaseStock(event.getItems());
+    }
+}
+
+@EventHandler
+public class ShippingEventHandler {
+    public void handle(OrderPlacedEvent event) {
+        shippingService.createShipment(event.getOrderId());
+    }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 mt-4 rounded-r-lg overflow-hidden">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-600 mt-1"></i>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-emerald-900 font-medium break-words">改善のポイント</p>
+                                    <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4 list-disc break-words">
+                                        <li>注文クラスは他のサービスに依存しない（疎結合）</li>
+                                        <li>新しい処理を追加しても注文クラスを変更しなくて良い</li>
+                                        <li>各イベントハンドラーは独立してエラーハンドリング可能</li>
+                                        <li>テストが容易（イベント発行を確認するだけ）</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ドメインイベントの設計 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.3 ドメインイベントの設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインイベントを設計する際には、以下の点に注意します：
+                    </p>
+
+                    <h3 class="font-semibold text-slate-800 mb-3 mt-6">イベントの構造</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインイベントは通常、以下の要素を持ちます：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-database"></i>
+                                必須の属性
+                            </h4>
+                            <ul class="space-y-1 text-purple-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>イベントID</strong>: イベントを一意に識別するID</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>発生日時</strong>: イベントがいつ発生したか</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>集約ID</strong>: どの集約で起きたイベントか</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-info"></i>
+                                ドメイン固有の属性
+                            </h4>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>ビジネス情報</strong>: イベント処理に必要な情報</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>変更前の状態</strong>: 必要に応じて含める</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>変更後の状態</strong>: 必要に応じて含める</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-code text-primary-500"></i>
+                            ドメインイベントの実装例
+                        </h4>
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// 注文確定イベント
+public class OrderPlacedEvent implements DomainEvent {
+    private final String eventId;        // イベントID
+    private final LocalDateTime occurredOn; // 発生日時
+    private final String orderId;        // 注文ID（集約ID）
+    private final String customerId;     // 顧客ID
+    private final List&lt;OrderItem&gt; items; // 注文明細
+    private final Money totalAmount;     // 合計金額
+
+    public OrderPlacedEvent(String orderId, String customerId,
+                           List&lt;OrderItem&gt; items, Money totalAmount) {
+        this.eventId = UUID.randomUUID().toString();
+        this.occurredOn = LocalDateTime.now();
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.items = new ArrayList&lt;&gt;(items);
+        this.totalAmount = totalAmount;
+    }
+
+    // Getterのみ（イベントは不変）
+    public String getEventId() { return eventId; }
+    public LocalDateTime getOccurredOn() { return occurredOn; }
+    public String getOrderId() { return orderId; }
+    public String getCustomerId() { return customerId; }
+    public List&lt;OrderItem&gt; getItems() { return items; }
+    public Money getTotalAmount() { return totalAmount; }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">イベントは不変（Immutable）にする</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    ドメインイベントは「過去に起きたこと」を表すため、一度作成したら変更できないようにします。すべてのフィールドをfinalにし、Setterを提供しません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: イベントの発行と購読 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.4 イベントの発行と購読パターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインイベントを活用するには、<strong>発行（Publish）</strong>と<strong>購読（Subscribe）</strong>の仕組みが必要です。これを「<strong>Pub/Subパターン</strong>」と呼びます。
+                    </p>
+
+                    <!-- フロー図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-project-diagram text-primary-500"></i>
+                            イベント発行・購読のフロー
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant Order as 注文集約
+    participant Publisher as イベント発行者
+    participant Handler1 as 在庫ハンドラー
+    participant Handler2 as 配送ハンドラー
+    participant Handler3 as 通知ハンドラー
+
+    Order->>Order: 注文確定処理
+    Order->>Publisher: OrderPlacedEventを発行
+    Publisher->>Handler1: イベントを通知
+    Publisher->>Handler2: イベントを通知
+    Publisher->>Handler3: イベントを通知
+    Handler1->>Handler1: 在庫減少処理
+    Handler2->>Handler2: 配送手配処理
+    Handler3->>Handler3: メール送信処理
+                        </div>
+                    </div>
+
+                    <h3 class="font-semibold text-slate-800 mb-3 mt-6">イベント発行者（Publisher）の実装</h3>
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// シンプルなイベント発行者
+public class DomainEventPublisher {
+    private static final List&lt;DomainEventHandler&gt; handlers = new ArrayList&lt;&gt;();
+
+    // ハンドラーを登録
+    public static void subscribe(DomainEventHandler handler) {
+        handlers.add(handler);
+    }
+
+    // イベントを発行
+    public static void publish(DomainEvent event) {
+        for (DomainEventHandler handler : handlers) {
+            if (handler.canHandle(event)) {
+                handler.handle(event);
+            }
+        }
+    }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 class="font-semibold text-slate-800 mb-3 mt-6">イベントハンドラー（Subscriber）の実装</h3>
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// イベントハンドラーのインターフェース
+public interface DomainEventHandler&lt;T extends DomainEvent&gt; {
+    boolean canHandle(DomainEvent event);
+    void handle(T event);
+}
+
+// 在庫減少ハンドラーの実装
+public class InventoryEventHandler
+    implements DomainEventHandler&lt;OrderPlacedEvent&gt; {
+
+    private final InventoryService inventoryService;
+
+    @Override
+    public boolean canHandle(DomainEvent event) {
+        return event instanceof OrderPlacedEvent;
+    }
+
+    @Override
+    public void handle(OrderPlacedEvent event) {
+        // 注文確定イベントを受け取って在庫を減らす
+        inventoryService.decreaseStock(event.getItems());
+    }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: 実践例 - ECサイトでのイベント活用 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.5 実践例: ECサイトでのドメインイベント活用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ECサイトの注文処理で、ドメインイベントを使った実装例を見てみましょう。
+                    </p>
+
+                    <!-- 全体フロー図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-shopping-cart text-primary-500"></i>
+                            注文確定時のイベントフロー
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    A[顧客が注文確定] --> B[注文集約]
+    B --> C{OrderPlacedEvent発行}
+
+    C --> D1[在庫ハンドラー]
+    C --> D2[配送ハンドラー]
+    C --> D3[通知ハンドラー]
+    C --> D4[ポイントハンドラー]
+
+    D1 --> E1[在庫減少]
+    D2 --> E2[配送伝票作成]
+    D3 --> E3[確認メール送信]
+    D4 --> E4[ポイント付与]
+
+    E1 --> F{在庫不足?}
+    F -->|はい| G[OutOfStockEvent発行]
+    F -->|いいえ| H[処理完了]
+
+    G --> I[発注ハンドラー]
+    I --> J[自動発注]
+                        </div>
+                    </div>
+
+                    <h3 class="font-semibold text-slate-800 mb-3 mt-6">統合例: 注文から発送までの一連の流れ</h3>
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <div class="code-block-wrapper">
+<pre><code class="language-java">// 1. 注文集約でイベントを発行
+public class Order {
+    public void place() {
+        // ビジネスルール検証
+        if (this.items.isEmpty()) {
+            throw new IllegalStateException("注文明細が空です");
+        }
+
+        // 注文確定
+        this.status = OrderStatus.PLACED;
+
+        // イベント発行
+        DomainEventPublisher.publish(
+            new OrderPlacedEvent(orderId, customerId, items, totalAmount)
+        );
+    }
+}
+
+// 2. 各ハンドラーが独立して処理
+@Component
+public class ShippingEventHandler
+    implements DomainEventHandler&lt;OrderPlacedEvent&gt; {
+
+    public void handle(OrderPlacedEvent event) {
+        // 配送伝票を作成
+        Shipment shipment = new Shipment(event.getOrderId());
+        shipmentRepository.save(shipment);
+
+        // 配送伝票作成イベントを発行
+        DomainEventPublisher.publish(
+            new ShipmentCreatedEvent(shipment.getId(), event.getOrderId())
+        );
+    }
+}
+</code></pre>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: イベントストーミング -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.6 イベントストーミング - イベントでビジネスを理解する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>イベントストーミング</strong>は、ビジネスプロセスを「ドメインイベント」の視点で洗い出すワークショップ手法です。DDDを実践する際の強力なツールです。
+                    </p>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-users text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-800 mb-2 break-words">イベントストーミングの進め方</h3>
+                                <ol class="space-y-2 text-purple-900 list-decimal ml-5">
+                                    <li><strong>ドメインイベントを洗い出す</strong>: オレンジ色の付箋で「～された」という出来事を書き出す</li>
+                                    <li><strong>時系列に並べる</strong>: イベントを発生順に壁に貼っていく</li>
+                                    <li><strong>コマンドを追加</strong>: 青色の付箋でイベントを引き起こす「アクション」を書く</li>
+                                    <li><strong>集約を識別する</strong>: 黄色の付箋で関連するイベント群をまとめる</li>
+                                    <li><strong>境界を見つける</strong>: 境界づけられたコンテキストの境界を引く</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">イベントストーミングの効果</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    開発者とビジネス担当者が同じ場所で付箋を貼りながら議論することで、ドメインへの理解が深まり、ユビキタス言語が自然に形成されます。また、システムの複雑な部分や境界が可視化されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7: イベント駆動アーキテクチャとの関係 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.7 イベント駆動アーキテクチャ（EDA）への発展
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインイベントの考え方は、<strong>イベント駆動アーキテクチャ（Event-Driven Architecture / EDA）</strong>へと発展します。
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+                        <!-- 同期処理 -->
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-sync text-orange-600"></i>
+                                同期的なイベント処理
+                            </h4>
+                            <p class="text-orange-900 text-sm mb-3">
+                                同じプロセス内で即座に処理
+                            </p>
+                            <ul class="space-y-2 text-orange-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">✓</span>
+                                    <span>実装がシンプル</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">✓</span>
+                                    <span>トランザクション管理が容易</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">✗</span>
+                                    <span>処理が遅くなる可能性</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 非同期処理 -->
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-rocket text-emerald-600"></i>
+                                非同期的なイベント処理
+                            </h4>
+                            <p class="text-emerald-900 text-sm mb-3">
+                                メッセージキューを使って後で処理
+                            </p>
+                            <ul class="space-y-2 text-emerald-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">✓</span>
+                                    <span>レスポンスが速い</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">✓</span>
+                                    <span>スケーラビリティが高い</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">✗</span>
+                                    <span>実装が複雑</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- メッセージキューを使った非同期処理 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-stream text-primary-500"></i>
+                            メッセージキューを使った非同期イベント処理
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A[注文サービス] -->|OrderPlacedEvent| B[メッセージキュー<br/>RabbitMQ/Kafka]
+    B -->|イベント配信| C[在庫サービス]
+    B -->|イベント配信| D[配送サービス]
+    B -->|イベント配信| E[通知サービス]
+
+    C --> F[在庫減少]
+    D --> G[配送手配]
+    E --> H[メール送信]
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">マイクロサービスとの親和性</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    ドメインイベントを使うことで、マイクロサービス間の連携が疎結合になります。各サービスは他のサービスの内部実装を知らなくても、イベントを通じて協調動作できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8: ベストプラクティスと注意点 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.8 ドメインイベントのベストプラクティス
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                        <!-- ベストプラクティス -->
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-emerald-600"></i>
+                                ベストプラクティス
+                            </h4>
+                            <ul class="space-y-2 text-emerald-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>イベント名は過去形で明確に（OrderPlaced, PaymentCompleted）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>イベントは不変（Immutable）にする</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>イベントにビジネス的意味を持たせる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>必要な情報だけを含める（肥大化させない）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600">●</span>
+                                    <span>イベントハンドラーは冪等性を保つ</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- アンチパターン -->
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle text-red-600"></i>
+                                避けるべきアンチパターン
+                            </h4>
+                            <ul class="space-y-2 text-red-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>技術的な名前をつける（DataSaved, RecordUpdated）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>イベントを変更可能にする</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>イベントに処理ロジックを含める</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>すべての変更をイベント化する（過剰設計）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600">●</span>
+                                    <span>イベントハンドラーで別のイベントに依存する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">イベントの粒度に注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    すべての変更をイベント化する必要はありません。ビジネス的に重要な出来事だけをイベントにしましょう。例えば「住所が変更された」はイベント化すべきですが、「画面のボタンがクリックされた」は技術的な出来事であり、ドメインイベントではありません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ドメインイベントを使う最大のメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            疎結合化です。イベント発行側と購読側が直接依存しないため、システムが柔軟になり、新しい機能の追加や変更が容易になります。また、ビジネスロジックが明確になり、監査ログとしても活用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ドメインイベントを過去形で命名する理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ドメインイベントは「既に起きたこと」を表現するためです。イベントが発行される時点で状態変更が完了していることを明確にします。例: OrderPlaced（注文された）、PaymentCompleted（支払いが完了した）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. イベントストーミングとは何ですか？また、その効果は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ビジネスプロセスを「ドメインイベント」の視点で洗い出すワークショップ手法です。開発者とビジネス担当者が付箋を使って議論することで、ドメインへの理解が深まり、ユビキタス言語が自然に形成されます。システムの複雑な部分や境界も可視化されます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. ドメインイベントを不変（Immutable）にする理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            イベントは「過去に起きたこと」を表すため、後から変更されるべきではありません。不変にすることで、イベントの内容が改ざんされず、監査ログとしても信頼性が保たれます。また、並行処理でも安全に使用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q5. 同期的なイベント処理と非同期的なイベント処理の使い分けの基準は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            同期処理は実装がシンプルで、トランザクション管理が容易ですが、処理が遅くなる可能性があります。非同期処理はレスポンスが速くスケーラビリティが高いですが、実装が複雑になります。ビジネス要件（レスポンス時間、処理量、整合性の要求度合い）に応じて選択します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 実習課題 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習課題: ドメインイベントの実装</h3>
+                            <div class="space-y-4 text-purple-900">
+                                <div>
+                                    <p class="font-medium mb-2 break-words">課題1: イベントの設計</p>
+                                    <p class="text-sm text-purple-800 mb-2 break-words">
+                                        図書館システムの「本が貸し出された」というドメインイベントを設計してください。必要な属性（イベントID、発生日時、集約ID、その他のビジネス情報）を考えて実装しましょう。
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium mb-2 break-words">課題2: イベントハンドラーの実装</p>
+                                    <p class="text-sm text-purple-800 mb-2 break-words">
+                                        「本が貸し出された」イベントに対して、以下の処理を行うイベントハンドラーを実装してください：<br>
+                                        - 貸出記録を作成する<br>
+                                        - 在庫数を1減らす<br>
+                                        - 返却期限のリマインダーを設定する
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium mb-2 break-words">課題3: イベントフローの設計</p>
+                                    <p class="text-sm text-purple-800 mb-2 break-words">
+                                        ECサイトの「商品が返品された」という業務について、どのようなドメインイベントが発生するか洗い出し、それぞれのイベントでどのような処理が必要か考えてください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ドメインイベントは、ドメインで発生した重要な出来事を表現するオブジェクトである</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>イベントを使うことで疎結合化が実現し、システムが柔軟になる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>イベント名は過去形で命名し、イベントオブジェクトは不変にする</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Pub/Subパターンでイベントの発行と購読を実現する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>イベントストーミングでビジネスプロセスを可視化できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>非同期イベント処理でマイクロサービス間の疎結合な連携が可能になる</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="ddd-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">レイヤードアーキテクチャ</span>
+                        </div>
+                    </a>
+                    <a href="ddd-learning-material-14.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">実践演習</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

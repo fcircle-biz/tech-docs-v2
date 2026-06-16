@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webアプリ開発入門 第12章 - CORSとセキュリティ基礎</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-globe text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webアプリ開発入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                入門
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-network-wired text-[9px]"></i>
+                                <span>Web技術</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="README.md" class="hover:text-primary-600 transition-colors">Webアプリ開発入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">CORSとセキュリティ基礎</h1>
+                    <p class="text-slate-600">同一オリジンポリシー、CORSエラーの原因と対処法、HTTPSについて学びます。Webアプリケーションのセキュリティの基礎を理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>同一オリジンポリシーとは何か理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CORSエラーの原因と対処法を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPSの役割とセキュリティの基礎を把握する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: 同一オリジンポリシーとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 同一オリジンポリシー（Same-Origin Policy）
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>同一オリジンポリシー（Same-Origin Policy）</strong>は、Webブラウザに組み込まれているセキュリティの仕組みです。
+                        異なるオリジン（ドメイン）からのリソースへのアクセスを制限することで、悪意のあるWebサイトからユーザーを守ります。
+                    </p>
+
+                    <!-- オリジンとは -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-key text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">ポイント: オリジンとは？</h3>
+                                <p class="text-emerald-900 mb-2">
+                                    オリジンは「<strong>スキーム（プロトコル）</strong>」「<strong>ホスト（ドメイン）</strong>」「<strong>ポート番号</strong>」の3つの組み合わせで決まります。
+                                </p>
+                                <div class="bg-emerald-100 rounded-lg p-3 text-emerald-900">
+                                    <code>https://example.com:443</code>
+                                    <br>
+                                    <span class="text-sm">スキーム: https / ホスト: example.com / ポート: 443</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 同一オリジンの判定 -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">同一オリジンの判定例</h4>
+
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">基準URL</th>
+                                    <th class="px-4 py-2 text-left">比較URL</th>
+                                    <th class="px-4 py-2 text-left">結果</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-2"><code>https://example.com</code></td>
+                                    <td class="px-4 py-2"><code>https://example.com/page</code></td>
+                                    <td class="px-4 py-2 text-emerald-600 font-medium">✓ 同一</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2"><code>https://example.com</code></td>
+                                    <td class="px-4 py-2"><code>http://example.com</code></td>
+                                    <td class="px-4 py-2 text-red-600 font-medium">✗ 異なる（スキーム違い）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2"><code>https://example.com</code></td>
+                                    <td class="px-4 py-2"><code>https://api.example.com</code></td>
+                                    <td class="px-4 py-2 text-red-600 font-medium">✗ 異なる（ホスト違い）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2"><code>https://example.com:443</code></td>
+                                    <td class="px-4 py-2"><code>https://example.com:8080</code></td>
+                                    <td class="px-4 py-2 text-red-600 font-medium">✗ 異なる（ポート違い）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        同一オリジンポリシーにより、例えば <code class="bg-slate-100 px-2 py-1 rounded text-sm">https://mybank.com</code> のページから
+                        <code class="bg-slate-100 px-2 py-1 rounded text-sm">https://attacker.com</code> のAPIにアクセスすることは、ブラウザによってブロックされます。
+                    </p>
+                </section>
+
+                <!-- セクション2: CORSとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 CORS（Cross-Origin Resource Sharing）
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>CORS（Cross-Origin Resource Sharing、オリジン間リソース共有）</strong>は、
+                        異なるオリジン間でのリソースへのアクセスを安全に許可するための仕組みです。
+                    </p>
+
+                    <!-- 身近な例 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                                rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-lightbulb text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-800 mb-2">身近な例で考えてみよう</h3>
+                                <p class="text-blue-900">
+                                    CORSは「<strong>国境の税関</strong>」のようなものです。
+                                    通常は外国からの荷物を受け取ることはできませんが、税関が「この国からの荷物は安全」と許可してくれれば受け取れます。
+                                    CORSヘッダーが、この「許可証」の役割を果たします。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CORS の動作図 -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 text-center">CORSの動作フロー</h4>
+                        <div class="mermaid">
+sequenceDiagram
+    participant B as ブラウザ (https://myapp.com)
+    participant API as APIサーバー (https://api.example.com)
+
+    B->>API: リクエスト (Origin: https://myapp.com)
+    Note over API: CORSヘッダーをチェック
+    alt CORS許可あり
+        API->>B: レスポンス + Access-Control-Allow-Origin
+        B->>B: データ取得成功
+    else CORS許可なし
+        API->>B: レスポンス (CORSヘッダーなし)
+        B->>B: CORSエラー発生
+    end
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-4">
+                            サーバーがCORSヘッダーを返さないと、ブラウザがアクセスをブロックする
+                        </p>
+                    </div>
+                </section>
+
+                <!-- セクション3: CORSエラーの原因と対処法 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 CORSエラーの原因と対処法
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        開発中によく遭遇する<strong>CORSエラー</strong>について、原因と対処法を理解しましょう。
+                    </p>
+
+                    <!-- 典型的なCORSエラーメッセージ -->
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">典型的なCORSエラーメッセージ</p>
+                                <div class="bg-red-100 rounded-lg p-3 mt-2 text-red-900 text-sm font-mono">
+                                    Access to fetch at 'https://api.example.com/data'<br>
+                                    from origin 'http://localhost:3000' has been blocked by CORS policy
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- トラブルシューティング -->
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden mb-6">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                CORSエラーの対処法
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">フロントエンド側でできること</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>1. プロキシを使う（開発環境のみ）</strong></p>
+                                    <p class="mb-2 text-sm">
+                                        開発用サーバー（Vite、Webpack Dev Serverなど）のプロキシ機能を使い、同一オリジンからのリクエストに見せかける方法です。
+                                    </p>
+                                    <p class="mb-2"><strong>2. バックエンドに連絡する</strong></p>
+                                    <p class="text-sm">
+                                        フロントエンド単独では解決できないため、バックエンド開発者にCORSヘッダーの設定を依頼します。
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">バックエンド側の対処法（サーバー側設定）</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>解決方法: CORSヘッダーを返す</strong></p>
+                                    <p class="mb-2 text-sm">
+                                        サーバーのレスポンスに以下のヘッダーを含めることで、ブラウザがCORSを許可します。
+                                    </p>
+                                    <div class="code-block-wrapper my-3">
+                                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                            <span class="text-slate-400 text-sm">HTTPレスポンスヘッダーの例</span>
+                                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                    onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">Access-Control-Allow-Origin: https://myapp.com
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+Access-Control-Allow-Headers: Content-Type, Authorization</code></pre>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">ワイルドカード使用時の注意</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>開発環境:</strong> <code class="bg-orange-100 px-2 py-1 rounded text-sm">Access-Control-Allow-Origin: *</code></p>
+                                    <p class="mb-2 text-sm">すべてのオリジンからのアクセスを許可（テスト用のみ）</p>
+                                    <p class="mb-2"><strong>本番環境:</strong> <code class="bg-orange-100 px-2 py-1 rounded text-sm">Access-Control-Allow-Origin: https://myapp.com</code></p>
+                                    <p class="text-sm">特定のオリジンのみ許可（セキュリティのため必須）</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: HTTPSとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 HTTPS（HTTP over SSL/TLS）
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>HTTPS</strong>は、HTTPに<strong>暗号化</strong>の仕組みを追加したプロトコルです。
+                        通信内容を暗号化することで、第三者による盗聴や改ざんを防ぎます。
+                    </p>
+
+                    <!-- HTTPとHTTPSの違い -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-red-50 rounded-xl border border-red-200 p-4">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-unlock text-red-600"></i>
+                                </div>
+                                <h4 class="font-semibold text-slate-800">HTTP（暗号化なし）</h4>
+                            </div>
+                            <ul class="text-slate-600 text-sm space-y-1 list-disc list-inside">
+                                <li>通信内容が平文</li>
+                                <li>盗聴・改ざんのリスクあり</li>
+                                <li>パスワードなどが漏れる可能性</li>
+                                <li>ブラウザに「安全ではない」と表示</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-emerald-600"></i>
+                                </div>
+                                <h4 class="font-semibold text-slate-800">HTTPS（暗号化あり）</h4>
+                            </div>
+                            <ul class="text-slate-600 text-sm space-y-1 list-disc list-inside">
+                                <li>通信内容が暗号化される</li>
+                                <li>盗聴・改ざんを防ぐ</li>
+                                <li>パスワードなどが守られる</li>
+                                <li>ブラウザに鍵マークが表示</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- HTTPSの動作図 -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 text-center">HTTPSの暗号化イメージ</h4>
+                        <div class="mermaid">
+sequenceDiagram
+    participant B as ブラウザ
+    participant S as Webサーバー (HTTPS)
+
+    Note over B,S: 暗号化通信の確立
+    B->>S: SSL/TLS ハンドシェイク
+    S->>B: サーバー証明書
+    B->>B: 証明書の検証
+    Note over B,S: 暗号化通信開始
+    B->>S: 暗号化されたリクエスト
+    S->>B: 暗号化されたレスポンス
+    Note over B: 第三者は内容を読めない
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-4">
+                            HTTPSでは通信内容が暗号化され、第三者による盗聴が不可能
+                        </p>
+                    </div>
+
+                    <!-- SSL証明書 -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">SSL証明書とは</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    SSL証明書は、Webサイトの身元を証明する「デジタル身分証」のようなものです。
+                                    認証局（CA）という信頼できる第三者機関が発行します。
+                                    ブラウザはこの証明書を確認し、接続先のサーバーが本物かどうかをチェックします。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: Mixed Content -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 Mixed Content（混在コンテンツ）
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Mixed Content</strong>とは、HTTPSページの中にHTTP（暗号化なし）のリソースが混在している状態です。
+                        これはセキュリティリスクとなるため、ブラウザによってブロックされます。
+                    </p>
+
+                    <!-- Mixed Contentの例 -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">Mixed Contentの例</h4>
+
+                        <div class="space-y-4">
+                            <div class="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
+                                <p class="text-red-900 font-medium mb-2">✗ 悪い例（ブロックされる）</p>
+                                <div class="code-block-wrapper">
+                                    <pre class="!mt-0"><code class="language-html">&lt;!-- HTTPSページ内で --&gt;
+&lt;img src="http://example.com/image.jpg"&gt;
+&lt;script src="http://example.com/script.js"&gt;&lt;/script&gt;</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="bg-emerald-50 rounded-lg p-4 border-l-4 border-emerald-500">
+                                <p class="text-emerald-900 font-medium mb-2">✓ 良い例（すべてHTTPS）</p>
+                                <div class="code-block-wrapper">
+                                    <pre class="!mt-0"><code class="language-html">&lt;!-- HTTPSページ内で --&gt;
+&lt;img src="https://example.com/image.jpg"&gt;
+&lt;script src="https://example.com/script.js"&gt;&lt;/script&gt;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    HTTPSページでは、画像、CSS、JavaScript、APIリクエストなど、すべてのリソースをHTTPSで読み込む必要があります。
+                                    HTTPリソースはブラウザによってブロックされ、正常に動作しません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: セキュリティのベストプラクティス -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 Webセキュリティのベストプラクティス
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webアプリケーション開発において、セキュリティを意識することは非常に重要です。
+                        初心者が押さえておくべき基本的なポイントを紹介します。
+                    </p>
+
+                    <!-- ベストプラクティス一覧 -->
+                    <div class="grid grid-cols-1 gap-4 mb-6">
+                        <div class="bg-white rounded-xl border border-slate-200 p-5">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">1</div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 mb-1">HTTPSを使用する</h4>
+                                    <p class="text-slate-600 text-sm">
+                                        本番環境では必ずHTTPSを使い、通信を暗号化します。無料のSSL証明書（Let's Encrypt）も利用可能です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">2</div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 mb-1">CORSを適切に設定する</h4>
+                                    <p class="text-slate-600 text-sm">
+                                        ワイルドカード（*）は開発環境のみで使用し、本番環境では特定のオリジンのみを許可します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">3</div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 mb-1">機密情報をURLに含めない</h4>
+                                    <p class="text-slate-600 text-sm">
+                                        パスワードやAPIキーなどの機密情報は、クエリパラメータではなくリクエストボディやヘッダーで送信します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">4</div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 mb-1">入力値の検証を行う</h4>
+                                    <p class="text-slate-600 text-sm">
+                                        ユーザーからの入力は必ず検証し、不正なデータが処理されないようにします（フロントエンド・バックエンド両方で実施）。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5">
+                            <div class="flex items-start gap-3 mb-2">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold">5</div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 mb-1">依存ライブラリを最新に保つ</h4>
+                                    <p class="text-slate-600 text-sm">
+                                        使用しているライブラリやフレームワークは、セキュリティパッチが適用された最新版を使用します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 この章のまとめ
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200
+                                rounded-xl p-6 mb-6">
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-bold">1</div>
+                                <div>
+                                    <p class="text-slate-700">
+                                        <strong>同一オリジンポリシー</strong>は、異なるオリジンからのアクセスを制限する仕組み
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-bold">2</div>
+                                <div>
+                                    <p class="text-slate-700">
+                                        <strong>CORS</strong>は、異なるオリジン間でのリソース共有を安全に行う仕組み
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-bold">3</div>
+                                <div>
+                                    <p class="text-slate-700">
+                                        <strong>CORSエラー</strong>は、サーバー側でCORSヘッダーを設定することで解決する
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-bold">4</div>
+                                <div>
+                                    <p class="text-slate-700">
+                                        <strong>HTTPS</strong>は通信を暗号化し、盗聴や改ざんを防ぐ
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-bold">5</div>
+                                <div>
+                                    <p class="text-slate-700">
+                                        <strong>Mixed Content</strong>を避け、すべてのリソースをHTTPSで読み込む
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. オリジンの判定に使われる3つの要素を挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            (1) スキーム（プロトコル: http、httpsなど）<br>
+                                            (2) ホスト（ドメイン名: example.comなど）<br>
+                                            (3) ポート番号（:80、:443、:8080など）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. CORSエラーが発生した場合、誰が（どこで）対処する必要がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            主に<strong>バックエンド（APIサーバー側）</strong>で対処します。
+                                            サーバーのレスポンスに「Access-Control-Allow-Origin」などのCORSヘッダーを追加する必要があります。
+                                            フロントエンド側では、開発環境でプロキシを使って一時的に回避することも可能ですが、根本的な解決にはなりません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. HTTPSがHTTPより優れている点を2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            (1) <strong>通信内容が暗号化される</strong>ため、第三者による盗聴を防ぐことができる<br>
+                                            (2) <strong>データの改ざんを検知できる</strong>ため、通信途中でデータが書き換えられても気づくことができる<br>
+                                            （他にも、サーバーの身元を証明できる、ブラウザに「安全」と表示される、なども正解）
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webapp-intro-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">ローカル開発環境</span>
+                        </div>
+                    </a>
+                    <a href="webapp-intro-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">開発者ツールでWebを観察しよう</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

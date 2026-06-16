@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS基礎学習教材 第4章 - 最初のサーバーを作ってみよう - EC2入門</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS オレンジ系カラー
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS基礎学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウドインフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約11.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">最初のサーバーを作ってみよう - EC2入門</h1>
+                    <p class="text-slate-600">いよいよサーバー（インターネット上のパソコン）を作ります。「サーバー」と聞くと難しそうですが、手順通りに進めれば15分で完成します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーとは「24時間動いているパソコン」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>EC2は「レンタルパソコン」のサービス</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>無料で使えるサーバーの選び方（t2.micro / t3.micro）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーの作り方（ステップバイステップ）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーに接続する方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>使い終わったらサーバーを止める方法（課金を防ぐ）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション4.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 サーバーって何？
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>サーバー</strong>とは、一言で表すと<strong>「24時間動き続けているパソコン」</strong>です。
+                        普段使っているパソコンとの違いは、常に電源が入っていて、いつでもインターネット経由でアクセスできることです。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">身近な例え</h3>
+                                <p class="text-blue-900 text-sm">サーバー = <strong>コンビニ</strong>（24時間営業、いつでも利用できる）<br>
+                                普通のパソコン = <strong>自宅の冷蔵庫</strong>（自分の家族だけが使う）</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">サーバーの役割</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-globe text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-purple-800">Webサイト配信</h4>
+                            </div>
+                            <p class="text-purple-900 text-sm">インターネット上のWebサイトは、すべてサーバーに保存されています。</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-blue-800">データ保存</h4>
+                            </div>
+                            <p class="text-blue-900 text-sm">ユーザー情報、商品情報などを保存する場所として使われます。</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-emerald-800">プログラム実行</h4>
+                            </div>
+                            <p class="text-emerald-900 text-sm">検索機能や計算処理など、様々なプログラムを実行します。</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-envelope text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-orange-800">メール送受信</h4>
+                            </div>
+                            <p class="text-orange-900 text-sm">メールサーバーとして、メールの送受信を管理します。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 EC2とは？
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>EC2（Elastic Compute Cloud）</strong>は、AWSが提供する<strong>「レンタルパソコン」</strong>のサービスです。
+                        「Elastic（弾力的）」という名前の通り、必要に応じてサーバーのサイズを増やしたり減らしたりできます。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    EC2 = <strong>レンタカー</strong>のようなもの。必要なときだけ借りて、使い終わったら返す。借りている間だけ料金が発生します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mermaid図: EC2の概念図 -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            EC2の仕組み
+                        </h4>
+                        <div class="mermaid">
+flowchart LR
+    User["あなた（ユーザー）"] -->|インターネット経由で接続| EC2["EC2インスタンス<br/>（レンタルサーバー）"]
+    EC2 -->|保存| EBS["EBSストレージ<br/>（ハードディスク）"]
+    EC2 -->|通信| VPC["VPC<br/>（ネットワーク）"]
+    AWS["AWS データセンター"] -.->|物理的に配置| EC2
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">EC2の主要概念</h3>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-server text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">インスタンス</p>
+                                    <p class="text-sm text-slate-600">レンタルしたサーバーそのもの。「車」のようなもの。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-key text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">キーペア</p>
+                                    <p class="text-sm text-slate-600">サーバーに接続するための「鍵」。絶対になくさないこと！</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-shield-alt text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">セキュリティグループ</p>
+                                    <p class="text-sm text-slate-600">サーバーへのアクセスを制限する「警備員」のようなもの。</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-hdd text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">EBS（Elastic Block Store）</p>
+                                    <p class="text-sm text-slate-600">サーバーのハードディスク。データを保存する場所。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 無料で使えるインスタンスタイプ
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWSには「無料利用枠」があり、初めてアカウントを作成してから12ヶ月間、一部のサービスを無料で使えます。
+                        EC2では、<strong>t2.micro</strong>または<strong>t3.micro</strong>というタイプのサーバーを、月750時間まで無料で使えます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    月750時間 = 約31日 × 24時間。つまり、サーバーを1台だけ動かし続けても1ヶ月フル稼働で無料！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">インスタンスタイプの見方</h3>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">t2.micro の意味</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <span class="font-mono bg-primary-100 text-primary-700 px-2 py-1 rounded">t2</span>
+                                <p class="text-slate-600 text-sm">インスタンスファミリー（汎用タイプ）</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="font-mono bg-primary-100 text-primary-700 px-2 py-1 rounded">micro</span>
+                                <p class="text-slate-600 text-sm">サイズ（最小サイズ）</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 bg-white rounded-lg p-4 border border-slate-200">
+                            <p class="text-sm text-slate-700"><strong>スペック:</strong></p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1 list-disc list-inside">
+                                <li>CPU: 1コア</li>
+                                <li>メモリ: 1GB</li>
+                                <li>ネットワーク: 低〜中程度</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">注意</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    t2.small、t2.medium など、「micro」以外のサイズを選ぶと課金されます！必ず「t2.micro」または「t3.micro」を選んでください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 実習: EC2インスタンスを起動してみよう
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        それでは、実際にサーバーを作ってみましょう！画面の指示に従って進めてください。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-1: EC2インスタンスの起動</h3>
+                                <p class="text-purple-900 mb-4 break-words">無料利用枠でサーバーを起動し、接続できる状態にします。</p>
+
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">AWSマネジメントコンソールにログイン</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">画面右上のリージョンが「東京」になっているか確認</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">検索バーに「EC2」と入力し、「EC2」サービスをクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスを起動」ボタンをクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                        <span class="flex-1 min-w-0 break-words">インスタンス名を入力（例: my-first-server）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">6</span>
+                                        <span class="flex-1 min-w-0 break-words">「Amazon Linux 2023 AMI」を選択（デフォルトで選ばれている）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">7</span>
+                                        <span class="flex-1 min-w-0 break-words">インスタンスタイプで「t2.micro」または「t3.micro」を選択</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">8</span>
+                                        <span class="flex-1 min-w-0 break-words">キーペアで「新しいキーペアを作成」をクリック<br>
+                                        - キーペア名: my-key<br>
+                                        - キーペアタイプ: RSA<br>
+                                        - 秘密鍵ファイル形式: .pem（Macの場合）または .ppk（Windowsの場合）<br>
+                                        - 「キーペアを作成」をクリック → ファイルがダウンロードされます（大切に保管！）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">9</span>
+                                        <span class="flex-1 min-w-0 break-words">ネットワーク設定はデフォルトのまま（後の章で詳しく学びます）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">10</span>
+                                        <span class="flex-1 min-w-0 break-words">画面右側の「概要」で、無料利用枠の対象であることを確認</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">11</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスを起動」ボタンをクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">12</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスを表示」をクリックして、起動状態を確認</span>
+                                    </li>
+                                </ol>
+
+                                <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                                    <h4 class="font-medium text-purple-800 mb-2 break-words">
+                                        <i class="fas fa-check-circle mr-2"></i>起動完了の確認
+                                    </h4>
+                                    <p class="text-purple-900 text-sm">インスタンスの「インスタンスの状態」が「実行中」になり、「ステータスチェック」が「2/2のチェックに合格しました」と表示されれば完了です。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">キーペアは絶対になくさない！</p>
+                                <ul class="text-red-800 text-sm mt-2 space-y-1 list-disc list-inside">
+                                    <li>ダウンロードしたキーペアファイル（.pem または .ppk）は、再発行できません</li>
+                                    <li>なくすとサーバーに接続できなくなります</li>
+                                    <li>安全な場所（USBメモリ、クラウドストレージなど）にバックアップしましょう</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 EC2インスタンスに接続してみよう
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サーバーが起動したら、次は接続してみましょう。AWSには「EC2 Instance Connect」という、ブラウザから簡単に接続できる機能があります。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-2: ブラウザからサーバーに接続</h3>
+                                <p class="text-purple-900 mb-4 break-words">EC2 Instance Connectを使って、コマンドラインでサーバーを操作します。</p>
+
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">EC2ダッシュボードで、先ほど作成したインスタンスにチェックを入れる</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">画面上部の「接続」ボタンをクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">「EC2 Instance Connect」タブを選択（デフォルトで選ばれている）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">「接続」ボタンをクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                        <span class="flex-1 min-w-0 break-words">新しいタブでターミナル（黒い画面）が開きます</span>
+                                    </li>
+                                </ol>
+
+                                <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                                    <h4 class="font-medium text-purple-800 mb-2 break-words">
+                                        <i class="fas fa-terminal mr-2"></i>試しにコマンドを実行してみよう
+                                    </h4>
+                                    <p class="text-purple-900 text-sm mb-3">以下のコマンドを入力して、Enterキーを押してみてください。</p>
+
+                                    <div class="code-block-wrapper">
+                                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                            <span class="text-slate-400 text-sm">コマンド</span>
+                                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 現在のディレクトリを表示
+pwd
+
+# ファイル一覧を表示
+ls -la
+
+# OSのバージョンを確認
+cat /etc/os-release</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ターミナルは「コマンドライン」や「シェル」とも呼ばれます。文字でコンピュータを操作するための画面です。最初は難しく感じるかもしれませんが、基本的なコマンドだけ覚えれば大丈夫！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 インスタンスの「停止」と「終了」の違い
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EC2には「停止」と「終了（削除）」という2つの操作があります。この違いを理解しておくことが、課金を防ぐために非常に重要です。
+                    </p>
+
+                    <!-- Mermaid図: 停止と終了の比較 -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            停止と終了の違い
+                        </h4>
+                        <div class="mermaid">
+flowchart LR
+    A["インスタンス<br/>（実行中）"] -->|停止| B["インスタンス<br/>（停止中）"]
+    B -->|再起動| A
+    A -->|終了| C["インスタンス<br/>（削除）"]
+
+    B -.->|データは残る<br/>EBS課金あり| D[EBSストレージ]
+    C -.->|完全削除<br/>課金なし| E[なし]
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-pause text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-blue-800">停止（Stop）</h4>
+                            </div>
+                            <ul class="text-blue-900 text-sm space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-0.5"></i>
+                                    <span>サーバーを一時停止</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-0.5"></i>
+                                    <span>データは残る</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-0.5"></i>
+                                    <span>再起動できる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-orange-500 mt-0.5"></i>
+                                    <span>EBS（ストレージ）の課金は続く</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-red-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-trash text-white"></i>
+                                </div>
+                                <h4 class="font-semibold text-red-800">終了（Terminate）</h4>
+                            </div>
+                            <ul class="text-red-900 text-sm space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-times text-red-500 mt-0.5"></i>
+                                    <span>サーバーを完全削除</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-times text-red-500 mt-0.5"></i>
+                                    <span>データも全部消える</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-times text-red-500 mt-0.5"></i>
+                                    <span>元に戻せない</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-500 mt-0.5"></i>
+                                    <span>課金は完全に止まる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    <strong>停止 = レンタカーを駐車場に停めておく</strong>（また使える）<br>
+                                    <strong>終了 = レンタカーを返却する</strong>（もう使えない）
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.7 お片付け: インスタンスを停止・終了する
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        練習が終わったら、必ずインスタンスを停止または終了しましょう。予期しない課金を防ぐためです。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-3: インスタンスの停止</h3>
+                                <p class="text-purple-900 mb-4 break-words">また使う予定がある場合は「停止」を選びます。</p>
+
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">EC2ダッシュボードで、インスタンスにチェックを入れる</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスの状態」→「インスタンスを停止」をクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">確認画面で「停止」をクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスの状態」が「停止中」→「停止済み」になることを確認</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-4: インスタンスの終了（削除）</h3>
+                                <p class="text-purple-900 mb-4 break-words">もう使わない場合は「終了」を選びます。完全に削除されます。</p>
+
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">EC2ダッシュボードで、インスタンスにチェックを入れる</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスの状態」→「インスタンスを終了」をクリック</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">確認画面で「終了」をクリック（慎重に！）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">「インスタンスの状態」が「終了中」→「終了済み」になることを確認</span>
+                                    </li>
+                                </ol>
+
+                                <div class="bg-red-50 rounded-lg p-4 border border-red-200 mt-4">
+                                    <p class="text-red-900 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i><strong>注意:</strong> 終了すると元に戻せません！本当に削除して良いか、よく確認してから実行してください。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q1. EC2とは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            AWSが提供する「レンタルパソコン」のサービスです。必要なときだけサーバーを借りて、使い終わったら返すことができます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q2. 無料利用枠で使えるインスタンスタイプは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            t2.micro または t3.micro です。月750時間まで無料で使えます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q3. インスタンスの「停止」と「終了」の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            「停止」は一時停止でデータは残り、再起動できます。「終了」は完全削除で、データも消えて元に戻せません。停止中もEBS（ストレージ）の課金は続きますが、終了すれば課金は完全に止まります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q4. キーペアファイルをなくすとどうなりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            キーペアファイルは再発行できないため、なくすとサーバーに接続できなくなります。必ず安全な場所にバックアップを取りましょう。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>サーバーとは「24時間動き続けているパソコン」。Webサイト配信、データ保存、プログラム実行などに使われる。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>EC2は「レンタルパソコン」のサービス。必要なときだけ借りて、使い終わったら返せる。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>無料利用枠では t2.micro または t3.micro を月750時間まで使える。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>キーペアは「サーバーに接続するための鍵」。絶対になくさないこと！</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>「停止」はデータが残る一時停止、「終了」は完全削除。違いを理解して使い分ける。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>練習が終わったら必ず停止または終了して、予期しない課金を防ぐ。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第3章: AWSの画面に慣れよう</span>
+                        </div>
+                    </a>
+                    <a href="aws-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: ファイルの保管場所を作ろう</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+
+    <!-- コピー機能 -->
+    <script>
+        function copyCode(btn) {
+            const code = btn.closest('.code-block-wrapper').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = btn.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

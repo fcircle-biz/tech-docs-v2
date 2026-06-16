@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第2章 - APIとWebhookの違い 〜プル型とプッシュ型〜</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第2章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第2章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        APIとWebhookの違い 〜プル型とプッシュ型〜
+                    </h1>
+                    <p class="text-slate-600">
+                        通常のAPI（ポーリング）とWebhookの違いを「プル型」と「プッシュ型」という視点から比較します。
+                        それぞれの長所・短所を理解し、どのような場面でWebhookが適しているのかを学びます。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>通常のAPI（プル型）とWebhook（プッシュ型）の根本的な違いを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ポーリングの仕組みと問題点を理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>それぞれの長所・短所を整理し、使い分けの判断基準を持てる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>「Webhookが適している場面」と「そうでない場面」を具体例で挙げられる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 2.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.1 「プル型」と「プッシュ型」とは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データ通信の世界では、情報の受け取り方に大きく2つのパターンがあります。
+                        これを「プル型（Pull）」と「プッシュ型（Push）」と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        この2つの違いを、まずは日常生活のイメージで理解しましょう。
+                    </p>
+
+                    <!-- プル型・プッシュ型 比較カード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- プル型 -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-12 h-12 bg-orange-400 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-hand-paper text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-orange-800 text-lg">プル型（Pull）</h3>
+                                    <p class="text-orange-600 text-sm">自分から取りに行く</p>
+                                </div>
+                            </div>
+                            <p class="text-orange-900 text-sm leading-relaxed mb-4">
+                                「情報が必要になったら、自分から問い合わせる」方式。
+                                川の水を自分でくみに行くイメージです。
+                            </p>
+                            <div class="bg-orange-100 rounded-lg p-3">
+                                <p class="text-orange-800 text-xs font-semibold mb-1">日常の例</p>
+                                <ul class="text-orange-700 text-xs space-y-1">
+                                    <li>・メールを確認したいときにアプリを開く</li>
+                                    <li>・天気予報サイトを自分で開いて確認する</li>
+                                    <li>・株価を調べたいときにサイトを見に行く</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- プッシュ型 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-bell text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-emerald-800 text-lg">プッシュ型（Push）</h3>
+                                    <p class="text-emerald-600 text-sm">向こうから送ってくれる</p>
+                                </div>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-4">
+                                「何かが起きたとき、相手が自動的に送ってくれる」方式。
+                                川の水が自動的にパイプで届くイメージです。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs font-semibold mb-1">日常の例</p>
+                                <ul class="text-emerald-700 text-xs space-y-1">
+                                    <li>・LINEでメッセージが届くと通知が来る</li>
+                                    <li>・大雨警報がスマホに自動で届く</li>
+                                    <li>・株価が急変したときにアラートが届く</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    通常のAPIはプル型（自分でリクエストを送り、データを取得する）、
+                                    Webhookはプッシュ型（サービス側からデータを送ってもらう）です。
+                                    どちらも「データをやり取りする仕組み」ですが、主導権が異なります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 2.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.2 通常のAPI（プル型）の仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通常のAPIは「クライアント（あなたのアプリ）がリクエストを送り、サーバーが返答する」という仕組みです。
+                        これは「質問と回答」の形式で、必ず自分から動き出す必要があります。
+                    </p>
+
+                    <!-- API通信フロー図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            通常のAPIの通信フロー
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant C as クライアント
+    participant S as サーバー（APIサービス）
+
+    C->>S: リクエスト送信（データをください）
+    S-->>C: レスポンス（はい、データです）
+    Note over C: しばらく後...
+    C->>S: リクエスト送信（新しいデータありますか？）
+    S-->>C: レスポンス（変更はありません）
+    Note over C: また少し後...
+    C->>S: リクエスト送信（データをください）
+    S-->>C: レスポンス（新しいデータが2件あります）
+        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この「何度も確認しに行く」動作を<strong>ポーリング（Polling）</strong>と呼びます。
+                        ポーリングは英語の「poll（調査する・確認する）」から来た言葉で、
+                        定期的に状態を問い合わせる動作を指します。
+                    </p>
+
+                    <!-- ポーリングの問題点 -->
+                    <div class="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-red-800 mb-3">ポーリングの3つの問題点</h3>
+                                <div class="space-y-3">
+                                    <div class="bg-red-100 rounded-lg p-3">
+                                        <p class="text-red-800 text-sm font-semibold">1. 無駄なリクエストが多い</p>
+                                        <p class="text-red-700 text-sm mt-1">
+                                            「何も変化がない」ときでもリクエストを送り続けるため、サーバーに余分な負荷がかかります。
+                                            100回確認して1回しかデータが来なかった場合、99回は無駄です。
+                                        </p>
+                                    </div>
+                                    <div class="bg-red-100 rounded-lg p-3">
+                                        <p class="text-red-800 text-sm font-semibold">2. リアルタイム性に限界がある</p>
+                                        <p class="text-red-700 text-sm mt-1">
+                                            「1分ごとに確認」していると、最大1分間のタイムラグが生じます。
+                                            注文が来た瞬間に処理したい場合には不向きです。
+                                        </p>
+                                    </div>
+                                    <div class="bg-red-100 rounded-lg p-3">
+                                        <p class="text-red-800 text-sm font-semibold">3. 実装・運用コストがかかる</p>
+                                        <p class="text-red-700 text-sm mt-1">
+                                            定期的に確認するための仕組み（タイマー処理）を自分で作る必要があります。
+                                            確認間隔を短くするほど、コストが増えます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 2.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.3 Webhook（プッシュ型）の仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookはポーリングの問題点を解決するために生まれた仕組みです。
+                        「イベントが発生したときだけ通知する」という考え方で、
+                        無駄な通信をなくすことができます。
+                    </p>
+
+                    <!-- Webhook通信フロー図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            Webhookの通信フロー
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant C as あなたのアプリ
+    participant S as 外部サービス
+
+    Note over C,S: 事前設定（1回だけ）
+    C->>S: URLを登録（このURLに通知してください）
+    S-->>C: 了解しました
+
+    Note over C,S: イベント発生まで待機...
+
+    Note over S: イベント発生！
+    S->>C: Webhook通知（イベントが起きました！）
+    C-->>S: 受け取りました（200 OK）
+        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ポーリングと比べると、やり取りの回数が劇的に減っていることがわかります。
+                        Webhookでは「URLを登録する」という1回の設定をするだけで、
+                        あとはイベントが起きたときだけ通信が発生します。
+                    </p>
+
+                    <!-- Webhookの利点 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-bolt text-emerald-600"></i>
+                                <h4 class="font-semibold text-emerald-800">即時通知</h4>
+                            </div>
+                            <p class="text-emerald-900 text-sm">
+                                イベント発生と同時に通知が届くため、タイムラグがほぼありません。
+                            </p>
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-server text-blue-600"></i>
+                                <h4 class="font-semibold text-blue-800">効率的な通信</h4>
+                            </div>
+                            <p class="text-blue-900 text-sm">
+                                必要なときだけ通信するので、サーバーへの負荷が最小限で済みます。
+                            </p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-code text-purple-600"></i>
+                                <h4 class="font-semibold text-purple-800">シンプルな設定</h4>
+                            </div>
+                            <p class="text-purple-900 text-sm">
+                                URLを1つ登録するだけで連携が始まります。複雑なタイマー処理が不要です。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 2.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.4 ポーリングとWebhookを徹底比較
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        2つの方式の違いを、具体的な数字や特徴で比較してみましょう。
+                    </p>
+
+                    <!-- 比較テーブル -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm overflow-x-auto">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-primary-500"></i>
+                            ポーリング vs Webhook 比較表
+                        </h3>
+                        <table class="w-full text-sm min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">比較項目</th>
+                                    <th class="text-left px-4 py-3 text-orange-700 bg-orange-50">ポーリング（プル型）</th>
+                                    <th class="text-left px-4 py-3 text-emerald-700 bg-emerald-50 rounded-tr-lg">Webhook（プッシュ型）</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-medium text-slate-700">主導権</td>
+                                    <td class="px-4 py-3 text-orange-800">クライアント側（自分）</td>
+                                    <td class="px-4 py-3 text-emerald-800">サーバー側（相手）</td>
+                                </tr>
+                                <tr class="border-t border-slate-200 bg-slate-50">
+                                    <td class="px-4 py-3 font-medium text-slate-700">通信タイミング</td>
+                                    <td class="px-4 py-3 text-orange-800">定期的（常に確認）</td>
+                                    <td class="px-4 py-3 text-emerald-800">イベント発生時のみ</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-medium text-slate-700">リアルタイム性</td>
+                                    <td class="px-4 py-3 text-orange-800">低い（タイムラグあり）</td>
+                                    <td class="px-4 py-3 text-emerald-800">高い（即時通知）</td>
+                                </tr>
+                                <tr class="border-t border-slate-200 bg-slate-50">
+                                    <td class="px-4 py-3 font-medium text-slate-700">サーバー負荷</td>
+                                    <td class="px-4 py-3 text-orange-800">高い（無駄なリクエスト多）</td>
+                                    <td class="px-4 py-3 text-emerald-800">低い（必要時のみ）</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-medium text-slate-700">実装のしやすさ</td>
+                                    <td class="px-4 py-3 text-orange-800">比較的簡単（呼び出すだけ）</td>
+                                    <td class="px-4 py-3 text-emerald-800">受信エンドポイントの準備が必要</td>
+                                </tr>
+                                <tr class="border-t border-slate-200 bg-slate-50">
+                                    <td class="px-4 py-3 font-medium text-slate-700">向いている場面</td>
+                                    <td class="px-4 py-3 text-orange-800">定期的なデータ取得・シンプルな要件</td>
+                                    <td class="px-4 py-3 text-emerald-800">リアルタイム通知・イベント駆動処理</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-medium text-slate-700">典型的な用途</td>
+                                    <td class="px-4 py-3 text-orange-800">天気予報の取得・ニュース一覧の更新</td>
+                                    <td class="px-4 py-3 text-emerald-800">決済完了通知・メッセージ受信</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- イメージ図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            通信量のイメージ比較
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    subgraph Polling["ポーリング（プル型）"]
+        direction TB
+        P1["問い合わせ①: 変化なし"] --> P2["問い合わせ②: 変化なし"]
+        P2 --> P3["問い合わせ③: 変化なし"]
+        P3 --> P4["問い合わせ④: 変化なし"]
+        P4 --> P5["問い合わせ⑤: イベント発生！"]
+    end
+    subgraph Webhook["Webhook（プッシュ型）"]
+        direction TB
+        W1["URL登録（1回のみ）"] --> W2["待機..."]
+        W2 --> W3["イベント発生！通知が届く"]
+    end
+        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">具体的なイメージ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ポーリングは「郵便受けに何度も確認しに行く」、Webhookは「宅配業者がドアベルを鳴らしてくれる」イメージです。
+                                    後者のほうが効率的なのは明らかですね。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 2.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.5 どちらを使うべき？ 使い分けの考え方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookが優れているからといって、常にWebhookを使えばよいわけではありません。
+                        状況によっては通常のAPIのほうが適している場合もあります。
+                    </p>
+
+                    <!-- 使い分けフロー -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            どちらを選ぶかの判断フロー
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A[データを取得したい] --> B{イベント発生時にすぐ処理したい？}
+    B -->|はい| C{相手サービスがWebhookを提供している？}
+    B -->|いいえ| D["通常のAPI<br/>（定期バッチや手動取得）"]
+    C -->|はい| E["Webhookを使う"]
+    C -->|いいえ| F["ポーリングで代替<br/>（または短いポーリング間隔）"]
+        </div>
+                    </div>
+
+                    <!-- シナリオ別の使い分け -->
+                    <div class="space-y-4 mb-6">
+                        <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+                            <i class="fas fa-list-check text-primary-500"></i>
+                            シナリオ別の使い分け例
+                        </h3>
+
+                        <!-- Webhookが適している場合 -->
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <i class="fas fa-check-circle text-emerald-600 text-lg mt-0.5"></i>
+                                <h4 class="font-semibold text-emerald-800">Webhookが適している場面</h4>
+                            </div>
+                            <ul class="space-y-2 ml-6">
+                                <li class="flex items-start gap-2 text-emerald-900 text-sm">
+                                    <i class="fas fa-arrow-right text-emerald-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>決済完了の通知</strong>: 支払いが確定した瞬間に在庫更新や確認メール送信を行いたい</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900 text-sm">
+                                    <i class="fas fa-arrow-right text-emerald-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>チャットボット</strong>: ユーザーがメッセージを送ったときに即座に応答したい</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900 text-sm">
+                                    <i class="fas fa-arrow-right text-emerald-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>CI/CDパイプライン</strong>: コードがプッシュされたら自動でテストを実行したい</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900 text-sm">
+                                    <i class="fas fa-arrow-right text-emerald-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>在庫アラート</strong>: 在庫が変化したときにチームに通知したい</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 通常のAPIが適している場合 -->
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <i class="fas fa-info-circle text-orange-600 text-lg mt-0.5"></i>
+                                <h4 class="font-semibold text-orange-800">通常のAPIが適している場面</h4>
+                            </div>
+                            <ul class="space-y-2 ml-6">
+                                <li class="flex items-start gap-2 text-orange-900 text-sm">
+                                    <i class="fas fa-arrow-right text-orange-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>商品一覧の取得</strong>: ユーザーが画面を開いたタイミングで最新データを表示したい</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-orange-900 text-sm">
+                                    <i class="fas fa-arrow-right text-orange-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>天気予報の取得</strong>: 1時間ごとに最新の天気情報を更新したい</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-orange-900 text-sm">
+                                    <i class="fas fa-arrow-right text-orange-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>相手がWebhookに未対応</strong>: 連携したいサービスがWebhookを提供していない</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-orange-900 text-sm">
+                                    <i class="fas fa-arrow-right text-orange-500 mt-1 flex-shrink-0 text-xs"></i>
+                                    <span><strong>データの検索・取得</strong>: ユーザーの操作に応じてデータを取得する場合</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    Webhookを使う場合、自分のアプリ側にも「受信できる環境」が必要です。
+                                    インターネットからアクセス可能なURL（エンドポイント）を用意する必要があります。
+                                    ローカル（自分のパソコン）で開発中の場合は追加の設定が必要になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 2.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.6 WebhookとAPIは対立するものではない
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「WebhookかAPIか」は、どちらかを選んで他方を捨てるという話ではありません。
+                        実際の現場では、<strong>両方を組み合わせて使う</strong>ことがよくあります。
+                    </p>
+
+                    <!-- 組み合わせ例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            ECサイトでのAPIとWebhookの組み合わせ例
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A[ユーザー] -->|"商品を検索する（API呼び出し）"| B["ECサイト"]
+    B -->|"商品一覧を返す（APIレスポンス）"| A
+    A -->|"購入ボタンを押す（API呼び出し）"| C["決済サービス"]
+    C -->|"支払い完了（Webhook通知）"| B
+    B -->|"注文確定メールを送る"| D[メールサービス]
+        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この例では、「商品を検索する」「購入ボタンを押す」という<strong>ユーザーのアクション</strong>にはAPIを使い、
+                        「支払い完了の通知」という<strong>外部サービスからのイベント</strong>にはWebhookを使っています。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">まとめの重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    APIは「自分から情報を取りに行く道具」、Webhookは「相手が情報を送ってくれる仕組み」です。
+                                    どちらが優れているという話ではなく、状況に応じて使い分けること、
+                                    そして両方を組み合わせることが実際の開発では一般的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第2章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">プル型（通常のAPI）は「自分から取りに行く」、プッシュ型（Webhook）は「相手が送ってくれる」という違いがある</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">ポーリングは「無駄なリクエスト」「タイムラグ」「実装コスト」という3つの問題点がある</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700">Webhookはリアルタイム性が高く、サーバー負荷も少ない。特に「イベント発生時の即時処理」に向いている</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700">APIとWebhookはどちらが優れているかという話ではなく、場面によって使い分けるもの。組み合わせて使うことも多い</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「ポーリング」とはどのような通信方式ですか？
+                                        (A) サーバーが変化を検知してクライアントに通知する方式
+                                        (B) クライアントが定期的にサーバーへ問い合わせ続ける方式
+                                        (C) クライアントとサーバーが常時接続を維持する方式</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。ポーリングはクライアントが「何か変化がありましたか？」と繰り返し問い合わせる方式です。
+                                            (A) はWebhook（プッシュ型）の説明、(C) はWebSocketなどの「常時接続」の説明です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ポーリングの問題点として正しくないものはどれですか？
+                                        (A) 無駄なリクエストが多くサーバーに負荷がかかる
+                                        (B) イベント発生のタイミングと通知のタイミングにズレが生じる
+                                        (C) URLを登録する設定作業が難しい</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            正しくないのは (C) です。「URLを登録する設定作業」はWebhookの特徴であり、ポーリングには関係ありません。
+                                            ポーリングの実際の問題点は (A) 無駄なリクエストと (B) タイムラグです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 次のうち、Webhookよりも通常のAPI（ポーリング）が向いている場面はどれですか？
+                                        (A) クレジットカードの支払いが完了したときに、すぐ在庫を更新したい
+                                        (B) ユーザーが「検索」ボタンを押したときに、商品一覧を表示したい
+                                        (C) GitHubにコードが追加されたとき、自動でテストを実行したい</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。「ユーザーのアクションに応じてデータを取得する」場合は、通常のAPI呼び出しが適しています。
+                                            (A) と (C) はイベント発生時の即時処理が必要なため、Webhookが向いています。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第3章では、Webhookでデータが送信元から受信先に届くまでの流れを詳しく学びます。
+                                「イベント発生」「HTTPリクエスト送信」「レスポンス返却」という一連の流れを、
+                                図解を使いながら段階的に理解します。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-01.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">Webhookとは何か？</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">Webhookの仕組み</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

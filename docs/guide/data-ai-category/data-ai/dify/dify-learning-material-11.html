@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Dify入門 第11章 - エージェント機能 - AIに自律的に行動させる</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Dify用カラー: fuchsia (生成AI/LLM)
+                        primary: {
+                            50: '#fdf4ff',
+                            100: '#fae8ff',
+                            200: '#f5d0fe',
+                            300: '#f0abfc',
+                            400: '#e879f9',
+                            500: '#d946ef',
+                            600: '#c026d3',
+                            700: '#a21caf',
+                            800: '#86198f',
+                            900: '#701a75',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-robot text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Dify入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級〜中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-brain text-[9px]"></i>
+                                <span>データ・AI</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/data-ai-category/data-ai/dify/" class="hover:text-primary-600 transition-colors">Dify入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">エージェント機能 - AIに自律的に行動させる</h1>
+                    <p class="text-slate-600">Difyのエージェント機能を使って、AIが状況に応じてツールを選択・実行する自律的なアプリケーションを構築します。Function CallingとReActの違いを理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エージェントとは何か、ワークフローとの違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Function CallingとReActの2つのエージェントモードの違いと使い分け</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エージェント機能を使った自律的なAIアプリケーションの構築方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エージェントのプロンプト設計とツール選択精度の向上テクニック</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 エージェントとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>エージェント（Agent）</strong>は、AIが状況に応じて自律的にツールを選択し、実行する仕組みです。
+                        ワークフローが「事前に定義された手順を順番に実行する」のに対し、エージェントは「目的を達成するために、AIが最適なツールと実行順序を判断する」点が大きく異なります。
+                    </p>
+
+                    <!-- 比較カード -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="min-w-full border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">観点</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">ワークフロー</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">エージェント</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">実行フロー</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">事前定義された固定フロー</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">AIが動的に判断</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">柔軟性</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">条件分岐のみ</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">状況に応じて柔軟に対応</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">予測可能性</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">高い（必ず同じ流れ）</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">低い（AIの判断で変化）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">向いている用途</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">定型処理の自動化</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">多様な質問への対応</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">コスト</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">低い</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">高い（複数回のLLM呼び出し）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 図：エージェントの動作概念 -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">エージェントの動作概念</h3>
+                        <div class="mermaid">
+flowchart TD
+    A["ユーザーの質問:<br/>「東京の天気と最適な服装を教えて」"] --> B[エージェント: LLMが分析]
+    B --> C{必要なツールを判断}
+    C -->|ツール1| D["Web検索ツール:<br/>東京の天気を検索"]
+    C -->|ツール2| E["計算ツール:<br/>気温から服装判定"]
+    D --> F[検索結果を取得]
+    E --> G[適切な服装を算出]
+    F --> H[LLMが結果を統合]
+    G --> H
+    H --> I["回答生成:<br/>「晴れ、25℃です。半袖がおすすめです」"]
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">エージェントの本質</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    エージェントは「人間のように考えて行動する」AI です。ユーザーの質問を理解し、「この質問に答えるにはどのツールが必要か？」を自分で考え、実行し、結果を統合して回答します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 Function CallingとReActの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Difyのエージェント機能には、<strong>Function Calling</strong>と<strong>ReAct</strong>という2つのモードがあります。それぞれの特徴と使い分けを理解しましょう。
+                    </p>
+
+                    <!-- Function Calling -->
+                    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-plug text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-800 mb-2">Function Calling（関数呼び出し）</h3>
+                                <p class="text-blue-900 mb-3">
+                                    LLMが「どの関数を、どんなパラメータで呼び出すべきか」を判断し、構造化されたJSON形式で指示を返します。
+                                    OpenAIのGPT-4、Anthropic Claudeなど、多くのモデルがネイティブでサポートしています。
+                                </p>
+                                <div class="bg-blue-100 rounded-lg p-3">
+                                    <p class="text-blue-800 text-sm mb-2"><strong>動作の流れ:</strong></p>
+                                    <ol class="text-blue-900 text-sm space-y-1 list-decimal list-inside">
+                                        <li>ユーザーの質問を分析</li>
+                                        <li>必要なツールとパラメータをJSON形式で出力</li>
+                                        <li>Difyがツールを実行</li>
+                                        <li>結果をLLMに渡して最終回答を生成</li>
+                                    </ol>
+                                </div>
+                                <p class="text-blue-800 text-sm mt-3"><strong>メリット:</strong> 精度が高く、並列実行可能、構造化された出力</p>
+                                <p class="text-blue-800 text-sm"><strong>デメリット:</strong> 対応モデルが限られる</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ReAct -->
+                    <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-brain text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-800 mb-2">ReAct（Reasoning + Acting）</h3>
+                                <p class="text-purple-900 mb-3">
+                                    LLMが「思考（Thought）→ 行動（Action）→ 観察（Observation）」のサイクルを繰り返し、段階的に問題を解決します。
+                                    プロンプトベースの手法なので、どのLLMでも利用可能です。
+                                </p>
+                                <div class="bg-purple-100 rounded-lg p-3">
+                                    <p class="text-purple-800 text-sm mb-2"><strong>動作の流れ:</strong></p>
+                                    <ol class="text-purple-900 text-sm space-y-1 list-decimal list-inside">
+                                        <li><strong>Thought:</strong> 「まず天気を調べる必要がある」</li>
+                                        <li><strong>Action:</strong> Web検索ツールを実行</li>
+                                        <li><strong>Observation:</strong> 「晴れ、25℃」</li>
+                                        <li><strong>Thought:</strong> 「次に服装を判定する」</li>
+                                        <li><strong>Action:</strong> 計算ツールを実行</li>
+                                        <li><strong>Observation:</strong> 「半袖が適切」</li>
+                                        <li><strong>Final Answer:</strong> 最終回答を生成</li>
+                                    </ol>
+                                </div>
+                                <p class="text-purple-800 text-sm mt-3"><strong>メリット:</strong> どのモデルでも使える、推論過程が可視化</p>
+                                <p class="text-purple-800 text-sm"><strong>デメリット:</strong> 精度がやや低い、並列実行不可、トークン消費が多い</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 比較図 -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">Function Calling vs ReAct</h3>
+                        <div class="mermaid">
+graph TB
+    subgraph FC["Function Calling"]
+        FC1["質問分析"] --> FC2["ツール選択<br/>JSON出力"]
+        FC2 --> FC3["並列実行"]
+        FC3 --> FC4["結果統合"]
+    end
+
+    subgraph RA["ReAct"]
+        RA1["Thought 1"] --> RA2["Action 1"]
+        RA2 --> RA3["Observation 1"]
+        RA3 --> RA4["Thought 2"]
+        RA4 --> RA5["Action 2"]
+        RA5 --> RA6["Final Answer"]
+    end
+
+    FC4 -.速い.- X[ ]
+    RA6 -.柔軟.- Y[ ]
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">使い分けの目安</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <strong>Function Calling:</strong> GPT-4、Claudeなど対応モデルを使う場合、精度重視、並列処理が必要な場合<br>
+                                    <strong>ReAct:</strong> 対応モデルがない場合、推論過程を可視化したい場合、複雑な多段階推論が必要な場合
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 エージェントアプリの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際にエージェント機能を使ったアプリケーションを作成してみましょう。ここでは、Web検索と計算ツールを組み合わせた簡単なエージェントを構築します。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 11-1: 情報検索エージェントの作成</h3>
+                                <p class="text-purple-900 mb-4 break-words">Web検索ツールを使って、ユーザーの質問に自律的に答えるエージェントを作成します。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">Difyダッシュボードで「新規アプリを作成」→「エージェント」を選択</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">モデル設定で「GPT-4」または「Claude 3.5」など、Function Calling対応モデルを選択</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">エージェントモードで「Function Calling」を選択</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">「ツールを追加」→「Web Search」を選択（SerpAPI、Google Search APIなど）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                        <span class="flex-1 min-w-0 break-words">システムプロンプトを設定</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">6</span>
+                                        <span class="flex-1 min-w-0 break-words">「公開」ボタンをクリックして保存</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- プロンプト例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">システムプロンプト例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">あなたは情報検索のエキスパートです。
+ユーザーの質問に答えるために、Web検索ツールを使って最新の情報を調べてください。
+
+【重要な指示】
+- 検索結果は必ず複数のソースを確認し、信頼性の高い情報を優先してください
+- 検索キーワードは、質問の意図を正確に反映したものを選んでください
+- 最終回答には、参照したソースのURLを含めてください
+- 検索結果が見つからない場合は、その旨を正直に伝えてください</code></pre>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                                <p class="text-emerald-900 mb-4 break-words">以下のような質問を試してみましょう：</p>
+                                <ul class="text-emerald-900 text-sm space-y-2">
+                                    <li>• 「2024年のノーベル物理学賞の受賞者を教えて」</li>
+                                    <li>• 「最新のiPhoneモデルの特徴は？」</li>
+                                    <li>• 「東京の明日の天気予報は？」</li>
+                                </ul>
+                                <h4 class="font-medium text-emerald-800 mb-2 mt-4 break-words">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される動作
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <p class="text-emerald-900 text-sm">
+                                        1. エージェントがWeb検索ツールを自動的に選択<br>
+                                        2. 適切なキーワードで検索を実行<br>
+                                        3. 検索結果を分析して回答を生成<br>
+                                        4. 参照元のURLと共に回答を表示
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 複数ツールを組み合わせたエージェント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エージェントの真価は、複数のツールを組み合わせて使う場面で発揮されます。
+                        Web検索、計算、データベース検索などを状況に応じて使い分けるエージェントを構築してみましょう。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 11-2: 多機能リサーチエージェント</h3>
+                                <p class="text-purple-900 mb-4 break-words">Web検索、計算、知識ベース検索を組み合わせた高度なエージェントを作成します。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">追加するツール</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words"><strong>Web Search:</strong> 最新情報の検索</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words"><strong>Calculator:</strong> 数値計算、単位変換</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words"><strong>Knowledge Base:</strong> 社内文書の参照（事前に作成したナレッジベースを指定）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words"><strong>Current Time:</strong> 現在時刻の取得</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ツール選択の流れ図 -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">エージェントのツール選択フロー</h3>
+                        <div class="mermaid">
+flowchart TD
+    A["ユーザーの質問"] --> B[エージェント分析]
+    B --> C{質問の種類を判定}
+
+    C -->|最新情報| D["Web Search<br/>ツールを選択"]
+    C -->|計算| E["Calculator<br/>ツールを選択"]
+    C -->|社内情報| F["Knowledge Base<br/>ツールを選択"]
+    C -->|日時| G["Current Time<br/>ツールを選択"]
+
+    D --> H[検索実行]
+    E --> I[計算実行]
+    F --> J[KB検索実行]
+    G --> K[時刻取得]
+
+    H --> L[結果を統合]
+    I --> L
+    J --> L
+    K --> L
+
+    L --> M["最終回答を生成"]
+                        </div>
+                    </div>
+
+                    <!-- プロンプト例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">多機能エージェントのシステムプロンプト例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">あなたは多機能なリサーチアシスタントです。
+ユーザーの質問に答えるために、以下のツールを適切に使い分けてください。
+
+【利用可能なツール】
+1. Web Search: 最新のニュース、製品情報、一般的な知識を検索
+2. Calculator: 数値計算、単位変換、日数計算などを実行
+3. Knowledge Base: 社内文書、マニュアル、規定を検索
+4. Current Time: 現在の日時を取得
+
+【ツール選択のガイドライン】
+- 「最新」「今年」「現在」などのキーワードがあればWeb Search
+- 数値計算、パーセント、金額計算などはCalculator
+- 社内の規定、手順、ポリシーに関する質問はKnowledge Base
+- 日付や時刻が必要な場合はCurrent Time
+- 複数のツールが必要な場合は、順番に実行してください
+
+【回答スタイル】
+- 使用したツールと取得した情報を明示
+- 計算結果は式と答えの両方を示す
+- 不確かな情報は推測せず、その旨を伝える</code></pre>
+                    </div>
+
+                    <!-- テスト質問例 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-flask text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">テスト質問例</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>複合質問:</strong> 「今日から1週間後の日付と、その日の東京の天気予報は？」<br>
+                                    → Current Time + Calculator + Web Search を組み合わせる</li>
+                                    <li><strong>計算+検索:</strong> 「最新のiPhoneの価格を米ドルから日本円に換算して」<br>
+                                    → Web Search + Calculator を組み合わせる</li>
+                                    <li><strong>社内情報+計算:</strong> 「有給休暇の規定と、今年の残日数から使用率を計算して」<br>
+                                    → Knowledge Base + Calculator を組み合わせる</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 エージェントのプロンプト設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エージェントの性能は、プロンプト設計で大きく変わります。ツール選択の精度を高め、適切な回答を生成するためのプロンプト設計テクニックを学びましょう。
+                    </p>
+
+                    <!-- ベストプラクティス -->
+                    <div class="space-y-4 mb-6">
+                        <!-- プラクティス1 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1"></i>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">1. ツールの使用条件を明確に記述する</p>
+                                    <p class="text-sm text-slate-600 mb-2">「いつ、どのツールを使うべきか」を具体的に指示することで、ツール選択の精度が向上します。</p>
+                                    <div class="bg-emerald-50 rounded-lg p-3 mt-2">
+                                        <p class="text-sm text-emerald-900">
+                                            <strong>例:</strong> 「ユーザーが『最新の』『今年の』『現在の』というキーワードを使った場合は、必ずWeb Searchツールを使用してください」
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- プラクティス2 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1"></i>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">2. ツール実行結果の扱い方を指示する</p>
+                                    <p class="text-sm text-slate-600 mb-2">ツールが返した結果をどう処理し、どう回答に反映するかを明示します。</p>
+                                    <div class="bg-emerald-50 rounded-lg p-3 mt-2">
+                                        <p class="text-sm text-emerald-900">
+                                            <strong>例:</strong> 「Web検索の結果は、必ず参照元のURLと共に提示してください。複数の情報源がある場合は、それぞれを比較してください」
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- プラクティス3 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1"></i>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">3. エラーハンドリングを定義する</p>
+                                    <p class="text-sm text-slate-600 mb-2">ツール実行に失敗した場合や、期待する結果が得られなかった場合の対応を指示します。</p>
+                                    <div class="bg-emerald-50 rounded-lg p-3 mt-2">
+                                        <p class="text-sm text-emerald-900">
+                                            <strong>例:</strong> 「検索結果が見つからない場合は、別のキーワードで再検索を試みてください。3回試しても見つからない場合は、その旨を正直に伝えてください」
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- プラクティス4 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-emerald-500 mt-1"></i>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">4. 回答フォーマットを指定する</p>
+                                    <p class="text-sm text-slate-600 mb-2">一貫性のある回答を生成するために、フォーマットを明示します。</p>
+                                    <div class="bg-emerald-50 rounded-lg p-3 mt-2">
+                                        <p class="text-sm text-emerald-900">
+                                            <strong>例:</strong> 「回答は以下の形式で提示してください：<br>
+                                            【使用ツール】: [ツール名]<br>
+                                            【取得情報】: [結果の要約]<br>
+                                            【回答】: [最終回答]」
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">過度な制約に注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    プロンプトが詳細すぎると、AIの柔軟性が失われます。基本的なガイドラインを示しつつ、エージェントが状況に応じて判断できる余地を残すことが重要です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 エージェントのデバッグとモニタリング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エージェントは自律的に動作するため、デバッグやモニタリングが重要です。Difyの機能を使って、エージェントの動作を確認し、改善する方法を学びましょう。
+                    </p>
+
+                    <!-- デバッグ方法 -->
+                    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-bug text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-800 mb-2">ログとトレースの確認</h3>
+                                <p class="text-blue-900 mb-3">
+                                    Difyの「ログ」タブでは、エージェントがどのツールを選択し、どのような結果を得たかを時系列で確認できます。
+                                </p>
+                                <div class="bg-blue-100 rounded-lg p-3">
+                                    <p class="text-blue-800 text-sm mb-2"><strong>確認すべきポイント:</strong></p>
+                                    <ul class="text-blue-900 text-sm space-y-1 list-disc list-inside">
+                                        <li>ユーザーの質問に対して、適切なツールが選択されているか</li>
+                                        <li>ツールに渡されたパラメータは正確か</li>
+                                        <li>ツールの実行結果は期待通りか</li>
+                                        <li>最終回答は質問に適切に答えているか</li>
+                                        <li>トークン消費量は許容範囲内か</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- よくある問題と対処法 -->
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden mb-4">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                よくある問題と対処法
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">問題: エージェントが適切なツールを選択しない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> システムプロンプトでツールの使用条件が不明確</p>
+                                    <p><strong>解決方法:</strong> プロンプトに「いつ、どのツールを使うか」の具体例を追加。ツール名だけでなく、ツールの目的と使用シーンを明記する。</p>
+                                </div>
+                            </details>
+
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">問題: ツールの実行結果が不正確</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> ツールに渡すパラメータが不適切</p>
+                                    <p><strong>解決方法:</strong> プロンプトで「パラメータの抽出方法」を指示。例：「検索キーワードはユーザーの質問から重要な名詞と動詞を抽出して作成してください」</p>
+                                </div>
+                            </details>
+
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">問題: 回答生成に時間がかかりすぎる</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> ReActモードで不必要に多くの思考ステップを実行している</p>
+                                    <p><strong>解決方法:</strong> Function Callingモードに切り替える。または、プロンプトで最大ステップ数を制限する指示を追加。</p>
+                                </div>
+                            </details>
+
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">問題: トークン消費量が予算を超える</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> 複数ツールの結果を全て含めた長大なコンテキスト</p>
+                                    <p><strong>解決方法:</strong> プロンプトで「ツール実行結果は要約して使用してください」と指示。または、より小さいモデル（GPT-3.5など）を試す。</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. エージェントとワークフローの最大の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ワークフローは事前に定義された固定的な処理フローを順番に実行しますが、エージェントはAIが状況に応じて動的にツールを選択し、実行順序を判断します。エージェントは柔軟性が高い一方、予測可能性は低くなります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Function CallingとReActの違いと、それぞれの使い分けを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Function CallingはLLMがツールとパラメータをJSON形式で出力し、並列実行可能で精度が高いですが、対応モデルが限られます。ReActは思考→行動→観察のサイクルを繰り返すプロンプトベース手法で、どのモデルでも使えますが、精度がやや低くトークン消費が多くなります。GPT-4やClaudeを使う場合はFunction Calling、それ以外や推論過程を可視化したい場合はReActを選びます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. エージェントのプロンプト設計で重要なポイントは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ツールの使用条件を明確にする、ツール実行結果の扱い方を指示する、エラーハンドリングを定義する、回答フォーマットを指定する、といった点が重要です。ただし、過度に詳細な指示はAIの柔軟性を損なうため、基本ガイドラインを示しつつ判断の余地を残すバランスが大切です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第11章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>エージェントはAIが状況に応じて自律的にツールを選択・実行する仕組みで、ワークフローとは異なる柔軟性を持つ</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Function Calling（高精度・並列実行可能）とReAct（どのモデルでも使える・推論過程可視化）の2つのモードがある</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>複数のツールを組み合わせることで、Web検索、計算、知識ベース参照などを統合した高度なエージェントを構築できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>適切なプロンプト設計とログモニタリングにより、エージェントの精度と効率を継続的に改善できる</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="dify-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第10章: ワークフローノードの活用</span>
+                        </div>
+                    </a>
+                    <a href="dify-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: ツールの活用</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

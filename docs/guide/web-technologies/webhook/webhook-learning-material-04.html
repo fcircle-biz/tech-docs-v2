@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第4章 - Webhookで使われるHTTPの基礎</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        Webhookで使われるHTTPの基礎
+                    </h1>
+                    <p class="text-slate-600">
+                        Webhookの通信で使われるHTTPの基本要素（POSTメソッド、ヘッダー、ボディ、ステータスコード）を学びます。プログラミング未経験でも理解できるよう、各要素を具体例とともに解説します。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPとは何かを「手紙のやり取り」に例えて理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>WebhookでPOSTメソッドが使われる理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPヘッダーとボディの役割の違いを理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookでよく使われるステータスコード（200・4xx・5xx）の意味を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 4.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 HTTPとは何か？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookを理解するには、まず「HTTP」という通信の仕組みを知る必要があります。
+                        HTTPは難しく聞こえますが、私たちが毎日使っている「手紙のやり取り」にそっくりです。
+                    </p>
+
+                    <!-- 手紙の例え -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-envelope text-primary-500"></i>
+                            手紙のやり取りとHTTPの比較
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100">
+                                        <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">手紙のやり取り</th>
+                                        <th class="text-left px-4 py-3 rounded-tr-lg text-slate-700">HTTPの世界</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 text-slate-600">手紙を送る人（差出人）</td>
+                                        <td class="px-4 py-3 text-slate-600 font-medium">クライアント（送信元）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200 bg-slate-50">
+                                        <td class="px-4 py-3 text-slate-600">手紙を受け取る人（受取人）</td>
+                                        <td class="px-4 py-3 text-slate-600 font-medium">サーバー（受信先）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 text-slate-600">封筒の宛名・差出人・切手</td>
+                                        <td class="px-4 py-3 text-slate-600 font-medium">HTTPヘッダー（付加情報）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200 bg-slate-50">
+                                        <td class="px-4 py-3 text-slate-600">手紙の本文</td>
+                                        <td class="px-4 py-3 text-slate-600 font-medium">HTTPボディ（データ本体）</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 text-slate-600">「受け取りました」という返信</td>
+                                        <td class="px-4 py-3 text-slate-600 font-medium">HTTPレスポンス（応答）</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    HTTPとは、インターネット上でデータをやり取りするための「共通のルール（プロトコル）」です。
+                                    Webhookもこのルールに従ってデータを送受信します。
+                                    「HyperText Transfer Protocol」の略称ですが、名前よりも「手紙のルール」だと覚えておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HTTPの基本的な流れ図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            HTTPリクエストとレスポンスの基本的な流れ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant C as 送信元<br/>（Webhookを送る側）
+    participant S as 受信先<br/>（あなたのサーバー）
+
+    C->>S: HTTPリクエスト送信<br/>（POSTメソッド＋データ）
+    Note right of S: ヘッダーとボディを読んで処理
+    S-->>C: HTTPレスポンス返却<br/>（ステータスコード: 200 OK）
+    Note left of C: 正常受信を確認
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 HTTPメソッドとは？ 〜GETとPOSTの違い〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPには「メソッド」と呼ばれる「何をしたいか」を指定する仕組みがあります。
+                        Webhookでは主に<strong>POSTメソッド</strong>が使われます。なぜでしょうか？
+                    </p>
+
+                    <!-- GETとPOSTの比較 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- GETメソッド -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-search text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-orange-800">GETメソッド</h3>
+                            </div>
+                            <p class="text-orange-900 text-sm leading-relaxed mb-3">
+                                「情報を取ってくる（取得する）」ためのメソッドです。
+                                Webブラウザでページを開くときに使われます。
+                            </p>
+                            <div class="bg-orange-100 rounded-lg p-3">
+                                <p class="text-orange-800 text-xs font-medium">例え</p>
+                                <p class="text-orange-700 text-xs">図書館で「この本を見せてください」とお願いする行為</p>
+                            </div>
+                            <div class="mt-3 bg-orange-100 rounded-lg p-3">
+                                <p class="text-orange-800 text-xs font-medium">Webhookでは使わない理由</p>
+                                <p class="text-orange-700 text-xs">GETはデータを「送る」のに不向き。URLにデータをつけるため、大量データや秘密情報を送れない</p>
+                            </div>
+                        </div>
+
+                        <!-- POSTメソッド -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-paper-plane text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">POSTメソッド（Webhookで使用）</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-3">
+                                「データを送る（投稿する）」ためのメソッドです。
+                                フォームの送信やWebhookで活用されます。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs font-medium">例え</p>
+                                <p class="text-emerald-700 text-xs">図書館に「この本を返します（＋返却書を添付）」と届ける行為</p>
+                            </div>
+                            <div class="mt-3 bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs font-medium">Webhookで使われる理由</p>
+                                <p class="text-emerald-700 text-xs">ボディにJSONデータを含めて送れる。大量データも安全に送信できる</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主なHTTPメソッド一覧 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list text-primary-500"></i>
+                            主なHTTPメソッド一覧
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-50">
+                                <span class="flex-shrink-0 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded font-mono min-w-16 text-center">GET</span>
+                                <div>
+                                    <p class="text-slate-800 text-sm font-medium">データを取得する</p>
+                                    <p class="text-slate-500 text-xs">Webページを開く、APIからデータを読む</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 rounded-lg bg-primary-50 border border-primary-200">
+                                <span class="flex-shrink-0 px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded font-mono min-w-16 text-center">POST</span>
+                                <div>
+                                    <p class="text-slate-800 text-sm font-medium">データを送信する <span class="text-primary-600 text-xs">← Webhookで主に使用</span></p>
+                                    <p class="text-slate-500 text-xs">フォーム送信、Webhookの通知送信</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-50">
+                                <span class="flex-shrink-0 px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded font-mono min-w-16 text-center">PUT</span>
+                                <div>
+                                    <p class="text-slate-800 text-sm font-medium">データを更新する（全体）</p>
+                                    <p class="text-slate-500 text-xs">既存のリソースを丸ごと置き換える</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-50">
+                                <span class="flex-shrink-0 px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded font-mono min-w-16 text-center">DELETE</span>
+                                <div>
+                                    <p class="text-slate-800 text-sm font-medium">データを削除する</p>
+                                    <p class="text-slate-500 text-xs">リソースの削除操作</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 HTTPヘッダー 〜封筒の表書きに相当する情報〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPヘッダーは、データ本体（ボディ）と一緒に送られる「付加情報」です。
+                        手紙の封筒に書かれた宛先・差出人・切手の種類のようなものです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        Webhookでは、ヘッダーを使って「どんな種類のデータを送るか」「本物のWebhookか確認するための署名」などの情報を伝えます。
+                    </p>
+
+                    <!-- Webhookで使われる主なヘッダー -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-tags text-primary-500"></i>
+                            Webhookでよく使われるHTTPヘッダー
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="border border-slate-200 rounded-lg overflow-hidden">
+                                <div class="bg-slate-800 px-4 py-2 flex items-center gap-2">
+                                    <span class="text-emerald-400 text-xs font-mono">ヘッダー名</span>
+                                    <span class="text-slate-400 text-xs">→</span>
+                                    <span class="text-yellow-300 text-xs font-mono">値の例</span>
+                                </div>
+                                <div class="divide-y divide-slate-100">
+                                    <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-2">
+                                        <span class="flex-shrink-0 font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 sm:min-w-56">Content-Type</span>
+                                        <div>
+                                            <p class="text-slate-700 text-sm font-medium">application/json</p>
+                                            <p class="text-slate-500 text-xs mt-1">「ボディのデータはJSON形式です」と伝える。Webhookでは必ずこれが指定される</p>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-2 bg-slate-50">
+                                        <span class="flex-shrink-0 font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 sm:min-w-56">User-Agent</span>
+                                        <div>
+                                            <p class="text-slate-700 text-sm font-medium">GitHub-Hookshot/abc123</p>
+                                            <p class="text-slate-500 text-xs mt-1">「このWebhookを送ったのはGitHubです」という送信元の識別情報</p>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-2">
+                                        <span class="flex-shrink-0 font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 sm:min-w-56">X-Webhook-Signature</span>
+                                        <div>
+                                            <p class="text-slate-700 text-sm font-medium">sha256=abc123...</p>
+                                            <p class="text-slate-500 text-xs mt-1">署名（サイン）。「このデータは本物の送信元から来ています」という証明。第10章で詳しく学びます</p>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-2 bg-slate-50">
+                                        <span class="flex-shrink-0 font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 sm:min-w-56">X-GitHub-Event</span>
+                                        <div>
+                                            <p class="text-slate-700 text-sm font-medium">push / pull_request</p>
+                                            <p class="text-slate-500 text-xs mt-1">GitHubの例。「どんなイベントが起きたか」を伝えるカスタムヘッダー</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">豆知識: X-プレフィックスとは？</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ヘッダー名が「X-」で始まるものは「カスタムヘッダー」と呼ばれます。
+                                    標準のHTTPヘッダーにない独自の情報を追加するときに使います。
+                                    GitHubの「X-GitHub-Event」やStripeの「Stripe-Signature」もカスタムヘッダーです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 HTTPボディ 〜手紙の本文に相当するデータ〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPボディとは、リクエストに含まれる「データ本体」のことです。
+                        Webhookでは、イベントの詳細情報がボディに入って送られてきます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        ボディの中身は<strong>JSON形式</strong>（第5章で詳しく学びます）で書かれることがほとんどです。
+                        ここでは「こんなデータが届く」というイメージをつかんでください。
+                    </p>
+
+                    <!-- GitHubのWebhookボディの例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fab fa-github text-slate-700"></i>
+                            GitHubからWebhookが届いたときのボディ例
+                        </h3>
+                        <p class="text-slate-500 text-sm mb-4">「プッシュがありました」というイベントで届くデータのイメージ：</p>
+                        <div class="code-block-wrapper">
+                            <button class="copy-btn absolute top-2 right-2 px-2 py-1 bg-slate-600 text-white text-xs rounded hover:bg-slate-500"
+                                    onclick="navigator.clipboard.writeText(this.nextElementSibling.textContent)">
+                                コピー
+                            </button>
+                            <pre><code class="language-json">{
+  "event": "push",
+  "repository": {
+    "name": "my-project",
+    "full_name": "user/my-project"
+  },
+  "pusher": {
+    "name": "tanaka",
+    "email": "tanaka@example.com"
+  },
+  "commits": [
+    {
+      "message": "バグを修正しました",
+      "timestamp": "2026-03-25T10:00:00Z"
+    }
+  ]
+}</code></pre>
+                        </div>
+                        <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="bg-primary-50 rounded-lg p-3 text-center">
+                                <p class="text-primary-700 text-xs font-medium">何が起きたか</p>
+                                <p class="text-primary-900 text-sm font-bold">"event": "push"</p>
+                            </div>
+                            <div class="bg-primary-50 rounded-lg p-3 text-center">
+                                <p class="text-primary-700 text-xs font-medium">どのリポジトリか</p>
+                                <p class="text-primary-900 text-sm font-bold">"name": "my-project"</p>
+                            </div>
+                            <div class="bg-primary-50 rounded-lg p-3 text-center">
+                                <p class="text-primary-700 text-xs font-medium">誰がやったか</p>
+                                <p class="text-primary-900 text-sm font-bold">"name": "tanaka"</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HTTPリクエスト全体像 -->
+                    <div class="bg-slate-800 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                            <i class="fas fa-envelope-open text-primary-400"></i>
+                            HTTPリクエスト全体の構造（Webhookの場合）
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="bg-blue-900/50 border border-blue-500/30 rounded-lg p-3">
+                                <p class="text-blue-300 text-xs font-bold mb-1">リクエストライン</p>
+                                <code class="text-blue-200 text-sm">POST https://example.com/webhook HTTP/1.1</code>
+                                <p class="text-slate-400 text-xs mt-1">→ POSTメソッドで、このURLに送ります</p>
+                            </div>
+                            <div class="bg-emerald-900/50 border border-emerald-500/30 rounded-lg p-3">
+                                <p class="text-emerald-300 text-xs font-bold mb-1">ヘッダー（付加情報）</p>
+                                <code class="text-emerald-200 text-sm block">Content-Type: application/json</code>
+                                <code class="text-emerald-200 text-sm block">X-GitHub-Event: push</code>
+                                <code class="text-emerald-200 text-sm block">X-Hub-Signature-256: sha256=abc...</code>
+                                <p class="text-slate-400 text-xs mt-1">→ データの形式・イベント種類・署名を伝えます</p>
+                            </div>
+                            <div class="bg-amber-900/50 border border-amber-500/30 rounded-lg p-3">
+                                <p class="text-amber-300 text-xs font-bold mb-1">ボディ（データ本体）</p>
+                                <code class="text-amber-200 text-sm">{'{'} "event": "push", "repository": {'{'}"name": "my-project"{'}'} {'}'}</code>
+                                <p class="text-slate-400 text-xs mt-1">→ イベントの詳細情報が入っています</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 HTTPステータスコード 〜返事の種類を数字で表す〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookを受け取ったサーバーは、送信元に「結果」を返します。
+                        この結果を数字で表したのが<strong>HTTPステータスコード</strong>です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        宅配便の「配達完了」「不在のため持ち帰り」「住所不明で返送」のような状態を、3桁の数字で表現しています。
+                    </p>
+
+                    <!-- ステータスコードの種類 -->
+                    <div class="space-y-4 mb-6">
+                        <!-- 2xx -->
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center justify-center w-14 h-14 bg-emerald-500 text-white text-xl font-bold rounded-xl">2xx</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-emerald-800 mb-1">成功（Success）</h3>
+                                    <p class="text-emerald-900 text-sm leading-relaxed mb-2">
+                                        リクエストが正常に処理されました。Webhookでは必ずこの応答を返す必要があります。
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div class="bg-emerald-100 rounded-lg p-2">
+                                            <span class="text-emerald-800 text-xs font-bold">200 OK</span>
+                                            <p class="text-emerald-700 text-xs">最も一般的な成功応答。「問題なく受け取りました」</p>
+                                        </div>
+                                        <div class="bg-emerald-100 rounded-lg p-2">
+                                            <span class="text-emerald-800 text-xs font-bold">204 No Content</span>
+                                            <p class="text-emerald-700 text-xs">成功したが返すデータなし。Webhookでよく使われる</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4xx -->
+                        <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center justify-center w-14 h-14 bg-orange-400 text-white text-xl font-bold rounded-xl">4xx</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-orange-800 mb-1">クライアントエラー（送信側の問題）</h3>
+                                    <p class="text-orange-900 text-sm leading-relaxed mb-2">
+                                        送信したリクエストに問題がありました。送信元の設定や認証を確認する必要があります。
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div class="bg-orange-100 rounded-lg p-2">
+                                            <span class="text-orange-800 text-xs font-bold">400 Bad Request</span>
+                                            <p class="text-orange-700 text-xs">リクエストの形式が間違っている。JSONの書き方が不正など</p>
+                                        </div>
+                                        <div class="bg-orange-100 rounded-lg p-2">
+                                            <span class="text-orange-800 text-xs font-bold">401 Unauthorized</span>
+                                            <p class="text-orange-700 text-xs">認証が必要。正しい署名やトークンがない</p>
+                                        </div>
+                                        <div class="bg-orange-100 rounded-lg p-2">
+                                            <span class="text-orange-800 text-xs font-bold">403 Forbidden</span>
+                                            <p class="text-orange-700 text-xs">アクセス権がない。IPアドレス制限に引っかかった場合など</p>
+                                        </div>
+                                        <div class="bg-orange-100 rounded-lg p-2">
+                                            <span class="text-orange-800 text-xs font-bold">404 Not Found</span>
+                                            <p class="text-orange-700 text-xs">URLが存在しない。エンドポイントのパスが間違っている</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5xx -->
+                        <div class="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center justify-center w-14 h-14 bg-red-500 text-white text-xl font-bold rounded-xl">5xx</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-red-800 mb-1">サーバーエラー（受信側の問題）</h3>
+                                    <p class="text-red-900 text-sm leading-relaxed mb-2">
+                                        受信するサーバー側で問題が発生しました。Webhookを受け取ったサーバーのプログラムが壊れているときなどに発生します。
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div class="bg-red-100 rounded-lg p-2">
+                                            <span class="text-red-800 text-xs font-bold">500 Internal Server Error</span>
+                                            <p class="text-red-700 text-xs">サーバー内部でエラーが発生。プログラムのバグなど</p>
+                                        </div>
+                                        <div class="bg-red-100 rounded-lg p-2">
+                                            <span class="text-red-800 text-xs font-bold">503 Service Unavailable</span>
+                                            <p class="text-red-700 text-xs">サーバーが利用不可。メンテナンス中や過負荷など</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Webhookとステータスコードの重要性 -->
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">重要: Webhookでステータスコードが大切な理由</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    Webhookを受け取ったら、<strong>必ず 2xx のステータスコードを返す</strong>ことが重要です。
+                                    5xx などのエラーが返ると、送信元サービスは「届かなかった」と判断して再送（リトライ）を行います。
+                                    同じWebhookが何度も届いてしまう原因になります。（第11章で詳しく学びます）
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 HTTPSとは？ 〜安全な通信のための暗号化〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookに使われるURLはほぼ必ず「<strong>HTTPS</strong>」で始まります。
+                        HTTPとHTTPSはどう違うのでしょうか？
+                    </p>
+
+                    <!-- HTTPとHTTPSの比較 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white border-2 border-orange-300 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-unlock text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-orange-800">HTTP（暗号化なし）</h3>
+                            </div>
+                            <p class="text-orange-900 text-sm leading-relaxed mb-3">
+                                データが「素のまま」インターネットを流れます。
+                                途中で第三者に盗み見られる可能性があります。
+                            </p>
+                            <div class="bg-orange-100 rounded-lg p-3">
+                                <p class="text-orange-800 text-xs">例え: ハガキで手紙を送る（内容が丸見え）</p>
+                            </div>
+                            <p class="text-orange-700 text-xs mt-3 font-medium">⚠ Webhookでは使用禁止</p>
+                        </div>
+
+                        <div class="bg-white border-2 border-emerald-400 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">HTTPS（暗号化あり）</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-3">
+                                データが暗号化されてインターネットを流れます。
+                                途中で盗み見られても意味のある情報は読めません。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs">例え: 封筒に入れて暗号で書いた手紙を送る</p>
+                            </div>
+                            <p class="text-emerald-700 text-xs mt-3 font-medium">✓ Webhookで必ず使用する</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    WebhookのエンドポイントURLは必ず<code class="bg-emerald-100 px-1 rounded text-xs">https://</code>で始まるものを使いましょう。
+                                    多くのWebhook送信サービス（GitHub、Stripe等）は、HTTPSでないURLへの送信を拒否または警告します。
+                                    個人情報や認証情報が含まれるWebhookデータの盗聴を防ぐために必須です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 4.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.7 Webhookのリクエストを読み解いてみよう
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまで学んだHTTPの知識を使って、実際のWebhookリクエストを読み解いてみましょう。
+                        以下はStripe（決済サービス）から届くWebhookの例です。
+                    </p>
+
+                    <!-- Stripeのリクエスト例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+                        <div class="bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-3">
+                            <h3 class="font-semibold text-white flex items-center gap-2">
+                                <i class="fas fa-credit-card"></i>
+                                Stripe決済完了Webhookのリクエスト例
+                            </h3>
+                        </div>
+                        <div class="p-5 space-y-4">
+                            <!-- メソッドとURL -->
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 uppercase mb-2">メソッド ＋ URL</p>
+                                <div class="bg-slate-100 rounded-lg px-4 py-3 font-mono text-sm text-slate-800">
+                                    <span class="text-emerald-600 font-bold">POST</span> https://your-server.com/webhook/stripe
+                                </div>
+                            </div>
+                            <!-- ヘッダー -->
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 uppercase mb-2">ヘッダー</p>
+                                <div class="bg-slate-100 rounded-lg px-4 py-3 font-mono text-xs space-y-1">
+                                    <div><span class="text-blue-600">Content-Type</span>: <span class="text-amber-600">application/json</span></div>
+                                    <div><span class="text-blue-600">Stripe-Signature</span>: <span class="text-amber-600">t=1679999999,v1=abc123def456...</span></div>
+                                    <div><span class="text-blue-600">User-Agent</span>: <span class="text-amber-600">Stripe/1.0 (+https://stripe.com/docs/webhooks)</span></div>
+                                </div>
+                            </div>
+                            <!-- ボディ -->
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 uppercase mb-2">ボディ（JSONデータ）</p>
+                                <div class="code-block-wrapper">
+                                    <pre><code class="language-json">{
+  "type": "payment_intent.succeeded",
+  "data": {
+    "object": {
+      "amount": 5000,
+      "currency": "jpy",
+      "status": "succeeded",
+      "customer": "cus_abc123"
+    }
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 読み解きポイント -->
+                        <div class="bg-primary-50 border-t border-primary-200 px-5 py-4">
+                            <p class="text-primary-800 text-sm font-semibold mb-3">このリクエストから読み取れること：</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check text-primary-500 mt-1 text-xs"></i>
+                                    <p class="text-primary-900 text-xs">POSTメソッドで、あなたのサーバーにデータを「送っている」</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check text-primary-500 mt-1 text-xs"></i>
+                                    <p class="text-primary-900 text-xs">Content-TypeがJSONなので、ボディはJSON形式のデータ</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check text-primary-500 mt-1 text-xs"></i>
+                                    <p class="text-primary-900 text-xs">Stripe-Signatureで本物のStripeからの通知か確認できる</p>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-check text-primary-500 mt-1 text-xs"></i>
+                                    <p class="text-primary-900 text-xs">ボディから「決済が完了した」「5000円」「顧客ID」が分かる</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第4章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">HTTPとは「手紙のやり取り」のようなインターネット通信のルール。リクエスト（送信）とレスポンス（応答）で成り立つ</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">Webhookでは<strong>POSTメソッド</strong>が使われる。GETは「取得」用で、POSTは「送信」用。データをボディに含めて送れるため</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700"><strong>HTTPヘッダー</strong>は封筒の表書き（付加情報）、<strong>HTTPボディ</strong>は手紙の本文（データ本体）。Content-Typeやシグネチャがヘッダーに含まれる</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700"><strong>ステータスコード</strong>で処理結果を数字で返す。Webhookを受け取ったら必ず<strong>200</strong>などの2xxを返すことが重要</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">5</span>
+                                <p class="text-slate-700">Webhookのエンドポイントは必ず<strong>HTTPS</strong>を使う。暗号化によりデータの盗聴を防げる</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. WebhookではなぜGETではなくPOSTメソッドが使われるのですか？
+                                        (A) GETより速いから
+                                        (B) データをボディに含めて送れるから
+                                        (C) GETはWebhookに対応していないから</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。POSTメソッドはリクエストのボディにデータを含めて送ることができます。
+                                            GETはURLにデータをつけるため大量のデータや秘密情報（署名など）を安全に送ることができません。
+                                            Webhookはイベントの詳細データをボディのJSONとして送るため、POSTが適しています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Webhookを受け取ったサーバーが「500 Internal Server Error」を返すと、どうなりますか？
+                                        (A) 何も起きない
+                                        (B) 送信元サービスが「届かなかった」と判断して再送する可能性がある
+                                        (C) 送信元サービスがWebhookを停止する</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。5xxのステータスコードを受け取った送信元サービスは「受信側でエラーが起きた」と判断し、
+                                            しばらく後に同じWebhookを再送（リトライ）します。
+                                            これにより同じデータが複数回届くことがあります。Webhookを受け取ったら必ず200を返しましょう。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. HTTPヘッダーとHTTPボディの違いを正しく説明しているのはどれですか？
+                                        (A) ヘッダーはデータ本体、ボディは付加情報
+                                        (B) ヘッダーは付加情報（メタデータ）、ボディはデータ本体
+                                        (C) ヘッダーとボディは同じもので、呼び方が違うだけ</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。HTTPヘッダーは「Content-Type」「User-Agent」「署名」などの付加情報で、
+                                            手紙の封筒の表書きに相当します。HTTPボディはJSON形式のイベントデータなど「データ本体」で、
+                                            手紙の本文に相当します。両者は別々の情報です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第5章では、Webhookのボディに含まれる<strong>JSONデータ</strong>の読み方を学びます。
+                                「キーと値」「配列」「ネスト（入れ子）」といったJSONの構造を理解し、
+                                実際のWebhookペイロードを自分で読み解けるようになりましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              border border-slate-200 hover:bg-slate-50 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium text-slate-700">Webhookの仕組み</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">JSONデータの読み方</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS DVA-C02入門 第4章 - Amazon DynamoDB基礎</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS DVA-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約18時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS DVA-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Amazon DynamoDB基礎 - NoSQLデータベースの設計</h1>
+                    <p class="text-slate-600">DynamoDBの基本概念とデータモデリングの基礎を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DynamoDBのアーキテクチャとパーティショニング</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プライマリキーの設計（パーティションキー、ソートキー）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>読み取り・書き込み容量ユニット（RCU/WCU）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>オンデマンドキャパシティモードとプロビジョンドモード</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>整合性モデル（強い整合性、結果整合性）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>アイテムサイズとスループットの最適化</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>グローバルセカンダリインデックス（GSI）とローカルセカンダリインデックス（LSI）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション4.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 DynamoDBとは - NoSQLデータベースの特徴
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon DynamoDBは、AWSが提供する**フルマネージドNoSQLデータベース**です。RDB（リレーショナルデータベース）とは異なり、スキーマレスで水平スケーリングが容易な設計となっています。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    DynamoDBは、**一貫したミリ秒台のレスポンスタイム**を実現するため、高トラフィックのWebアプリケーションやモバイルバックエンドに最適です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">DynamoDBの主な特徴</h3>
+
+                    <div class="mermaid mb-6">
+flowchart TD
+    A["DynamoDB"] --> B["フルマネージド"]
+    A --> C["サーバーレス"]
+    A --> D["自動スケーリング"]
+    A --> E["高可用性"]
+
+    B --> B1["インフラ管理不要"]
+    C --> C1["容量計画なし"]
+    D --> D1["負荷に応じた自動調整"]
+    E --> E1["複数AZへの自動レプリケーション"]
+                    </div>
+
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>スキーマレス</strong>: テーブル作成時にプライマリキー以外のカラム定義は不要</li>
+                        <li><strong>水平スケーリング</strong>: パーティション分散により自動的にスケールアウト</li>
+                        <li><strong>低レイテンシ</strong>: 一貫したミリ秒台のレスポンス時間</li>
+                        <li><strong>高可用性</strong>: 3つのAZにデータを自動レプリケーション</li>
+                        <li><strong>柔軟な課金モデル</strong>: オンデマンドまたはプロビジョニング済みキャパシティ</li>
+                    </ul>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">RDBとの違い</h3>
+
+                    <div class="overflow-x-auto mb-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">項目</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">RDB（RDS等）</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">DynamoDB</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 bg-white">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">データモデル</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">テーブル・行・列（固定スキーマ）</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">テーブル・アイテム・属性（スキーマレス）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">スケーリング</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">垂直スケーリング（インスタンス拡張）</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">水平スケーリング（パーティション追加）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">クエリ</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">SQL、JOIN、集計関数</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">キーバリューアクセス、Query、Scan</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">トランザクション</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">ACID準拠</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">限定的なACIDサポート</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">課金モデル</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">インスタンス稼働時間ベース</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">リクエスト数とストレージ容量ベース</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション4.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 プライマリキーの設計 - データモデリングの基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DynamoDBでは、**プライマリキー**が最も重要な設計要素です。プライマリキーには2つのタイプがあります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">パーティションキー（Partition Key）のみ</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最もシンプルな構成。パーティションキーの値が一意であれば、そのまま主キーとして機能します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">パーティションキーのみの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "TableName": "Users",
+  "KeySchema": [
+    { "AttributeName": "userId", "KeyType": "HASH" }
+  ],
+  "AttributeDefinitions": [
+    { "AttributeName": "userId", "AttributeType": "S" }
+  ]
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">パーティションキー + ソートキー（Composite Key）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        パーティションキーとソートキーを組み合わせた複合主キー。同じパーティションキーを持つ複数のアイテムをソートキーで区別できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">複合キーの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "TableName": "Orders",
+  "KeySchema": [
+    { "AttributeName": "customerId", "KeyType": "HASH" },
+    { "AttributeName": "orderDate", "KeyType": "RANGE" }
+  ],
+  "AttributeDefinitions": [
+    { "AttributeName": "customerId", "AttributeType": "S" },
+    { "AttributeName": "orderDate", "AttributeType": "S" }
+  ]
+}</code></pre>
+                    </div>
+
+                    <div class="mermaid mb-6">
+flowchart LR
+    subgraph PK["パーティションキーのみ"]
+        A1["userId: U001<br/>name: Alice"]
+        A2["userId: U002<br/>name: Bob"]
+    end
+
+    subgraph CPK["複合キー（Partition + Sort）"]
+        B1["customerId: C001<br/>orderDate: 2025-01-15"]
+        B2["customerId: C001<br/>orderDate: 2025-02-01"]
+        B3["customerId: C002<br/>orderDate: 2025-01-20"]
+    end
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">設計のヒント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    パーティションキーは**均等に分散する値**を選びましょう。例えば、日付をパーティションキーにすると特定日にアクセスが集中し、ホットパーティション問題が発生します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 キャパシティユニット - RCUとWCU
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DynamoDBのスループットは、**読み取り容量ユニット（RCU）**と**書き込み容量ユニット（WCU）**で測定されます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">読み取り容量ユニット（RCU）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>1 RCU</strong> = 1秒あたり最大4KBのアイテムを1回読み取り（強い整合性）</li>
+                        <li><strong>結果整合性読み取り</strong>の場合、1 RCUで2回読み取り可能</li>
+                        <li>アイテムサイズが4KBを超える場合、追加のRCUが必要</li>
+                    </ul>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">RCU計算例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 例: 3KBのアイテムを100回/秒読み取り（強い整合性）
+# 必要なRCU = 100 × (3KB / 4KB) = 100 × 1 = 100 RCU
+
+# 例: 6KBのアイテムを50回/秒読み取り（結果整合性）
+# 必要なRCU = 50 × (6KB / 4KB) / 2 = 50 × 2 / 2 = 50 RCU</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">書き込み容量ユニット（WCU）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>1 WCU</strong> = 1秒あたり最大1KBのアイテムを1回書き込み</li>
+                        <li>アイテムサイズが1KBを超える場合、追加のWCUが必要</li>
+                    </ul>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">WCU計算例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 例: 2KBのアイテムを100回/秒書き込み
+# 必要なWCU = 100 × (2KB / 1KB) = 100 × 2 = 200 WCU
+
+# 例: 500バイトのアイテムを50回/秒書き込み
+# 必要なWCU = 50 × (0.5KB / 1KB) = 50 × 1 = 50 WCU</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 キャパシティモード - オンデマンド vs プロビジョニング済み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DynamoDBには2つのキャパシティモードがあります。ワークロードの予測可能性に応じて選択します。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart LR
+    A["キャパシティモード"] --> B["オンデマンド"]
+    A --> C["プロビジョニング済み"]
+
+    B --> B1["トラフィック予測不要"]
+    B --> B2["リクエスト単位の課金"]
+
+    C --> C1["RCU/WCU事前設定"]
+    C --> C2["予測可能なコスト"]
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">オンデマンドモード</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>適用ケース</strong>: トラフィックが予測不可能、新規アプリケーション</li>
+                        <li><strong>課金</strong>: リクエスト数に応じた従量課金</li>
+                        <li><strong>メリット</strong>: 事前のキャパシティ計画不要、自動スケーリング</li>
+                        <li><strong>デメリット</strong>: プロビジョニング済みより割高</li>
+                    </ul>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">プロビジョニング済みモード</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>適用ケース</strong>: 予測可能なトラフィック、コスト最適化が必要</li>
+                        <li><strong>課金</strong>: 設定したRCU/WCUに基づく固定費用</li>
+                        <li><strong>メリット</strong>: コスト予測可能、Auto Scalingで調整可能</li>
+                        <li><strong>デメリット</strong>: キャパシティ計画が必要</li>
+                    </ul>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    プロビジョニング済みモードで、設定したキャパシティを超えるリクエストが来ると<strong>スロットリングエラー</strong>が発生します。Auto Scalingの設定を推奨します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 整合性モデル - 強い整合性と結果整合性
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DynamoDBは分散データベースであるため、読み取り時に**整合性レベル**を選択できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">結果整合性読み取り（Eventual Consistency）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>デフォルト設定</strong>: 通常の読み取りは結果整合性</li>
+                        <li><strong>特徴</strong>: レプリケーションが完了していない可能性があるため、最新データでない場合がある</li>
+                        <li><strong>コスト</strong>: RCU消費が少ない（強い整合性の半分）</li>
+                        <li><strong>用途</strong>: リアルタイム性が不要なデータ取得</li>
+                    </ul>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">強い整合性読み取り（Strong Consistency）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>明示的指定</strong>: `ConsistentRead=true`パラメータで指定</li>
+                        <li><strong>特徴</strong>: 必ず最新のデータを返す</li>
+                        <li><strong>コスト</strong>: RCU消費が多い（結果整合性の2倍）</li>
+                        <li><strong>用途</strong>: 金融データなど、最新状態が必須のケース</li>
+                    </ul>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">強い整合性読み取りの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import boto3
+
+# DynamoDBクライアント作成
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('Users')
+
+# 強い整合性読み取り
+response = table.get_item(
+    Key={'userId': 'U001'},
+    ConsistentRead=True  # 強い整合性を指定
+)
+
+print(response['Item'])</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 セカンダリインデックス - GSIとLSI
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        プライマリキー以外の属性で検索したい場合、**セカンダリインデックス**を作成します。2つのタイプがあります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">グローバルセカンダリインデックス（GSI）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>特徴</strong>: 任意の属性をパーティションキーとして使用可能</li>
+                        <li><strong>作成タイミング</strong>: テーブル作成後でも追加可能</li>
+                        <li><strong>キャパシティ</strong>: GSI独自のRCU/WCUを設定</li>
+                        <li><strong>整合性</strong>: 結果整合性のみ</li>
+                    </ul>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">GSI作成例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "EmailIndex",
+      "KeySchema": [
+        { "AttributeName": "email", "KeyType": "HASH" }
+      ],
+      "Projection": {
+        "ProjectionType": "ALL"
+      }
+    }
+  ]
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">ローカルセカンダリインデックス（LSI）</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><strong>特徴</strong>: パーティションキーは同じ、ソートキーのみ別属性を使用</li>
+                        <li><strong>作成タイミング</strong>: テーブル作成時のみ</li>
+                        <li><strong>キャパシティ</strong>: テーブルのRCU/WCUを共有</li>
+                        <li><strong>整合性</strong>: 強い整合性と結果整合性の両方をサポート</li>
+                    </ul>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    GSIは柔軟性が高く後から追加可能なため、多くの場合GSIが推奨されます。LSIは強い整合性が必要で、テーブル設計時に要件が明確な場合に使用します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 3KBのアイテムを毎秒100回、強い整合性で読み取る場合、必要なRCUはいくつですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>100 RCU</strong><br>
+                                            計算式: 100回/秒 × (3KB / 4KB) = 100 × 1 = 100 RCU<br>
+                                            3KBは4KB以下なので、1RCUあたり1回読み取り可能です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. GSIとLSIの最も大きな違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            最も大きな違いは<strong>作成タイミング</strong>と<strong>パーティションキー</strong>です。<br>
+                                            - GSI: テーブル作成後でも追加可能、任意の属性をパーティションキーに使用<br>
+                                            - LSI: テーブル作成時のみ、パーティションキーはテーブルと同じ
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. どのようなケースでオンデマンドモードを選択すべきですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            以下のケースでオンデマンドモードが適しています：<br>
+                                            - トラフィックが予測不可能なアプリケーション<br>
+                                            - 新規サービスでアクセスパターンが未知<br>
+                                            - スパイク的なアクセスが発生する<br>
+                                            - キャパシティ計画の工数を削減したい
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-dva-c02-intro-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第3章: Lambda関数の開発とデプロイ</span>
+                        </div>
+                    </a>
+                    <a href="aws-dva-c02-intro-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: DynamoDB高度な操作</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+
+    <script>
+        function copyCode(btn) {
+            const code = btn.closest('.code-block-wrapper').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = btn.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

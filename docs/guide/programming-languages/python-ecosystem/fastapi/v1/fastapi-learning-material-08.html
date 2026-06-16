@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI学習教材 第8章 - 非同期処理とパフォーマンス最適化</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #2e7d32; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #2e7d32; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #2e7d32; padding-bottom: 0.5rem; }
+        .section-title { color: #4caf50; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #2e7d32; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #2e7d32 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid"><a class="navbar-brand"><strong>FastAPI学習教材</strong></a></div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-01.html">第1章: FastAPI入門と環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-02.html">第2章: ルーティングとリクエスト処理</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-03.html">第3章: Pydanticモデルとデータ検証</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-04.html">第4章: レスポンス処理と例外ハンドリング</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-05.html">第5章: 依存性注入とミドルウェア</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-06.html">第6章: データベース連携とORM</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-07.html">第7章: 認証とセキュリティ</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="fastapi-learning-material-08.html">第8章: 非同期処理とパフォーマンス最適化</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-09.html">第9章: テストとドキュメント</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-10.html">第10章: デプロイメントと本番環境</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第8章: 非同期処理とパフォーマンス最適化</h1>
+                </div>
+
+                <div id="chapter8">
+                    <h2 class="chapter-title">高性能API設計：async/awaitとスケーラビリティ</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>async/awaitを使用した非同期エンドポイント実装</li>
+                            <li>バックグラウンドタスクと並行処理</li>
+                            <li>WebSocket通信とリアルタイム機能</li>
+                            <li>キャッシング戦略とパフォーマンス改善</li>
+                            <li>監視とメトリクス収集による最適化</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">8.1 非同期プログラミングの基礎</h3>
+                    <p>FastAPIの真の力は非同期処理にあります。async/awaitを活用することで、I/O待機時間を有効活用し、大幅なパフォーマンス向上が可能になります。</p>
+
+                    <div class="mermaid">
+                        graph TB
+                            subgraph "同期処理"
+                                A1["リクエスト1"] --> B1["DB処理"]
+                                B1 --> C1["レスポンス"]
+                                C1 --> A2["リクエスト2"]
+                                A2 --> B2["DB処理"]
+                                B2 --> C2["レスポンス"]
+                            end
+                            
+                            subgraph "非同期処理"
+                                A3["リクエスト1"] --> B3["DB処理（非同期）"]
+                                A4["リクエスト2"] --> B4["DB処理（非同期）"]
+                                A5["リクエスト3"] --> B5["DB処理（非同期）"]
+                                B3 --> C3["レスポンス"]
+                                B4 --> C4["レスポンス"]
+                                B5 --> C5["レスポンス"]
+                            end
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 8-1: 非同期エンドポイントの実装</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">import asyncio
+import aiohttp
+import asyncpg
+from fastapi import FastAPI, BackgroundTasks, Depends
+from typing import List, Dict, Any
+import time
+from datetime import datetime
+
+app = FastAPI()
+
+# 非同期データベース接続（PostgreSQL例）
+class AsyncDatabase:
+    def __init__(self):
+        self.pool = None
+    
+    async def connect(self):
+        """データベース接続プール作成"""
+        self.pool = await asyncpg.create_pool(
+            "postgresql://user:password@localhost:5432/mydb",
+            min_size=1,
+            max_size=10,
+        )
+    
+    async def disconnect(self):
+        """接続プール閉鎖"""
+        if self.pool:
+            await self.pool.close()
+    
+    async def fetch_users(self) -> List[Dict]:
+        """非同期ユーザー取得"""
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch("SELECT * FROM users LIMIT 100")
+            return [dict(row) for row in rows]
+    
+    async def create_user(self, name: str, email: str) -> Dict:
+        """非同期ユーザー作成"""
+        async with self.pool.acquire() as connection:
+            row = await connection.fetchrow(
+                "INSERT INTO users (name, email, created_at) VALUES ($1, $2, $3) RETURNING *",
+                name, email, datetime.utcnow()
+            )
+            return dict(row)
+
+# 非同期HTTP クライアント
+class ExternalAPIClient:
+    def __init__(self):
+        self.session = None
+    
+    async def __aenter__(self):
+        """非同期コンテキストマネージャー開始"""
+        self.session = aiohttp.ClientSession()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """非同期コンテキストマネージャー終了"""
+        if self.session:
+            await self.session.close()
+    
+    async def fetch_weather_data(self, city: str) -> Dict:
+        """外部天気APIから データ取得"""
+        url = f"https://api.weather.com/v1/current?city={city}"
+        
+        async with self.session.get(url) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                return {"error": "Weather data not available"}
+    
+    async def fetch_multiple_cities(self, cities: List[str]) -> List[Dict]:
+        """複数都市の天気データを並行取得"""
+        tasks = [self.fetch_weather_data(city) for city in cities]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        return [
+            result if not isinstance(result, Exception) 
+            else {"city": cities[i], "error": str(result)}
+            for i, result in enumerate(results)
+        ]
+
+# グローバル DB インスタンス
+db = AsyncDatabase()
+
+@app.on_event("startup")
+async def startup_event():
+    """アプリケーション開始時処理"""
+    await db.connect()
+    print("Database connection established")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """アプリケーション終了時処理"""
+    await db.disconnect()
+    print("Database connection closed")
+
+# 非同期エンドポイント例
+@app.get("/async/users")
+async def get_users_async():
+    """非同期ユーザー一覧取得"""
+    start_time = time.time()
+    users = await db.fetch_users()
+    process_time = time.time() - start_time
+    
+    return {
+        "users": users,
+        "count": len(users),
+        "process_time": f"{process_time:.4f}s"
+    }
+
+@app.get("/async/weather/{city}")
+async def get_weather_async(city: str):
+    """非同期天気情報取得"""
+    async with ExternalAPIClient() as client:
+        weather_data = await client.fetch_weather_data(city)
+        return {"city": city, "weather": weather_data}
+
+@app.get("/async/weather-multiple")
+async def get_multiple_weather_async(cities: str):
+    """複数都市の天気情報を並行取得"""
+    city_list = cities.split(",")
+    start_time = time.time()
+    
+    async with ExternalAPIClient() as client:
+        weather_data = await client.fetch_multiple_cities(city_list)
+    
+    process_time = time.time() - start_time
+    
+    return {
+        "weather_data": weather_data,
+        "cities_count": len(city_list),
+        "process_time": f"{process_time:.4f}s",
+        "average_time_per_city": f"{process_time/len(city_list):.4f}s"
+    }
+
+# 同期版との比較用エンドポイント
+@app.get("/sync/weather-multiple")
+def get_multiple_weather_sync(cities: str):
+    """同期版：複数都市天気情報取得（比較用）"""
+    import requests
+    
+    city_list = cities.split(",")
+    start_time = time.time()
+    
+    weather_data = []
+    for city in city_list:
+        try:
+            # 同期的に1つずつリクエスト
+            response = requests.get(f"https://api.weather.com/v1/current?city={city}")
+            if response.status_code == 200:
+                weather_data.append(response.json())
+            else:
+                weather_data.append({"city": city, "error": "Data not available"})
+        except Exception as e:
+            weather_data.append({"city": city, "error": str(e)})
+    
+    process_time = time.time() - start_time
+    
+    return {
+        "weather_data": weather_data,
+        "cities_count": len(city_list),
+        "process_time": f"{process_time:.4f}s",
+        "note": "同期処理版（比較用）"
+    }</code></pre>
+                    </div>
+
+                    <h3 class="section-title">8.2 バックグラウンドタスクの実装</h3>
+                    <p>時間のかかる処理をバックグラウンドで実行することで、ユーザーの待機時間を短縮できます。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 8-2: バックグラウンドタスクとキューシステム</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">from fastapi import BackgroundTasks
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import asyncio
+from typing import List
+import uuid
+import json
+from datetime import datetime
+
+# タスクステータス管理
+task_status = {}
+
+class EmailService:
+    """メール送信サービス"""
+    
+    @staticmethod
+    async def send_welcome_email(email: str, name: str):
+        """ウェルカムメール送信（非同期）"""
+        # 実際のメール送信処理をシミュレート
+        await asyncio.sleep(2)  # 送信時間シミュレート
+        
+        print(f"ウェルカムメールを送信しました: {email} ({name})")
+        return True
+    
+    @staticmethod
+    async def send_bulk_emails(email_list: List[Dict], template: str):
+        """一括メール送信"""
+        results = []
+        
+        for email_data in email_list:
+            try:
+                await asyncio.sleep(0.5)  # 各メール送信時間
+                print(f"メール送信: {email_data['email']}")
+                results.append({
+                    "email": email_data["email"],
+                    "status": "sent",
+                    "sent_at": datetime.utcnow().isoformat()
+                })
+            except Exception as e:
+                results.append({
+                    "email": email_data["email"],
+                    "status": "failed",
+                    "error": str(e)
+                })
+        
+        return results
+
+class ReportGenerator:
+    """レポート生成サービス"""
+    
+    @staticmethod
+    async def generate_user_report(user_id: int) -> str:
+        """ユーザーレポート生成"""
+        await asyncio.sleep(5)  # 生成時間シミュレート
+        
+        report_data = {
+            "user_id": user_id,
+            "report_date": datetime.utcnow().isoformat(),
+            "total_posts": 42,
+            "total_comments": 128,
+            "engagement_rate": 85.5
+        }
+        
+        # ファイル保存シミュレート
+        report_filename = f"user_report_{user_id}_{datetime.now().strftime('%Y%m%d')}.json"
+        
+        print(f"ユーザーレポート生成完了: {report_filename}")
+        
+        return report_filename
+
+# バックグラウンドタスク関数
+async def process_user_registration(user_data: Dict, task_id: str):
+    """ユーザー登録後処理"""
+    try:
+        task_status[task_id] = {"status": "processing", "step": "メール送信"}
+        
+        # ウェルカムメール送信
+        await EmailService.send_welcome_email(
+            user_data["email"], 
+            user_data["name"]
+        )
+        
+        task_status[task_id] = {"status": "processing", "step": "プロファイル設定"}
+        
+        # 追加処理（プロファイル設定等）
+        await asyncio.sleep(1)
+        
+        task_status[task_id] = {
+            "status": "completed", 
+            "completed_at": datetime.utcnow().isoformat(),
+            "message": "ユーザー登録処理が完了しました"
+        }
+        
+    except Exception as e:
+        task_status[task_id] = {
+            "status": "failed",
+            "error": str(e),
+            "failed_at": datetime.utcnow().isoformat()
+        }
+
+async def process_bulk_email_task(email_list: List[Dict], template: str, task_id: str):
+    """一括メール送信タスク"""
+    try:
+        task_status[task_id] = {
+            "status": "processing", 
+            "total_emails": len(email_list),
+            "sent_count": 0
+        }
+        
+        results = await EmailService.send_bulk_emails(email_list, template)
+        
+        sent_count = sum(1 for r in results if r["status"] == "sent")
+        failed_count = len(results) - sent_count
+        
+        task_status[task_id] = {
+            "status": "completed",
+            "total_emails": len(email_list),
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "results": results,
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        task_status[task_id] = {
+            "status": "failed",
+            "error": str(e),
+            "failed_at": datetime.utcnow().isoformat()
+        }
+
+# バックグラウンドタスク API
+@app.post("/users/register-async")
+async def register_user_async(
+    user_data: Dict,
+    background_tasks: BackgroundTasks
+):
+    """非同期ユーザー登録"""
+    
+    # メインの登録処理（高速）
+    user_id = len(fake_users_db) + 1
+    user_record = {
+        "id": user_id,
+        "name": user_data["name"],
+        "email": user_data["email"],
+        "created_at": datetime.utcnow().isoformat()
+    }
+    fake_users_db.append(user_record)
+    
+    # バックグラウンド処理タスク追加
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(process_user_registration, user_data, task_id)
+    
+    return {
+        "message": "ユーザー登録を受け付けました",
+        "user": user_record,
+        "task_id": task_id,
+        "status_check_url": f"/tasks/{task_id}/status"
+    }
+
+@app.post("/emails/bulk-send")
+async def send_bulk_emails_async(
+    email_data: Dict,
+    background_tasks: BackgroundTasks
+):
+    """一括メール送信（非同期）"""
+    
+    task_id = str(uuid.uuid4())
+    
+    # バックグラウンドタスクとして実行
+    background_tasks.add_task(
+        process_bulk_email_task,
+        email_data["recipients"],
+        email_data["template"],
+        task_id
+    )
+    
+    return {
+        "message": "一括メール送信を開始しました",
+        "task_id": task_id,
+        "estimated_time": f"{len(email_data['recipients']) * 0.5}秒",
+        "status_check_url": f"/tasks/{task_id}/status"
+    }
+
+@app.get("/tasks/{task_id}/status")
+async def get_task_status(task_id: str):
+    """タスクステータス確認"""
+    if task_id not in task_status:
+        return {"error": "タスクが見つかりません"}
+    
+    return {
+        "task_id": task_id,
+        "status": task_status[task_id]
+    }
+
+@app.post("/reports/generate")
+async def generate_report_async(
+    user_id: int,
+    background_tasks: BackgroundTasks
+):
+    """レポート生成（非同期）"""
+    
+    task_id = str(uuid.uuid4())
+    
+    async def report_task(user_id: int, task_id: str):
+        try:
+            task_status[task_id] = {"status": "processing", "step": "データ収集"}
+            
+            report_filename = await ReportGenerator.generate_user_report(user_id)
+            
+            task_status[task_id] = {
+                "status": "completed",
+                "report_file": report_filename,
+                "download_url": f"/reports/download/{report_filename}",
+                "completed_at": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            task_status[task_id] = {
+                "status": "failed",
+                "error": str(e),
+                "failed_at": datetime.utcnow().isoformat()
+            }
+    
+    background_tasks.add_task(report_task, user_id, task_id)
+    
+    return {
+        "message": "レポート生成を開始しました",
+        "task_id": task_id,
+        "estimated_time": "約5分",
+        "status_check_url": f"/tasks/{task_id}/status"
+    }</code></pre>
+                    </div>
+
+                    <h3 class="section-title">8.3 WebSocket通信の実装</h3>
+                    <p>リアルタイム通信が必要なアプリケーションでは、WebSocketを使用します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 8-3: WebSocketチャットシステム</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">from fastapi import WebSocket, WebSocketDisconnect
+from typing import List, Dict
+import json
+from datetime import datetime
+
+class ConnectionManager:
+    """WebSocket接続管理"""
+    
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.user_connections: Dict[str, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        """新規接続"""
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        self.user_connections[user_id] = websocket
+        
+        # 接続通知
+        await self.broadcast_message({
+            "type": "user_joined",
+            "user_id": user_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": f"{user_id} がチャットに参加しました"
+        })
+    
+    def disconnect(self, websocket: WebSocket, user_id: str):
+        """接続切断"""
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        
+        if user_id in self.user_connections:
+            del self.user_connections[user_id]
+    
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        """個人メッセージ送信"""
+        await websocket.send_text(message)
+    
+    async def send_personal_json(self, data: Dict, websocket: WebSocket):
+        """個人JSON送信"""
+        await websocket.send_json(data)
+    
+    async def broadcast_message(self, data: Dict):
+        """全員にメッセージ配信"""
+        message = json.dumps(data, ensure_ascii=False)
+        
+        disconnected_connections = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # 切断されたコネクションを記録
+                disconnected_connections.append(connection)
+        
+        # 切断されたコネクションを削除
+        for conn in disconnected_connections:
+            self.active_connections.remove(conn)
+    
+    async def send_to_user(self, user_id: str, data: Dict):
+        """特定ユーザーにメッセージ送信"""
+        if user_id in self.user_connections:
+            websocket = self.user_connections[user_id]
+            try:
+                await websocket.send_json(data)
+                return True
+            except:
+                # ユーザーが切断されている場合
+                del self.user_connections[user_id]
+                return False
+        return False
+    
+    def get_connected_users(self) -> List[str]:
+        """接続中ユーザー一覧"""
+        return list(self.user_connections.keys())
+
+# グローバル接続マネージャー
+manager = ConnectionManager()
+
+# チャット履歴（実際のシステムではDBに保存）
+chat_history = []
+
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_chat(websocket: WebSocket, user_id: str):
+    """チャット用WebSocketエンドポイント"""
+    
+    await manager.connect(websocket, user_id)
+    
+    # 過去のチャット履歴を送信
+    if chat_history:
+        await manager.send_personal_json({
+            "type": "chat_history",
+            "messages": chat_history[-50:]  # 最新50件
+        }, websocket)
+    
+    # 接続中ユーザー一覧を送信
+    await manager.send_personal_json({
+        "type": "connected_users",
+        "users": manager.get_connected_users()
+    }, websocket)
+    
+    try:
+        while True:
+            # クライアントからのメッセージ受信
+            message_data = await websocket.receive_text()
+            
+            try:
+                data = json.loads(message_data)
+                message_type = data.get("type", "chat")
+                
+                if message_type == "chat":
+                    # チャットメッセージ処理
+                    chat_message = {
+                        "type": "chat",
+                        "user_id": user_id,
+                        "message": data["message"],
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    
+                    # メッセージ履歴に追加
+                    chat_history.append(chat_message)
+                    
+                    # 全員に配信
+                    await manager.broadcast_message(chat_message)
+                
+                elif message_type == "private_message":
+                    # プライベートメッセージ処理
+                    target_user = data["target_user"]
+                    private_message = {
+                        "type": "private_message",
+                        "from_user": user_id,
+                        "message": data["message"],
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    
+                    # 送信先ユーザーに配信
+                    success = await manager.send_to_user(target_user, private_message)
+                    
+                    # 送信者に結果通知
+                    await manager.send_personal_json({
+                        "type": "private_message_status",
+                        "target_user": target_user,
+                        "success": success
+                    }, websocket)
+                
+                elif message_type == "typing":
+                    # 入力中通知
+                    typing_notification = {
+                        "type": "typing",
+                        "user_id": user_id,
+                        "is_typing": data["is_typing"]
+                    }
+                    
+                    # 他の全ユーザーに通知
+                    for conn in manager.active_connections:
+                        if conn != websocket:
+                            await manager.send_personal_json(typing_notification, conn)
+            
+            except json.JSONDecodeError:
+                # JSON形式でない場合は通常のチャットとして処理
+                chat_message = {
+                    "type": "chat",
+                    "user_id": user_id,
+                    "message": message_data,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                chat_history.append(chat_message)
+                await manager.broadcast_message(chat_message)
+    
+    except WebSocketDisconnect:
+        # 接続切断時の処理
+        manager.disconnect(websocket, user_id)
+        
+        # 切断通知
+        await manager.broadcast_message({
+            "type": "user_left",
+            "user_id": user_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": f"{user_id} がチャットから退出しました"
+        })
+
+# チャット管理API
+@app.get("/api/chat/history")
+async def get_chat_history(limit: int = 50):
+    """チャット履歴取得"""
+    return {"messages": chat_history[-limit:]}
+
+@app.get("/api/chat/connected-users")
+async def get_connected_users():
+    """接続中ユーザー一覧"""
+    return {"connected_users": manager.get_connected_users()}
+
+@app.post("/api/chat/broadcast")
+async def broadcast_admin_message(message_data: Dict):
+    """管理者メッセージ配信"""
+    admin_message = {
+        "type": "admin_message",
+        "message": message_data["message"],
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    await manager.broadcast_message(admin_message)
+    
+    return {"message": "管理者メッセージを配信しました"}</code></pre>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>
+                                <strong>非同期関数を定義するキーワードは？</strong>
+                                <details><summary>解答</summary><p>async (async def function_name():)</p></details>
+                            </li>
+                            <li>
+                                <strong>非同期処理を待機するキーワードは？</strong>
+                                <details><summary>解答</summary><p>await</p></details>
+                            </li>
+                            <li>
+                                <strong>FastAPIでバックグラウンドタスクを追加するメソッドは？</strong>
+                                <details><summary>解答</summary><p>background_tasks.add_task()</p></details>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 class="section-title">8.4 まとめ</h3>
+                    <div class="highlight">
+                        <h6>この章で習得したスキル</h6>
+                        <ul>
+                            <li>async/awaitによる非同期エンドポイント実装</li>
+                            <li>バックグラウンドタスクによる処理分散</li>
+                            <li>WebSocketを使ったリアルタイム通信</li>
+                            <li>並行処理によるパフォーマンス改善</li>
+                            <li>タスクステータス管理システム</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="fastapi-learning-material-07.html" class="btn btn-secondary">← 前の章: 認証とセキュリティ</a>
+                        <a href="fastapi-learning-material-09.html" class="btn btn-primary">次の章: テストとドキュメント →</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <footer class="bg-dark text-white mt-5">
+        <div class="container-fluid py-3">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="mb-0">© 2025 F-Circle. All rights reserved.<br>
+本資料はAIツールを活用し、人間による編集・監修のもと作成されています。無断転載・再配布を禁じます。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>

@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>LangChain学習教材 第14章 - Memory - 会話履歴の管理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AI/ML - Purple
+                        primary: {
+                            50: '#faf5ff',
+                            100: '#f3e8ff',
+                            200: '#e9d5ff',
+                            300: '#d8b4fe',
+                            400: '#c084fc',
+                            500: '#a855f7',
+                            600: '#9333ea',
+                            700: '#7e22ce',
+                            800: '#6b21a8',
+                            900: '#581c87',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-purple-400/30 to-fuchsia-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-robot text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">LangChain学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-brain text-[9px]"></i>
+                                <span>生成AI/LLM</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約23.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/data-ai-category/data-ai/" class="hover:text-primary-600 transition-colors">データ・AI</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第14章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第14章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Memory - 会話履歴の管理</h1>
+                    <p class="text-slate-600">ConversationBufferMemory、ConversationSummaryMemoryなど、LLMとの会話履歴を管理する機能を学びます。文脈を保持した対話システムを構築します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Memoryの基本概念と会話履歴管理の重要性を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ConversationBufferMemoryで全履歴を保持する方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ConversationSummaryMemoryで要約による効率化を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Memory付きチェーンで文脈保持型チャットボットを構築する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: Memoryとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.1 Memoryとは - 会話の文脈を保つ技術
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        LLMは基本的にステートレス（状態を持たない）であり、各リクエストは独立して処理されます。<strong>Memory（メモリ）</strong>は、過去の会話履歴を管理し、LLMに文脈を提供する機能です。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    User[ユーザー]
+    Memory[(Memory<br/>会話履歴)]
+    LLM[LLM]
+
+    User -->|新しい質問| Memory
+    Memory -->|履歴＋質問| LLM
+    LLM -->|回答| User
+    LLM -->|回答を保存| Memory
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">図14-1: Memoryの仕組み</p>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">Memoryが必要な理由</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    「それについて詳しく教えて」「前に言った内容を要約して」といった、過去の会話を参照する質問に対応するには、会話履歴を保持する仕組みが必須です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">LangChainのMemoryタイプ</h3>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-database"></i>
+                                ConversationBufferMemory
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                全ての会話履歴をそのまま保存。シンプルだが、長い会話ではトークン数が増大
+                            </p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-file-alt"></i>
+                                ConversationSummaryMemory
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                会話履歴を要約して保存。トークン節約に有効だが、詳細情報が失われる可能性
+                            </p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-window-restore"></i>
+                                ConversationBufferWindowMemory
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                最新のN件のメッセージのみ保持。長期会話で一定サイズを維持
+                            </p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-chart-line"></i>
+                                ConversationSummaryBufferMemory
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                古い履歴は要約、最新履歴は完全保持。柔軟なトークン管理
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: ConversationBufferMemory -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.2 ConversationBufferMemory - 全履歴の保存
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        最もシンプルなMemoryで、全ての会話をそのまま保存します。短い会話や、詳細な文脈が必要な場合に適しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">基本的な使い方</h3>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># ConversationBufferMemoryの基本
+from langchain.memory import ConversationBufferMemory
+
+# Memoryの初期化
+memory = ConversationBufferMemory()
+
+# 会話を記録
+memory.save_context(
+    {"input": "こんにちは！私の名前は太郎です"},
+    {"output": "こんにちは太郎さん！何かお手伝いできることはありますか？"}
+)
+
+memory.save_context(
+    {"input": "Pythonについて教えてください"},
+    {"output": "Pythonは初心者にも学びやすいプログラミング言語です..."}
+)
+
+# 履歴を確認
+print(memory.load_memory_variables({})["history"])
+# Human: こんにちは！私の名前は太郎です
+# AI: こんにちは太郎さん！何かお手伝いできることはありますか？
+# Human: Pythonについて教えてください
+# AI: Pythonは初心者にも学びやすいプログラミング言語です...
+</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Chainとの統合</h3>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># Memory付きチェーンの構築
+from langchain.chains import ConversationChain
+from langchain_openai import ChatOpenAI
+
+# LLMの初期化
+llm = ChatOpenAI(temperature=0.7)
+
+# Memory付きConversationChain
+conversation = ConversationChain(
+    llm=llm,
+    memory=ConversationBufferMemory(),
+    verbose=True  # デバッグ情報を表示
+)
+
+# 会話1
+response1 = conversation.predict(input="私は東京に住んでいます")
+print(response1)
+
+# 会話2（前の会話を覚えている）
+response2 = conversation.predict(input="私が住んでいる場所の特徴を教えて")
+print(response2)  # 「東京」を参照した回答が返る
+</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    <code>verbose=True</code>を設定すると、LLMに送信されるプロンプト全体が表示され、Memoryがどのように機能しているかを確認できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ConversationSummaryMemory -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.3 ConversationSummaryMemory - 要約による効率化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        長い会話ではトークン数が増大し、コストや処理時間の問題が発生します。<strong>ConversationSummaryMemory</strong>は、会話履歴をLLMで要約することでトークン数を削減します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    Conv1[会話履歴<br/>100ターン]
+    Summary[LLMで要約]
+    Compact[要約版<br/>10ターン相当]
+
+    Conv1 --> Summary
+    Summary --> Compact
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">図14-2: 要約による履歴圧縮</p>
+                    </div>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># ConversationSummaryMemoryの使用
+from langchain.memory import ConversationSummaryMemory
+from langchain_openai import ChatOpenAI
+
+# LLM（要約にも使用）
+llm = ChatOpenAI(temperature=0)
+
+# 要約型Memory
+memory = ConversationSummaryMemory(llm=llm)
+
+# 会話を保存
+memory.save_context(
+    {"input": "私はデータサイエンティストとして5年働いています"},
+    {"output": "素晴らしいご経歴ですね！どのような分野を専門にされていますか？"}
+)
+
+memory.save_context(
+    {"input": "主に機械学習モデルの構築と最適化です"},
+    {"output": "機械学習の専門家なのですね。どのようなフレームワークを使用されていますか？"}
+)
+
+# 要約された履歴を確認
+print(memory.load_memory_variables({})["history"])
+# 「ユーザーは5年経験のデータサイエンティストで、機械学習モデルの構築と最適化を専門としている」
+</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">注意点</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    要約にはLLMの呼び出しが必要なため、追加コストと時間がかかります。また、詳細な情報が失われる可能性があるため、用途に応じて選択してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: その他のMemoryタイプ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.4 その他のMemoryタイプ
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ConversationBufferWindowMemory</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        最新のN件のメッセージのみを保持します。長期会話でトークン数を一定に保ちたい場合に有効です。
+                    </p>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># 最新5件のみ保持
+from langchain.memory import ConversationBufferWindowMemory
+
+memory = ConversationBufferWindowMemory(k=5)  # 最新5ターン
+
+# 10回会話しても、最新5ターンのみ保持される
+for i in range(10):
+    memory.save_context(
+        {"input": f"質問{i+1}"},
+        {"output": f"回答{i+1}"}
+    )
+
+# 最新5ターンのみ表示される
+print(memory.load_memory_variables({})["history"])
+</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ConversationSummaryBufferMemory</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        古い履歴は要約し、最新の履歴は完全な形で保持します。柔軟なトークン管理が可能です。
+                    </p>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># ハイブリッド型Memory
+from langchain.memory import ConversationSummaryBufferMemory
+
+memory = ConversationSummaryBufferMemory(
+    llm=llm,
+    max_token_limit=200  # この閾値を超えたら要約
+)
+
+# 会話が増えると、古い部分は自動的に要約される
+# 最新の会話は完全な形で保持
+</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: Memoryの永続化 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.5 Memoryの永続化 - 会話の保存と復元
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        デフォルトではMemoryはメモリ上に保存されるため、プログラム終了で消失します。会話を保存・復元するには、永続化が必要です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Chat Message Historyによる永続化</h3>
+
+                    <div class="code-block-wrapper relative group my-6">
+                        <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                     bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onclick="copyCode(this)">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre><code class="language-python"># ファイルへの保存
+from langchain.memory import FileChatMessageHistory
+
+# ファイルに保存
+history = FileChatMessageHistory("chat_history.json")
+
+# Memoryに統合
+memory = ConversationBufferMemory(
+    chat_memory=history,
+    return_messages=True
+)
+
+# 会話は自動的にファイルに保存される
+# プログラム再起動後も履歴が維持される
+</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">他の永続化オプション</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• <strong>RedisChatMessageHistory</strong>: Redis（高速キャッシュDB）に保存</li>
+                                    <li>• <strong>MongoChatMessageHistory</strong>: MongoDBに保存</li>
+                                    <li>• <strong>PostgresChatMessageHistory</strong>: PostgreSQLに保存</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習: Memory付きチャットボット -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: Memory付きチャットボットの構築</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                ConversationBufferMemoryを使って、文脈を保持した対話型チャットボットを作成しましょう。
+                            </p>
+
+                            <div class="code-block-wrapper relative group">
+                                <button class="code-copy-btn absolute right-3 top-3 px-3 py-1.5 rounded-md text-sm
+                                             bg-slate-700 hover:bg-slate-600 text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onclick="copyCode(this)">
+                                    <i class="fas fa-copy mr-1"></i>コピー
+                                </button>
+                                <pre><code class="language-python"># Memory付きチャットボット
+from langchain.chains import ConversationChain
+from langchain.memory import ConversationBufferMemory
+from langchain_openai import ChatOpenAI
+
+# 初期化
+llm = ChatOpenAI(temperature=0.7)
+memory = ConversationBufferMemory()
+
+conversation = ConversationChain(
+    llm=llm,
+    memory=memory
+)
+
+# チャットループ
+print("チャットボット起動（終了は'quit'）")
+while True:
+    user_input = input("あなた: ")
+    if user_input.lower() == 'quit':
+        break
+
+    response = conversation.predict(input=user_input)
+    print(f"ボット: {response}\n")
+
+# 会話履歴を確認
+print("\n=== 会話履歴 ===")
+print(memory.load_memory_variables({})["history"])
+</code></pre>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4 mt-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">実行例：</p>
+                                <pre class="text-purple-800 text-xs bg-purple-200 rounded p-3 overflow-x-auto">あなた: 私は昨日、京都に旅行に行きました
+ボット: 京都旅行、素敵ですね！どこを訪れましたか？
+
+あなた: 清水寺と金閣寺を見てきました
+ボット: 京都の代表的な観光地ですね。どちらも歴史ある美しい寺院です。
+
+あなた: 旅行先でおすすめのお土産はありますか？
+ボット: 京都でしたら、八つ橋や抹茶スイーツが定番のお土産として人気です。</pre>
+                                <p class="text-purple-800 text-xs mt-2">※ ボットは「京都旅行」という文脈を保持しています</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6: Memoryのベストプラクティス -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.6 Memoryのベストプラクティス
+                    </h2>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-lightbulb"></i>
+                                用途に応じたMemory選択
+                            </h4>
+                            <ul class="text-emerald-900 text-sm space-y-1 ml-4">
+                                <li>• 短い会話: ConversationBufferMemory</li>
+                                <li>• 長い会話: ConversationSummaryMemory</li>
+                                <li>• 最近の文脈重視: BufferWindowMemory</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-coins"></i>
+                                トークン数の監視
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                履歴が増えるとトークン消費が増大。定期的に履歴をクリアするか、要約型Memoryを検討
+                            </p>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-user"></i>
+                                ユーザー別の管理
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                複数ユーザーがいる場合は、ユーザーIDごとにMemoryインスタンスを分ける
+                            </p>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shield-alt"></i>
+                                プライバシーとセキュリティ
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                個人情報を含む会話は暗号化や適切なアクセス制御を実施
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 章のまとめ -->
+                <section class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-book text-primary-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-2">
+                        <li class="flex items-start gap-2 text-slate-700">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>Memoryは、ステートレスなLLMに会話履歴を提供し、文脈保持を可能にする</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-700">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>ConversationBufferMemoryは全履歴を保存、シンプルだが長期会話ではトークン増大</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-700">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>ConversationSummaryMemoryは要約によりトークン節約、詳細情報は失われる</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-700">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>ConversationBufferWindowMemoryは最新N件のみ保持、一定サイズを維持</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-700">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>FileChatMessageHistoryなどで会話を永続化し、プログラム再起動後も復元可能</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. LangChainのMemoryが必要な理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            LLMは基本的にステートレス（状態を持たない）で、各リクエストは独立して処理されます。そのため、「それについて教えて」「前に言ったことを要約して」といった過去の会話を参照する質問に対応するには、会話履歴を保持・管理するMemoryが必要です。Memoryにより、文脈を保った自然な対話が実現できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ConversationBufferMemoryとConversationSummaryMemoryの違いと、それぞれの適用シーンを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>ConversationBufferMemory</strong>は全ての会話をそのまま保存します。シンプルで詳細な文脈を保持できますが、長い会話ではトークン数が増大します。短い会話や詳細な文脈が必要な場合に適しています。<br><br>
+                                            <strong>ConversationSummaryMemory</strong>は会話履歴をLLMで要約して保存します。トークン数を節約できますが、要約時に詳細情報が失われる可能性があり、要約にもLLM呼び出しコストがかかります。長期会話やコスト削減が重要な場合に適しています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Memoryを永続化する方法と、その利点を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            FileChatMessageHistory、RedisChatMessageHistory、MongoChatMessageHistoryなどを使用することで、会話履歴をファイルやデータベースに保存できます。永続化により、プログラム再起動後も会話履歴が維持され、ユーザーが前回の会話を継続できます。また、複数のサーバーで履歴を共有したり、分析用にデータを蓄積したりする用途にも活用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="langchain-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第13章: RAG（検索拡張生成）の実装</span>
+                        </div>
+                    </a>
+                    <a href="langchain-learning-material-15.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第15章: Agents入門 - LLMに意思決定させる</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>pytest入門 第7章 - フィクスチャ応用 - 再利用とパラメータ化</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Python - Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">pytest入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-vial text-[9px]"></i>
+                                <span>プログラミング言語 / テスト</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="./README.md" class="hover:text-primary-600 transition-colors">pytest入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">フィクスチャ応用 - 再利用とパラメータ化</h1>
+                    <p class="text-slate-600">conftest.pyを使ったフィクスチャの共有、フィクスチャの組み合わせ、ファクトリフィクスチャパターン、組み込みフィクスチャ（tmp_path、capsys、monkeypatch等）の活用方法を学びます。テストコードの重複を効率的に削減する技術を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>conftest.pyを使って複数テストファイルでフィクスチャを共有する方法を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>フィクスチャが他のフィクスチャに依存する「フィクスチャの組み合わせ」を実装できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ファクトリフィクスチャパターンで柔軟なテストデータ生成を実現できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>tmp_path、capsys、monkeypath等の組み込みフィクスチャを目的に応じて使い分けられる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 7.1 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 第6章の振り返りと本章の位置づけ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6章では、フィクスチャの基本概念を学びました。<code class="bg-slate-100 px-1 rounded">@pytest.fixture</code>デコレータ、yield文による後処理、スコープの設定など、1つのテストファイル内でフィクスチャを活用する方法を習得しました。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本章では、その知識を発展させ、<strong class="text-slate-800">フィクスチャをより賢く再利用する</strong>テクニックを学びます。特に重要なのが <code class="bg-slate-100 px-1 rounded">conftest.py</code> を使った複数ファイルへの共有です。
+                    </p>
+
+                    <!-- 概念図: フィクスチャの進化 -->
+                    <div class="my-6 p-4 bg-white border border-slate-200 rounded-xl">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            フィクスチャ活用の段階
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A["基礎<br/>（第6章）"] --> B["応用<br/>（本章）"]
+    subgraph A_detail["基礎スキル"]
+        A1["単一ファイル内のフィクスチャ"]
+        A2["yield による後処理"]
+        A3["スコープの設定"]
+    end
+    subgraph B_detail["応用スキル"]
+        B1["conftest.py で複数ファイルに共有"]
+        B2["フィクスチャの組み合わせ"]
+        B3["ファクトリパターン"]
+        B4["組み込みフィクスチャの活用"]
+    end
+    A --> A_detail
+    B --> B_detail
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.2 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 conftest.py - フィクスチャの共有ファイル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        テストプロジェクトが成長すると、複数のテストファイルで同じフィクスチャを使いたいケースが増えてきます。そのときに役立つのが <strong class="text-slate-800">conftest.py</strong> です。
+                    </p>
+
+                    <!-- conftest.pyの説明 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-file-code text-primary-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800 mb-2">conftest.py とは</h3>
+                                <ul class="text-sm text-slate-600 space-y-2">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-primary-500 mt-0.5 flex-shrink-0"></i>
+                                        <span>pytestが自動的に認識する特殊なファイル</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-primary-500 mt-0.5 flex-shrink-0"></i>
+                                        <span>同じディレクトリおよびサブディレクトリのテストファイルからフィクスチャを共有できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-primary-500 mt-0.5 flex-shrink-0"></i>
+                                        <span><code class="bg-slate-100 px-1 rounded">import</code> 不要 - pytestが自動的に読み込む</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-primary-500 mt-0.5 flex-shrink-0"></i>
+                                        <span>ディレクトリ階層に応じて適用範囲が変わる</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ファイル構成 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-5 mb-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            conftest.py のディレクトリ配置と適用範囲
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>myproject/
+├── conftest.py          ← プロジェクト全体に適用
+├── tests/
+│   ├── conftest.py      ← tests/ 以下に適用
+│   ├── test_user.py     ← 両方の conftest.py を参照できる
+│   ├── test_order.py    ← 両方の conftest.py を参照できる
+│   └── admin/
+│       ├── conftest.py  ← admin/ 以下のみ適用
+│       └── test_admin.py</code></pre>
+                        <p class="text-xs text-slate-500 mt-3">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            pytestはテストファイルを探しながら、各ディレクトリのconftest.pyを自動的に読み込みます。階層が上のconftest.pyも引き継がれます。
+                        </p>
+                    </div>
+
+                    <!-- conftest.py の基本的な書き方 -->
+                    <h3 class="text-lg font-medium text-slate-800 mb-3">conftest.py に書くフィクスチャ</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">tests/conftest.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import pytest
+
+# このフィクスチャは tests/ 以下のすべてのテストで使える
+@pytest.fixture
+def sample_user():
+    """テスト用のユーザーデータ"""
+    return {
+        "id": 1,
+        "name": "田中太郎",
+        "email": "tanaka@example.com",
+        "age": 30
+    }
+
+@pytest.fixture
+def sample_orders():
+    """テスト用の注文データリスト"""
+    return [
+        {"id": 101, "product": "Python入門書", "price": 2800},
+        {"id": 102, "product": "pytest解説書", "price": 3200},
+    ]</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">tests/test_user.py（importなしで使える）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># conftest.py からのインポートは不要！
+# pytest が自動的に認識する
+
+def test_ユーザー名を確認する(sample_user):
+    assert sample_user["name"] == "田中太郎"
+
+def test_ユーザーのメールアドレスを確認する(sample_user):
+    assert "@" in sample_user["email"]</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">tests/test_order.py（同じフィクスチャを別ファイルで使う）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 同じ conftest.py のフィクスチャをこちらでも使える
+
+def test_注文件数を確認する(sample_orders):
+    assert len(sample_orders) == 2
+
+def test_注文の合計金額を確認する(sample_orders):
+    total = sum(order["price"] for order in sample_orders)
+    assert total == 6000</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">conftest.py の最大のメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    テストデータの定義を一箇所に集約できます。仕様変更でユーザーの構造が変わった場合も、conftest.pyを修正するだけで全テストに反映されます。DRY（Don't Repeat Yourself）原則の実践です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.3 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 フィクスチャの組み合わせ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フィクスチャは他のフィクスチャを引数として受け取ることができます。これにより、小さな部品を組み合わせて、より複雑なテスト環境を段階的に構築できます。
+                    </p>
+
+                    <!-- 概念図 -->
+                    <div class="my-6 p-4 bg-white border border-slate-200 rounded-xl">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            フィクスチャの依存関係
+                        </h3>
+                        <div class="mermaid">
+flowchart BT
+    A["db_connection<br/>（データベース接続）"] --> B["db_with_tables<br/>（テーブル作成済みDB）"]
+    B --> C["db_with_users<br/>（ユーザーデータ投入済みDB）"]
+    C --> D["テスト関数<br/>（完全なテスト環境を受け取る）"]
+
+    style A fill:#dbeafe,stroke:#3b82f6
+    style B fill:#e0f2fe,stroke:#0284c7
+    style C fill:#d1fae5,stroke:#10b981
+    style D fill:#fef9c3,stroke:#ca8a04
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">conftest.py（フィクスチャの組み合わせ例）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import pytest
+
+# 基本フィクスチャ（他に依存しない）
+@pytest.fixture
+def base_config():
+    """アプリケーションの基本設定"""
+    return {"debug": False, "version": "1.0"}
+
+# base_config に依存するフィクスチャ
+@pytest.fixture
+def app_config(base_config):
+    """拡張された設定（base_config を受け取る）"""
+    config = base_config.copy()
+    config["database_url"] = "sqlite:///test.db"
+    config["secret_key"] = "test-secret"
+    return config
+
+# app_config に依存するフィクスチャ
+@pytest.fixture
+def app_client(app_config):
+    """テスト用アプリクライアント"""
+    # 実際には Flask/FastAPI 等のクライアントを作成
+    return {"config": app_config, "is_test": True}</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_app.py（組み合わせたフィクスチャを使う）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def test_アプリクライアントの設定を確認(app_client):
+    # app_client は app_config を内包し、
+    # app_config は base_config を内包している
+    assert app_client["config"]["version"] == "1.0"
+    assert app_client["config"]["database_url"] == "sqlite:///test.db"
+    assert app_client["is_test"] is True
+
+def test_デバッグモードが無効であること(app_config):
+    # app_config だけ必要な場合は直接受け取る
+    assert app_config["debug"] is False</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">pytestが依存関係を自動解決する</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <code class="bg-blue-100 px-1 rounded">app_client</code> を引数に指定するだけで、pytestが自動的に <code class="bg-blue-100 px-1 rounded">app_config</code> と <code class="bg-blue-100 px-1 rounded">base_config</code> も作成してくれます。依存関係の解決は自動で行われるため、テスト関数は必要なフィクスチャだけを宣言すれば十分です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.4 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 ファクトリフィクスチャパターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通常のフィクスチャは毎回同じデータを返します。しかし「テストごとに少しだけ異なるデータが欲しい」場合はどうでしょうか？そこで活用するのが<strong class="text-slate-800">ファクトリフィクスチャパターン</strong>です。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- 通常のフィクスチャ -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-4">
+                            <h3 class="font-semibold text-slate-700 mb-2 text-sm">通常のフィクスチャ（固定値）</h3>
+                            <div class="code-block-wrapper">
+                                <div class="flex items-center justify-between bg-slate-800 px-3 py-1.5 rounded-t-lg">
+                                    <span class="text-slate-400 text-xs">固定値フィクスチャ</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                            onclick="copyCode(this)">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none text-xs"><code class="language-python">@pytest.fixture
+def user():
+    # 常に同じユーザーを返す
+    return {"name": "田中", "age": 30}
+
+def test_成人確認(user):
+    assert user["age"] >= 18</code></pre>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">異なる年齢でテストしたい場合に困る</p>
+                        </div>
+
+                        <!-- ファクトリフィクスチャ -->
+                        <div class="bg-blue-100 border border-blue-300 rounded-xl p-4">
+                            <h3 class="font-semibold text-blue-900 mb-2 text-sm">ファクトリフィクスチャ（柔軟）</h3>
+                            <div class="code-block-wrapper">
+                                <div class="flex items-center justify-between bg-slate-800 px-3 py-1.5 rounded-t-lg">
+                                    <span class="text-slate-400 text-xs">ファクトリパターン</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                            onclick="copyCode(this)">
+                                        <i class="fas fa-copy text-xs"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none text-xs"><code class="language-python">@pytest.fixture
+def make_user():
+    # 関数を返す（ファクトリ）
+    def _make_user(name="田中", age=30):
+        return {"name": name, "age": age}
+    return _make_user
+
+def test_未成年の確認(make_user):
+    user = make_user(age=17)
+    assert user["age"] < 18</code></pre>
+                            </div>
+                            <p class="text-xs text-blue-800 mt-2">引数を指定して柔軟にデータを生成できる</p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-medium text-slate-800 mb-3">ファクトリフィクスチャの実践例</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">conftest.py（ファクトリフィクスチャ）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import pytest
+
+@pytest.fixture
+def make_product():
+    """商品データを生成するファクトリ"""
+    def _make_product(
+        name="テスト商品",
+        price=1000,
+        stock=10,
+        category="一般"
+    ):
+        return {
+            "name": name,
+            "price": price,
+            "stock": stock,
+            "category": category
+        }
+    return _make_product</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_product.py（ファクトリフィクスチャの活用）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def test_在庫ありの商品を確認(make_product):
+    product = make_product(stock=5)
+    assert product["stock"] > 0
+
+def test_在庫切れの商品を確認(make_product):
+    product = make_product(stock=0)
+    assert product["stock"] == 0
+
+def test_高額商品のカテゴリを確認(make_product):
+    product = make_product(price=50000, category="高級品")
+    assert product["price"] > 10000
+    assert product["category"] == "高級品"
+
+def test_複数商品の一覧を作成(make_product):
+    # 同じファクトリから複数のデータを生成
+    products = [
+        make_product(name=f"商品{i}", price=i * 100)
+        for i in range(1, 4)
+    ]
+    assert len(products) == 3
+    assert products[0]["price"] == 100</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション 7.5 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 組み込みフィクスチャ - pytestが最初から提供するもの
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        pytestには、よく必要となる機能が組み込みフィクスチャとして最初から用意されています。自分で実装することなく、引数に名前を書くだけで使えます。
+                    </p>
+
+                    <!-- 主要な組み込みフィクスチャ一覧 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-primary-50">
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">フィクスチャ名</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">用途</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">提供するもの</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-primary-700">tmp_path</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">一時ファイル・ディレクトリ操作</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">テスト専用の一時ディレクトリ（自動削除）</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 border border-slate-200 font-mono text-primary-700">capsys</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">標準出力のキャプチャ</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">print()などの出力内容を検証できる</td>
+                                </tr>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-primary-700">monkeypatch</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">関数・属性・環境変数の一時置換</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">テスト後に自動で元に戻す機能付きのモック</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 border border-slate-200 font-mono text-primary-700">capfd</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">ファイルデスクリプタレベルのキャプチャ</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">C言語拡張などからの出力もキャプチャ可能</td>
+                                </tr>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-primary-700">request</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">テスト実行コンテキストの情報</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">テスト名、パラメータ情報などへのアクセス</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- tmp_path の使い方 -->
+                    <h3 class="text-lg font-medium text-slate-800 mb-3">
+                        <span class="bg-primary-100 text-primary-700 px-2 py-0.5 rounded font-mono text-sm">tmp_path</span>
+                        - 一時ファイル操作
+                    </h3>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-3">
+                        ファイルの読み書きを行う関数をテストする際に便利です。テストが終わると一時ディレクトリは自動的に削除されます。
+                    </p>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_file_operations.py（tmp_path の活用）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def save_to_file(filepath, content):
+    """テスト対象の関数: ファイルに保存"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+def read_from_file(filepath):
+    """テスト対象の関数: ファイルから読み込み"""
+    with open(filepath, "r", encoding="utf-8") as f:
+        return f.read()
+
+# tmp_path は pytest の組み込みフィクスチャ
+def test_ファイルへの保存と読み込み(tmp_path):
+    # tmp_path は pathlib.Path オブジェクト
+    test_file = tmp_path / "test_data.txt"
+
+    # 書き込み
+    save_to_file(test_file, "Hello, pytest!")
+
+    # 読み込んで確認
+    content = read_from_file(test_file)
+    assert content == "Hello, pytest!"
+
+def test_ディレクトリも作成できる(tmp_path):
+    # サブディレクトリを作成
+    sub_dir = tmp_path / "logs"
+    sub_dir.mkdir()
+
+    log_file = sub_dir / "app.log"
+    save_to_file(log_file, "エラーなし")
+
+    assert log_file.exists()
+    assert log_file.read_text(encoding="utf-8") == "エラーなし"</code></pre>
+                    </div>
+
+                    <!-- capsys の使い方 -->
+                    <h3 class="text-lg font-medium text-slate-800 mb-3">
+                        <span class="bg-primary-100 text-primary-700 px-2 py-0.5 rounded font-mono text-sm">capsys</span>
+                        - 標準出力のキャプチャ
+                    </h3>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-3">
+                        <code class="bg-slate-100 px-1 rounded">print()</code> で出力する関数のテストに使います。出力内容を文字列として取得して検証できます。
+                    </p>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_output.py（capsys の活用）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def greet(name):
+    """テスト対象: 挨拶を出力する関数"""
+    print(f"こんにちは、{name}さん！")
+
+def show_error(message):
+    """テスト対象: エラーを標準エラーに出力"""
+    import sys
+    print(f"エラー: {message}", file=sys.stderr)
+
+def test_挨拶メッセージの出力を確認(capsys):
+    greet("鈴木")
+
+    # キャプチャした出力を取得
+    captured = capsys.readouterr()
+    assert captured.out == "こんにちは、鈴木さん！\n"
+
+def test_エラーメッセージの出力を確認(capsys):
+    show_error("ファイルが見つかりません")
+
+    captured = capsys.readouterr()
+    # 標準エラーは captured.err で取得
+    assert "ファイルが見つかりません" in captured.err</code></pre>
+                    </div>
+
+                    <!-- monkeypatch の使い方 -->
+                    <h3 class="text-lg font-medium text-slate-800 mb-3">
+                        <span class="bg-primary-100 text-primary-700 px-2 py-0.5 rounded font-mono text-sm">monkeypatch</span>
+                        - 一時的な置換（モック）
+                    </h3>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-3">
+                        関数、クラスの属性、環境変数などを一時的に別の値や関数に置き換えます。テスト終了後は自動的に元に戻ります。
+                    </p>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_monkeypatch.py（monkeypatch の活用）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import os
+
+def get_database_url():
+    """環境変数からDB URLを取得する関数"""
+    return os.environ.get("DATABASE_URL", "sqlite:///default.db")
+
+def test_環境変数を使ったDB接続先の確認(monkeypatch):
+    # 環境変数を一時的に設定
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test:5432/testdb")
+
+    result = get_database_url()
+    assert result == "postgresql://test:5432/testdb"
+    # テスト終了後、環境変数は自動的に元に戻る
+
+def test_デフォルトのDB接続先を確認(monkeypatch):
+    # DATABASE_URL 環境変数を削除（存在する場合）
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    result = get_database_url()
+    assert result == "sqlite:///default.db"</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">monkeypatch と unittest.mock の使い分け</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    <code class="bg-orange-100 px-1 rounded">monkeypatch</code> はシンプルな置換に適しています。呼び出し回数の検証や戻り値の詳細設定など、複雑なモックが必要な場合は <code class="bg-orange-100 px-1 rounded">unittest.mock</code> を使いましょう（第10章で詳しく学習）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.6 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 フィクスチャのパラメータ化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フィクスチャ自体に複数のパラメータを設定することができます。これにより、同じテストを異なるフィクスチャ設定で自動的に繰り返し実行できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">conftest.py（パラメータ付きフィクスチャ）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import pytest
+
+@pytest.fixture(params=["sqlite", "postgresql"])
+def db_type(request):
+    """複数のDBタイプを順番にテスト"""
+    # request.param に現在のパラメータ値が入る
+    return request.param
+
+@pytest.fixture(params=[
+    {"role": "admin", "can_delete": True},
+    {"role": "user", "can_delete": False},
+])
+def user_with_role(request):
+    """権限の異なるユーザーを順番にテスト"""
+    return request.param</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_db.py（パラメータ付きフィクスチャの使用）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def test_DBタイプに応じた接続文字列を確認(db_type):
+    # このテストは "sqlite" と "postgresql" の両方で実行される
+    assert db_type in ["sqlite", "postgresql"]
+
+def test_ユーザー権限の確認(user_with_role):
+    # admin と user の両方でこのテストが実行される
+    user = user_with_role
+    assert "role" in user
+    assert "can_delete" in user</code></pre>
+                    </div>
+
+                    <!-- 実行結果 -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">実行結果のイメージ</h3>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <pre class="text-emerald-900 text-sm whitespace-pre-wrap">test_db.py::test_DBタイプに応じた接続文字列を確認[sqlite] PASSED
+test_db.py::test_DBタイプに応じた接続文字列を確認[postgresql] PASSED
+test_db.py::test_ユーザー権限の確認[user_with_role0] PASSED
+test_db.py::test_ユーザー権限の確認[user_with_role1] PASSED</pre>
+                                </div>
+                                <p class="text-emerald-800 text-sm mt-2">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    パラメータの数だけテストが自動的に生成・実行されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.7 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 よく使うパターンの整理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本章で学んだ技術を整理します。実際のプロジェクトでは、これらを組み合わせて使うことが多いです。
+                    </p>
+
+                    <!-- パターン整理図 -->
+                    <div class="my-6 p-4 bg-white border border-slate-200 rounded-xl">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            フィクスチャ応用パターンの使い分け
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    Q{"何が必要？"} --> A["複数ファイルで<br/>同じフィクスチャを使いたい"]
+    Q --> B["テストごとに<br/>少し異なるデータが欲しい"]
+    Q --> C["複雑な環境を<br/>段階的に構築したい"]
+    Q --> D["ファイルや出力・環境変数を<br/>テストしたい"]
+
+    A --> A1["conftest.py にフィクスチャを定義"]
+    B --> B1["ファクトリフィクスチャパターン<br/>（関数を返すフィクスチャ）"]
+    C --> C1["フィクスチャの組み合わせ<br/>（依存関係チェーン）"]
+    D --> D1["組み込みフィクスチャを活用<br/>（tmp_path / capsys / monkeypatch）"]
+
+    style A1 fill:#dbeafe,stroke:#3b82f6
+    style B1 fill:#d1fae5,stroke:#10b981
+    style C1 fill:#f3e8ff,stroke:#8b5cf6
+    style D1 fill:#fef9c3,stroke:#ca8a04
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                実習 7-1: conftest.py とファクトリフィクスチャを作ってみよう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                本章で学んだ内容を実際に手を動かして確認します。conftest.pyにフィクスチャを定義し、複数のテストファイルから共有する構造を作ります。
+                            </p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">課題</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">以下のディレクトリ構成を作成してください。<br>
+                                        <code class="text-xs bg-purple-100 px-1 rounded">practice_ch07/conftest.py</code>、
+                                        <code class="text-xs bg-purple-100 px-1 rounded">practice_ch07/test_book.py</code>、
+                                        <code class="text-xs bg-purple-100 px-1 rounded">practice_ch07/test_library.py</code>
+                                    </span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">conftest.py に <code class="bg-purple-100 px-1 rounded">make_book</code> ファクトリフィクスチャを定義してください。引数は <code class="bg-purple-100 px-1 rounded">title</code>（デフォルト: "テスト書籍"）、<code class="bg-purple-100 px-1 rounded">price</code>（デフォルト: 1500）、<code class="bg-purple-100 px-1 rounded">in_stock</code>（デフォルト: True）とします。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">test_book.py と test_library.py のそれぞれで <code class="bg-purple-100 px-1 rounded">make_book</code> を使ったテストを2つずつ書いてください。<code class="bg-purple-100 px-1 rounded">pytest practice_ch07/</code> ですべて成功することを確認しましょう。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">（発展）conftest.py に <code class="bg-purple-100 px-1 rounded">tmp_path</code> を使った「ログファイルを書き込む関数」のテストを追加してみましょう。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-4 mt-4">
+                                <p class="text-sm text-purple-900 font-medium mb-2">
+                                    <i class="fas fa-lightbulb text-purple-600 mr-2"></i>ヒント
+                                </p>
+                                <ul class="text-sm text-purple-800 space-y-1">
+                                    <li>• ファクトリフィクスチャは「関数を返すフィクスチャ」であることを意識しましょう</li>
+                                    <li>• conftest.py は import 不要で自動認識されます</li>
+                                    <li>• <code class="bg-purple-100 px-1 rounded">pytest --fixtures</code> コマンドで利用可能なフィクスチャ一覧が確認できます</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-primary-50 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-flag-checkered text-primary-500"></i>
+                        第7章のまとめ
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-700 mb-2">学んだこと</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>conftest.py を使うと複数のテストファイルでフィクスチャを共有できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>フィクスチャは他のフィクスチャに依存でき、pytestが自動的に依存関係を解決する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>ファクトリフィクスチャパターンで柔軟なテストデータ生成が可能になる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>tmp_path（一時ファイル）、capsys（出力キャプチャ）、monkeypatch（置換）が特に便利な組み込みフィクスチャ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>フィクスチャ自体をパラメータ化すると、同じテストを複数の設定で自動実行できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-700 mb-2">次章の予告</h3>
+                            <div class="bg-white border border-primary-200 rounded-lg p-4">
+                                <p class="text-sm text-slate-600 leading-relaxed">
+                                    第8章では、<code class="bg-primary-100 text-primary-700 px-1 rounded">@pytest.mark.parametrize</code> を使ったパラメータ化テストを学びます。1つのテスト関数に複数の入力と期待値を指定して、境界値テストや正常系・異常系を効率的に網羅する方法を習得します。
+                                </p>
+                                <p class="text-xs text-primary-600 mt-2">
+                                    <i class="fas fa-arrow-right mr-1"></i>第8章: パラメータ化テスト - 同じテストを複数データで実行する
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-6">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. conftest.py に定義したフィクスチャを使う際、テストファイル側で何をする必要がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>何もする必要はありません</strong>。pytestが conftest.py を自動的に認識するため、import 文を書かなくても、テスト関数の引数にフィクスチャ名を書くだけで使用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ファクトリフィクスチャパターンとは何ですか？なぜ通常のフィクスチャより柔軟なのか説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>フィクスチャが「データそのもの」ではなく「データを生成する関数」を返すパターン</strong>です。テスト関数内でその関数を任意の引数で呼び出せるため、テストごとに異なる値のデータを生成できます。通常のフィクスチャは毎回同じデータを返しますが、ファクトリパターンは必要に応じて異なる値のデータを作り分けられる点が柔軟です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. tmp_path、capsys、monkeypatch のそれぞれを使う場面を1つずつ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>tmp_path</strong>: ファイルへの書き込みや読み込みを行う関数をテストするとき（一時ディレクトリを使って実際のファイルI/Oをテストし、後に自動削除される）。<br><br>
+                                            <strong>capsys</strong>: print()で出力する関数をテストするとき（出力内容を文字列として取得して検証できる）。<br><br>
+                                            <strong>monkeypatch</strong>: 環境変数によって動作が変わる関数をテストするとき（setenvで環境変数を一時設定し、テスト後は自動復元される）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. フィクスチャ A が フィクスチャ B に依存しているとき、テスト関数が A を引数に指定した場合、pytestはどのように動作しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            pytestは<strong>依存関係を自動的に解決</strong>します。テスト関数が A を要求すると、pytest はまず B を作成し、その結果を A に渡してから A をテスト関数に渡します。テスト関数側では A だけを宣言すればよく、B の存在を意識する必要はありません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="pytest-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">フィクスチャ基礎 - テストの前準備と後片付け</span>
+                        </div>
+                    </a>
+                    <a href="pytest-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">パラメータ化テスト - 同じテストを複数データで実行する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

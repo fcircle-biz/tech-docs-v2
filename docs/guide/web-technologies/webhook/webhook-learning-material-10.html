@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第10章 - Webhookのセキュリティ 〜安全に使うための基礎〜</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        Webhookのセキュリティ 〜安全に使うための基礎〜
+                    </h1>
+                    <p class="text-slate-600">
+                        Webhookを安全に利用するために必要なセキュリティの考え方を学びます。署名検証（シークレットキー）、HTTPS通信、IPアドレス制限など、基本的なセキュリティ対策を初心者向けに解説します。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookがなぜセキュリティリスクをもつのかを理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>署名検証（シークレットキー）の仕組みと目的を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPS通信がWebhookでなぜ必須なのかを理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>IPアドレス制限など基本的なセキュリティ対策を列挙できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookのセキュリティチェックリストを活用できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 10.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 Webhookのセキュリティリスクとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookはとても便利な仕組みですが、使い方を間違えると深刻なセキュリティ問題につながることがあります。
+                        まず「どのようなリスクがあるのか」を理解しましょう。
+                    </p>
+
+                    <!-- リスクの説明 -->
+                    <div class="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-red-800 mb-3">Webhookの主なセキュリティリスク</h3>
+                                <ul class="space-y-2">
+                                    <li class="flex items-start gap-2 text-red-900">
+                                        <i class="fas fa-times-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>なりすまし攻撃</strong>：悪意のある第三者が、正規のサービスのふりをして偽のWebhookを送りつける</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-red-900">
+                                        <i class="fas fa-times-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>データの盗聴</strong>：HTTP（暗号化なし）で通信すると、送受信のデータが第三者に読まれる可能性がある</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-red-900">
+                                        <i class="fas fa-times-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>データの改ざん</strong>：通信途中でデータが書き換えられても、気づかずに処理してしまう</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-red-900">
+                                        <i class="fas fa-times-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>リプレイ攻撃</strong>：一度キャプチャした正規のWebhookをコピーして繰り返し送りつける</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        具体的なイメージで考えてみましょう。あなたが運営するオンラインショップが
+                        「支払い完了のWebhookを受け取ったら商品を発送する」という仕組みを作ったとします。
+                    </p>
+
+                    <!-- 攻撃シナリオ図解 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-shield-alt text-red-500"></i>
+                            セキュリティ対策がない場合の攻撃シナリオ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant A as 悪意のある第三者
+    participant B as あなたのサーバー
+    participant C as 倉庫・発送システム
+
+    Note over A,C: セキュリティ対策なしの場合
+    A->>B: 偽の「支払い完了」Webhookを送信
+    Note over B: 誰でも送れる！検証なし
+    B->>C: 商品を発送してください
+    C-->>B: 発送完了
+    Note over A,C: お金を払わずに商品をだまし取れてしまう
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    Webhookのエンドポイント（受け取るURL）は、インターネット上で公開されています。
+                                    「誰でもアクセスできる場所」に置かれているため、適切なセキュリティ対策がなければ
+                                    悪意のあるリクエストを受け入れてしまいます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 10.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 HTTPS通信 〜データを守る暗号化〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookで最初に意識すべきセキュリティ対策が <strong>HTTPS通信</strong> です。
+                        まずHTTPとHTTPSの違いを理解しましょう。
+                    </p>
+
+                    <!-- HTTP vs HTTPS 比較 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock-open text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-red-800">HTTP（暗号化なし）</h3>
+                            </div>
+                            <p class="text-red-900 text-sm leading-relaxed mb-3">
+                                データがそのままインターネット上を流れます。途中で第三者が盗み見したり、
+                                書き換えることができる「はがき」のようなものです。
+                            </p>
+                            <div class="bg-red-100 rounded-lg p-3">
+                                <p class="text-red-800 text-xs">
+                                    <i class="fas fa-times-circle mr-1"></i>
+                                    Webhookでの使用は危険。機密データが漏洩する可能性あり
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">HTTPS（SSL/TLS暗号化）</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-3">
+                                データが暗号化されてやり取りされます。途中で盗み見られても解読できない
+                                「封筒に入った手紙」のようなものです。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    Webhookでは必ずHTTPSを使用すること
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    多くのWebhookサービス（GitHub、Stripe等）は、HTTPSのエンドポイントしか受け付けません。
+                                    HTTPのURLを登録しようとするとエラーになります。これは意図的なセキュリティ設計です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HTTPS通信の流れ -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            HTTPS通信でのWebhookの流れ
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A["送信元サービス"] -->|"暗号化されたデータ"| B{{"インターネット"}}
+    B -->|"暗号化されたデータ"| C["あなたのサーバー"]
+
+    style A fill:#f0fdfa,stroke:#14b8a6
+    style B fill:#fef3c7,stroke:#f59e0b
+    style C fill:#f0fdfa,stroke:#14b8a6
+                        </div>
+                        <p class="text-slate-500 text-sm mt-3 text-center">
+                            通信経路全体が暗号化されるため、途中での盗聴・改ざんを防げます
+                        </p>
+                    </div>
+                </section>
+
+                <!-- セクション 10.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 署名検証 〜送信元が本物かを確認する〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookセキュリティの核心が <strong>署名検証</strong>（シグネチャ検証）です。
+                        これは「届いたWebhookが本当に正規のサービスから送られてきたのか」を確認する仕組みです。
+                    </p>
+
+                    <!-- 署名の仕組み説明 -->
+                    <div class="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-book-open text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary-800 mb-2">署名検証の仕組み</h3>
+                                <p class="text-primary-900 leading-relaxed mb-3">
+                                    送信元サービスとあなたが <strong>シークレットキー</strong>（秘密の合言葉）を共有します。
+                                    送信元はWebhookデータをシークレットキーで「署名」し、受信側はその署名が正しいかを検証します。
+                                </p>
+                                <p class="text-primary-900 leading-relaxed">
+                                    合言葉を知らない第三者は、正しい署名を作れません。
+                                    これにより「本物の送信元からのWebhookだ」と確認できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 署名検証の流れ -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            署名検証の全体的な流れ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant S as 送信元サービス
+    participant N as あなたのサーバー
+
+    Note over S,N: 事前準備（一度だけ）
+    S->>N: シークレットキーを発行・共有
+    Note over S,N: Webhook送信時
+
+    S->>S: シークレットキーでデータに署名を作成
+    S->>N: Webhookデータ + 署名をHTTPヘッダーに添付して送信
+    N->>N: 受け取ったデータで署名を再計算
+    N->>N: 添付された署名と比較して一致を確認
+    alt 署名が一致
+        N-->>S: 処理実行 + 200 OK
+    else 署名が不一致
+        N-->>S: 拒否 + 401 Unauthorized
+    end
+                        </div>
+                    </div>
+
+                    <!-- 代表的な署名の例 -->
+                    <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <i class="fas fa-code text-primary-500"></i>
+                        実際のサービスでの署名の例
+                    </h3>
+
+                    <div class="space-y-4 mb-6">
+                        <!-- GitHub -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+                                    <i class="fab fa-github text-slate-700 text-xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-slate-800 mb-2">GitHubの署名検証</h4>
+                                    <p class="text-slate-600 text-sm leading-relaxed mb-3">
+                                        GitHubは <code class="bg-slate-100 px-1 rounded text-xs">X-Hub-Signature-256</code> というHTTPヘッダーに
+                                        署名を含めて送信します。HMAC-SHA256というアルゴリズムで計算されます。
+                                    </p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-xs font-mono text-slate-700">
+                                        X-Hub-Signature-256: sha256=abc123def456...（長い文字列）
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stripe -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-credit-card text-purple-600 text-xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-slate-800 mb-2">Stripeの署名検証</h4>
+                                    <p class="text-slate-600 text-sm leading-relaxed mb-3">
+                                        Stripeは <code class="bg-slate-100 px-1 rounded text-xs">Stripe-Signature</code> ヘッダーを使います。
+                                        タイムスタンプも含まれており、リプレイ攻撃（古いデータの再送）への対策も組み込まれています。
+                                    </p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-xs font-mono text-slate-700">
+                                        Stripe-Signature: t=1702000000,v1=abc123...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HMAC署名の概念説明 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-700 mb-4">
+                            <i class="fas fa-key text-primary-500 mr-2"></i>
+                            HMAC署名のしくみ（概念）
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100">
+                                        <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">材料</th>
+                                        <th class="text-left px-4 py-3 text-slate-700">内容</th>
+                                        <th class="text-left px-4 py-3 rounded-tr-lg text-slate-700">例</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700 bg-primary-50">Webhookデータ</td>
+                                        <td class="px-4 py-3 text-slate-600">送信するJSONデータ（ボディ）</td>
+                                        <td class="px-4 py-3 text-slate-500 font-mono text-xs">{"event":"payment.succeeded",...}</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700 bg-primary-50">シークレットキー</td>
+                                        <td class="px-4 py-3 text-slate-600">送受信双方が知っている秘密の文字列</td>
+                                        <td class="px-4 py-3 text-slate-500 font-mono text-xs">whsec_abcdefgh123...</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-emerald-700 bg-emerald-50">署名（結果）</td>
+                                        <td class="px-4 py-3 text-slate-600">2つを組み合わせて計算された固有の文字列</td>
+                                        <td class="px-4 py-3 text-slate-500 font-mono text-xs">sha256=3e2f1a...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-slate-500 text-sm mt-3">
+                            シークレットキーを知らない人は同じデータから同じ署名を作れないため、なりすましを防げます。
+                        </p>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">豆知識：シークレットキーの扱い方</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    シークレットキーは絶対に公開しないでください。GitHubに誤ってコードと一緒に
+                                    アップロードしてしまうと、第三者に署名を偽造されてしまいます。
+                                    環境変数（.envファイル等）に保存し、コードに直接書かないようにしましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 10.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 IPアドレス制限 〜許可された送信元だけ受け付ける〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        署名検証と組み合わせて使われる対策が <strong>IPアドレス制限</strong> です。
+                        これは「特定のIPアドレスからのリクエストしか受け付けない」という設定です。
+                    </p>
+
+                    <!-- IPアドレス制限の概念 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-network-wired text-primary-500"></i>
+                            IPアドレス制限のイメージ
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A["GitHubサーバー<br/>（IPアドレス: 192.30.252.x）"] -->|"Webhookリクエスト"| D{{"あなたのサーバー\nIPフィルタリング"}}
+    B["不明なサーバー<br/>（IPアドレス: 攻撃者）"] -->|"偽のWebhookリクエスト"| D
+    D -->|"GitHubのIPから？YES"| E["処理実行"]
+    D -->|"不明なIPから？NO"| F["アクセス拒否 403"]
+
+    style A fill:#f0fdfa,stroke:#14b8a6
+    style B fill:#fef2f2,stroke:#ef4444
+    style D fill:#fef3c7,stroke:#f59e0b
+    style E fill:#ecfdf5,stroke:#10b981
+    style F fill:#fef2f2,stroke:#ef4444
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">IPアドレス制限のメリット</h3>
+                            </div>
+                            <ul class="space-y-2 text-emerald-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>署名検証の前段階でブロックできる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>サーバーへの不要な負荷を減らせる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>多層防御の一層として機能する</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-orange-800">注意点</h3>
+                            </div>
+                            <ul class="space-y-2 text-orange-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-circle text-orange-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>サービスがIPを変更した場合に動かなくなる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-circle text-orange-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>IPの偽装（スプーフィング）は完全に防げない</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-circle text-orange-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>署名検証と組み合わせて使うのが基本</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 主要サービスのIPアドレス情報 -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+                        <div class="bg-slate-100 px-5 py-3 border-b border-slate-200">
+                            <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+                                <i class="fas fa-list text-slate-500"></i>
+                                主要サービスのIPアドレス帯域の確認方法
+                            </h3>
+                        </div>
+                        <div class="p-5 space-y-3">
+                            <div class="flex items-start gap-3">
+                                <i class="fab fa-github text-slate-700 mt-0.5 w-5 text-center"></i>
+                                <div>
+                                    <p class="font-medium text-slate-800 text-sm">GitHub</p>
+                                    <p class="text-slate-600 text-xs">api.github.com/meta のエンドポイントでhooksのIPリストを確認できます</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-credit-card text-purple-600 mt-0.5 w-5 text-center"></i>
+                                <div>
+                                    <p class="font-medium text-slate-800 text-sm">Stripe</p>
+                                    <p class="text-slate-600 text-xs">Stripeのドキュメントページで送信元IPの範囲を確認できます</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fab fa-slack text-blue-600 mt-0.5 w-5 text-center"></i>
+                                <div>
+                                    <p class="font-medium text-slate-800 text-sm">Slack</p>
+                                    <p class="text-slate-600 text-xs">Slackのヘルプセンターで送信元IPの情報を確認できます</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 10.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 リプレイ攻撃への対策 〜タイムスタンプの活用〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        署名検証だけではまだ不十分なケースがあります。それが <strong>リプレイ攻撃</strong> への対策です。
+                    </p>
+
+                    <!-- リプレイ攻撃の説明 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4">リプレイ攻撃とは？</h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant A as 正規の送信元
+    participant H as 攻撃者
+    participant B as あなたのサーバー
+
+    A->>B: 正規のWebhook（署名付き）を送信
+    H->>H: 通信をキャプチャして保存
+
+    Note over H,B: 時間が経った後（例：1日後）
+    H->>B: 保存した同じWebhookをコピーして再送
+    Note over B: 署名は本物と同じなので通過してしまう
+    Note over B: 同じ処理が二重に実行される！
+                        </div>
+                    </div>
+
+                    <!-- タイムスタンプによる対策 -->
+                    <div class="space-y-3 mb-6">
+                        <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+                            <i class="fas fa-clock text-primary-500"></i>
+                            タイムスタンプを使ったリプレイ攻撃対策
+                        </h3>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">手順1</span>
+                                <p class="text-slate-600 text-sm">
+                                    送信元がWebhookデータに <strong>現在の時刻（タイムスタンプ）</strong>を含めて署名する
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">手順2</span>
+                                <p class="text-slate-600 text-sm">
+                                    受信側はWebhookを受け取ったとき、タイムスタンプと現在時刻の <strong>差が許容範囲内（例：5分以内）</strong>か確認する
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">手順3</span>
+                                <p class="text-slate-600 text-sm">
+                                    時刻の差が許容範囲外（例：5分以上）なら、古いデータとして <strong>拒否</strong>する
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    StripeなどのWebhookサービスでは、タイムスタンプを署名に含める仕組みが標準で組み込まれています。
+                                    SDKやライブラリを使うと、こうした検証処理を自動で行ってくれます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 10.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 その他のセキュリティ対策
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPSと署名検証の他にも、Webhookを安全に使うためのベストプラクティスがいくつかあります。
+                    </p>
+
+                    <div class="space-y-4 mb-6">
+                        <!-- レスポンスの高速化 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-bolt text-blue-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">すぐにレスポンスを返す（DoS攻撃対策）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        Webhookを受け取ったらすぐに「200 OK」を返し、重い処理は後で別途実行しましょう。
+                                        レスポンスが遅いと、送信元がタイムアウトして再送を繰り返し、サーバーに大きな負荷がかかります。
+                                        目安として <strong>5秒以内</strong>にレスポンスを返すのが一般的です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- べき等性の確保 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-redo text-purple-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">べき等性の確保（重複処理の防止）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        Webhookは何らかの理由で同じデータが複数回届くことがあります（第11章で詳しく解説）。
+                                        「同じWebhookが2回来ても、処理結果は1回と同じ」になるよう設計することを
+                                        <strong>べき等性</strong>といいます。注文IDなどのユニークなIDで重複チェックを行いましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ログの記録 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-clipboard-list text-emerald-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">受信ログの記録（監査と調査用）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        受け取ったWebhookのログ（記録）を保存しておきましょう。
+                                        不審なアクセスを検知したり、問題が起きたときの原因調査に役立ちます。
+                                        特に日時、IPアドレス、ペイロードのハッシュ値は記録しておくと便利です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- シークレットの定期更新 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-key text-amber-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">シークレットキーの定期的な更新</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        シークレットキーは定期的に変更することが推奨されます。
+                                        万が一キーが漏洩してしまった場合は、すぐに再発行して古いキーを無効にしましょう。
+                                        多くのサービスで管理画面からキーの再発行が簡単にできます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 10.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.7 Webhookセキュリティの全体像
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまで学んだセキュリティ対策を一つの図で整理してみましょう。
+                        「多層防御」という考え方で、複数の対策を組み合わせるのが基本です。
+                    </p>
+
+                    <!-- 多層防御の概念図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-layer-group text-primary-500"></i>
+                            Webhookセキュリティの多層防御
+                        </h3>
+                        <div class="space-y-3">
+                            <!-- 第1層 -->
+                            <div class="relative bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-primary-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                                    <div>
+                                        <p class="font-semibold text-primary-800">HTTPS通信（必須）</p>
+                                        <p class="text-primary-700 text-xs">データの暗号化・盗聴防止</p>
+                                    </div>
+                                    <i class="fas fa-lock text-primary-500 ml-auto text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- 第2層 -->
+                            <div class="relative bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                                    <div>
+                                        <p class="font-semibold text-blue-800">IPアドレス制限（推奨）</p>
+                                        <p class="text-blue-700 text-xs">許可された送信元のみ受け付ける</p>
+                                    </div>
+                                    <i class="fas fa-network-wired text-blue-500 ml-auto text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- 第3層 -->
+                            <div class="relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                                    <div>
+                                        <p class="font-semibold text-emerald-800">署名検証（必須）</p>
+                                        <p class="text-emerald-700 text-xs">送信元の正当性確認・改ざん検知</p>
+                                    </div>
+                                    <i class="fas fa-signature text-emerald-500 ml-auto text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- 第4層 -->
+                            <div class="relative bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+                                    <div>
+                                        <p class="font-semibold text-amber-800">タイムスタンプ検証（推奨）</p>
+                                        <p class="text-amber-700 text-xs">リプレイ攻撃の防止</p>
+                                    </div>
+                                    <i class="fas fa-clock text-amber-500 ml-auto text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- 第5層 -->
+                            <div class="relative bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div>
+                                    <div>
+                                        <p class="font-semibold text-purple-800">べき等性・ログ記録（推奨）</p>
+                                        <p class="text-purple-700 text-xs">重複処理の防止・監査証跡</p>
+                                    </div>
+                                    <i class="fas fa-clipboard-list text-purple-500 ml-auto text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- セキュリティチェックリスト -->
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">Webhookセキュリティチェックリスト</h3>
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check1" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check1" class="text-blue-900 cursor-pointer">エンドポイントURLがHTTPSになっている</label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check2" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check2" class="text-blue-900 cursor-pointer">シークレットキーを設定し、署名検証を実装している</label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check3" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check3" class="text-blue-900 cursor-pointer">シークレットキーを環境変数に保存し、コードに直接書いていない</label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check4" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check4" class="text-blue-900 cursor-pointer">受信後5秒以内にレスポンスを返すよう設計している</label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check5" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check5" class="text-blue-900 cursor-pointer">重複したWebhookに対応できるべき等な処理を実装している</label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="sec-check6" class="w-5 h-5 rounded border-blue-300 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                                        <label for="sec-check6" class="text-blue-900 cursor-pointer">受信ログを記録・保存している</label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第10章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">Webhookのエンドポイントは公開されているため、なりすまし・盗聴・改ざん・リプレイ攻撃などのリスクがあります</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">HTTPS通信は必須の対策で、データを暗号化し通信経路での盗聴・改ざんを防ぎます</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700">署名検証（シークレットキー＋HMAC）により、送信元の正当性と改ざんの有無を確認できます</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700">タイムスタンプ検証・IPアドレス制限・べき等性・ログ記録を組み合わせた多層防御が基本です</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">5</span>
+                                <p class="text-slate-700">シークレットキーは環境変数に保存し、コードに直接書かないこと、定期的に更新することが重要です</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Webhookのエンドポイントには必ずHTTPSを使う理由として正しいものはどれですか？
+                                        (A) HTTPSの方が処理速度が速いから
+                                        (B) データを暗号化して盗聴や改ざんを防ぐため
+                                        (C) HTTPSでないとWebhookが届かないから</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。HTTPSはSSL/TLS暗号化によりデータの盗聴・改ざんを防ぎます。
+                                            (A) 速度は関係ありません。(C) HTTPも技術的には届きますが、多くのサービスがセキュリティ上の理由でHTTPSのみ受け付けます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 署名検証の目的は何ですか？
+                                        (A) Webhookの送信速度を向上させるため
+                                        (B) 送信元が本物であることを確認し、データの改ざんを検知するため
+                                        (C) Webhookのデータを圧縮して転送量を削減するため</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。署名検証はシークレットキーを使い、届いたWebhookが正規の送信元からのものかを確認し、
+                                            データが途中で改ざんされていないかを検知します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. シークレットキーの管理として正しい方法はどれですか？
+                                        (A) ソースコードに直接書いてGitHubで管理する
+                                        (B) メモ帳に書いてデスクトップに置く
+                                        (C) 環境変数（.envファイル等）に保存し、Gitの管理対象外にする</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (C) です。シークレットキーをソースコードに直接書いてGitHubにアップすると、
+                                            世界中に公開されてしまいます。環境変数に保存し、.gitignoreで管理対象外にするのが基本です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第11章では、Webhookの配信が失敗したときの対処法を学びます。
+                                リトライ（再送）の仕組みと、同じデータが複数回届いても安全に処理するための
+                                「べき等性」の考え方を詳しく解説します。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">GitHub・開発ツール連携</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">エラーとリトライ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

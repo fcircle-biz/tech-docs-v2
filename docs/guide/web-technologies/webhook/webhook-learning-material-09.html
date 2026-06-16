@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第9章 - 身近なWebhook活用例（3）〜GitHub・開発ツール連携〜</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        身近なWebhook活用例（3）〜GitHub・開発ツール連携〜
+                    </h1>
+                    <p class="text-slate-600">
+                        GitHubのWebhookを例に、開発ツールでの活用方法を学びます。「コードがプッシュされたら自動でテストを実行する」「プルリクエストが作られたら通知する」といったCI/CD連携の基礎概念を理解しましょう。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GitHubのWebhook機能の概要と、設定できるイベントの種類を理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プッシュ・プルリクエスト・マージなど主要なGitHubイベントがどう使われるか説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CI/CD（継続的インテグレーション・継続的デリバリー）の基礎概念とWebhookの関係を理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GitHubと他の開発ツール（Slack、Jiraなど）の連携パターンを具体例で挙げることができる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 GitHubとWebhookの関係
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GitHubはプログラマーが「ソースコード」を管理・共有するためのサービスです。
+                        「GitHub」という名前を聞いたことがある方も多いかもしれません。
+                        GitHub上でコードの変更やレビューなど様々な作業が行われており、
+                        それらの「出来事（イベント）」をWebhookで外部サービスに通知できる仕組みが整っています。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        開発現場では、GitHubのWebhookを使って「チームへの自動通知」「テストの自動実行」「本番環境への自動展開」
+                        といった作業を自動化することが一般的です。これにより、人手でやっていた繰り返し作業が省け、
+                        ミスも大幅に減ります。
+                    </p>
+
+                    <!-- GitHubの概念図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fab fa-github text-slate-600"></i>
+                            GitHubを中心とした開発ツール連携のイメージ
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph GitHub["GitHubリポジトリ"]
+        E1["コードプッシュ"]
+        E2["プルリクエスト"]
+        E3["マージ完了"]
+        E4["イシュー作成"]
+    end
+
+    subgraph Tools["連携先ツール"]
+        T1["Slack通知"]
+        T2["自動テスト実行"]
+        T3["本番デプロイ"]
+        T4["Jiraチケット更新"]
+    end
+
+    E1 -->|"Webhook"| T2
+    E2 -->|"Webhook"| T1
+    E3 -->|"Webhook"| T3
+    E4 -->|"Webhook"| T4
+
+    style GitHub fill:#f8fafc,stroke:#64748b
+    style Tools fill:#f0fdfa,stroke:#14b8a6
+        </div>
+    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">GitHubを知らなくても大丈夫です</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    GitHubはプログラマーが使うツールですが、この章ではWebhookの仕組みを理解することが目的です。
+                                    「コードの変更があったとき、それを他のサービスに自動で知らせる」というイメージで読み進めてください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 GitHubで使える主なイベント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GitHubでは非常に多くの「イベント」が定義されており、それぞれに対してWebhookを設定できます。
+                        代表的なイベントを見ていきましょう。
+                    </p>
+
+                    <!-- イベント一覧テーブル -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm overflow-x-auto">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list text-primary-500"></i>
+                            GitHubの主なWebhookイベント
+                        </h3>
+                        <table class="w-full text-sm min-w-[500px]">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">イベント名</th>
+                                    <th class="text-left px-4 py-3 text-slate-700">いつ発生する？</th>
+                                    <th class="text-left px-4 py-3 rounded-tr-lg text-slate-700">よくある活用例</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-mono text-xs text-slate-700 bg-slate-50">push</td>
+                                    <td class="px-4 py-3 text-slate-600">コードが更新されたとき</td>
+                                    <td class="px-4 py-3 text-slate-500">自動テスト、Slackへの通知</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-mono text-xs text-slate-700 bg-slate-50">pull_request</td>
+                                    <td class="px-4 py-3 text-slate-600">レビュー依頼が作られたとき</td>
+                                    <td class="px-4 py-3 text-slate-500">チームへの通知、自動チェック</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-mono text-xs text-slate-700 bg-slate-50">issues</td>
+                                    <td class="px-4 py-3 text-slate-600">課題・バグ報告が作られたとき</td>
+                                    <td class="px-4 py-3 text-slate-500">Jiraチケット自動作成</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-mono text-xs text-slate-700 bg-slate-50">release</td>
+                                    <td class="px-4 py-3 text-slate-600">新バージョンが公開されたとき</td>
+                                    <td class="px-4 py-3 text-slate-500">リリースノート通知、自動デプロイ</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-3 font-mono text-xs text-slate-700 bg-slate-50">create</td>
+                                    <td class="px-4 py-3 text-slate-600">ブランチやタグが作られたとき</td>
+                                    <td class="px-4 py-3 text-slate-500">開発環境の自動構築</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    GitHubのWebhookはイベントの種類を細かく選択できます。
+                                    「全てのイベント」を受け取るのではなく、「pushイベントだけ」「pull_requestだけ」と絞ることで、
+                                    不要な通知を減らし、システムを効率的に動かすことができます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 コードプッシュからSlack通知までの流れ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最も身近な活用例として「GitHubにコードが追加されたとき、SlackにWebhookで通知を送る」という流れを
+                        詳しく見てみましょう。プログラマーが普段どのようにこの仕組みを使っているかが分かります。
+                    </p>
+
+                    <!-- ステップバイステップ -->
+                    <div class="space-y-4 mb-6">
+                        <div class="flex items-start gap-4 bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="flex-shrink-0 w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
+                            <div>
+                                <h4 class="font-semibold text-slate-800 mb-1">プログラマーがコードを書いてGitHubに送る（プッシュ）</h4>
+                                <p class="text-slate-600 text-sm leading-relaxed">
+                                    プログラマーが自分のパソコンでコードを修正し、GitHubの「リポジトリ（コード置き場）」に送信します。
+                                    この操作を「プッシュ」と呼びます。
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-4 bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
+                            <div>
+                                <h4 class="font-semibold text-slate-800 mb-1">GitHubがWebhookを送信する</h4>
+                                <p class="text-slate-600 text-sm leading-relaxed">
+                                    プッシュを受け取ったGitHubは、あらかじめ設定されたURL（エンドポイント）に対して
+                                    Webhookリクエストを自動で送信します。
+                                    このリクエストには「誰が」「何を」「いつ」変更したかの情報が含まれています。
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-4 bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+                            <div>
+                                <h4 class="font-semibold text-slate-800 mb-1">受信先がWebhookデータを受け取る</h4>
+                                <p class="text-slate-600 text-sm leading-relaxed">
+                                    Slackとの連携ツール（またはZapierなどの自動化ツール）がGitHubからのWebhookを受け取ります。
+                                    JSONデータの中から「コミットメッセージ」「変更者名」などの情報を取り出します。
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-4 bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
+                            <div>
+                                <h4 class="font-semibold text-slate-800 mb-1">SlackにメッセージがBOT投稿される</h4>
+                                <p class="text-slate-600 text-sm leading-relaxed">
+                                    取得した情報をもとにSlackのチャンネルにメッセージを投稿します。
+                                    チームメンバーは「誰が何を変更したか」をSlack上で即座に確認できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- シーケンス図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            GitHubプッシュからSlack通知までのシーケンス
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Dev as プログラマー
+    participant GH as GitHub
+    participant WH as Webhookエンドポイント
+    participant SL as Slack
+
+    Dev->>GH: コードをプッシュ
+    GH-->>Dev: プッシュ受け付け完了
+    GH->>WH: Webhookリクエスト送信（pushイベント）
+    WH-->>GH: 200 OK（受信成功）
+    WH->>SL: Slackへメッセージ投稿
+    SL-->>WH: 投稿完了
+        </div>
+    </div>
+
+                    <!-- Webhookペイロードのサンプル -->
+                    <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <i class="fas fa-code text-primary-500"></i>
+                        GitHubが送るWebhookデータ（pushイベント）のイメージ
+                    </h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">github-push-webhook.json（一部抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "ref": "refs/heads/main",
+  "repository": {
+    "name": "my-project",
+    "full_name": "yamada-taro/my-project"
+  },
+  "pusher": {
+    "name": "yamada-taro"
+  },
+  "commits": [
+    {
+      "message": "ログイン画面のバグを修正",
+      "author": { "name": "山田 太郎" },
+      "timestamp": "2026-03-25T10:00:00Z"
+    }
+  ]
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        上のデータから「<strong>yamada-taro</strong>さんが<strong>my-project</strong>に
+                        「<strong>ログイン画面のバグを修正</strong>」というコードを追加した」と読み取れます。
+                        このデータを使ってSlackに「山田 太郎さんがコードを更新しました」と自動投稿できます。
+                    </p>
+                </section>
+
+                <!-- セクション 9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 CI/CDとWebhook 〜自動テスト・自動デプロイの仕組み〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        開発の現場でよく聞く「CI/CD」という言葉があります。難しそうに聞こえますが、
+                        Webhookを活用した「自動化の仕組み」のことです。一つずつ見ていきましょう。
+                    </p>
+
+                    <!-- CI/CDの説明カード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-vial text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-blue-800">CI（継続的インテグレーション）</h3>
+                            </div>
+                            <p class="text-blue-900 text-sm leading-relaxed mb-3">
+                                コードが追加されるたびに自動でテストを実行して、
+                                「このコードは正しく動くか？」を自動で確認する仕組みです。
+                            </p>
+                            <div class="bg-blue-100 rounded-lg p-3">
+                                <p class="text-blue-800 text-xs font-medium">Webhookとの関係</p>
+                                <p class="text-blue-700 text-xs mt-1">GitHubのpushイベントをWebhookで受け取り、
+                                    テスト用サーバーに「テストを開始して」と伝える</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-rocket text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">CD（継続的デリバリー）</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-3">
+                                テストが通ったコードを自動的に本番環境（ユーザーが使うサーバー）に反映する仕組みです。
+                                「デプロイ」とも呼ばれます。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs font-medium">Webhookとの関係</p>
+                                <p class="text-emerald-700 text-xs mt-1">テスト成功のイベントをWebhookで受け取り、
+                                    本番サーバーに「最新コードに更新して」と指示を出す</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CI/CDパイプラインの図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            Webhookを活用したCI/CDパイプラインの流れ
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A["プログラマー<br/>コードを書く"] -->|"プッシュ"| B["GitHub<br/>リポジトリ"]
+    B -->|"Webhook<br/>pushイベント"| C["CIサーバー<br/>自動テスト実行"]
+    C -->|"テスト成功<br/>Webhook"| D["CDパイプライン<br/>デプロイ準備"]
+    D -->|"自動デプロイ"| E["本番サーバー<br/>最新版が公開"]
+    C -->|"テスト失敗<br/>Webhook"| F["開発者へ<br/>Slackで通知"]
+
+    style A fill:#f8fafc,stroke:#64748b
+    style B fill:#1f2937,stroke:#374151,color:#f9fafb
+    style C fill:#eff6ff,stroke:#3b82f6
+    style D fill:#f0fdfa,stroke:#14b8a6
+    style E fill:#ecfdf5,stroke:#10b981
+    style F fill:#fef2f2,stroke:#ef4444
+        </div>
+    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    実際のCI/CDには「GitHub Actions」「Jenkins」「CircleCI」など様々なツールが使われます。
+                                    これらはどれもWebhookを活用してGitHubと連携しています。
+                                    詳細な設定は各ツールの学習で扱いますが、「Webhookがベースになっている」ことを覚えておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 プルリクエストと自動通知
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「プルリクエスト（Pull Request / PR）」とは、プログラマーが「このコードを取り込んでください」と
+                        チームに依頼する機能です。コードレビュー（確認・チェック）の出発点になります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        プルリクエストが作られたタイミングで、Webhookを使って関係するメンバーに自動で通知する仕組みが
+                        多くの開発チームで使われています。
+                    </p>
+
+                    <!-- プルリクエストの流れ -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+                        <div class="bg-slate-100 px-6 py-3 border-b border-slate-200">
+                            <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+                                <i class="fas fa-code-branch text-primary-500"></i>
+                                プルリクエストのライフサイクルとWebhook通知
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                    <span class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">開</span>
+                                    <div>
+                                        <p class="font-medium text-blue-800 text-sm">プルリクエストを作成（opened）</p>
+                                        <p class="text-blue-700 text-xs">→ Slackの #review チャンネルに自動投稿</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <span class="flex-shrink-0 w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center text-xs font-bold">審</span>
+                                    <div>
+                                        <p class="font-medium text-yellow-800 text-sm">コードレビューのコメントが追加（review_requested）</p>
+                                        <p class="text-yellow-700 text-xs">→ 担当者にメールまたはSlackでDM通知</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                    <span class="flex-shrink-0 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold">承</span>
+                                    <div>
+                                        <p class="font-medium text-emerald-800 text-sm">プルリクエストが承認・マージされる（closed）</p>
+                                        <p class="text-emerald-700 text-xs">→ 自動デプロイ処理を開始、Slackへの完了通知</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    GitHubの <code class="bg-blue-100 px-1 rounded text-xs">pull_request</code> イベントは
+                                    「作成」「更新」「クローズ」「マージ」などの細かいアクションを区別できます。
+                                    <code class="bg-blue-100 px-1 rounded text-xs">action</code> フィールドの値（opened, closed, merged等）
+                                    を見て、どのタイミングで通知するかを制御します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 GitHubと他の開発ツールとの連携例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GitHubのWebhookは、Slackだけでなく様々な開発ツールと連携することができます。
+                        代表的なケースを紹介します。
+                    </p>
+
+                    <div class="space-y-4 mb-6">
+                        <!-- Slack連携 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <i class="fab fa-slack text-purple-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">GitHub × Slack</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        コードのプッシュ、プルリクエストの作成、イシュー（バグ報告）の投稿などを
+                                        Slackのチャンネルに自動通知します。
+                                        チームが GitHub を開かなくても、Slack上でリポジトリの動きをリアルタイムで把握できます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Jira連携 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-tasks text-blue-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">GitHub × Jira（プロジェクト管理ツール）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        GitHubのコミットメッセージに「PROJ-123を修正」と記載しておくと、
+                                        Webhookを通じてJiraのチケット（タスク管理カード）のステータスを自動更新できます。
+                                        コードの変更とタスクの進捗が自動で紐づきます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vercel/Netlify連携 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-globe text-slate-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">GitHub × Vercel / Netlify（ホスティングサービス）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        VercelやNetlifyはGitHubのWebhookを使って、mainブランチへのプッシュを検知し、
+                                        Webサイトを自動でビルド・公開します。
+                                        コードを更新するだけで本番サイトが自動更新される仕組みです。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GitHub Actions連携 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-cogs text-orange-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">GitHub Actions（GitHub内蔵の自動化ツール）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        GitHubが提供するCI/CDツールで、Webhookイベントをトリガーにして様々な処理を自動実行します。
+                                        テスト・ビルド・デプロイなどをすべてGitHub上で設定でき、
+                                        外部サービスとの連携も容易です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 GitHubのWebhook設定のイメージ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際にGitHubのWebhookを設定する画面はどのような構成になっているか、
+                        概念的なイメージを確認しておきましょう。実際の操作は第12章で体験できます。
+                    </p>
+
+                    <!-- 設定画面のイメージ -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6 shadow-sm">
+                        <div class="bg-slate-800 px-4 py-2 flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span class="text-slate-400 text-xs ml-2">GitHub > Settings > Webhooks > Add webhook</span>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Payload URL</label>
+                                <div class="w-full border border-slate-300 rounded-lg px-4 py-2 text-slate-500 text-sm bg-slate-50">
+                                    https://example.com/webhook/github
+                                </div>
+                                <p class="text-slate-500 text-xs mt-1">Webhookデータを受け取るURL（エンドポイント）を入力します</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Content type</label>
+                                <div class="w-full border border-slate-300 rounded-lg px-4 py-2 text-slate-500 text-sm bg-slate-50">
+                                    application/json
+                                </div>
+                                <p class="text-slate-500 text-xs mt-1">データをJSON形式で送信します（推奨）</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Which events would you like to trigger this webhook?</label>
+                                <div class="space-y-2 mt-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 bg-primary-500 rounded flex-shrink-0"></div>
+                                        <span class="text-slate-600 text-sm">Just the push event（プッシュイベントのみ）</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 border border-slate-300 rounded flex-shrink-0"></div>
+                                        <span class="text-slate-500 text-sm">Send me everything（全イベント）</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 border border-slate-300 rounded flex-shrink-0"></div>
+                                        <span class="text-slate-500 text-sm">Let me select individual events（イベントを個別選択）</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    GitHubのWebhook設定は「受け取るURL」「送るデータ形式」「どのイベントで送るか」の3点を設定するだけです。
+                                    第6章で学んだ「エンドポイント登録」の考え方がそのまま当てはまります。
+                                    基本的な仕組みはどのサービスでも同じです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.8 開発ツール連携での注意点
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GitHubなどの開発ツールとWebhookを連携する際には、いくつかの注意点があります。
+                    </p>
+
+                    <div class="space-y-4 mb-6">
+                        <div class="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-red-800 mb-2">秘密鍵（Secret）の設定を忘れずに</h3>
+                                    <p class="text-red-900 text-sm leading-relaxed">
+                                        GitHubのWebhook設定には「Secret（シークレット）」という秘密のパスワードを設定できます。
+                                        これを設定しておくと、受け取ったWebhookが本当にGitHubから送られたものかどうかを確認できます。
+                                        悪意のある第三者がWebhookを偽装して送ってくる攻撃（なりすまし）を防ぐために重要です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-orange-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-bolt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-orange-800 mb-2">大量のpushに注意</h3>
+                                    <p class="text-orange-900 text-sm leading-relaxed">
+                                        開発が活発なリポジトリでは、1日に何十回もpushが発生することがあります。
+                                        すべてのpushでWebhookが送られると、受け取り側のサーバーに大きな負荷がかかる場合があります。
+                                        イベントフィルタリングを活用して、必要なイベントだけを受け取るよう設計しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-network-wired text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-blue-800 mb-2">受信先URLは公開されている必要がある</h3>
+                                    <p class="text-blue-900 text-sm leading-relaxed">
+                                        GitHubからWebhookを受け取るためには、受信先のURLがインターネットから
+                                        アクセスできる状態（公開URL）でなければなりません。
+                                        自分のパソコン上でテストする場合は、ngrokなどのトンネリングツールを使って
+                                        一時的な公開URLを作成する方法があります。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第9章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">GitHubではpush・pull_request・issuesなど多くのイベントにWebhookを設定でき、開発作業の自動化に活用されています</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">CI/CDはWebhookをベースにした自動テスト・自動デプロイの仕組みで、コードの変更を起点に処理が連鎖的に実行されます</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700">GitHub × Slack・Jira・Vercelなど、開発ツール同士をWebhookで連携させることで、手作業を大幅に削減できます</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700">Secretの設定・イベントの絞り込み・公開URLの確保など、開発ツール連携特有の注意点があります</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. GitHubでコードが更新されたときに発生するWebhookイベントの名前は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            「push」イベントです。プログラマーがコードをGitHubに送信（プッシュ）したときに発生します。
+                                            このイベントを受け取って自動テストを実行したり、Slackに通知を送ったりします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. CI（継続的インテグレーション）とは何ですか？WebhookとどのようにつながっていますかQ2. CI（継続的インテグレーション）とは何ですか？Webhookとの関係も説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            CIとは、コードが追加されるたびに自動でテストを実行し、正しく動くかを確認する仕組みです。
+                                            GitHubのpushイベントをWebhookで受け取り、CIサーバーに「テストを開始して」と伝えることで実現します。
+                                            Webhookがなければ、人が手動でテストを実行する必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. GitHubのWebhook設定でSecretを設定する目的は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            受け取ったWebhookが本当にGitHubから送られたものかどうかを検証するためです。
+                                            Secretがないと、悪意のある第三者がGitHubのふりをして偽のWebhookを送りつけ、
+                                            不正な処理を実行させる「なりすまし攻撃」のリスクがあります。
+                                            セキュリティ対策として重要な設定です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第10章では、Webhookを安全に利用するためのセキュリティの考え方を学びます。
+                                署名検証（シークレットキー）、HTTPS通信、IPアドレス制限など、
+                                基本的なセキュリティ対策を初心者向けに解説します。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">決済・ECサービス連携</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">Webhookのセキュリティ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS基礎学習教材 第10章 - サーバーなしでプログラムを動かそう - Lambda入門</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS オレンジ系カラー
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS基礎学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウドインフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約11.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">サーバーなしでプログラムを動かそう - Lambda入門</h1>
+                    <p class="text-slate-600">「サーバーレス」という新しい仕組みを体験します。サーバーを持たなくても、必要なときだけプログラムを動かせます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーレスは「必要なときだけ動く自販機」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Lambdaは「呼ばれたときだけ働くプログラム」</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>簡単なプログラムの作り方(プログラミング経験不要)</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>自動実行の設定(毎日決まった時間に動かす)</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>S3にファイルが追加されたら自動で処理する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション10.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 サーバーレスとは何か？
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまでの章では、EC2でサーバーを起動してプログラムを動かしていました。しかし、<strong>「サーバーレス」</strong>では、サーバーを起動しなくてもプログラムを実行できます。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">身近な例え</h3>
+                                <p class="text-blue-900 text-sm">
+                                    <strong>Lambda</strong> = 出前サービス(注文があったときだけ調理・配達)<br>
+                                    <strong>EC2</strong> = 常設レストラン(お客さんがいなくても店を開けておく)<br>
+                                    <strong>トリガー</strong> = 注文ボタン(押されたら調理開始)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サーバーレスの最大のメリットは、<strong>「プログラムが動いた分だけ料金が発生する」</strong>こと。サーバーを常時起動させておく必要がないため、コストを大幅に削減できます。
+                    </p>
+
+                    <!-- Mermaid図: EC2とLambdaの比較 -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            EC2とLambdaの比較
+                        </h4>
+                        <div class="mermaid">
+flowchart LR
+    subgraph A["EC2 (従来型)"]
+        A1["サーバー常時起動"]
+        A2["待機中も課金"]
+        A3["手動でスケール調整"]
+    end
+
+    subgraph B["Lambda (サーバーレス)"]
+        B1["必要なときだけ実行"]
+        B2["実行時間分だけ課金"]
+        B3["自動でスケール調整"]
+    end
+
+    A --> C{コストと管理}
+    B --> C
+    C --> D["Lambdaは小規模な処理に最適<br/>待機時間が不要"]
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    Lambdaは月100万リクエストまで無料！小規模なアプリケーションなら実質タダで運用できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 Lambda関数を作成しよう
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        それでは実際にLambda関数を作ってみましょう。<strong>「Hello, Lambda!」</strong>と表示するシンプルなプログラムを作成します。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-hands-helping text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4">実習: 最初のLambda関数を作る</h3>
+
+                                <div class="space-y-4">
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">1</span>
+                                            AWSコンソールでLambdaサービスを開く
+                                        </h4>
+                                        <p class="text-purple-900 text-sm">検索ボックスに「Lambda」と入力し、サービスを選択します。</p>
+                                    </div>
+
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">2</span>
+                                            「関数の作成」をクリック
+                                        </h4>
+                                        <ul class="text-purple-900 text-sm list-disc list-inside space-y-1">
+                                            <li>「一から作成」を選択</li>
+                                            <li>関数名: <code class="bg-white px-2 py-0.5 rounded">my-first-lambda</code></li>
+                                            <li>ランタイム: <strong>Python 3.12</strong> を選択</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">3</span>
+                                            「関数の作成」をクリック
+                                        </h4>
+                                        <p class="text-purple-900 text-sm">デフォルト設定のまま作成します。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda関数のコードを書く</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        関数が作成されると、コードエディタ画面が表示されます。以下のコードに書き換えましょう。
+                    </p>
+
+                    <!-- コードブロック -->
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">lambda_function.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i> コピー
+                            </button>
+                        </div>
+                        <pre><code class="language-python"># Lambda関数のメインハンドラー
+def lambda_handler(event, context):
+    # メッセージを定義
+    message = "Hello, Lambda!"
+
+    # 結果を返す
+    return {
+        'statusCode': 200,  # 成功ステータス
+        'body': message      # 返却メッセージ
+    }
+</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">コードの説明</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1 list-disc list-inside">
+                                    <li><code>lambda_handler</code>: Lambdaが最初に呼び出す関数(エントリーポイント)</li>
+                                    <li><code>event</code>: トリガーから渡されるデータ</li>
+                                    <li><code>context</code>: 実行環境の情報</li>
+                                    <li><code>statusCode</code>: HTTP 200 は成功を意味します</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 Lambda関数をテストしよう
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コードを書いたら、実際に動作するか確認しましょう。
+                    </p>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-4">動作確認: Lambda関数を実行する</h3>
+
+                                <div class="space-y-4">
+                                    <div class="bg-emerald-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-emerald-900 mb-2">1. 「Deploy」ボタンをクリック</h4>
+                                        <p class="text-emerald-900 text-sm">コードを保存・デプロイします。</p>
+                                    </div>
+
+                                    <div class="bg-emerald-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-emerald-900 mb-2">2. 「Test」ボタンをクリック</h4>
+                                        <p class="text-emerald-900 text-sm">初回はテストイベント設定画面が表示されます。</p>
+                                        <ul class="text-emerald-900 text-sm list-disc list-inside mt-2 space-y-1">
+                                            <li>イベント名: <code class="bg-white px-2 py-0.5 rounded">test-event</code></li>
+                                            <li>デフォルトのJSONのまま「保存」</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="bg-emerald-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-emerald-900 mb-2">3. もう一度「Test」をクリック</h4>
+                                        <p class="text-emerald-900 text-sm">実行結果が表示されます。</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 bg-emerald-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600"></i>
+                                        期待される結果
+                                    </h4>
+                                    <div class="bg-white rounded p-3 text-sm text-emerald-900 font-mono">
+                                        <pre>{
+  "statusCode": 200,
+  "body": "Hello, Lambda!"
+}</pre>
+                                    </div>
+                                    <p class="text-emerald-900 text-sm mt-2">
+                                        <strong>成功！</strong> この結果が表示されればLambda関数は正常に動作しています。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 トリガーを設定しよう(自動実行)
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Lambdaは「トリガー」を設定することで、さまざまなイベントに反応して自動実行できます。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list-ul text-primary-500"></i>
+                            代表的なトリガー
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-clock text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">EventBridge(CloudWatch Events)</p>
+                                    <p class="text-sm text-slate-600">定期実行(毎日9時、1時間ごとなど)</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-folder text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">S3</p>
+                                    <p class="text-sm text-slate-600">ファイルアップロード時に自動実行</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-network-wired text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">API Gateway</p>
+                                    <p class="text-sm text-slate-600">HTTPリクエスト受信時に実行</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-stream text-primary-500 mt-1"></i>
+                                <div>
+                                    <p class="font-medium text-slate-700">DynamoDB</p>
+                                    <p class="text-sm text-slate-600">データベース変更時に実行</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">例: 毎日9時に実行する設定</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EventBridge(CloudWatch Events)を使って、毎朝9時に自動実行する設定をしてみましょう。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-hands-helping text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4">実習: 定期実行トリガーを設定</h3>
+
+                                <div class="space-y-4">
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">1</span>
+                                            Lambda関数画面で「トリガーを追加」
+                                        </h4>
+                                    </div>
+
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">2</span>
+                                            トリガー設定
+                                        </h4>
+                                        <ul class="text-purple-900 text-sm list-disc list-inside space-y-1">
+                                            <li>トリガーを選択: <strong>EventBridge(CloudWatch Events)</strong></li>
+                                            <li>「新しいルールの作成」を選択</li>
+                                            <li>ルール名: <code class="bg-white px-2 py-0.5 rounded">daily-9am-trigger</code></li>
+                                            <li>ルールタイプ: <strong>スケジュール式</strong></li>
+                                            <li>スケジュール式: <code class="bg-white px-2 py-0.5 rounded">cron(0 0 * * ? *)</code></li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="bg-purple-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                                            <span class="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-sm">3</span>
+                                            「追加」をクリック
+                                        </h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">cron式の読み方</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <code class="bg-blue-100 px-2 py-0.5 rounded">cron(0 0 * * ? *)</code> = 毎日午前0時(UTC)<br>
+                                    日本時間(JST)は+9時間なので、午前9時に実行されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 S3トリガーで画像処理を自動化
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後に、実用的な例として「S3にファイルがアップロードされたら自動で処理する」仕組みを作ってみましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">シナリオ</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        S3バケット <code class="bg-slate-100 px-2 py-0.5 rounded">my-upload-bucket</code> に画像がアップロードされたら、
+                        自動でログにファイル名を記録する。
+                    </p>
+
+                    <!-- Mermaid図: S3トリガーフロー -->
+                    <div class="my-6 bg-white rounded-lg p-4 border border-slate-200">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            S3トリガーの仕組み
+                        </h4>
+                        <div class="mermaid">
+flowchart LR
+    A["ユーザー"] --> B["S3バケット"]
+    B --> C{"ファイルアップロード<br/>イベント発生"}
+    C --> D["Lambda関数<br/>自動起動"]
+    D --> E["処理実行<br/>ログ出力等"]
+
+    style C fill:#fef3c7
+    style D fill:#dbeafe
+    style E fill:#d1fae5
+                        </div>
+                    </div>
+
+                    <!-- コードブロック -->
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">s3_trigger_lambda.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i> コピー
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import json
+
+def lambda_handler(event, context):
+    # S3イベント情報を取得
+    for record in event['Records']:
+        # バケット名とファイル名を取得
+        bucket = record['s3']['bucket']['name']
+        key = record['s3']['object']['key']
+
+        # ログ出力
+        print(f"新しいファイルがアップロードされました!")
+        print(f"バケット: {bucket}")
+        print(f"ファイル名: {key}")
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps('処理完了!')
+    }
+</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">注意事項</p>
+                                <ul class="text-red-800 text-sm mt-2 space-y-1 list-disc list-inside">
+                                    <li>S3トリガーを設定する前に、Lambda関数にS3読み取り権限を付与する必要があります</li>
+                                    <li>トリガー設定時にバケット名とイベントタイプ(PUT, POST等)を指定します</li>
+                                    <li>無限ループに注意!(Lambda → S3書き込み → 再びLambda起動)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 Lambdaの制限と料金
+                    </h2>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">実行時間制限</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Lambdaには実行時間の上限があります。デフォルトは<strong>3秒</strong>、最大<strong>15分</strong>まで設定可能です。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    15分以上かかる処理は、ECSやBatch、Step Functionsなど別のサービスを検討しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">料金体系</h3>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-4">無料枠(毎月)</h4>
+                        <ul class="space-y-2 text-slate-700">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                <span><strong>100万リクエスト</strong>まで無料</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                <span><strong>40万GB秒</strong>の実行時間まで無料</span>
+                            </li>
+                        </ul>
+
+                        <h4 class="font-semibold text-slate-800 mb-4 mt-6">有料の場合(無料枠超過後)</h4>
+                        <ul class="space-y-2 text-slate-700 text-sm">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-dollar-sign text-primary-500 mt-1 text-xs"></i>
+                                <span>リクエスト料金: 100万リクエストあたり $0.20</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-dollar-sign text-primary-500 mt-1 text-xs"></i>
+                                <span>実行時間料金: メモリサイズと実行時間で計算</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション10.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.7 お片付け: Lambda関数を削除
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Lambda関数は実行時のみ課金されますが、練習用の関数は削除しておきましょう。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-3">削除手順</h4>
+                        <ol class="space-y-2 text-slate-700 list-decimal list-inside">
+                            <li>Lambda管理画面で削除したい関数を選択</li>
+                            <li>「アクション」→「削除」をクリック</li>
+                            <li>関数名を入力して確認</li>
+                            <li>「削除」をクリック</li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    トリガー(EventBridge等)も一緒に削除されるか確認しましょう。残っているとイベントが発生し続けることがあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 初心者がつまずきやすいポイント -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-exclamation-circle text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4">初心者がつまずきやすいポイント</h3>
+                            <div class="space-y-3">
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2">「ハンドラー」はプログラムの入り口</h4>
+                                    <p class="text-orange-900 text-sm">
+                                        <code class="bg-white px-2 py-0.5 rounded">lambda_handler</code>という関数名は変更できますが、
+                                        設定で「ハンドラー名」も合わせて変更する必要があります。
+                                    </p>
+                                </div>
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2">タイムアウト設定に注意</h4>
+                                    <p class="text-orange-900 text-sm">
+                                        デフォルト3秒で時間切れになると、処理が途中で止まります。
+                                        長い処理の場合は設定画面でタイムアウト時間を延長しましょう。
+                                    </p>
+                                </div>
+                                <div class="bg-orange-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-orange-900 mb-2">テスト実行で動作確認してから本番利用</h4>
+                                    <p class="text-orange-900 text-sm">
+                                        いきなりトリガーを設定せず、まずは「Test」ボタンで正常動作を確認しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q1. Lambdaのメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            サーバーを常時起動させる必要がなく、プログラムが動いた分だけ料金が発生するため、コストを削減できます。また、月100万リクエストまで無料です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q2. Lambda関数の実行時間の上限は？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            最大15分です。デフォルトは3秒なので、長い処理の場合は設定変更が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2">Q3. S3トリガーで注意すべきことは？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3">
+                                            無限ループに注意が必要です。Lambda関数がS3にファイルを書き込み、それがまたトリガーとなってLambdaが起動する、という循環を避ける設計が大切です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>サーバーレスは「必要なときだけ動く」仕組み。Lambdaは実行時間分だけ課金される。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>Lambda関数は<code class="bg-slate-200 px-2 py-0.5 rounded">lambda_handler</code>から実行開始。月100万リクエストまで無料。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>トリガーを設定することで、S3アップロード、定期実行、APIリクエストなど様々なイベントで自動実行できる。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>実行時間の上限は15分。タイムアウト設定に注意し、テスト実行で動作確認してから本番利用。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第9章: CloudWatch入門</span>
+                        </div>
+                    </a>
+                    <a href="aws-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第11章: 復習と実践プロジェクト</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

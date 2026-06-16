@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>JDBC学習教材 第7章 - 実践的なDAO（Data Access Object）パターン</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Java/JDBC - Orange
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-java text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">JDBC学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>プログラミング言語</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約9.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JDBC</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">実践的なDAO（Data Access Object）パターン</h1>
+                    <p class="text-slate-600">データベース操作を整理するDAOパターンの設計と実装を学びます。データベース処理とビジネスロジックの分離、再利用可能なDAOクラスの作成方法を実践します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DAOパターンとは何か、その目的とメリットを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DAOクラスの設計方針と実装方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DAO・DTO・Entityクラスの役割分担を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>実践的なDAOパターンの実装例を通じて保守性の高いコードを学ぶ</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 DAOパターンとは？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>DAO（Data Access Object）パターン</strong>は、データベースアクセス処理を専門のクラスに分離する設計パターンです。ビジネスロジック（業務処理）とデータベース処理を切り離すことで、コードの見通しが良くなり、保守性が向上します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまでの章では、メインメソッドの中にSQL実行コードを直接書いていました。しかし、実務のアプリケーションでは、複数の画面や機能から同じようなデータベース操作を行うことが多く、コードの重複が発生します。DAOパターンを使えば、データベース操作を一箇所にまとめ、再利用しやすくなります。
+                    </p>
+
+                    <!-- DAOパターンのメリット -->
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-xl border border-blue-200">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-layer-group text-blue-600 text-xl mt-1"></i>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">1. 責任の分離</h3>
+                                    <p class="text-sm text-slate-600">ビジネスロジックとデータベース処理を分けることで、それぞれの役割が明確になり、コードが読みやすくなります。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 rounded-xl border border-emerald-200">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-sync-alt text-emerald-600 text-xl mt-1"></i>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">2. 再利用性</h3>
+                                    <p class="text-sm text-slate-600">同じデータベース操作を複数の場所で使い回せるため、コードの重複がなくなります。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-xl border border-purple-200">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-wrench text-purple-600 text-xl mt-1"></i>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">3. 保守性の向上</h3>
+                                    <p class="text-sm text-slate-600">データベース操作の変更が必要な場合、DAOクラスのみを修正すればよく、影響範囲が限定されます。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-5 rounded-xl border border-orange-200">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-vial text-orange-600 text-xl mt-1"></i>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">4. テストしやすさ</h3>
+                                    <p class="text-sm text-slate-600">データベース処理を切り出すことで、単体テストやモック（模擬オブジェクト）を使ったテストがしやすくなります。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 DAOパターンの全体像
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAOパターンでは、通常3つの要素が登場します：<strong>DAOクラス</strong>、<strong>DTOクラス（またはEntityクラス）</strong>、そして<strong>ビジネスロジッククラス</strong>です。それぞれの役割を理解しましょう。
+                    </p>
+
+                    <!-- DAOパターン構成図 -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-4">DAOパターンの構成</h3>
+                        <pre class="mermaid bg-transparent border-0">
+flowchart TB
+    subgraph App[アプリケーション層]
+        Main[メインプログラム<br/>ビジネスロジック]
+    end
+
+    subgraph DAO[データアクセス層]
+        UserDAO[UserDAO<br/>データベース操作専門]
+    end
+
+    subgraph Data[データベース]
+        DB[(users テーブル)]
+    end
+
+    subgraph Model[データモデル]
+        UserDTO[User DTO/Entity<br/>データの入れ物]
+    end
+
+    Main -- "検索・登録・更新依頼" --> UserDAO
+    UserDAO -- "User オブジェクトを返却" --> Main
+    UserDAO -- "SQL実行" --> DB
+    UserDAO -- "結果をDTOに詰める" --> UserDTO
+
+    style Main fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style UserDAO fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style DB fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style UserDTO fill:#fce7f3,stroke:#ec4899,stroke-width:2px
+                        </pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">用語解説</p>
+                                <ul class="text-emerald-900 space-y-1 text-sm">
+                                    <li><strong>DAO（Data Access Object）</strong>: データベース操作を担当するクラス（例：UserDAO、OrderDAO）</li>
+                                    <li><strong>DTO（Data Transfer Object）</strong> / <strong>Entity</strong>: データベースのテーブル1行分のデータを格納するクラス（例：User、Order）</li>
+                                    <li><strong>ビジネスロジック</strong>: 業務処理を担当するクラスやメソッド（例：ユーザー登録処理、注文処理）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 DTOクラス（Entityクラス）の作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まずは、データベースのテーブル1行分のデータを表すクラスを作成します。ここでは、<code>users</code>テーブルのデータを扱う<code>User</code>クラスを作ってみましょう。
+                    </p>
+
+                    <!-- テーブル定義 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-4">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-slate-500"></i>
+                            usersテーブルの構造
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>CREATE TABLE users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    age INT
+);</code></pre>
+                    </div>
+
+                    <!-- DTOクラス実装例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">User.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// DTO（Data Transfer Object）クラス
+// データベースの1行分のデータを保持する
+public class User {
+    // フィールド（テーブルのカラムに対応）
+    private int id;
+    private String name;
+    private String email;
+    private int age;
+
+    // コンストラクタ
+    public User() {}
+
+    public User(int id, String name, String email, int age) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.age = age;
+    }
+
+    // ゲッター・セッター（省略形）
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public int getAge() { return age; }
+    public void setAge(int age) { this.age = age; }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ポイント</p>
+                                <p class="text-blue-900 text-sm">
+                                    DTOクラスは「データの入れ物」です。テーブルの各カラムに対応するフィールドと、それらを取得・設定するためのゲッター・セッターを用意します。データベース操作のロジックは含みません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 DAOクラスの設計と実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次に、データベース操作を担当する<code>UserDAO</code>クラスを作成します。一般的に、DAOクラスには以下のようなメソッドを用意します：
+                    </p>
+
+                    <ul class="space-y-2 text-slate-600 mb-4">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-primary-500 text-xs mt-2 flex-shrink-0"></i>
+                            <span><code>findAll()</code>: 全件検索</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-primary-500 text-xs mt-2 flex-shrink-0"></i>
+                            <span><code>findById(int id)</code>: ID指定で1件検索</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-primary-500 text-xs mt-2 flex-shrink-0"></i>
+                            <span><code>insert(User user)</code>: 新規登録</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-primary-500 text-xs mt-2 flex-shrink-0"></i>
+                            <span><code>update(User user)</code>: 更新</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-circle text-primary-500 text-xs mt-2 flex-shrink-0"></i>
+                            <span><code>delete(int id)</code>: 削除</span>
+                        </li>
+                    </ul>
+
+                    <!-- UserDAO実装例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">UserDAO.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+// データベース操作を担当するDAOクラス
+public class UserDAO {
+    // データベース接続情報
+    private static final String URL = "jdbc:h2:~/testdb";
+    private static final String USER = "sa";
+    private static final String PASS = "";
+
+    // 全件検索
+    public List&lt;User&gt; findAll() {
+        List&lt;User&gt; users = new ArrayList&lt;&gt;();
+        String sql = "SELECT * FROM users";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                // ResultSetからUserオブジェクトを生成
+                User user = new User(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getString("email"),
+                    rs.getInt("age")
+                );
+                users.add(user);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
+
+    // ID指定で1件検索
+    public User findById(int id) {
+        String sql = "SELECT * FROM users WHERE id = ?";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return new User(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getString("email"),
+                    rs.getInt("age")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null; // 見つからなかった場合
+    }
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 INSERT・UPDATE・DELETEメソッドの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        検索メソッドに続いて、登録・更新・削除のメソッドも実装しましょう。これらを<code>UserDAO</code>クラスに追加します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">UserDAO.java（続き）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">    // 新規登録
+    public boolean insert(User user) {
+        String sql = "INSERT INTO users (name, email, age) VALUES (?, ?, ?)";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, user.getName());
+            pstmt.setString(2, user.getEmail());
+            pstmt.setInt(3, user.getAge());
+
+            int rows = pstmt.executeUpdate();
+            return rows > 0; // 成功したらtrue
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // 更新
+    public boolean update(User user) {
+        String sql = "UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, user.getName());
+            pstmt.setString(2, user.getEmail());
+            pstmt.setInt(3, user.getAge());
+            pstmt.setInt(4, user.getId());
+
+            int rows = pstmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // 削除
+    public boolean delete(int id) {
+        String sql = "DELETE FROM users WHERE id = ?";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, id);
+
+            int rows = pstmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">
+                                    戻り値は<code>boolean</code>型で、成功したら<code>true</code>、失敗したら<code>false</code>を返すようにしています。呼び出し側で結果を判定しやすくなります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 DAOクラスの利用方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAOクラスができたので、実際に使ってみましょう。メインプログラムからDAOクラスを呼び出してデータベース操作を行います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Main.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        // DAOインスタンスを生成
+        UserDAO dao = new UserDAO();
+
+        // 1. 全件検索
+        System.out.println("=== 全件検索 ===");
+        List&lt;User&gt; users = dao.findAll();
+        for (User u : users) {
+            System.out.println(u.getId() + ": " + u.getName());
+        }
+
+        // 2. 新規登録
+        System.out.println("\n=== 新規登録 ===");
+        User newUser = new User();
+        newUser.setName("田中太郎");
+        newUser.setEmail("tanaka@example.com");
+        newUser.setAge(28);
+
+        boolean success = dao.insert(newUser);
+        if (success) {
+            System.out.println("登録成功！");
+        }
+
+        // 3. ID指定検索
+        System.out.println("\n=== ID=1のユーザー検索 ===");
+        User user = dao.findById(1);
+        if (user != null) {
+            System.out.println("名前: " + user.getName());
+            System.out.println("メール: " + user.getEmail());
+        }
+
+        // 4. 更新
+        System.out.println("\n=== 更新 ===");
+        user.setAge(30); // 年齢を変更
+        dao.update(user);
+        System.out.println("更新完了");
+
+        // 5. 削除
+        System.out.println("\n=== 削除 ===");
+        dao.delete(2);
+        System.out.println("削除完了");
+    }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ポイント</p>
+                                <p class="text-blue-900 text-sm">
+                                    メインプログラムからは、SQL文やConnectionの詳細を意識する必要がありません。<code>dao.findAll()</code>、<code>dao.insert(user)</code>のように、わかりやすいメソッド名で操作できます。これがDAOパターンの大きなメリットです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 接続情報の外部化（応用）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        現在のDAOクラスでは、データベース接続情報（URL、ユーザー名、パスワード）がハードコーディングされています。実務では、これらを<strong>プロパティファイル</strong>や<strong>環境変数</strong>から読み込むことが一般的です。
+                    </p>
+
+                    <!-- プロパティファイル例 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-4">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-file-alt text-slate-500"></i>
+                            db.properties（設定ファイル例）
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>db.url=jdbc:h2:~/testdb
+db.user=sa
+db.password=</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">DBConfig.java（設定読み込みクラス例）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">import java.io.*;
+import java.util.Properties;
+
+// データベース接続情報を管理するクラス
+public class DBConfig {
+    private static Properties props = new Properties();
+
+    static {
+        try (InputStream in = new FileInputStream("db.properties")) {
+            props.load(in); // プロパティファイルを読み込み
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String getUrl() {
+        return props.getProperty("db.url");
+    }
+
+    public static String getUser() {
+        return props.getProperty("db.user");
+    }
+
+    public static String getPassword() {
+        return props.getProperty("db.password");
+    }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAOクラスでは、<code>DBConfig.getUrl()</code>のように呼び出すことで、接続情報を取得できます。設定変更時にソースコードを修正する必要がなくなり、保守性が向上します。
+                    </p>
+                </section>
+
+                <!-- セクション8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.8 実践：DAOパターンの演習
+                    </h2>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 7-1: 商品管理DAOの作成</h3>
+                                <p class="text-purple-900 mb-4 break-words">商品管理システムを想定し、<code>Product</code>DTO と <code>ProductDAO</code> を作成してみましょう。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words"><code>products</code>テーブルを作成（id, name, price, stock）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words"><code>Product</code>クラス（DTO）を作成</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words"><code>ProductDAO</code>クラスを作成し、<code>findAll()</code>、<code>findById()</code>、<code>insert()</code>メソッドを実装</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">メインプログラムから商品一覧表示と新規登録を実行</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. DAOパターンを使う主なメリットを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            1. <strong>責任の分離</strong>: ビジネスロジックとデータベース処理を分離できる<br>
+                                            2. <strong>再利用性</strong>: 同じデータベース操作を複数の箇所で使い回せる<br>
+                                            3. <strong>保守性の向上</strong>: 変更の影響範囲が限定され、修正がしやすい
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. DTO（Data Transfer Object）クラスとDAOクラスの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>DTO（Entityクラス）</strong>: データベースの1行分のデータを保持する「データの入れ物」。フィールドとゲッター・セッターのみを持つ。<br>
+                                            <strong>DAOクラス</strong>: データベース操作（検索、登録、更新、削除）を担当するクラス。SQL実行やConnectionの管理を行う。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code>UserDAO.findById(int id)</code>メソッドが、該当するユーザーが見つからなかった場合に返す値は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <code>null</code>を返します。呼び出し側では、戻り値が<code>null</code>かどうかをチェックして、データが見つかったかどうかを判定します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. データベース接続情報をハードコーディングせず、外部化する方法として適切なものは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>プロパティファイル</strong>（<code>db.properties</code>など）に接続情報を記載し、Javaの<code>Properties</code>クラスで読み込む方法が一般的です。また、環境変数やYAML/JSON形式の設定ファイルを使う方法もあります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-300 rounded-xl p-6 my-8">
+                    <h3 class="flex items-center gap-2 text-lg font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>DAOパターン</strong>は、データベース操作を専門のクラスに分離する設計パターン</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span><strong>DTOクラス</strong>はデータの入れ物、<strong>DAOクラス</strong>はデータベース操作を担当</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>DAOクラスには<code>findAll()</code>、<code>findById()</code>、<code>insert()</code>、<code>update()</code>、<code>delete()</code>などのメソッドを用意</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>データベース接続情報は外部ファイルから読み込むことで保守性が向上</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>DAOパターンにより、コードの再利用性・保守性・テストのしやすさが大幅に向上</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jdbc-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">トランザクション処理</span>
+                        </div>
+                    </a>
+                    <a href="jdbc-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ベストプラクティス</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <script src="sidebar-content.js"></script>
+    <script src="main.js"></script>
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

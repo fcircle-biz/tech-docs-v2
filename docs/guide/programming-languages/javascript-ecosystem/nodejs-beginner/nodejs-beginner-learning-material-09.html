@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Node.js入門 第9章 - HTTPサーバーを作ってみよう</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-node-js text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Node.js入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>サーバーサイド JavaScript</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約19時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Node.js入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間30分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">HTTPサーバーを作ってみよう</h1>
+                    <p class="text-slate-600">Node.jsの標準モジュールを使って、シンプルなWebサーバーを構築します。HTTPの基礎知識も合わせて学習します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPプロトコルの基礎知識を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Node.jsのhttpモジュールを使ってWebサーバーを構築できるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リクエストとレスポンスの処理方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>静的ファイルの配信と簡易ルーティングを実装できるようになる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 HTTPの基礎知識
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webサーバーを構築する前に、まずHTTPの基本を理解しましょう。<strong class="text-slate-800">HTTP（HyperText Transfer Protocol）</strong>は、WebブラウザとWebサーバーがデータをやり取りするための約束事（プロトコル）です。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">わかりやすい例え</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    HTTPは、レストランでの注文に似ています。お客様（ブラウザ）が注文（リクエスト）を出すと、店員（サーバー）が料理（レスポンス）を提供します。この注文と提供のやり取りを規定したルールがHTTPです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">HTTPリクエストとレスポンス</h3>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant Browser as ブラウザ全文クライアント全文
+    participant Server as Webサーバー
+
+    Browser->>Server: HTTPリクエスト全文例: GET /index.html全文
+    Note over Server: ファイルを読み込む
+    Server-->>Browser: HTTPレスポンス全文HTMLコンテンツ全文
+    Note over Browser: HTMLを表示
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">主なHTTPメソッド</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPメソッドは、サーバーに対して何をしたいのかを伝えるための動詞のようなものです。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">メソッド</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">意味</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-slate-700">用途</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">GET</td>
+                                        <td class="px-4 py-3 text-slate-600">取得</td>
+                                        <td class="px-4 py-3 text-slate-600">ページやデータの取得</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">POST</td>
+                                        <td class="px-4 py-3 text-slate-600">送信</td>
+                                        <td class="px-4 py-3 text-slate-600">フォームデータの送信</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">PUT</td>
+                                        <td class="px-4 py-3 text-slate-600">更新</td>
+                                        <td class="px-4 py-3 text-slate-600">データの更新</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-700">DELETE</td>
+                                        <td class="px-4 py-3 text-slate-600">削除</td>
+                                        <td class="px-4 py-3 text-slate-600">データの削除</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">HTTPステータスコード</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ステータスコードは、リクエストの処理結果をクライアントに伝える3桁の数字です。
+                    </p>
+
+                    <div class="grid sm:grid-cols-2 gap-4 my-6">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle text-emerald-500"></i>
+                                2xx 成功
+                            </h4>
+                            <ul class="text-emerald-900 text-sm space-y-1">
+                                <li><strong>200 OK</strong>: 成功</li>
+                                <li><strong>201 Created</strong>: 作成成功</li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-arrow-right text-blue-500"></i>
+                                3xx リダイレクト
+                            </h4>
+                            <ul class="text-blue-900 text-sm space-y-1">
+                                <li><strong>301</strong>: 永続的な移動</li>
+                                <li><strong>302</strong>: 一時的な移動</li>
+                            </ul>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle text-amber-500"></i>
+                                4xx クライアントエラー
+                            </h4>
+                            <ul class="text-amber-900 text-sm space-y-1">
+                                <li><strong>400 Bad Request</strong>: 不正なリクエスト</li>
+                                <li><strong>404 Not Found</strong>: 見つからない</li>
+                            </ul>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-times-circle text-red-500"></i>
+                                5xx サーバーエラー
+                            </h4>
+                            <ul class="text-red-900 text-sm space-y-1">
+                                <li><strong>500</strong>: サーバー内部エラー</li>
+                                <li><strong>503</strong>: サービス利用不可</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 はじめてのHTTPサーバー
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Node.jsの<strong class="text-slate-800">httpモジュール</strong>を使って、最もシンプルなWebサーバーを構築してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">basic-server.js</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// httpモジュールを読み込む
+const http = require('http');
+
+// サーバーを作成
+const server = http.createServer((req, res) => {
+  // レスポンスヘッダーを設定
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+
+  // レスポンスボディを送信
+  res.end('&lt;h1&gt;Hello, Node.js Server!&lt;/h1&gt;');
+});
+
+// ポート3000でリクエストを待ち受ける
+server.listen(3000, () => {
+  console.log('サーバーが起動しました: http://localhost:3000');
+});</code></pre>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 9-1: 基本的なHTTPサーバーを起動</h3>
+                                <p class="text-purple-900 mb-4 break-words">上記のコードを実行して、ブラウザで確認してみましょう。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">上記のコードを <code class="bg-purple-100 px-2 py-0.5 rounded">basic-server.js</code> として保存</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">ターミナルで <code class="bg-purple-100 px-2 py-0.5 rounded">node basic-server.js</code> を実行</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">ブラウザで <code class="bg-purple-100 px-2 py-0.5 rounded">http://localhost:3000</code> にアクセス</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">サーバーを停止するには、ターミナルで <kbd class="bg-purple-200 px-2 py-0.5 rounded">Ctrl + C</kbd></span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3">コードの解説</h3>
+
+                    <div class="space-y-4 mb-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">1. httpモジュールの読み込み</h4>
+                            <p class="text-slate-600 text-sm">
+                                <code class="bg-slate-100 px-2 py-0.5 rounded">const http = require('http')</code> で、Node.js標準のhttpモジュールを使えるようにします。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">2. サーバーの作成</h4>
+                            <p class="text-slate-600 text-sm mb-2">
+                                <code class="bg-slate-100 px-2 py-0.5 rounded">http.createServer()</code> は、リクエストを受け取るたびに実行されるコールバック関数を登録します。
+                            </p>
+                            <ul class="text-slate-600 text-sm space-y-1 pl-4">
+                                <li><strong>req</strong> (request): リクエスト情報（URL、メソッドなど）</li>
+                                <li><strong>res</strong> (response): レスポンスを作成するオブジェクト</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">3. レスポンスの送信</h4>
+                            <p class="text-slate-600 text-sm mb-2">
+                                <code class="bg-slate-100 px-2 py-0.5 rounded">res.writeHead()</code> でステータスコードとヘッダーを設定し、<code class="bg-slate-100 px-2 py-0.5 rounded">res.end()</code> で本文を送信します。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">4. ポートの待ち受け</h4>
+                            <p class="text-slate-600 text-sm">
+                                <code class="bg-slate-100 px-2 py-0.5 rounded">server.listen(3000)</code> で、ポート3000番でリクエストを待ち受けます。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ポート番号とは？</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ポート番号は、コンピュータ上で複数のサービスを区別するための番号です。Webサーバーは通常80番（HTTP）や443番（HTTPS）を使いますが、開発時は3000番や8080番などを使うのが一般的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 リクエストとレスポンスの処理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リクエストからURLやメソッドを取得し、それに応じた処理を行う方法を学びましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">request-handler.js</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">const http = require('http');
+
+const server = http.createServer((req, res) => {
+  // リクエスト情報を取得
+  const method = req.method;  // HTTPメソッド
+  const url = req.url;        // リクエストURL
+
+  // リクエスト情報をログ出力
+  console.log(`${method} ${url}`);
+
+  // レスポンスを作成
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`
+    &lt;h1&gt;リクエスト情報&lt;/h1&gt;
+    &lt;p&gt;メソッド: ${method}&lt;/p&gt;
+    &lt;p&gt;URL: ${url}&lt;/p&gt;
+  `);
+});
+
+server.listen(3000, () => {
+  console.log('サーバー起動: http://localhost:3000');
+});</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">URLのパース</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        URLからパス名やクエリパラメータを取り出すには、Node.js標準の<strong class="text-slate-800">urlモジュール</strong>を使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">url-parse.js</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">const http = require('http');
+const url = require('url');
+
+const server = http.createServer((req, res) => {
+  // URLをパース
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;     // /users
+  const query = parsedUrl.query;           // { id: '123' }
+
+  console.log('パス名:', pathname);
+  console.log('クエリ:', query);
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`
+    &lt;h1&gt;URL解析結果&lt;/h1&gt;
+    &lt;p&gt;パス: ${pathname}&lt;/p&gt;
+    &lt;p&gt;クエリ: ${JSON.stringify(query)}&lt;/p&gt;
+  `);
+});
+
+server.listen(3000);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    <code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">url.parse(req.url, true)</code> の第2引数に <code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">true</code> を指定すると、クエリパラメータがオブジェクトとして自動的にパースされます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                                <p class="text-emerald-900 mb-4 break-words">サーバーを起動して、以下のURLにアクセスしてみましょう：</p>
+                                <ul class="space-y-2 text-emerald-900 mb-4">
+                                    <li><code class="bg-emerald-100 px-2 py-0.5 rounded">http://localhost:3000/users?id=123&name=taro</code></li>
+                                    <li><code class="bg-emerald-100 px-2 py-0.5 rounded">http://localhost:3000/products?category=books</code></li>
+                                </ul>
+                                <h4 class="font-medium text-emerald-800 mb-2 break-words">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される結果
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <pre class="text-emerald-900 text-sm whitespace-pre-wrap">パス名: /users
+クエリ: { id: '123', name: 'taro' }</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 静的ファイルの配信
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTMLファイルやCSSファイルなどの静的ファイルをサーバーから配信する方法を学びましょう。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            プロジェクト構成
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>myserver/
+├── server.js
+└── public/
+    ├── index.html
+    └── style.css</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">public/index.html</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;!DOCTYPE html&gt;
+&lt;html lang="ja"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;Node.js Server&lt;/title&gt;
+  &lt;link rel="stylesheet" href="/style.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Welcome to Node.js Server!&lt;/h1&gt;
+  &lt;p&gt;これは静的HTMLファイルです。&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">server.js（静的ファイル配信）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const server = http.createServer((req, res) => {
+  // ルートパスは index.html に変換
+  let filePath = req.url === '/' ? '/index.html' : req.url;
+
+  // publicディレクトリ内のファイルパスを構築
+  filePath = path.join(__dirname, 'public', filePath);
+
+  // ファイルを非同期で読み込む
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      // ファイルが見つからない場合
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('&lt;h1&gt;404 Not Found&lt;/h1&gt;');
+    } else {
+      // ファイルの拡張子からContent-Typeを判定
+      const ext = path.extname(filePath);
+      const contentType = getContentType(ext);
+
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+    }
+  });
+});
+
+// Content-Type判定関数
+function getContentType(ext) {
+  switch (ext) {
+    case '.html': return 'text/html; charset=utf-8';
+    case '.css':  return 'text/css';
+    case '.js':   return 'application/javascript';
+    case '.json': return 'application/json';
+    default:      return 'text/plain';
+  }
+}
+
+server.listen(3000, () => {
+  console.log('サーバー起動: http://localhost:3000');
+});</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">Content-Typeとは？</h3>
+                                <p class="text-blue-900 text-sm mb-3">
+                                    Content-Typeは、送信するデータの種類をブラウザに伝えるHTTPヘッダーです。これが正しく設定されていないと、ブラウザが適切にファイルを処理できません。
+                                </p>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li><strong>text/html</strong>: HTMLファイル</li>
+                                    <li><strong>text/css</strong>: CSSファイル</li>
+                                    <li><strong>application/javascript</strong>: JavaScriptファイル</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 簡易ルーティングの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        URLに応じて異なるレスポンスを返す、簡易的なルーティング機能を実装してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">routing-server.js</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">const http = require('http');
+const url = require('url');
+
+const server = http.createServer((req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+  const method = req.method;
+
+  // ルーティング処理
+  if (pathname === '/' && method === 'GET') {
+    // トップページ
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('&lt;h1&gt;ホームページ&lt;/h1&gt;&lt;p&gt;ようこそ！&lt;/p&gt;');
+
+  } else if (pathname === '/about' && method === 'GET') {
+    // aboutページ
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('&lt;h1&gt;Aboutページ&lt;/h1&gt;&lt;p&gt;このサイトについて&lt;/p&gt;');
+
+  } else if (pathname === '/api/users' && method === 'GET') {
+    // API: ユーザー一覧
+    const users = [
+      { id: 1, name: '太郎' },
+      { id: 2, name: '花子' }
+    ];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(users));
+
+  } else {
+    // 404 Not Found
+    res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('&lt;h1&gt;404 Not Found&lt;/h1&gt;&lt;p&gt;ページが見つかりません&lt;/p&gt;');
+  }
+});
+
+server.listen(3000, () => {
+  console.log('サーバー起動: http://localhost:3000');
+});</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    Start([リクエスト受信]) --> Check1{パス == / ?}
+    Check1 -- はい --> Home[ホームページ表示]
+    Check1 -- いいえ --> Check2{パス == /about ?}
+    Check2 -- はい --> About[Aboutページ表示]
+    Check2 -- いいえ --> Check3{パス == /api/users ?}
+    Check3 -- はい --> API[JSON形式でユーザー一覧返却]
+    Check3 -- いいえ --> NotFound[404エラー返却]
+
+    Home --> End([レスポンス送信])
+    About --> End
+    API --> End
+    NotFound --> End
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 9-2: ルーティングサーバーを構築</h3>
+                                <p class="text-purple-900 mb-4 break-words">以下の機能を持つサーバーを作成してみましょう。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">実装する機能</h4>
+                                <ol class="space-y-3">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-2 py-0.5 rounded">/</code> にアクセス → トップページを表示</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-2 py-0.5 rounded">/contact</code> にアクセス → お問い合わせページを表示</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-2 py-0.5 rounded">/api/products</code> にアクセス → 商品データをJSON形式で返す</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">上記以外のパス → 404エラーページを表示</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    このような単純なif-else分岐によるルーティングは、規模が大きくなると管理が難しくなります。実際の開発では、次章で学習する<strong>Expressフレームワーク</strong>を使うのが一般的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden mb-8">
+                    <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                        <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                            <i class="fas fa-tools"></i>
+                            トラブルシューティング
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">Error: listen EADDRINUSE :::3000</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> ポート3000番が既に使用中です。前回のサーバープロセスが残っているか、別のアプリが使用しています。</p>
+                                <p><strong>解決方法:</strong></p>
+                                <ul class="list-disc pl-5 mt-1 space-y-1">
+                                    <li>Ctrl+C でサーバーを停止してから再起動</li>
+                                    <li>別のポート番号（例: 3001, 8080）を使用する</li>
+                                    <li>プロセスを強制終了: <code class="bg-orange-100 px-1 rounded">pkill node</code>（Windowsは <code class="bg-orange-100 px-1 rounded">taskkill /f /im node.exe</code>）</li>
+                                </ul>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">ブラウザに「接続できません」と表示される</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> サーバーが起動していないか、別のポートで起動しています。</p>
+                                <p><strong>解決方法:</strong></p>
+                                <ul class="list-disc pl-5 mt-1 space-y-1">
+                                    <li>ターミナルで「サーバー起動」メッセージが出ているか確認</li>
+                                    <li>URLのポート番号が正しいか確認（例: http://localhost:3000）</li>
+                                    <li><code class="bg-orange-100 px-1 rounded">node server.js</code> でサーバーを起動</li>
+                                </ul>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">CSSが適用されない</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> Content-Typeが正しく設定されていない、またはファイルパスが間違っています。</p>
+                                <p><strong>解決方法:</strong></p>
+                                <ul class="list-disc pl-5 mt-1 space-y-1">
+                                    <li>ブラウザの開発者ツール（F12）のネットワークタブで、CSSファイルが読み込まれているか確認</li>
+                                    <li>Content-Typeが <code class="bg-orange-100 px-1 rounded">text/css</code> になっているか確認</li>
+                                    <li>CSSファイルのパスが正しいか確認（例: <code class="bg-orange-100 px-1 rounded">/style.css</code>）</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. HTTPステータスコードの「404」と「500」の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>404 Not Found</strong>は、クライアントが存在しないページやリソースをリクエストしたときに返されるエラーです（クライアント側の問題）。一方、<strong>500 Internal Server Error</strong>は、サーバー側でプログラムのエラーが発生したときに返されるエラーです（サーバー側の問題）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100 px-1 rounded">http.createServer()</code> のコールバック関数の2つの引数（reqとres）は、それぞれ何を表しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>req（request）</strong>は、クライアントからのリクエスト情報を含むオブジェクトです（URL、メソッド、ヘッダーなど）。<strong>res（response）</strong>は、クライアントに送り返すレスポンスを作成するためのオブジェクトです（ステータスコード、ヘッダー、本文を設定する）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Content-Typeヘッダーはなぜ重要ですか？具体例を挙げて説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Content-Typeヘッダーは、送信するデータの種類をブラウザに伝えるために重要です。例えば、CSSファイルを送る際に <code class="bg-blue-200 px-1 rounded">Content-Type: text/html</code> と設定してしまうと、ブラウザはそれをHTMLとして解釈してしまい、スタイルが適用されません。正しく <code class="bg-blue-200 px-1 rounded">Content-Type: text/css</code> を設定することで、ブラウザが適切に処理できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="flex items-center gap-2 text-lg font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>HTTPはWebブラウザとサーバーがデータをやり取りするプロトコルで、リクエストとレスポンスで構成される</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Node.jsのhttpモジュールを使えば、数行のコードでWebサーバーを構築できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>reqオブジェクトからURL・メソッド・ヘッダー情報を取得し、resオブジェクトでレスポンスを作成する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>静的ファイル配信では、適切なContent-Typeを設定することが重要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>URLパターンとHTTPメソッドを組み合わせて、簡易的なルーティングを実装できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>実際の開発では、Expressなどのフレームワークを使うことで、より効率的にWebアプリケーションを構築できる</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="nodejs-beginner-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">ファイル操作をマスターしよう</span>
+                        </div>
+                    </a>
+                    <a href="nodejs-beginner-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">Expressフレームワーク入門</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

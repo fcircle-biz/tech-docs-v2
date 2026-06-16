@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Flutter学習教材 第17章 - HTTP通信とAPI連携</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Flutter - Cyan (Reactと同系統)
+                        primary: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-cyan-400/30 to-blue-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-mobile-alt text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Flutter学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>モバイルアプリ開発</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約40時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">Flutter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第17章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第17章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">HTTP通信とAPI連携</h1>
+                    <p class="text-slate-600">httpパッケージを使ったAPI通信、JSONデータの取得と表示、エラーハンドリングを学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>httpパッケージのインストールと基本的な使い方を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GETリクエストでAPIからデータを取得する方法を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSONデータの解析（パース）と表示方法をマスターする</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>POST/PUT/DELETEリクエストとエラーハンドリングを実装する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: HTTP通信とは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.1 HTTP通信とは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>HTTP（HyperText Transfer Protocol）</strong>は、インターネット上でデータをやり取りするための通信規約です。Flutterアプリでは、このHTTPを使って外部のサーバー（Web API）からデータを取得したり、データを送信したりします。
+                    </p>
+
+                    <!-- HTTP通信の基本概念カード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-download text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-blue-900 mb-1">GETリクエスト</h3>
+                                    <p class="text-sm text-blue-800">サーバーからデータを取得する（例: ユーザー情報の取得）</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-upload text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-emerald-900 mb-1">POSTリクエスト</h3>
+                                    <p class="text-sm text-emerald-800">サーバーに新しいデータを作成する（例: 新規登録）</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-edit text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-purple-900 mb-1">PUTリクエスト</h3>
+                                    <p class="text-sm text-purple-800">サーバーのデータを更新する（例: プロフィール編集）</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-red-50 rounded-lg p-4 border border-red-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-trash text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-red-900 mb-1">DELETEリクエスト</h3>
+                                    <p class="text-sm text-red-800">サーバーのデータを削除する（例: 投稿削除）</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HTTP通信の流れ図 -->
+                    <div class="my-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">HTTP通信の流れ</h3>
+                        <div class="mermaid bg-white p-4 rounded-lg border border-slate-200">
+sequenceDiagram
+    participant App as Flutterアプリ
+    participant Server as Webサーバー
+
+    App->>Server: HTTPリクエスト送信
+    Note over App,Server: GET/POST/PUT/DELETE
+    Server->>Server: データ処理
+    Server->>App: HTTPレスポンス返却
+    Note over App,Server: JSON形式のデータ
+    App->>App: データ解析・表示
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: httpパッケージのインストール -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.2 httpパッケージのインストール
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        FlutterでHTTP通信を行うには、<strong>httpパッケージ</strong>を使用します。まずはこのパッケージをプロジェクトに追加します。
+                    </p>
+
+                    <!-- 実習カード: パッケージ追加 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-3">実習: httpパッケージのインストール</h3>
+
+                                <p class="text-purple-800 mb-3">
+                                    <strong>手順1:</strong> pubspec.yamlファイルを開き、dependenciesセクションにhttpパッケージを追加します。
+                                </p>
+
+                                <div class="code-block-wrapper mb-4">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">pubspec.yaml</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-yaml">dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0  # この行を追加</code></pre>
+                                </div>
+
+                                <p class="text-purple-800 mb-3">
+                                    <strong>手順2:</strong> ターミナルで以下のコマンドを実行してパッケージをインストールします。
+                                </p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">ターミナル</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash">flutter pub get</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイント -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-emerald-500 mt-1"></i>
+                            <div>
+                                <h3 class="font-semibold text-emerald-900 mb-2">インストール後の確認</h3>
+                                <p class="text-sm text-emerald-800">
+                                    パッケージが正しくインストールされたかは、<code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">pubspec.lock</code>ファイルにhttpパッケージの情報が追加されていることで確認できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: GETリクエストの実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.3 GETリクエストの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まずは最も基本的な<strong>GETリクエスト</strong>を実装して、外部APIからデータを取得してみましょう。ここでは公開されているテスト用API「JSONPlaceholder」を使用します。
+                    </p>
+
+                    <!-- 実習カード: GETリクエスト -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-3">実習: ユーザー情報を取得するアプリ</h3>
+
+                                <p class="text-purple-800 mb-3">
+                                    JSONPlaceholder APIからユーザー情報を取得して表示するアプリを作成します。
+                                </p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">lib/main.dart</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-dart">import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // httpパッケージをインポート
+import 'dart:convert'; // JSON解析用
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: UserListScreen(),
+    );
+  }
+}
+
+class UserListScreen extends StatefulWidget {
+  @override
+  _UserListScreenState createState() => _UserListScreenState();
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">lib/main.dart（続き）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-dart">class _UserListScreenState extends State&lt;UserListScreen&gt; {
+  List users = []; // ユーザー情報を格納するリスト
+  bool isLoading = false; // ローディング状態
+
+  // GETリクエストでデータを取得する関数
+  Future&lt;void&gt; fetchUsers() async {
+    setState(() => isLoading = true);
+
+    final url = Uri.parse('https://jsonplaceholder.typicode.com/users');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        users = json.decode(response.body); // JSON文字列を配列に変換
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('ユーザー一覧')),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: users.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(users[index]['name']),
+                  subtitle: Text(users[index]['email']),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: fetchUsers,
+        child: Icon(Icons.refresh),
+      ),
+    );
+  }
+}</code></pre>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4 border border-blue-200">
+                        <h3 class="text-lg font-semibold text-blue-900 mb-3">コード解説</h3>
+                        <ul class="text-sm text-blue-800 space-y-2">
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">import 'package:http/http.dart' as http</code> - httpパッケージをインポート</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">Uri.parse()</code> - URLを解析してUri型に変換</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">http.get(url)</code> - GETリクエストを送信</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">response.statusCode</code> - HTTPステータスコード（200=成功）</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">json.decode()</code> - JSON文字列をDartのデータ型に変換</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション4: JSONデータの解析 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.4 JSONデータの解析とモデルクラス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際のアプリ開発では、JSONデータを<strong>モデルクラス</strong>に変換して扱うのが一般的です。これにより、型安全性が高まり、コードの可読性も向上します。
+                    </p>
+
+                    <!-- JSON構造の例 -->
+                    <div class="bg-slate-50 rounded-lg p-5 mb-4 border border-slate-200">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">APIが返すJSONデータの例</h3>
+                        <div class="code-block-wrapper">
+                            <div class="code-block-header">
+                                <span class="code-block-title">JSON</span>
+                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre><code class="language-json">{
+  "id": 1,
+  "name": "Leanne Graham",
+  "username": "Bret",
+  "email": "Sincere@april.biz"
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- 実習カード: モデルクラス作成 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-3">実習: モデルクラスの作成</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">lib/models/user.dart</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-dart">class User {
+  final int id;
+  final String name;
+  final String username;
+  final String email;
+
+  User({
+    required this.id,
+    required this.name,
+    required this.username,
+    required this.email,
+  });
+
+  // JSONからUserオブジェクトを作成するファクトリコンストラクタ
+  factory User.fromJson(Map&lt;String, dynamic&gt; json) {
+    return User(
+      id: json['id'],
+      name: json['name'],
+      username: json['username'],
+      email: json['email'],
+    );
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- モデルクラスを使った書き換え -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="code-block-header">
+                            <span class="code-block-title">モデルクラスを使ったfetchUsers関数</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-dart">List&lt;User&gt; users = []; // User型のリストに変更
+
+Future&lt;void&gt; fetchUsers() async {
+  setState(() => isLoading = true);
+
+  final url = Uri.parse('https://jsonplaceholder.typicode.com/users');
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    final List jsonList = json.decode(response.body);
+    setState(() {
+      users = jsonList.map((json) => User.fromJson(json)).toList();
+      isLoading = false;
+    });
+  }
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: POSTリクエストの実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.5 POSTリクエストの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>POSTリクエスト</strong>は、サーバーに新しいデータを送信する際に使用します。フォームの送信や新規登録などでよく使われます。
+                    </p>
+
+                    <!-- 実習カード: POSTリクエスト -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-3">実習: 投稿データの送信</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">POSTリクエストの例</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-dart">Future&lt;void&gt; createPost(String title, String body) async {
+  final url = Uri.parse('https://jsonplaceholder.typicode.com/posts');
+
+  final response = await http.post(
+    url,
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'title': title,
+      'body': body,
+      'userId': 1,
+    }),
+  );
+
+  if (response.statusCode == 201) {
+    print('投稿作成成功！');
+    print(response.body);
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4 border border-blue-200">
+                        <h3 class="text-lg font-semibold text-blue-900 mb-3">POSTリクエストのポイント</h3>
+                        <ul class="text-sm text-blue-800 space-y-2">
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">headers</code> - リクエストヘッダー（データ形式などを指定）</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">body</code> - 送信するデータ（JSON形式にエンコード）</li>
+                            <li><code class="bg-blue-100 px-2 py-0.5 rounded text-blue-900">statusCode 201</code> - リソース作成成功のステータスコード</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション6: エラーハンドリング -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        17.6 エラーハンドリング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ネットワーク通信では、接続エラーやサーバーエラーなど様々な問題が発生する可能性があります。適切なエラーハンドリングを実装しましょう。
+                    </p>
+
+                    <!-- 実習カード: エラーハンドリング -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-3">実習: エラーハンドリングの実装</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">エラーハンドリング付きfetchUsers</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-dart">Future&lt;void&gt; fetchUsers() async {
+  setState(() => isLoading = true);
+
+  try {
+    final url = Uri.parse('https://jsonplaceholder.typicode.com/users');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final List jsonList = json.decode(response.body);
+      setState(() {
+        users = jsonList.map((json) => User.fromJson(json)).toList();
+        isLoading = false;
+      });
+    } else {
+      throw Exception('サーバーエラー: ${response.statusCode}');
+    }
+  } catch (e) {
+    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('データ取得に失敗しました: $e')),
+    );
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- エラーハンドリングのパターン -->
+                    <div class="bg-slate-50 rounded-lg p-5 mb-4 border border-slate-200">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">主なエラーパターン</h3>
+                        <ul class="text-sm text-slate-700 space-y-2">
+                            <li class="flex items-start gap-2">
+                                <span class="flex-shrink-0 w-20 bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-semibold">400番台</span>
+                                <span>クライアントエラー（例: 401 認証エラー、404 Not Found）</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="flex-shrink-0 w-20 bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-semibold">500番台</span>
+                                <span>サーバーエラー（例: 500 Internal Server Error）</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="flex-shrink-0 w-20 bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-semibold">Exception</span>
+                                <span>ネットワーク接続エラー、タイムアウトなど</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-wrench text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-lg font-semibold text-orange-900 mb-3">トラブルシューティング</h2>
+
+                                <div class="space-y-4">
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h3 class="font-semibold text-orange-900 mb-2">問題: SocketException が発生する</h3>
+                                        <p class="text-sm text-orange-800 mb-2">
+                                            <strong>原因:</strong> インターネット接続権限が不足している、または実機でHTTP通信が許可されていない。
+                                        </p>
+                                        <p class="text-sm text-orange-800">
+                                            <strong>解決策:</strong> AndroidManifest.xmlにINTERNET権限を追加。iOS 9以降でHTTP通信する場合はInfo.plistにATS設定を追加。
+                                        </p>
+                                    </div>
+
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h3 class="font-semibold text-orange-900 mb-2">問題: FormatException が発生する</h3>
+                                        <p class="text-sm text-orange-800 mb-2">
+                                            <strong>原因:</strong> JSON解析に失敗している（不正なJSON形式）。
+                                        </p>
+                                        <p class="text-sm text-orange-800">
+                                            <strong>解決策:</strong> response.bodyを出力してJSON形式が正しいか確認。APIのドキュメントを確認。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- クイズセクション -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        理解度チェッククイズ
+                    </h2>
+
+                    <!-- クイズ1 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q1
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">FlutterでHTTP通信を行うために使用するパッケージは何ですか?</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>A. network</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>B. http</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>C. api</span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: B</strong><br>
+                                        FlutterでHTTP通信を行うには、公式の「http」パッケージを使用します。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- クイズ2 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q2
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">サーバーからデータを取得する際に使用するHTTPメソッドは?</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>A. GET</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>B. POST</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>C. DELETE</span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: A</strong><br>
+                                        GETメソッドはサーバーからデータを取得する際に使用します。POSTは新規作成、DELETEは削除に使います。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- クイズ3 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q3
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">HTTPリクエストが成功したことを示すステータスコードは?</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>A. 200</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>B. 404</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>C. 500</span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: A</strong><br>
+                                        200はHTTPリクエスト成功を示すステータスコードです。404はNot Found、500はサーバーエラーを表します。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 章まとめ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-bookmark text-primary-500"></i>
+                            第17章のまとめ
+                        </h2>
+                        <ul class="space-y-2 text-slate-700">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>httpパッケージ</strong>を使ってHTTP通信を実装できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>GETリクエスト</strong>でサーバーからデータを取得し、UIに表示できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>json.decode()</strong>を使ってJSON文字列をDartのデータ型に変換できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>モデルクラス</strong>を作成することで型安全にデータを扱える</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>POSTリクエスト</strong>でサーバーにデータを送信できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>try-catch</strong>を使った適切なエラーハンドリングが重要</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 border-t border-slate-200">
+                    <a href="flutter-learning-material-16.html"
+                       class="flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200
+                              text-slate-700 rounded-lg transition-colors">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>前の章へ</span>
+                    </a>
+                    <a href="flutter-learning-material-18.html"
+                       class="flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600
+                              text-white rounded-lg transition-colors">
+                        <span>次の章へ</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript読み込み -->
+    <script src="sidebar-content.js"></script>
+    <script src="main.js"></script>
+    <script src="drawing-tool.js"></script>
+
+    <!-- Highlight.js初期化 -->
+    <script>
+        hljs.highlightAll();
+    </script>
+
+    <!-- Mermaid初期化 -->
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+        });
+    </script>
+</body>
+</html>

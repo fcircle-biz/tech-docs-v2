@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>MySQL入門 第12章 - 実践！MySQLでWebアプリのDBを設計しよう</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">MySQL入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-database text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">MySQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">実践！MySQLでWebアプリのDBを設計しよう</h1>
+                    <p class="text-slate-600">これまで学んだ知識を活用して、実際のWebアプリケーション（ECサイトやブログシステム）を想定したデータベースを設計・構築します。テーブル設計、インデックス設計、文字コード設定、ビュー作成までを総合的に実践します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ECサイトを想定したテーブル設計（ユーザー、商品、注文、レビューなど）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>適切なデータ型・制約・インデックスの選定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>文字コード・照合順序の設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューとストアドプロシージャを活用した運用</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: 要件定義と設計の流れ -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 要件定義と設計の流れ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際のWebアプリケーション開発では、まず「どんな機能が必要か」を整理してからデータベース設計に入ります。今回は、シンプルなECサイトを想定して設計してみましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ECサイトに必要な主な機能</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>会員管理</strong> - ユーザー登録、ログイン、プロフィール編集</li>
+                                    <li><strong>商品管理</strong> - 商品一覧、商品詳細、在庫管理</li>
+                                    <li><strong>カート機能</strong> - カート追加、数量変更、削除</li>
+                                    <li><strong>注文機能</strong> - 注文確定、注文履歴、注文状態管理</li>
+                                    <li><strong>レビュー機能</strong> - 商品レビュー投稿、評価</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart TD
+    A[要件定義] --> B[エンティティ抽出]
+    B --> C[テーブル設計]
+    C --> D[データ型・制約決定]
+    D --> E[インデックス設計]
+    E --> F[ビュー設計]
+    F --> G[初期データ投入]
+    G --> H[動作確認]
+                    </div>
+                </section>
+
+                <!-- セクション2: テーブル設計（エンティティ定義） -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 テーブル設計（エンティティ定義）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ECサイトに必要なエンティティ（テーブル）を洗い出します。今回は以下の5つのテーブルを作成します。
+                    </p>
+
+                    <div class="mermaid my-6">
+erDiagram
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ REVIEWS : writes
+    USERS ||--o{ CART_ITEMS : has
+    PRODUCTS ||--o{ CART_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : includes
+    PRODUCTS ||--o{ REVIEWS : receives
+    ORDERS ||--o{ ORDER_ITEMS : contains
+
+    USERS {
+        INT user_id PK
+        VARCHAR email
+        VARCHAR password_hash
+        VARCHAR name
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    PRODUCTS {
+        INT product_id PK
+        VARCHAR name
+        TEXT description
+        DECIMAL price
+        INT stock_quantity
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    ORDERS {
+        INT order_id PK
+        INT user_id FK
+        DECIMAL total_amount
+        VARCHAR status
+        DATETIME ordered_at
+        DATETIME updated_at
+    }
+
+    ORDER_ITEMS {
+        INT order_item_id PK
+        INT order_id FK
+        INT product_id FK
+        INT quantity
+        DECIMAL price_at_order
+    }
+
+    REVIEWS {
+        INT review_id PK
+        INT user_id FK
+        INT product_id FK
+        INT rating
+        TEXT comment
+        DATETIME created_at
+    }
+
+    CART_ITEMS {
+        INT cart_item_id PK
+        INT user_id FK
+        INT product_id FK
+        INT quantity
+        DATETIME added_at
+    }
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3">テーブル概要</h3>
+                        <ul class="text-slate-700 text-sm space-y-2">
+                            <li><strong>users</strong> - 会員情報（ユーザーID、メールアドレス、パスワード、名前など）</li>
+                            <li><strong>products</strong> - 商品情報（商品ID、商品名、説明、価格、在庫数など）</li>
+                            <li><strong>orders</strong> - 注文情報（注文ID、ユーザーID、合計金額、状態など）</li>
+                            <li><strong>order_items</strong> - 注文明細（注文ID、商品ID、数量、注文時の価格）</li>
+                            <li><strong>reviews</strong> - 商品レビュー（レビューID、ユーザーID、商品ID、評価、コメント）</li>
+                            <li><strong>cart_items</strong> - カート情報（ユーザーID、商品ID、数量、追加日時）</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション3: データベースとテーブルの作成 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 データベースとテーブルの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まず、文字コードをutf8mb4に設定したデータベースを作成し、各テーブルを定義していきます。
+                    </p>
+
+                    <!-- 実習カード：データベース作成 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: データベースの作成</h3>
+
+                                <p class="text-purple-900 mb-3 break-words">まず、ECサイト用のデータベースを作成します。</p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-filename">データベース作成（SQL）</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- ECサイト用データベース作成
+CREATE DATABASE ec_site
+    DEFAULT CHARACTER SET utf8mb4
+    DEFAULT COLLATE utf8mb4_general_ci;
+
+-- データベースを選択
+USE ec_site;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- usersテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">usersテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">usersテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 会員情報テーブル
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+
+                    <!-- productsテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">productsテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">productsテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 商品情報テーブル
+CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    stock_quantity INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+
+                    <!-- ordersテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ordersテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">ordersテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 注文情報テーブル
+CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    ordered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+
+                    <!-- order_itemsテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">order_itemsテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">order_itemsテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 注文明細テーブル
+CREATE TABLE order_items (
+    order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price_at_order DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    INDEX idx_order_id (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+
+                    <!-- reviewsテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">reviewsテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">reviewsテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 商品レビューテーブル
+CREATE TABLE reviews (
+    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    INDEX idx_product_id (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+
+                    <!-- cart_itemsテーブル -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">cart_itemsテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">cart_itemsテーブル作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- カート情報テーブル
+CREATE TABLE cart_items (
+    cart_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    INDEX idx_user_id (user_id),
+    UNIQUE KEY uk_user_product (user_id, product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: 初期データの投入 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 初期データの投入
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        テーブルを作成したら、テスト用のサンプルデータを投入して動作を確認します。
+                    </p>
+
+                    <!-- 実習カード：サンプルデータ投入 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: サンプルデータの投入</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-filename">サンプルデータ投入（SQL）</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- ユーザーデータ投入
+INSERT INTO users (email, password_hash, name) VALUES
+('tanaka@example.com', '$2y$10$abc...', '田中太郎'),
+('suzuki@example.com', '$2y$10$def...', '鈴木花子'),
+('sato@example.com', '$2y$10$ghi...', '佐藤次郎');
+
+-- 商品データ投入
+INSERT INTO products (name, description, price, stock_quantity) VALUES
+('ノートPC', '高性能な最新ノートパソコン', 120000.00, 10),
+('マウス', 'ワイヤレスマウス', 2500.00, 50),
+('キーボード', 'メカニカルキーボード', 8500.00, 30);</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: ビューとストアドプロシージャの作成 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 ビューとストアドプロシージャの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        複雑な集計や頻繁に使うクエリはビューやストアドプロシージャとして保存しておくと便利です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ビューの作成例：商品レビュー一覧</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">ビュー作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 商品レビュー一覧ビュー
+CREATE VIEW product_reviews AS
+SELECT
+    p.product_id,
+    p.name AS product_name,
+    u.name AS reviewer_name,
+    r.rating,
+    r.comment,
+    r.created_at
+FROM
+    reviews r
+    JOIN users u ON r.user_id = u.user_id
+    JOIN products p ON r.product_id = p.product_id
+ORDER BY
+    r.created_at DESC;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ストアドプロシージャの作成例：注文作成</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">ストアドプロシージャ作成（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">DELIMITER //
+
+CREATE PROCEDURE create_order(IN p_user_id INT)
+BEGIN
+    DECLARE v_total DECIMAL(10, 2);
+    DECLARE v_order_id INT;
+
+    -- カート内の合計金額を計算
+    SELECT SUM(p.price * c.quantity) INTO v_total
+    FROM cart_items c
+    JOIN products p ON c.product_id = p.product_id
+    WHERE c.user_id = p_user_id;
+
+    -- 注文レコードを作成
+    INSERT INTO orders (user_id, total_amount) VALUES (p_user_id, v_total);
+    SET v_order_id = LAST_INSERT_ID();
+
+    -- カート内容を注文明細に移動
+    INSERT INTO order_items (order_id, product_id, quantity, price_at_order)
+    SELECT v_order_id, c.product_id, c.quantity, p.price
+    FROM cart_items c
+    JOIN products p ON c.product_id = p.product_id
+    WHERE c.user_id = p_user_id;
+
+    -- カートをクリア
+    DELETE FROM cart_items WHERE user_id = p_user_id;
+END //
+
+DELIMITER ;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション6: 動作確認クエリ -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 動作確認クエリ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作成したテーブルとビューが正しく動作するか、実際のクエリで確認してみましょう。
+                    </p>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-check-circle text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認クエリ例</h3>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-filename">動作確認（SQL）</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- 全ユーザー一覧を表示
+SELECT * FROM users;
+
+-- 在庫がある商品のみ表示
+SELECT * FROM products WHERE stock_quantity > 0;
+
+-- ビューを使ってレビュー一覧を表示
+SELECT * FROM product_reviews;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7: パフォーマンスチューニングのポイント -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 パフォーマンスチューニングのポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の運用では、アクセス数が増えた際のパフォーマンスも考慮する必要があります。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">インデックス設計のポイント</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>・WHERE句で頻繁に使われるカラムにはインデックスを設定</li>
+                                    <li>・外部キーには必ずインデックスを設定（JOIN時に高速化）</li>
+                                    <li>・複合インデックスは検索条件の組み合わせを考慮</li>
+                                    <li>・EXPLAINコマンドで実行計画を確認</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-filename">実行計画の確認（SQL）</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 実行計画を表示してインデックスが使われるか確認
+EXPLAIN SELECT * FROM orders WHERE user_id = 1;</code></pre>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ECサイトのテーブル設計で、注文時の商品価格を保存する理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            商品テーブルの価格は変動する可能性があるため、注文時の価格を別途保存しておかないと、過去の注文の金額が変わってしまいます。order_itemsテーブルのprice_at_orderカラムに注文時の価格を記録することで、注文履歴を正確に保持できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ビューとテーブルの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            テーブルは実際にデータを保存するのに対し、ビューは複数のテーブルを結合したクエリを「仮想的なテーブル」として保存したものです。ビュー自体はデータを持たず、参照時に元のテーブルからデータを取得して表示します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 外部キー制約を設定するメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            外部キー制約により、存在しないユーザーIDや商品IDを誤って登録することを防げます。また、参照整合性が保たれるため、データの矛盾を防ぐことができます。例えば、注文が残っているユーザーを削除しようとするとエラーになり、データの一貫性が保たれます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>実際のWebアプリケーション（ECサイト）を想定したDB設計を実践した</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>適切なデータ型、制約、インデックスを選定してテーブルを作成した</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>文字コードutf8mb4を設定し、日本語データを正しく扱えるようにした</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>ビューとストアドプロシージャを活用して運用を効率化した</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>EXPLAINコマンドでパフォーマンスを確認する方法を学んだ</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-wrench text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">トラブルシューティング</h3>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="font-medium text-orange-900 mb-1 break-words">外部キー制約エラーが出る</p>
+                                    <p class="text-orange-800 text-sm break-words">
+                                        参照先のテーブルが存在しない、または参照先のカラムにデータがない可能性があります。先に親テーブル（users、productsなど）にデータを投入してから、子テーブル（orders、reviewsなど）にデータを追加しましょう。
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="font-medium text-orange-900 mb-1 break-words">ストアドプロシージャが作成できない</p>
+                                    <p class="text-orange-800 text-sm break-words">
+                                        DELIMITERを設定せずにストアドプロシージャを作成しようとしている可能性があります。DELIMITER //を設定してから作成し、最後にDELIMITER ;で元に戻しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- コース完了おめでとうカード -->
+                <div class="bg-gradient-to-r from-purple-50 via-pink-50 to-yellow-50 border-2 border-purple-300
+                            rounded-xl p-6 my-8 text-center">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h3 class="text-2xl font-bold text-purple-800 mb-3">MySQL入門コース完了おめでとうございます！</h3>
+                    <p class="text-purple-900 mb-4">
+                        全12章を通して、MySQLの基礎から実践的なDB設計まで学びました。<br>
+                        この知識を活かして、さらに高度な学習や実際の開発に挑戦してください！
+                    </p>
+                    <div class="flex items-center justify-center gap-4 text-sm text-purple-800">
+                        <div>
+                            <i class="fas fa-check-circle text-purple-500"></i>
+                            MySQL基礎理解
+                        </div>
+                        <div>
+                            <i class="fas fa-check-circle text-purple-500"></i>
+                            テーブル設計
+                        </div>
+                        <div>
+                            <i class="fas fa-check-circle text-purple-500"></i>
+                            インデックス最適化
+                        </div>
+                        <div>
+                            <i class="fas fa-check-circle text-purple-500"></i>
+                            実践DB構築
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次のステップ -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">次のステップ</h3>
+                            <ul class="text-blue-900 text-sm space-y-2">
+                                <li><strong>PHPやPythonと連携</strong> - プログラミング言語からMySQLを操作する方法を学ぶ</li>
+                                <li><strong>MySQL中級</strong> - レプリケーション、パーティショニング、パフォーマンスチューニングに挑戦</li>
+                                <li><strong>実務プロジェクト</strong> - 実際のアプリケーション開発でMySQLを活用する</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="mysql-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">ユーザーと権限管理</span>
+                        </div>
+                    </a>
+                    <div class="text-center text-slate-500 text-sm">
+                        <i class="fas fa-flag-checkered mr-2"></i>
+                        コース完了
+                    </div>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS SAP-C02入門 第11章 - ストレージの高可用性とデータ保護</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS Orange
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS SAP-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS SAP-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ストレージの高可用性とデータ保護</h1>
+                    <p class="text-slate-600">S3、EBS、EFSの高可用性設計とデータ保護戦略を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>S3のストレージクラスと可用性設計</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>S3クロスリージョンレプリケーション（CRR）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>S3バージョニングとオブジェクトロック</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>EBSスナップショットとマルチアタッチ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>EFSのパフォーマンスモードとバックアップ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>AWS Backupによる統合バックアップ管理</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>データライフサイクル管理</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: S3のストレージクラスと可用性設計 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 S3のストレージクラスと可用性設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon S3は、オブジェクトストレージとして業界最高レベルの耐久性（99.999999999%、イレブンナイン）を提供します。
+                        データのアクセスパターンとコスト要件に応じて、適切なストレージクラスを選択することが重要です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">S3ストレージクラスの種類</h3>
+
+                    <div class="mermaid">
+graph LR
+    A["データ"]
+    B["S3 Standard<br/>頻繁なアクセス<br/>可用性: 99.99%"]
+    C["S3 Standard-IA<br/>低頻度アクセス<br/>可用性: 99.9%"]
+    D["S3 One Zone-IA<br/>単一AZ<br/>可用性: 99.5%"]
+    E["S3 Glacier<br/>アーカイブ<br/>取り出し時間: 分～時間"]
+    F["S3 Glacier Deep Archive<br/>長期アーカイブ<br/>取り出し時間: 12時間以内"]
+    G["S3 Intelligent-Tiering<br/>自動最適化<br/>可用性: 99.9%"]
+
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    A --> G
+
+    style B fill:#dbeafe
+    style C fill:#e0f2fe
+    style D fill:#cffafe
+    style E fill:#ddd6fe
+    style F fill:#e9d5ff
+    style G fill:#fef3c7
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">ストレージクラス</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">耐久性</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">可用性</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">最小保存期間</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">用途</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Standard</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.99%</td>
+                                    <td class="border border-slate-300 px-4 py-2">なし</td>
+                                    <td class="border border-slate-300 px-4 py-2">頻繁にアクセスされるデータ</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Standard-IA</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.9%</td>
+                                    <td class="border border-slate-300 px-4 py-2">30日</td>
+                                    <td class="border border-slate-300 px-4 py-2">バックアップ、DR用データ</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 One Zone-IA</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.5%</td>
+                                    <td class="border border-slate-300 px-4 py-2">30日</td>
+                                    <td class="border border-slate-300 px-4 py-2">再作成可能なデータ</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Glacier Instant Retrieval</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.9%</td>
+                                    <td class="border border-slate-300 px-4 py-2">90日</td>
+                                    <td class="border border-slate-300 px-4 py-2">四半期に1回程度のアクセス</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Glacier Flexible Retrieval</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.99%</td>
+                                    <td class="border border-slate-300 px-4 py-2">90日</td>
+                                    <td class="border border-slate-300 px-4 py-2">年に1～2回のアクセス</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Glacier Deep Archive</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.99%</td>
+                                    <td class="border border-slate-300 px-4 py-2">180日</td>
+                                    <td class="border border-slate-300 px-4 py-2">7～10年保管のアーカイブ</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">S3 Intelligent-Tiering</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.999999999%</td>
+                                    <td class="border border-slate-300 px-4 py-2">99.9%</td>
+                                    <td class="border border-slate-300 px-4 py-2">なし</td>
+                                    <td class="border border-slate-300 px-4 py-2">アクセスパターンが不明</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">耐久性と可用性の違い</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    <strong>耐久性（Durability）:</strong> データが失われない確率。S3は全クラスで11ナインの耐久性を提供。<br>
+                                    <strong>可用性（Availability）:</strong> データにアクセスできる確率。ストレージクラスによって異なり、Standard（99.99%）からOne Zone-IA（99.5%）まで。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">S3の可用性設計原則</h3>
+
+                    <div class="mermaid">
+graph TD
+    A["S3バケット"]
+    B["マルチAZ<br/>データレプリケーション"]
+    C["AZ-1"]
+    D["AZ-2"]
+    E["AZ-3"]
+    F["イレブンナイン<br/>耐久性保証"]
+
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> F
+    D --> F
+    E --> F
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#d1fae5
+    style D fill:#d1fae5
+    style E fill:#d1fae5
+    style F fill:#fef3c7
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">1. デフォルトでマルチAZ</h4>
+                            <p class="text-sm text-slate-600">
+                                S3 Standard、Standard-IA、Glacierは、複数のアベイラビリティゾーンにデータを自動的にレプリケート。
+                                単一AZ障害でもデータにアクセス可能。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">2. リージョン内の自動レプリケーション</h4>
+                            <p class="text-sm text-slate-600">
+                                S3は、同一リージョン内の複数のアベイラビリティゾーンに少なくとも3つのコピーを保存。
+                                ハードウェア障害からデータを保護。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">3. 自動的なデータ整合性チェック</h4>
+                            <p class="text-sm text-slate-600">
+                                S3は定期的にチェックサムを検証し、破損したデータを検出・修復。
+                                データの完全性を継続的に保証。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: S3クロスリージョンレプリケーション -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 S3クロスリージョンレプリケーション（CRR）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        S3クロスリージョンレプリケーション（CRR）を使用すると、バケット内のオブジェクトを異なるAWSリージョンに自動的にレプリケートできます。
+                        災害復旧、レイテンシー削減、コンプライアンス要件への対応に有効です。
+                    </p>
+
+                    <div class="mermaid">
+graph LR
+    A["ソースバケット<br/>東京リージョン"]
+    B["レプリケーションルール"]
+    C["宛先バケット<br/>シンガポールリージョン"]
+    D["IAMロール"]
+
+    A -->|新規オブジェクト| B
+    B -->|レプリケート| C
+    B -.->|権限| D
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#d1fae5
+    style D fill:#fef3c7
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">CRRの主要機能</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-clock"></i>
+                                自動レプリケーション
+                            </h4>
+                            <p class="text-blue-900 text-sm">
+                                新規オブジェクトはバージョン管理有効時に自動的にレプリケート。
+                                既存オブジェクトのレプリケーションも可能（Batch Replication）。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-filter"></i>
+                                フィルタリング
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                プレフィックス、タグに基づいてレプリケート対象を指定可能。
+                                特定のフォルダやオブジェクトのみをレプリケート。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exchange-alt"></i>
+                                ストレージクラス変更
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                レプリケーション先で異なるストレージクラスに変更可能。
+                                例: Standard → Standard-IA でコスト削減。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-users"></i>
+                                所有権の変更
+                            </h4>
+                            <p class="text-orange-900 text-sm">
+                                宛先バケットの所有者に所有権を変更可能（Replica Ownership Override）。
+                                クロスアカウントレプリケーションで有用。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">CRR設定の前提条件</h3>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">CRRの前提条件</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>✓ ソースバケットとレプリケーション先バケットの両方でバージョニングが有効</li>
+                                    <li>✓ ソースバケットと宛先バケットが異なるリージョンに存在</li>
+                                    <li>✓ S3がソースバケットから宛先バケットにオブジェクトをレプリケートする権限を持つIAMロールが必要</li>
+                                    <li>✓ ソースバケットの所有者がレプリケーションロールに対して適切な権限を付与</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">CRRのユースケース</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">災害復旧（DR）</h4>
+                            <p class="text-sm text-slate-600">
+                                プライマリリージョンで障害が発生した場合、別リージョンのバケットにフェイルオーバー。
+                                RPOをほぼゼロに近づけることが可能。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">レイテンシー削減</h4>
+                            <p class="text-sm text-slate-600">
+                                グローバルユーザーに対して、地理的に近いリージョンからコンテンツを提供。
+                                ダウンロード速度の向上。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">コンプライアンス</h4>
+                            <p class="text-sm text-slate-600">
+                                法規制により、データを特定の地理的場所に保管する必要がある場合、
+                                該当リージョンにデータをレプリケート。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">レプリケーションの注意点</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    レプリケーションは非同期で行われるため、わずかな遅延が発生します。
+                                    また、削除マーカーや特定バージョンの削除はデフォルトではレプリケートされません。
+                                    必要に応じて、削除マーカーのレプリケーションを有効化してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: S3バージョニングとオブジェクトロック -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 S3バージョニングとオブジェクトロック
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        S3バージョニングとオブジェクトロックは、データの保護と不変性を保証するための重要な機能です。
+                        誤削除や悪意のある変更からデータを保護できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">S3バージョニング</h3>
+
+                    <div class="mermaid">
+graph LR
+    A["オブジェクト: file.txt"]
+    B["Version 1<br/>初回アップロード"]
+    C["Version 2<br/>更新"]
+    D["Version 3<br/>更新"]
+    E["削除マーカー<br/>削除実行時"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#e0f2fe
+    style D fill:#cffafe
+    style E fill:#fecaca
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">バージョニングの仕組み</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                バケットでバージョニングを有効にすると、オブジェクトの全バージョンが保存されます。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• 同じキー名でアップロードすると新しいバージョンが作成される</li>
+                                <li>• 削除すると削除マーカーが追加される（実際には削除されない）</li>
+                                <li>• 削除マーカーを削除すると元のオブジェクトが復元される</li>
+                                <li>• 特定バージョンを指定して取得・削除が可能</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">バージョニングの利点</h4>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• 誤削除からの保護: 削除マーカーを削除すれば復元可能</li>
+                                <li>• 誤上書きからの保護: 過去のバージョンを取得可能</li>
+                                <li>• レプリケーションの前提条件: CRR/SRRにはバージョニングが必須</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">S3オブジェクトロック</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        S3オブジェクトロックは、WORM（Write Once Read Many）モデルを実装し、
+                        指定期間または無期限にオブジェクトの削除や上書きを防ぎます。
+                        金融、医療、法律分野のコンプライアンス要件に対応。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shield-alt"></i>
+                                ガバナンスモード
+                            </h4>
+                            <p class="text-blue-900 text-sm mb-2">
+                                特別な権限を持つユーザーはロック設定を変更または削除可能。
+                            </p>
+                            <p class="text-blue-800 text-xs">
+                                用途: 開発環境、テスト環境でのデータ保護
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-lock"></i>
+                                コンプライアンスモード
+                            </h4>
+                            <p class="text-purple-900 text-sm mb-2">
+                                ルートユーザーを含むすべてのユーザーがロック期間中は削除・変更不可。
+                            </p>
+                            <p class="text-purple-800 text-xs">
+                                用途: 金融記録、医療記録の保管（SEC 17a-4等）
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">リーガルホールド</h3>
+                                <p class="text-blue-900 text-sm">
+                                    保持期間とは独立して、無期限にオブジェクトを保護できる機能。
+                                    訴訟や調査が進行中の場合に使用。
+                                    <code class="bg-blue-100 px-1 rounded text-xs">s3:PutObjectLegalHold</code> 権限を持つユーザーのみが解除可能。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">オブジェクトロックの設定例</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">バケット作成時にオブジェクトロックを有効化</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 新規バケット作成時にオブジェクトロック有効化
+aws s3api create-bucket \
+  --bucket my-compliance-bucket \
+  --region ap-northeast-1 \
+  --create-bucket-configuration LocationConstraint=ap-northeast-1 \
+  --object-lock-enabled-for-bucket
+
+# デフォルト保持期間を設定（30日間のコンプライアンスモード）
+aws s3api put-object-lock-configuration \
+  --bucket my-compliance-bucket \
+  --object-lock-configuration '{
+    "ObjectLockEnabled": "Enabled",
+    "Rule": {
+      "DefaultRetention": {
+        "Mode": "COMPLIANCE",
+        "Days": 30
+      }
+    }
+  }'</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">バージョニングとオブジェクトロックの組み合わせ</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    オブジェクトロックを使用するには、バケットでバージョニングが有効である必要があります。
+                                    両機能を組み合わせることで、最高レベルのデータ保護を実現できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: EBSスナップショットとマルチアタッチ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 EBSスナップショットとマルチアタッチ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon EBSは、EC2インスタンス用のブロックストレージを提供します。
+                        スナップショット機能とマルチアタッチ機能により、データの保護と高可用性を実現します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EBSスナップショットの仕組み</h3>
+
+                    <div class="mermaid">
+graph LR
+    A["EBSボリューム<br/>AP-Northeast-1a"]
+    B["スナップショット<br/>増分バックアップ"]
+    C["S3<br/>リージョン全体に保存"]
+    D["新規EBSボリューム<br/>任意のAZに復元"]
+
+    A -->|作成| B
+    B -->|保存| C
+    C -->|復元| D
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#fef3c7
+    style D fill:#d1fae5
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">増分バックアップ</h4>
+                            <p class="text-sm text-slate-600">
+                                初回スナップショットはフルバックアップ、以降は変更分のみを保存。
+                                ストレージコストと作成時間を削減。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">リージョンレベルの可用性</h4>
+                            <p class="text-sm text-slate-600">
+                                スナップショットはS3に保存され、リージョン内の複数AZに自動的にレプリケート。
+                                任意のAZに復元可能。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">クロスリージョンコピー</h4>
+                            <p class="text-sm text-slate-600">
+                                スナップショットを別リージョンにコピーして、リージョン障害からのDRを実現。
+                                暗号化や暗号化キーの変更も可能。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EBSスナップショットのベストプラクティス</h3>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">スナップショット作成のベストプラクティス</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• 定期的なスナップショット作成を自動化（Data Lifecycle Manager使用）</li>
+                                    <li>• ボリュームのアタッチ中でもスナップショット作成可能（オンラインバックアップ）</li>
+                                    <li>• 重要なスナップショットにはタグを付けて管理</li>
+                                    <li>• 不要なスナップショットは削除してコスト削減</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EBSマルチアタッチ</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EBSマルチアタッチを使用すると、単一のProvisioned IOPS SSD（io1/io2）ボリュームを
+                        同一アベイラビリティゾーン内の最大16個のEC2インスタンスに同時にアタッチできます。
+                    </p>
+
+                    <div class="mermaid">
+graph TD
+    A["EBSボリューム<br/>io2 Multi-Attach"]
+    B["EC2インスタンス1"]
+    C["EC2インスタンス2"]
+    D["EC2インスタンス3"]
+
+    A --> B
+    A --> C
+    A --> D
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#e0f2fe
+    style D fill:#cffafe
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2">ユースケース</h4>
+                            <ul class="text-emerald-900 text-sm space-y-1">
+                                <li>• クラスタファイルシステム（Oracle RAC等）</li>
+                                <li>• 高可用性アプリケーション</li>
+                                <li>• 共有ストレージが必要なアプリケーション</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-orange-800 mb-2">制限事項</h4>
+                            <ul class="text-orange-900 text-sm space-y-1">
+                                <li>• io1/io2ボリュームのみサポート</li>
+                                <li>• 同一AZ内のインスタンスのみ</li>
+                                <li>• クラスタ対応ファイルシステムが必要</li>
+                                <li>• 最大16インスタンスまで</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">ファイルシステムの注意点</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    マルチアタッチを使用する場合、通常のファイルシステム（ext4、XFS等）では
+                                    データ破損のリスクがあります。
+                                    必ずクラスタ対応ファイルシステム（GFS2、OCFS2等）またはアプリケーションレベルの同期制御を使用してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: EFSのパフォーマンスモードとバックアップ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 EFSのパフォーマンスモードとバックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon EFS（Elastic File System）は、フルマネージド型のNFSファイルシステムを提供します。
+                        マルチAZ構成によりデフォルトで高可用性を実現し、自動バックアップ機能でデータを保護します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EFSの高可用性アーキテクチャ</h3>
+
+                    <div class="mermaid">
+graph TD
+    A["EFSファイルシステム"]
+    B["AZ-1<br/>マウントターゲット"]
+    C["AZ-2<br/>マウントターゲット"]
+    D["AZ-3<br/>マウントターゲット"]
+    E["EC2インスタンス<br/>AZ-1"]
+    F["EC2インスタンス<br/>AZ-2"]
+    G["EC2インスタンス<br/>AZ-3"]
+
+    A --> B
+    A --> C
+    A --> D
+    B --> E
+    C --> F
+    D --> G
+
+    style A fill:#fed7aa
+    style B fill:#dbeafe
+    style C fill:#e0f2fe
+    style D fill:#cffafe
+    style E fill:#d1fae5
+    style F fill:#d1fae5
+    style G fill:#d1fae5
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">マルチAZアーキテクチャ</h4>
+                            <p class="text-sm text-slate-600">
+                                EFSは複数のAZにデータを自動的にレプリケート。
+                                各AZにマウントターゲットを作成し、AZ障害時でも他のAZからアクセス可能。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">自動スケーリング</h4>
+                            <p class="text-sm text-slate-600">
+                                ファイルの追加・削除に応じて自動的に容量が増減。
+                                事前のキャパシティプロビジョニング不要。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EFSパフォーマンスモード</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">モード</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">特徴</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">用途</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">General Purpose</td>
+                                    <td class="border border-slate-300 px-4 py-2">低レイテンシー（ミリ秒単位）を提供</td>
+                                    <td class="border border-slate-300 px-4 py-2">Webサーバー、CMS、開発環境</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">Max I/O</td>
+                                    <td class="border border-slate-300 px-4 py-2">高スループット、並列処理に最適化</td>
+                                    <td class="border border-slate-300 px-4 py-2">ビッグデータ分析、メディア処理</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EFSスループットモード</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2">Bursting Throughput</h4>
+                            <p class="text-blue-900 text-sm mb-2">
+                                ファイルシステムのサイズに応じてスループットがスケール。
+                                小規模ファイルシステムでも一時的に高スループットを実現（バースト）。
+                            </p>
+                            <p class="text-blue-800 text-xs">
+                                適用: 小〜中規模のワークロード
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2">Provisioned Throughput</h4>
+                            <p class="text-purple-900 text-sm mb-2">
+                                必要なスループットを事前に指定。
+                                ファイルシステムのサイズに関係なく、一定のスループットを保証。
+                            </p>
+                            <p class="text-purple-800 text-xs">
+                                適用: 高スループットが必要なワークロード
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EFSバックアップ</h3>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">AWS Backupとの統合</h4>
+                            <p class="text-sm text-slate-600">
+                                AWS Backupを使用して、EFSファイルシステムの自動バックアップを設定。
+                                バックアップスケジュール、保持期間、ライフサイクルポリシーを一元管理。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">増分バックアップ</h4>
+                            <p class="text-sm text-slate-600">
+                                初回はフルバックアップ、以降は変更分のみをバックアップ。
+                                バックアップ時間とストレージコストを削減。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">クロスリージョンバックアップ</h4>
+                            <p class="text-sm text-slate-600">
+                                AWS Backupでバックアップを別リージョンにコピー。
+                                リージョン障害からのDRを実現。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">EFSとEBSの使い分け</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    <strong>EFS:</strong> 複数のEC2インスタンスから同時アクセスが必要な場合、マルチAZ構成のファイル共有。<br>
+                                    <strong>EBS:</strong> 単一のEC2インスタンス専用のブロックストレージ、低レイテンシーが必要な場合。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: AWS Backupによる統合バックアップ管理 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 AWS Backupによる統合バックアップ管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWS Backupは、複数のAWSサービスのバックアップを一元管理できるフルマネージド型サービスです。
+                        バックアップポリシーの一元管理、コンプライアンス対応、クロスリージョンバックアップを簡単に実現します。
+                    </p>
+
+                    <div class="mermaid">
+graph TD
+    A["AWS Backup"]
+    B["EBS"]
+    C["RDS"]
+    D["DynamoDB"]
+    E["EFS"]
+    F["Aurora"]
+    G["Storage Gateway"]
+    H["バックアップボールト"]
+    I["クロスリージョン<br/>バックアップ"]
+
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    A --> G
+    B --> H
+    C --> H
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H --> I
+
+    style A fill:#fed7aa
+    style H fill:#fef3c7
+    style I fill:#d1fae5
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">AWS Backupの主要機能</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-calendar-alt"></i>
+                                バックアッププラン
+                            </h4>
+                            <p class="text-blue-900 text-sm">
+                                バックアップのスケジュール、保持期間、ライフサイクルルールを定義。
+                                リソースタグに基づいて自動的にバックアップ対象を選択。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-vault"></i>
+                                バックアップボールト
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                バックアップを保存するコンテナ。
+                                暗号化、アクセス制御、ボールトロックポリシーでデータを保護。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-globe-americas"></i>
+                                クロスリージョンバックアップ
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                バックアップを別リージョンに自動的にコピー。
+                                リージョン障害からの復旧を実現。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-chart-line"></i>
+                                コンプライアンスレポート
+                            </h4>
+                            <p class="text-orange-900 text-sm">
+                                バックアップの成功/失敗を監視。
+                                監査証跡として、バックアップのコンプライアンス状況をレポート。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">バックアッププランの構成要素</h3>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">1. バックアップルール</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                バックアップのスケジュール、開始時刻、頻度を定義。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• スケジュール: 日次、週次、月次（cron式で指定可能）</li>
+                                <li>• バックアップウィンドウ: バックアップ開始の時間帯</li>
+                                <li>• 保持期間: バックアップの保存期間（日数、週数、月数、年数）</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">2. ライフサイクルポリシー</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                バックアップを低コストストレージに移行。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• コールドストレージへの移行: 一定期間後にコストの低いストレージに移行</li>
+                                <li>• 自動削除: 保持期間終了後に自動削除</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">3. リソース割り当て</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                バックアップ対象リソースの指定方法。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• リソースID: 特定のリソースを直接指定</li>
+                                <li>• タグベース: 特定のタグを持つすべてのリソースを自動選択</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">バックアップボールトロック</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バックアップボールトロックは、WORM（Write Once Read Many）ポリシーを実装し、
+                        バックアップの削除や変更を防ぎます。ランサムウェア攻撃や悪意のある削除からバックアップを保護します。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ボールトロックの仕組み</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>• 最小保持期間を設定（例: 30日間）</li>
+                                    <li>• 保持期間中はルートユーザーでもバックアップを削除不可</li>
+                                    <li>• 最大保持期間を設定して、保持期間の延長を制限</li>
+                                    <li>• コンプライアンス要件（SEC 17a-4、HIPAA等）に対応</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">AWS Backupのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    AWS Backupを使用することで、複数のAWSサービスのバックアップを一元管理でき、
+                                    バックアップポリシーの統一、監査証跡の確保、運用負荷の軽減を実現できます。
+                                    特に大規模環境では、タグベースのリソース割り当てにより、バックアップの自動化と標準化が容易になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7: データライフサイクル管理 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.7 データライフサイクル管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データライフサイクル管理は、データのアクセス頻度や保存期間に基づいて、
+                        ストレージコストを最適化する重要な戦略です。S3ライフサイクルポリシーとEBSライフサイクル管理を活用します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">S3ライフサイクルポリシー</h3>
+
+                    <div class="mermaid">
+graph LR
+    A["S3 Standard<br/>アップロード直後"]
+    B["S3 Standard-IA<br/>30日後"]
+    C["S3 Glacier<br/>90日後"]
+    D["S3 Glacier Deep Archive<br/>180日後"]
+    E["削除<br/>365日後"]
+
+    A -->|30日| B
+    B -->|60日| C
+    C -->|90日| D
+    D -->|185日| E
+
+    style A fill:#dbeafe
+    style B fill:#e0f2fe
+    style C fill:#ddd6fe
+    style D fill:#e9d5ff
+    style E fill:#fecaca
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">移行アクション</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                オブジェクトを別のストレージクラスに自動的に移行。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• Standard → Standard-IA（30日後）</li>
+                                <li>• Standard-IA → Glacier（90日後）</li>
+                                <li>• Glacier → Glacier Deep Archive（180日後）</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">削除アクション</h4>
+                            <p class="text-sm text-slate-600 mb-2">
+                                一定期間経過後にオブジェクトを自動削除。
+                            </p>
+                            <ul class="text-sm text-slate-600 space-y-1">
+                                <li>• ログファイルを365日後に削除</li>
+                                <li>• 古いバージョンを90日後に削除（バージョニング有効時）</li>
+                                <li>• 不完全なマルチパートアップロードを7日後に削除</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ライフサイクルポリシーの設定例</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">S3ライフサイクルポリシー（JSON）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "Rules": [
+    {
+      "Id": "LogArchival",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "logs/"
+      },
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "STANDARD_IA"
+        },
+        {
+          "Days": 90,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 365
+      }
+    }
+  ]
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">EBSデータライフサイクル管理</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon Data Lifecycle Manager（DLM）を使用して、EBSスナップショットとEBS-backed AMIのライフサイクルを自動化します。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">自動スナップショット作成</h4>
+                            <p class="text-sm text-slate-600">
+                                タグに基づいてEBSボリュームを自動的にスナップショット。
+                                毎日、毎週、毎月のスケジュールを設定可能。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">保持期間管理</h4>
+                            <p class="text-sm text-slate-600">
+                                スナップショットの保持期間を設定（例: 7日、30日、90日）。
+                                期間経過後に自動削除してストレージコストを削減。
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">クロスリージョンコピー</h4>
+                            <p class="text-sm text-slate-600">
+                                スナップショットを別リージョンに自動的にコピー。
+                                DRバックアップとして保存し、異なる保持期間を設定可能。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ライフサイクル管理のベストプラクティス</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• アクセスパターンが不明な場合は、S3 Intelligent-Tieringを使用</li>
+                                    <li>• ライフサイクルポリシーは、プレフィックスやタグで細かく制御</li>
+                                    <li>• 不完全なマルチパートアップロードを定期的に削除</li>
+                                    <li>• 古いバージョンの自動削除でストレージコストを削減</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. S3の耐久性と可用性の違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>耐久性（Durability）:</strong> データが失われない確率。S3は全ストレージクラスで99.999999999%（イレブンナイン）の耐久性を提供。<br>
+                                            <strong>可用性（Availability）:</strong> データにアクセスできる確率。ストレージクラスによって異なり、S3 Standard（99.99%）からS3 One Zone-IA（99.5%）まで。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. S3クロスリージョンレプリケーション（CRR）の主なユースケースを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. <strong>災害復旧（DR）:</strong> プライマリリージョン障害時に別リージョンにフェイルオーバー<br>
+                                            2. <strong>レイテンシー削減:</strong> グローバルユーザーに地理的に近いリージョンからコンテンツを提供<br>
+                                            3. <strong>コンプライアンス:</strong> 法規制により特定地域にデータを保管する必要がある場合
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. EBSマルチアタッチの制限事項を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            • io1/io2ボリュームのみサポート<br>
+                                            • 同一アベイラビリティゾーン内のインスタンスのみ<br>
+                                            • 最大16インスタンスまでアタッチ可能<br>
+                                            • クラスタ対応ファイルシステム（GFS2、OCFS2等）が必要
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. AWS Backupのバックアップボールトロックの目的は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            バックアップボールトロックは、WORM（Write Once Read Many）ポリシーを実装し、
+                                            最小保持期間中にルートユーザーを含むすべてのユーザーがバックアップを削除または変更できないようにします。
+                                            ランサムウェア攻撃や悪意のある削除からバックアップを保護し、コンプライアンス要件（SEC 17a-4、HIPAA等）に対応します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-emerald-500"></i>
+                        第11章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>S3は全ストレージクラスで11ナインの耐久性を提供、可用性はクラスによって異なる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>S3 CRRで災害復旧、レイテンシー削減、コンプライアンス要件に対応</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>S3バージョニングとオブジェクトロックで誤削除・悪意のある変更からデータを保護</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>EBSスナップショットは増分バックアップ、クロスリージョンコピーでDRを実現</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>EFSはマルチAZ構成でデフォルトで高可用性、AWS Backupで自動バックアップ</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>AWS Backupで複数サービスのバックアップを一元管理、ボールトロックでWORM実装</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>ライフサイクルポリシーでストレージコストを最適化</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 次のステップ -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-compass text-blue-600 mt-1"></i>
+                        <div>
+                            <p class="text-blue-900 font-medium">次のステップ</p>
+                            <p class="text-blue-800 text-sm mt-1">
+                                第12章では、ビジネス継続性を確保するための災害復旧（DR）戦略とマルチリージョン設計を学びます。
+                                4つのDR戦略パターン（バックアップ&リストア、パイロットライト、ウォームスタンバイ、マルチサイトアクティブ）と、
+                                RPO/RTOに基づいたDR設計手法を習得しましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-sap-c02-intro-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第10章: データベースの高可用性と災害復旧</span>
+                        </div>
+                    </a>
+                    <a href="aws-sap-c02-intro-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: 障害復旧戦略とマルチリージョン設計</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Docker学習教材 第4章 - Dockerイメージを理解しよう</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Docker カラーテーマ (sky)
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-docker text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Docker学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-server text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約11時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">クラウド・インフラ</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">Docker入門</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Dockerイメージを理解しよう - コンテナの設計図</h1>
+                    <p class="text-slate-600">「イメージ」と「コンテナ」の関係を料理のレシピと料理の例えで分かりやすく解説し、Docker Hubから様々なイメージを取得する方法を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Dockerイメージとコンテナの関係を料理の例えで理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Docker Hubから様々なイメージを取得（pull）して実行する方法を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>イメージの一覧表示、削除などの管理方法を実践する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>公式イメージの見分け方と安全な選び方を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: イメージとコンテナの関係 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 イメージとコンテナの関係 - レシピと料理の例え
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        第1章でも触れましたが、ここではもう少し詳しく<strong>イメージ</strong>と<strong>コンテナ</strong>の関係を見ていきましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">料理で例えると...</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    <strong>イメージ</strong>はレシピ本のレシピです。レシピには材料や作り方が書いてあります。<br>
+                                    <strong>コンテナ</strong>はそのレシピに従って実際に作った料理です。<br>
+                                    1つのレシピから何度でも同じ料理を作れるように、1つのイメージから何個でもコンテナを起動できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- イメージとコンテナの関係図 -->
+                    <div class="my-8">
+                        <pre class="mermaid">
+flowchart TB
+    subgraph DH["Docker Hub (レシピ本の図書館)"]
+        I1["Nginxイメージ"]
+        I2["Pythonイメージ"]
+        I3["MySQLイメージ"]
+    end
+
+    subgraph Local["あなたのPC"]
+        direction TB
+        LI["取得したイメージ<br/>(レシピ)"]
+        C1["コンテナ 1<br/>(料理)"]
+        C2["コンテナ 2<br/>(料理)"]
+        C3["コンテナ 3<br/>(料理)"]
+
+        LI -.->|起動| C1
+        LI -.->|起動| C2
+        LI -.->|起動| C3
+    end
+
+    I1 -->|pull| LI
+    I2 -->|pull| LI
+    I3 -->|pull| LI
+
+    style DH fill:#e0f2fe,stroke:#0ea5e9,stroke-width:2px
+    style Local fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style LI fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style C1 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style C2 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+    style C3 fill:#d1fae5,stroke:#10b981,stroke-width:2px
+</pre>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6 my-6">
+                        <!-- イメージの特徴 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-code text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-blue-800">イメージの特徴</h3>
+                            </div>
+                            <ul class="text-blue-800 text-sm space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-1"></i>
+                                    <span><strong>読み取り専用</strong>: 一度作られたイメージは書き換えられない</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-1"></i>
+                                    <span><strong>再利用可能</strong>: 何度でも使い回せる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-1"></i>
+                                    <span><strong>配布可能</strong>: Docker Hubで共有できる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-500 mt-1"></i>
+                                    <span><strong>バージョン管理</strong>: タグで複数バージョンを管理</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- コンテナの特徴 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-box text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-emerald-800">コンテナの特徴</h3>
+                            </div>
+                            <ul class="text-emerald-800 text-sm space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                    <span><strong>読み書き可能</strong>: 実行中にファイルを作成・変更できる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                    <span><strong>独立稼働</strong>: 各コンテナは独立して動く</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                    <span><strong>削除しても安心</strong>: 元のイメージには影響なし</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-500 mt-1"></i>
+                                    <span><strong>停止・再開可能</strong>: 必要なときだけ起動できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: Docker Hubとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 Docker Hub - イメージの巨大な図書館
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        <strong>Docker Hub</strong>は、世界中のDockerイメージが集まる公開リポジトリです。レシピ本の図書館のようなもので、誰でも自由にイメージを取得できます。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-star text-yellow-500"></i>
+                            Docker Hubの特徴
+                        </h3>
+                        <ul class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-shield-alt text-green-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>公式イメージ</strong>: Nginx、MySQL、Pythonなど、Docker社が認証した安全なイメージ
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-users text-blue-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>コミュニティイメージ</strong>: 世界中の開発者が作成したイメージ
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-lock text-purple-500 mt-1 flex-shrink-0"></i>
+                                <div>
+                                    <strong>プライベートリポジトリ</strong>: 自分だけが使えるイメージも保存可能
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">公式イメージの見分け方</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    Docker Hubで「nginx」と検索すると、一番上に<strong>「DOCKER OFFICIAL IMAGE」</strong>というバッジが付いたイメージが表示されます。これが公式イメージです。初心者の方は公式イメージを選ぶと安心です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: イメージの取得 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 イメージの取得 - docker pull コマンド
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        Docker Hubからイメージを取得するには<code class="bg-slate-200 text-slate-800 px-2 py-0.5 rounded">docker pull</code>コマンドを使います。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: Ubuntuイメージを取得しよう</h3>
+                                <p class="text-purple-900 mb-4 break-words">Ubuntu（Linux OS）のイメージを取得してみましょう。</p>
+
+                                <!-- コードブロック -->
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">ターミナル</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash"># Ubuntuイメージを取得
+docker pull ubuntu
+
+# 最新版のubuntuイメージがダウンロードされます</code></pre>
+                                </div>
+
+                                <p class="text-purple-900 mt-4 break-words">実行すると以下のような出力が表示されます：</p>
+
+                                <!-- 出力例 -->
+                                <div class="bg-purple-100 rounded-lg p-4 mt-3">
+                                    <pre class="text-sm text-purple-900 overflow-x-auto"><code>Using default tag: latest
+latest: Pulling from library/ubuntu
+01007420e9b0: Pull complete
+Digest: sha256:xxxxx...
+Status: Downloaded newer image for ubuntu:latest
+docker.io/library/ubuntu:latest</code></pre>
+                                </div>
+
+                                <div class="bg-purple-100 border-l-4 border-purple-400 p-3 mt-4 rounded-r overflow-hidden">
+                                    <p class="text-purple-900 text-sm break-words">
+                                        <i class="fas fa-info-circle text-purple-600"></i>
+                                        <strong>解説</strong>: <code>latest</code>というタグが自動的に選ばれます。これは「最新版」という意味です。特定のバージョンを指定したい場合は<code>docker pull ubuntu:22.04</code>のようにタグを指定します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: イメージの管理 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 イメージの管理 - 一覧表示と削除
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        取得したイメージを管理する基本的なコマンドを見ていきましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">イメージ一覧の表示</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        あなたのPCにあるすべてのイメージを表示します。
+                    </p>
+
+                    <!-- コードブロック -->
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">ターミナル</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># イメージ一覧を表示
+docker images
+
+# または
+docker image ls</code></pre>
+                    </div>
+
+                    <!-- 出力例 -->
+                    <div class="bg-slate-100 rounded-lg p-4 my-4">
+                        <p class="text-sm text-slate-600 mb-2">出力例：</p>
+                        <pre class="text-sm text-slate-900 overflow-x-auto"><code>REPOSITORY    TAG       IMAGE ID       CREATED       SIZE
+ubuntu        latest    3b418d7b466a   2 weeks ago   77.8MB
+hello-world   latest    feb5d9fea6a5   2 years ago   13.3kB</code></pre>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-5 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-3">各列の意味</h4>
+                        <ul class="space-y-2 text-slate-700 text-sm">
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">REPOSITORY</code>
+                                <span>イメージの名前</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">TAG</code>
+                                <span>バージョンやタイプを示すタグ（latest = 最新版）</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">IMAGE ID</code>
+                                <span>イメージを識別するユニークなID</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">CREATED</code>
+                                <span>イメージが作成された日時</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">SIZE</code>
+                                <span>イメージのサイズ</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">イメージの削除</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        不要になったイメージを削除してディスク容量を節約します。
+                    </p>
+
+                    <!-- コードブロック -->
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">ターミナル</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># イメージを削除（名前:タグで指定）
+docker rmi ubuntu:latest
+
+# または IMAGE ID で指定
+docker rmi 3b418d7b466a
+
+# 強制削除（コンテナが使用中でも削除）
+docker rmi -f ubuntu:latest</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">注意点</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    そのイメージから起動したコンテナが存在する場合、削除できません。先にコンテナを削除してから（<code>docker rm</code>）、イメージを削除してください。または<code>-f</code>オプションで強制削除できますが、実行中のコンテナがある場合は注意が必要です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: イメージのタグとバージョン -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 イメージのタグとバージョン管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        イメージには<strong>タグ</strong>という仕組みがあり、同じイメージの異なるバージョンを管理できます。
+                    </p>
+
+                    <!-- タグの例 -->
+                    <div class="my-8">
+                        <pre class="mermaid">
+flowchart LR
+    P["Pythonイメージ"] --> P1["python:3.9"]
+    P --> P2["python:3.10"]
+    P --> P3["python:3.11"]
+    P --> P4["python:latest"]
+
+    style P fill:#e0f2fe,stroke:#0ea5e9,stroke-width:2px
+    style P1 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style P2 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style P3 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style P4 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+</pre>
+                    </div>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: 異なるバージョンのPythonイメージを取得</h3>
+                                <p class="text-purple-900 mb-4 break-words">Pythonの異なるバージョンのイメージを取得してみましょう。</p>
+
+                                <!-- コードブロック -->
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">ターミナル</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash"># Python 3.9 を取得
+docker pull python:3.9
+
+# Python 3.11 を取得
+docker pull python:3.11
+
+# イメージ一覧を確認
+docker images python</code></pre>
+                                </div>
+
+                                <p class="text-purple-900 mt-4 break-words">出力例：</p>
+
+                                <!-- 出力例 -->
+                                <div class="bg-purple-100 rounded-lg p-4 mt-3">
+                                    <pre class="text-sm text-purple-900 overflow-x-auto"><code>REPOSITORY   TAG    IMAGE ID       CREATED       SIZE
+python       3.9    a5d7930b60cc   3 weeks ago   997MB
+python       3.11   fc7a60e86bae   3 weeks ago   1.01GB</code></pre>
+                                </div>
+
+                                <div class="bg-purple-100 border-l-4 border-purple-400 p-3 mt-4 rounded-r overflow-hidden">
+                                    <p class="text-purple-900 text-sm break-words">
+                                        <i class="fas fa-lightbulb text-purple-600"></i>
+                                        <strong>ポイント</strong>: 同じPythonイメージでも、タグが異なれば別のイメージとして扱われます。これにより、プロジェクトごとに異なるバージョンのPythonを使い分けることができます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4">よく使うタグのパターン</h3>
+                        <ul class="space-y-3 text-slate-700">
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">latest</code>
+                                <span>最新版（ただし、本番環境では避けるべき - バージョンが突然変わるため）</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">3.11</code>
+                                <span>メジャーバージョン指定（3.11.x系の最新）</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">3.11.5</code>
+                                <span>完全バージョン指定（最も安全）</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800 font-mono">3.11-alpine</code>
+                                <span>軽量版（Alpine Linuxベース、サイズが小さい）</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション6: イメージから起動してみよう -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 イメージからコンテナを起動してみよう
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        取得したイメージを使って、実際にコンテナを起動してみましょう。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: Ubuntuコンテナを起動してみよう</h3>
+                                <p class="text-purple-900 mb-4 break-words">Ubuntuイメージから対話型のコンテナを起動してみます。</p>
+
+                                <!-- コードブロック -->
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">ターミナル</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash"># Ubuntuコンテナを対話モードで起動
+docker run -it ubuntu bash
+
+# コンテナの中に入った状態になります
+# プロンプトが「root@xxxxx:/#」のように変わります</code></pre>
+                                </div>
+
+                                <p class="text-purple-900 mt-4 break-words">コンテナの中で操作してみましょう：</p>
+
+                                <!-- コードブロック -->
+                                <div class="code-block-wrapper mt-3">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">コンテナ内</span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash"># 現在のディレクトリを表示
+pwd
+
+# ファイル一覧を表示
+ls
+
+# Ubuntuのバージョンを確認
+cat /etc/os-release
+
+# コンテナから出る
+exit</code></pre>
+                                </div>
+
+                                <div class="bg-purple-100 border-l-4 border-purple-400 p-3 mt-4 rounded-r overflow-hidden">
+                                    <p class="text-purple-900 text-sm break-words">
+                                        <i class="fas fa-info-circle text-purple-600"></i>
+                                        <strong>オプション解説</strong>:<br>
+                                        <code>-it</code>: 対話モード（interactive + tty）でコンテナに入る<br>
+                                        <code>ubuntu</code>: 使用するイメージ名<br>
+                                        <code>bash</code>: コンテナ内で実行するコマンド（シェルを起動）
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-check-circle text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                                <p class="text-emerald-900 mb-3 break-words">以下を確認してみましょう：</p>
+                                <ul class="space-y-2">
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span>コンテナ内で<code class="bg-emerald-100 px-1.5 py-0.5 rounded">ls</code>を実行すると、Ubuntu Linux のディレクトリ構造が見えること</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><code class="bg-emerald-100 px-1.5 py-0.5 rounded">exit</code>でコンテナを抜けて、元のターミナルに戻れること</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><code class="bg-emerald-100 px-1.5 py-0.5 rounded">docker ps -a</code>で、停止したUbuntuコンテナが表示されること</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Docker Hubから「nginx」の公式イメージを取得するコマンドは？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> <code>docker pull nginx</code> です。タグを指定しない場合、自動的に<code>latest</code>タグが選ばれます。特定のバージョンを指定する場合は<code>docker pull nginx:1.25</code>のようにタグを付けます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. イメージとコンテナの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> イメージは「読み取り専用の設計図」で、何度でも使い回せます。コンテナは「イメージから起動した実行環境」で、読み書き可能です。料理に例えると、イメージはレシピ、コンテナはそのレシピから作った料理です。1つのイメージから複数のコンテナを起動できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. あなたのPCにあるすべてのDockerイメージを一覧表示するコマンドは？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> <code>docker images</code> または <code>docker image ls</code> です。どちらのコマンドも同じ結果を表示します。出力には、リポジトリ名、タグ、イメージID、作成日時、サイズが表示されます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第4章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>イメージは「読み取り専用の設計図」、コンテナは「起動した実行環境」という関係</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>Docker Hubは世界中のDockerイメージが集まる公開リポジトリ</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span><code class="bg-slate-200 px-1.5 py-0.5 rounded">docker pull</code>でイメージを取得、<code class="bg-slate-200 px-1.5 py-0.5 rounded">docker images</code>で一覧表示、<code class="bg-slate-200 px-1.5 py-0.5 rounded">docker rmi</code>で削除</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>タグを使って同じイメージの異なるバージョンを管理できる</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-circle text-[6px] text-primary-500 mt-2"></i>
+                            <span>公式イメージ（DOCKER OFFICIAL IMAGE）を選ぶと安心</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="docker-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第3章: はじめてのDockerコマンド</span>
+                        </div>
+                    </a>
+                    <a href="docker-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: Webサーバーを動かしてみよう</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

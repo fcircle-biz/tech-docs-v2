@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS SAP-C02入門 第5章 - Route 53 DNSとトラフィック管理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS Orange
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS SAP-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS SAP-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第5章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第5章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Route 53 - DNSとトラフィック管理</h1>
+                    <p class="text-slate-600">Route 53を使用したDNS管理とトラフィックルーティングの高度な設計手法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DNSの基礎とRoute 53の役割</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>レコードタイプの使い分け（A、AAAA、CNAME、Alias）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ルーティングポリシーの種類と選択基準</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ヘルスチェックとDNSフェイルオーバー</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プライベートホストゾーンとVPC統合</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Route 53 Resolverとハイブリッド環境</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: DNSの基礎とRoute 53の役割 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.1 DNSの基礎とRoute 53の役割
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DNS（Domain Name System）は、人間が理解しやすいドメイン名（例: example.com）を、コンピュータが通信に使用するIPアドレス（例: 192.0.2.1）に変換する仕組みです。
+                        Route 53は、AWSが提供する高可用性でスケーラブルなDNSサービスで、ドメイン登録、DNSルーティング、ヘルスチェック機能を統合しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">DNSの動作の仕組み</h3>
+                    <div class="mermaid">
+sequenceDiagram
+    participant User as ユーザー
+    participant Browser as Webブラウザ
+    participant Resolver as DNSリゾルバ
+    participant Route53 as Route 53
+    participant Web as Webサーバー
+
+    User->>Browser: example.com にアクセス
+    Browser->>Resolver: example.com のIPアドレスは？
+    Resolver->>Route53: example.com のAレコードを照会
+    Route53->>Resolver: IPアドレス: 203.0.113.10
+    Resolver->>Browser: IPアドレス: 203.0.113.10
+    Browser->>Web: 203.0.113.10 に接続
+    Web->>Browser: Webページを返す
+    Browser->>User: Webページを表示
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">Route 53の主要機能</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li><strong>ドメイン登録:</strong> .com、.org、.jpなど、様々なTLDのドメイン名を登録可能</li>
+                                    <li><strong>DNSルーティング:</strong> 7種類のルーティングポリシーで高度なトラフィック制御が可能</li>
+                                    <li><strong>ヘルスチェック:</strong> エンドポイントの正常性を監視し、自動フェイルオーバー</li>
+                                    <li><strong>100% SLA:</strong> 高可用性を保証（パブリックホストゾーン）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Route 53の名称の由来</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53という名称は、DNSサーバーが使用する標準ポート番号「53」に由来しています。また、「Route」は米国の国道「Route 66」を連想させ、高速で信頼性の高いトラフィックルーティングを意味しています。
+                    </p>
+                </section>
+
+                <!-- セクション2: レコードタイプの使い分け -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.2 レコードタイプの使い分け（A、AAAA、CNAME、Alias）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53では、様々なレコードタイプを使用してDNS名前解決を設定します。それぞれのレコードタイプの特徴と使い分けを理解することが重要です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">レコードタイプ</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">用途</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">A</td>
+                                    <td class="border border-slate-300 px-4 py-2">ドメイン名をIPv4アドレスにマッピング</td>
+                                    <td class="border border-slate-300 px-4 py-2">example.com → 203.0.113.10</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">AAAA</td>
+                                    <td class="border border-slate-300 px-4 py-2">ドメイン名をIPv6アドレスにマッピング</td>
+                                    <td class="border border-slate-300 px-4 py-2">example.com → 2001:0db8::1</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">CNAME</td>
+                                    <td class="border border-slate-300 px-4 py-2">ドメイン名を別のドメイン名にマッピング（ゾーン頂点では使用不可）</td>
+                                    <td class="border border-slate-300 px-4 py-2">www.example.com → example.com</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">Alias</td>
+                                    <td class="border border-slate-300 px-4 py-2">AWSリソースにマッピング（ゾーン頂点でも使用可、無料）</td>
+                                    <td class="border border-slate-300 px-4 py-2">example.com → ELB、CloudFront</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Aliasレコードの重要性</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Aliasレコードは、Route 53独自の拡張機能で、AWSリソース（ELB、CloudFront、S3、API Gatewayなど）に対して使用します。
+                        通常のCNAMEレコードと異なり、以下の利点があります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i>
+                                Aliasレコードの利点
+                            </h4>
+                            <ul class="text-emerald-900 text-sm space-y-1">
+                                <li>• ゾーン頂点（example.com）で使用可能</li>
+                                <li>• DNSクエリ料金が無料</li>
+                                <li>• ヘルスチェックが自動</li>
+                                <li>• TTLが自動設定される</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-circle"></i>
+                                CNAMEレコードの制限
+                            </h4>
+                            <ul class="text-orange-900 text-sm space-y-1">
+                                <li>• ゾーン頂点では使用不可</li>
+                                <li>• DNSクエリごとに課金</li>
+                                <li>• ヘルスチェックを別途設定</li>
+                                <li>• TTLを手動設定する必要</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">ベストプラクティス</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    AWSリソースへのマッピングには、常にAliasレコードを使用してください。
+                                    CNAMEレコードは、AWS外部のリソースや、サブドメイン（www.example.com）にのみ使用します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ルーティングポリシーの種類と選択基準 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.3 ルーティングポリシーの種類と選択基準
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53では、7種類のルーティングポリシーを提供しており、トラフィックの分散方法を細かく制御できます。
+                        ビジネス要件に応じて最適なポリシーを選択することが、SAP試験でも重要なポイントです。
+                    </p>
+
+                    <div class="mermaid">
+flowchart TD
+    User["ユーザーリクエスト"]
+    Policy{"ルーティングポリシー"}
+
+    Simple["シンプル<br/>単一リソース"]
+    Weighted["加重<br/>トラフィック分散"]
+    Latency["レイテンシー<br/>最低遅延"]
+    Geo["位置情報<br/>地域制御"]
+    GeoProx["地理的近接性<br/>距離ベース"]
+    Failover["フェイルオーバー<br/>障害対応"]
+    Multi["複数値<br/>最大8個返却"]
+
+    User --> Policy
+    Policy --> Simple
+    Policy --> Weighted
+    Policy --> Latency
+    Policy --> Geo
+    Policy --> GeoProx
+    Policy --> Failover
+    Policy --> Multi
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">7つのルーティングポリシー詳細</h3>
+
+                    <div class="space-y-4">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">1. シンプルルーティング（Simple Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                単一のリソースに対してDNSレコードを設定する最も基本的なポリシー。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: 単一のWebサーバー、単一のロードバランサー</li>
+                                <li>• 複数のIPアドレスを指定可能（ランダムに1つが返却される）</li>
+                                <li>• ヘルスチェック機能なし</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">2. 加重ルーティング（Weighted Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                複数のリソースに対して、指定した重み付けに応じてトラフィックを分散。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: ブルー/グリーンデプロイ、A/Bテスト、段階的移行</li>
+                                <li>• 例: リソースA（重み70）、リソースB（重み30）→ 70%と30%に分散</li>
+                                <li>• ヘルスチェックと統合可能</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">3. レイテンシールーティング（Latency Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                ユーザーに最も低いレイテンシーを提供できるリージョンのリソースを返す。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: グローバル展開されたアプリケーション</li>
+                                <li>• Route 53が自動的にユーザーからの遅延を測定</li>
+                                <li>• 例: 東京リージョンとバージニアリージョンで最適なものを自動選択</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">4. 位置情報ルーティング（Geolocation Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                ユーザーの地理的位置（国、大陸、都道府県）に基づいてリソースを返す。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: コンテンツのローカライゼーション、地域制限、コンプライアンス</li>
+                                <li>• 例: 日本からのアクセス→日本語サイト、米国→英語サイト</li>
+                                <li>• デフォルトロケーションを設定可能</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">5. 地理的近接性ルーティング（Geoproximity Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                リソースの物理的な場所とユーザーの場所の距離に基づいてルーティング。バイアス値で調整可能。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: トラフィックの地理的分散を細かく制御</li>
+                                <li>• バイアス値（-99～+99）でトラフィック範囲を拡大/縮小</li>
+                                <li>• Traffic Flow機能を使用して設定</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">6. フェイルオーバールーティング（Failover Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                アクティブ-スタンバイ構成で、プライマリリソースが異常時にセカンダリリソースに自動切り替え。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: 災害復旧（DR）、高可用性設計</li>
+                                <li>• プライマリとセカンダリを定義し、ヘルスチェックで監視</li>
+                                <li>• 例: プライマリ（東京リージョン）→ セカンダリ（大阪リージョン）</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2">7. 複数値回答ルーティング（Multivalue Answer Routing）</h4>
+                            <p class="text-sm text-slate-600">
+                                複数のリソース（最大8個）のIPアドレスをランダムに返す。各リソースにヘルスチェックを関連付け可能。
+                            </p>
+                            <ul class="text-sm text-slate-600 mt-2 space-y-1">
+                                <li>• 用途: シンプルな負荷分散とヘルスチェックの組み合わせ</li>
+                                <li>• シンプルルーティングにヘルスチェックを追加した拡張版</li>
+                                <li>• ELBの代替としては不適切（ELB + Aliasレコードを推奨）</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ルーティングポリシーの選択フローチャート</h3>
+                    <div class="mermaid">
+flowchart TD
+    Start{"要件は？"}
+    Start -->|単一リソース| Simple["シンプルルーティング"]
+    Start -->|DR構成| Failover["フェイルオーバー"]
+    Start -->|トラフィック比率制御| Weighted["加重ルーティング"]
+    Start -->|地域制限あり| GeoCheck{"距離ベース？"}
+    GeoCheck -->|はい| GeoProx["地理的近接性"]
+    GeoCheck -->|いいえ| Geo["位置情報"]
+    Start -->|グローバル最適化| Latency["レイテンシー"]
+    Start -->|複数IP+ヘルスチェック| Multi["複数値回答"]
+
+    style Failover fill:#fed7aa
+    style Weighted fill:#dbeafe
+    style Latency fill:#d1fae5
+                    </div>
+                </section>
+
+                <!-- セクション4: ヘルスチェックとDNSフェイルオーバー -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.4 ヘルスチェックとDNSフェイルオーバー
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53のヘルスチェック機能は、エンドポイントの正常性を監視し、異常を検出した場合にトラフィックを正常なリソースに自動的にルーティングします。
+                        高可用性アーキテクチャの重要な構成要素です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ヘルスチェックの3つのタイプ</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-server"></i>
+                                エンドポイント監視
+                            </h4>
+                            <p class="text-blue-900 text-sm">
+                                指定したIPアドレスやドメイン名に対してHTTP/HTTPS/TCPリクエストを送信し、正常性を確認。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-link"></i>
+                                計算されたヘルスチェック
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                複数の子ヘルスチェックの結果を組み合わせて、全体の正常性を判断（AND/OR条件）。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bell"></i>
+                                CloudWatch アラーム監視
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                CloudWatchアラームの状態を監視し、アラームがOKかALARMかで正常性を判断。
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フェイルオーバー構成の例</h3>
+                    <div class="mermaid">
+sequenceDiagram
+    participant User as ユーザー
+    participant R53 as Route 53
+    participant HC as ヘルスチェック
+    participant Primary as プライマリ (東京)
+    participant Secondary as セカンダリ (大阪)
+
+    HC->>Primary: ヘルスチェック
+    Primary->>HC: 正常応答
+    Note over HC: ステータス: Healthy
+
+    User->>R53: example.com の解決
+    R53->>HC: プライマリの状態確認
+    HC->>R53: Healthy
+    R53->>User: プライマリのIP返却
+    User->>Primary: アクセス
+
+    Note over Primary: 障害発生
+    HC->>Primary: ヘルスチェック
+    Primary--xHC: 応答なし
+    Note over HC: ステータス: Unhealthy
+
+    User->>R53: example.com の解決
+    R53->>HC: プライマリの状態確認
+    HC->>R53: Unhealthy
+    R53->>User: セカンダリのIP返却
+    User->>Secondary: アクセス
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">ヘルスチェックの注意点</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    ヘルスチェックのリクエストは、世界中のRoute 53ヘルスチェッカーから送信されます。
+                                    そのため、ファイアウォールやセキュリティグループで、Route 53のIPアドレス範囲（公開されている）からのトラフィックを許可する必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: プライベートホストゾーンとVPC統合 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.5 プライベートホストゾーンとVPC統合
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53プライベートホストゾーンは、VPC内でのみ有効なプライベートDNS名前空間を提供します。
+                        インターネットに公開されていない内部リソース（RDS、内部ELB、EC2インスタンス）に対してわかりやすい名前を付けることができます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">パブリックホストゾーン vs プライベートホストゾーン</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">項目</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">パブリックホストゾーン</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">プライベートホストゾーン</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">名前解決の範囲</td>
+                                    <td class="border border-slate-300 px-4 py-2">インターネット全体</td>
+                                    <td class="border border-slate-300 px-4 py-2">特定のVPC内のみ</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">用途</td>
+                                    <td class="border border-slate-300 px-4 py-2">公開Webサイト、API</td>
+                                    <td class="border border-slate-300 px-4 py-2">内部アプリケーション、RDS、内部ELB</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">関連付け</td>
+                                    <td class="border border-slate-300 px-4 py-2">なし</td>
+                                    <td class="border border-slate-300 px-4 py-2">1つ以上のVPCに関連付け</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">ヘルスチェック</td>
+                                    <td class="border border-slate-300 px-4 py-2">利用可能</td>
+                                    <td class="border border-slate-300 px-4 py-2">利用不可（VPC内からアクセスできないため）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">プライベートホストゾーンの構成例</h3>
+                    <div class="mermaid">
+flowchart TB
+    subgraph VPC["VPC (10.0.0.0/16)"]
+        EC2["EC2インスタンス"]
+        RDS["RDS<br/>db.internal.example.com"]
+        ALB["内部ALB<br/>api.internal.example.com"]
+    end
+
+    PHZ["プライベートホストゾーン<br/>internal.example.com"]
+
+    EC2 -->|DNS照会| PHZ
+    PHZ -->|db.internal.example.com<br/>→ RDSエンドポイント| RDS
+    PHZ -->|api.internal.example.com<br/>→ ALB DNS| ALB
+
+    style PHZ fill:#fed7aa
+    style VPC fill:#e0f2fe
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ベストプラクティス</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li>• 内部リソースには必ずプライベートホストゾーンを使用</li>
+                                    <li>• 内部ドメイン名には「.internal」などの明確な接尾辞を使用</li>
+                                    <li>• 複数のVPCで共通のプライベートDNS名前空間が必要な場合、VPCピアリングを検討</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: Route 53 Resolverとハイブリッド環境 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.6 Route 53 Resolverとハイブリッド環境
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Route 53 Resolverは、VPCとオンプレミスネットワーク間でDNSクエリを相互に転送する機能を提供します。
+                        ハイブリッドクラウド環境において、AWSリソースとオンプレミスリソース間でシームレスな名前解決を実現します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Route 53 Resolverの2つのエンドポイント</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-arrow-right"></i>
+                                インバウンドエンドポイント
+                            </h4>
+                            <p class="text-blue-900 text-sm mb-3">
+                                オンプレミスからVPC内のDNS名を解決できるようにする
+                            </p>
+                            <ul class="text-blue-900 text-sm space-y-1">
+                                <li>• オンプレミスDNSサーバー → Route 53 Resolver</li>
+                                <li>• 例: オンプレミスから「rds.internal.aws.com」を解決</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-arrow-left"></i>
+                                アウトバウンドエンドポイント
+                            </h4>
+                            <p class="text-emerald-900 text-sm mb-3">
+                                VPCからオンプレミスのDNS名を解決できるようにする
+                            </p>
+                            <ul class="text-emerald-900 text-sm space-y-1">
+                                <li>• Route 53 Resolver → オンプレミスDNSサーバー</li>
+                                <li>• 例: VPCから「app.onprem.local」を解決</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ハイブリッドDNS構成の例</h3>
+                    <div class="mermaid">
+flowchart LR
+    subgraph OnPrem["オンプレミス"]
+        OnPremDNS["オンプレミスDNS<br/>onprem.local"]
+        OnPremApp["アプリケーション"]
+    end
+
+    subgraph AWS["AWS VPC"]
+        R53Resolver["Route 53 Resolver"]
+        Inbound["インバウンド<br/>エンドポイント"]
+        Outbound["アウトバウンド<br/>エンドポイント"]
+        PrivateZone["プライベート<br/>ホストゾーン<br/>internal.aws.com"]
+        EC2["EC2"]
+    end
+
+    VPN["Site-to-Site VPN<br/>or Direct Connect"]
+
+    OnPremApp -->|"内部リソース解決<br/>rds.internal.aws.com"| OnPremDNS
+    OnPremDNS -->|転送| VPN
+    VPN --> Inbound
+    Inbound --> R53Resolver
+    R53Resolver --> PrivateZone
+
+    EC2 -->|"オンプレミス解決<br/>app.onprem.local"| R53Resolver
+    R53Resolver --> Outbound
+    Outbound --> VPN
+    VPN --> OnPremDNS
+
+    style R53Resolver fill:#fed7aa
+    style VPN fill:#fef3c7
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">ハイブリッド環境のベストプラクティス</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>• Route 53 Resolverルールを使用してドメイン単位で転送先を制御</li>
+                                    <li>• 条件付き転送ルールで特定のドメインのみをオンプレミスDNSに転送</li>
+                                    <li>• エンドポイントは高可用性のため、複数のAZに配置</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">ハンズオン実習: Route 53によるフェイルオーバー設定</h3>
+                            <div class="space-y-4">
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">実習1: パブリックホストゾーンの作成とAliasレコード設定</h4>
+                                    <ol class="text-purple-900 text-sm space-y-1 list-decimal list-inside">
+                                        <li>Route 53コンソールでパブリックホストゾーンを作成（ドメイン名: example.com）</li>
+                                        <li>Application Load Balancerを作成</li>
+                                        <li>Aliasレコード（Aレコード）を作成し、ALBを指定</li>
+                                        <li>ブラウザでドメイン名にアクセスし、動作確認</li>
+                                    </ol>
+                                </div>
+
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">実習2: ヘルスチェックとフェイルオーバールーティング設定</h4>
+                                    <ol class="text-purple-900 text-sm space-y-1 list-decimal list-inside">
+                                        <li>2つのEC2インスタンスを異なるリージョンに作成（東京、バージニア）</li>
+                                        <li>各インスタンスに対してヘルスチェックを作成</li>
+                                        <li>フェイルオーバールーティングポリシーで、プライマリとセカンダリを設定</li>
+                                        <li>プライマリインスタンスを停止し、フェイルオーバーを確認</li>
+                                    </ol>
+                                </div>
+
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">実習3: プライベートホストゾーンの作成</h4>
+                                    <ol class="text-purple-900 text-sm space-y-1 list-decimal list-inside">
+                                        <li>VPC内にプライベートホストゾーンを作成（internal.example.com）</li>
+                                        <li>RDSインスタンスに対してAliasレコードを作成</li>
+                                        <li>EC2インスタンスからプライベートDNS名で接続確認</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. AliasレコードとCNAMEレコードの主な違いを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. Aliasレコードはゾーン頂点（example.com）で使用可能、CNAMEは不可<br>
+                                            2. Aliasレコードは無料、CNAMEは有料（クエリごとに課金）<br>
+                                            3. Aliasレコードは自動ヘルスチェック、CNAMEは手動設定が必要
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. グローバルに展開されたWebアプリケーションで、ユーザーに最も低いレイテンシーを提供したい場合、どのルーティングポリシーを使用すべきですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            レイテンシールーティング（Latency Routing）を使用します。
+                                            Route 53が自動的にユーザーから各リージョンへのレイテンシーを測定し、最も低いレイテンシーのリソースを返します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. プライベートホストゾーンでヘルスチェックが利用できない理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Route 53のヘルスチェッカーは、インターネット上から対象リソースにアクセスして正常性を確認します。
+                                            プライベートホストゾーンはVPC内でのみ有効なため、外部からアクセスできず、ヘルスチェックが実行できません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. Route 53 Resolverのアウトバウンドエンドポイントは何のために使用されますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            VPC内のリソースから、オンプレミスのDNS名（例: app.onprem.local）を解決するために使用されます。
+                                            DNSクエリをオンプレミスのDNSサーバーに転送し、ハイブリッド環境での名前解決を実現します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-emerald-500"></i>
+                        第5章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>Route 53は高可用性でスケーラブルなDNSサービスで、100% SLAを提供</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>AWSリソースへのマッピングには、ゾーン頂点で使用可能で無料のAliasレコードを使用</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>7種類のルーティングポリシー（シンプル、加重、レイテンシー、位置情報、地理的近接性、フェイルオーバー、複数値）を要件に応じて使い分ける</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>ヘルスチェックで自動フェイルオーバーを実現し、高可用性を確保</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>プライベートホストゾーンでVPC内部のリソースにわかりやすいDNS名を付与</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>Route 53 Resolverでハイブリッド環境のDNS統合を実現</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 次のステップ -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-compass text-blue-600 mt-1"></i>
+                        <div>
+                            <p class="text-blue-900 font-medium">次のステップ</p>
+                            <p class="text-blue-800 text-sm mt-1">
+                                第6章では、CloudFrontを使用したグローバルコンテンツ配信を学びます。
+                                CDNの仕組み、エッジロケーション、キャッシュ戦略、Lambda@Edgeなど、パフォーマンス最適化の手法を習得しましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-sap-c02-intro-learning-material-04.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第4章: Auto Scaling</span>
+                        </div>
+                    </a>
+                    <a href="aws-sap-c02-intro-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第6章: CloudFront</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

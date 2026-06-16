@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>DDD学習教材 第8章 - ドメインサービス - エンティティに属さないビジネスロジック</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // DDD - Indigo (設計手法用)
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-project-diagram text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">DDD学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cubes text-[9px]"></i>
+                                <span>設計・モデリング</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">設計・モデリング</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ドメインサービス - エンティティに属さないビジネスロジック</h1>
+                    <p class="text-slate-600">複数のエンティティにまたがる処理や、特定のエンティティに属さないビジネスロジックを扱うドメインサービスを学びます。「送金処理」「在庫確認」などの例を通じて、ドメインサービスの適切な使い方と、過度な使用を避ける方法を理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ドメインサービスとは何か、どのような場面で使うのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エンティティとドメインサービスの使い分け基準を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>送金処理、在庫確認など具体的な実装例を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>過度な使用による貧血ドメインモデルを避ける方法を知る</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: ドメインサービスとは何か -->
+                <section class="prose prose-slate max-w-none">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 ドメインサービスとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ドメインサービス</strong>は、エンティティや値オブジェクトに自然に属さないビジネスロジックを扱うオブジェクトです。DDDの戦術的パターンの一つで、複数の集約をまたがる処理や、概念的に特定のエンティティに属さない操作を表現します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまで学んだエンティティや値オブジェクトは、「注文」「顧客」「金額」など「モノ」を表現していました。一方、ドメインサービスは「送金する」「在庫を確認する」「重複をチェックする」といった<strong>「行為」や「処理」</strong>を表現します。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ドメインサービスの特徴</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    ドメインサービスは「無状態（ステートレス）」であることが基本です。つまり、インスタンス変数を持たず、メソッドのパラメータとして必要な情報を受け取り、処理結果を返します。これにより、再利用性が高く、テストしやすい設計になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: なぜドメインサービスが必要なのか -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 なぜドメインサービスが必要なのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        すべてのビジネスロジックをエンティティに詰め込もうとすると、以下のような問題が発生します：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題①: 不自然な責務の割り当て
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                「口座Aから口座Bへの送金」を口座エンティティのメソッドにすると、「どちらの口座の責務か？」という不自然な問題が発生します。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題②: 集約境界を越えた依存
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                複数の集約をまたがる処理をエンティティに持たせると、集約の独立性が失われ、循環依存が発生する可能性があります。
+                            </p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインサービスを使うことで、これらの問題を解決し、<strong>ビジネスロジックをドメイン層に保ちながら、自然で保守しやすい設計</strong>を実現できます。
+                    </p>
+
+                    <!-- 対比図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-balance-scale text-primary-500"></i>
+                            エンティティに詰め込む vs ドメインサービスを使う
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    subgraph Wrong["❌ エンティティに無理やり詰め込む"]
+        A1[口座A]
+        A2[口座B]
+        A1 -.不自然な依存.-> A2
+    end
+
+    subgraph Right["✓ ドメインサービスを使う"]
+        B1[口座A]
+        B2[口座B]
+        BS[送金サービス]
+        BS --> B1
+        BS --> B2
+    end
+
+    Wrong -.改善.-> Right
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: ドメインサービスの具体例 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 ドメインサービスの具体例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインサービスが使われる代表的な場面を、具体例とともに見ていきましょう。
+                    </p>
+
+                    <!-- 例1: 送金処理 -->
+                    <div class="mt-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">例1: 送金処理</h3>
+                        <p class="text-slate-600 leading-relaxed mb-4">
+                            銀行システムで、口座Aから口座Bへ送金する処理は、どちらの口座エンティティに属するとも言えません。この場合、<strong>送金サービス</strong>として独立させます。
+                        </p>
+
+                        <div class="code-block-wrapper mb-4">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">MoneyTransferService.java</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ドメインサービス: 送金処理
+public class MoneyTransferService {
+
+    // 送金処理を実行
+    public void transfer(
+        Account fromAccount,
+        Account toAccount,
+        Money amount
+    ) {
+        // ビジネスルール検証
+        if (fromAccount.getBalance().lessThan(amount)) {
+            throw new InsufficientBalanceException(
+                "残高不足です"
+            );
+        }
+
+        // 送金実行
+        fromAccount.withdraw(amount);
+        toAccount.deposit(amount);
+    }
+}</code></pre>
+                        </div>
+
+                        <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-star text-emerald-600 mt-1"></i>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-emerald-900 font-medium break-words">重要ポイント</p>
+                                    <p class="text-emerald-800 text-sm mt-1 break-words">
+                                        送金サービスは、2つの口座エンティティを協調させる「オーケストレーター」の役割を果たします。エンティティ自身は単純な引き出し・預け入れのみを担当し、送金という複雑な処理はサービスが担います。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 例2: 在庫確認サービス -->
+                    <div class="mt-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">例2: 在庫確認サービス</h3>
+                        <p class="text-slate-600 leading-relaxed mb-4">
+                            ECサイトで、複数の倉庫をまたいで在庫を確認する処理も、ドメインサービスとして表現できます。
+                        </p>
+
+                        <div class="code-block-wrapper mb-4">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">InventoryCheckService.java</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ドメインサービス: 在庫確認
+public class InventoryCheckService {
+
+    // 複数倉庫の在庫を確認
+    public boolean isAvailable(
+        ProductId productId,
+        Quantity requestedQty,
+        List&lt;Warehouse&gt; warehouses
+    ) {
+        // 全倉庫の在庫数を合計
+        Quantity totalStock = warehouses.stream()
+            .map(w -> w.getStock(productId))
+            .reduce(Quantity.zero(), Quantity::add);
+
+        // 要求数量が在庫内か判定
+        return totalStock.greaterThanOrEqual(requestedQty);
+    }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- 例3: 重複チェックサービス -->
+                    <div class="mt-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">例3: ユーザー名重複チェックサービス</h3>
+                        <p class="text-slate-600 leading-relaxed mb-4">
+                            ユーザー登録時に、既に同じユーザー名が存在しないかチェックする処理は、リポジトリを使った検索が必要なため、ドメインサービスとして実装します。
+                        </p>
+
+                        <div class="code-block-wrapper mb-4">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">UserDuplicationCheckService.java</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ドメインサービス: ユーザー重複チェック
+public class UserDuplicationCheckService {
+
+    private final UserRepository userRepository;
+
+    public boolean isDuplicate(Username username) {
+        // リポジトリで既存ユーザーを検索
+        return userRepository.findByUsername(username)
+            .isPresent();
+    }
+}</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: エンティティ vs ドメインサービスの判断基準 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 エンティティ vs ドメインサービスの判断基準
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビジネスロジックをエンティティに持たせるべきか、ドメインサービスにすべきか、判断に迷うことがあります。以下の基準を参考にしてください。
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+                        <!-- エンティティに持たせる場合 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-cube text-blue-600"></i>
+                                エンティティに持たせる場合
+                            </h4>
+                            <ul class="space-y-2 text-blue-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>単一のエンティティの状態変更</strong>: 「注文をキャンセルする」など</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>エンティティの不変条件を守る処理</strong>: 「注文明細を追加する」など</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span><strong>概念的にそのエンティティに属する</strong>: 「顧客の住所を変更する」など</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- ドメインサービスにする場合 -->
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-cogs text-purple-600"></i>
+                                ドメインサービスにする場合
+                            </h4>
+                            <ul class="space-y-2 text-purple-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>複数のエンティティをまたがる処理</strong>: 「送金処理」など</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>特定のエンティティに属さない処理</strong>: 「在庫確認」など</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600">●</span>
+                                    <span><strong>リポジトリを使った検索が必要</strong>: 「重複チェック」など</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 判断フロー -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-sitemap text-primary-500"></i>
+                            判断フローチャート
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    Start([ビジネスロジックをどこに配置？]) --> Q1{単一のエンティティ<br/>だけで完結する？}
+    Q1 -->|はい| Q2{そのエンティティに<br/>概念的に属する？}
+    Q1 -->|いいえ| Service[ドメインサービス]
+
+    Q2 -->|はい| Entity[エンティティのメソッド]
+    Q2 -->|いいえ| Service
+
+    Service --> Ex1[例: 送金処理<br/>在庫確認など]
+    Entity --> Ex2[例: 注文キャンセル<br/>住所変更など]
+
+    style Service fill:#c7d2fe,stroke:#6366f1
+    style Entity fill:#bfdbfe,stroke:#3b82f6
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: 過度な使用を避ける方法 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 過度な使用を避ける - 貧血ドメインモデルの問題
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ドメインサービスは便利ですが、<strong>使いすぎると「貧血ドメインモデル」</strong>という問題が発生します。これは、エンティティがデータの入れ物だけになり、ビジネスロジックがすべてサービスに集まってしまう状態です。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-times-circle"></i>
+                                ❌ 貧血ドメインモデル（悪い例）
+                            </h4>
+                            <div class="code-block-wrapper mb-0">
+                                <pre class="!mt-0 !mb-0"><code class="language-java">// エンティティがデータのみ
+class Order {
+    private Money total;
+
+    // getter/setterのみ
+    public Money getTotal() {
+        return total;
+    }
+    public void setTotal(Money m) {
+        this.total = m;
+    }
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i>
+                                ✓ 適切な設計（良い例）
+                            </h4>
+                            <div class="code-block-wrapper mb-0">
+                                <pre class="!mt-0 !mb-0"><code class="language-java">// エンティティが振る舞いを持つ
+class Order {
+    private Money total;
+
+    // ビジネスロジックを持つ
+    public void cancel() {
+        if (isShipped()) {
+            throw new Exception(
+                "発送済みはキャンセル不可"
+            );
+        }
+        this.status = CANCELLED;
+    }
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    <strong>「迷ったらエンティティに配置する」</strong>を基本方針にしましょう。本当にエンティティに属さない場合のみ、ドメインサービスを使います。これにより、ドメインモデルが豊かな振る舞いを持ち、ビジネスロジックが分散しすぎることを防げます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: ドメインサービスとアプリケーションサービスの違い -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.6 ドメインサービス vs アプリケーションサービス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DDDには「ドメインサービス」の他に「アプリケーションサービス」という概念もあります。名前が似ていますが、役割は全く異なります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b">比較項目</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b">ドメインサービス</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b">アプリケーションサービス</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr class="border-b">
+                                    <td class="px-4 py-3 font-medium text-slate-700">配置レイヤ</td>
+                                    <td class="px-4 py-3 text-slate-600">ドメイン層</td>
+                                    <td class="px-4 py-3 text-slate-600">アプリケーション層</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="px-4 py-3 font-medium text-slate-700">役割</td>
+                                    <td class="px-4 py-3 text-slate-600">ビジネスロジックの実行</td>
+                                    <td class="px-4 py-3 text-slate-600">ユースケースの調整・制御</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="px-4 py-3 font-medium text-slate-700">具体例</td>
+                                    <td class="px-4 py-3 text-slate-600">送金処理、在庫確認</td>
+                                    <td class="px-4 py-3 text-slate-600">注文受付処理、ユーザー登録処理</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-slate-700">依存関係</td>
+                                    <td class="px-4 py-3 text-slate-600">エンティティ、値オブジェクトに依存</td>
+                                    <td class="px-4 py-3 text-slate-600">ドメインサービス、リポジトリに依存</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- レイヤ構造図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-layer-group text-primary-500"></i>
+                            レイヤードアーキテクチャでの位置付け
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph Presentation[プレゼンテーション層]
+        UI[UI / Controller]
+    end
+
+    subgraph Application[アプリケーション層]
+        AS[アプリケーションサービス<br/>注文受付処理など]
+    end
+
+    subgraph Domain[ドメイン層]
+        DS[ドメインサービス<br/>送金処理など]
+        Entity[エンティティ]
+        VO[値オブジェクト]
+    end
+
+    subgraph Infra[インフラストラクチャ層]
+        Repo[リポジトリ実装]
+        DB[(データベース)]
+    end
+
+    UI --> AS
+    AS --> DS
+    AS --> Repo
+    DS --> Entity
+    DS --> VO
+    Repo --> DB
+
+    style Domain fill:#c7d2fe,stroke:#6366f1
+    style Application fill:#bfdbfe,stroke:#3b82f6
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">使い分けのポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    <strong>ドメインサービス</strong>は「ビジネスの専門家と話す言葉」で書きます。<strong>アプリケーションサービス</strong>は「ユースケースの流れ」を調整します。「送金する」はビジネス用語なのでドメインサービス、「注文受付処理」はユースケースなのでアプリケーションサービスです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 8-1: ドメインサービスの実装</h3>
+                            <p class="text-purple-900 mb-4 break-words">ECサイトで、注文時に在庫を予約するドメインサービスを実装してみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">ProductクラスとWarehouseクラスを作成し、基本的な在庫管理機能を実装する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">InventoryReservationServiceを作成し、複数倉庫から在庫を予約するメソッドを実装する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">在庫不足時の例外処理を実装し、テストコードで動作確認する</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">
+                                    <i class="fas fa-check-circle mr-2"></i>実装のヒント
+                                </h4>
+                                <ul class="space-y-1 text-purple-900 text-sm">
+                                    <li>• ドメインサービスはステートレス（状態を持たない）にする</li>
+                                    <li>• 複数の倉庫エンティティを引数で受け取る設計にする</li>
+                                    <li>• ビジネスルールの検証をサービス内で行う</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ドメインサービスが必要になるのはどのような場面ですか？3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① 複数のエンティティをまたがる処理（例: 送金処理）<br>
+                                            ② 特定のエンティティに概念的に属さない処理（例: 在庫確認）<br>
+                                            ③ リポジトリを使った検索が必要な処理（例: 重複チェック）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 「貧血ドメインモデル」とは何ですか？なぜ避けるべきですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            貧血ドメインモデルとは、エンティティがデータの入れ物だけになり、ビジネスロジックがすべてドメインサービスに集まってしまう状態です。これを避けるべき理由は、エンティティが本来持つべき振る舞いを失い、オブジェクト指向の利点が損なわれるためです。ビジネスロジックが分散しすぎて保守性が低下します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ドメインサービスとアプリケーションサービスの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ドメインサービスはドメイン層に配置され、ビジネスロジックそのものを実装します（例: 送金処理）。アプリケーションサービスはアプリケーション層に配置され、ユースケースの流れを調整・制御します（例: 注文受付処理）。ドメインサービスは「ビジネスの専門家と話す言葉」、アプリケーションサービスは「システムのユースケース」を表現します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 「注文をキャンセルする」処理は、エンティティとドメインサービスのどちらに配置すべきですか？理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            エンティティ（Orderクラス）に配置すべきです。理由は、「注文をキャンセルする」は単一のエンティティ（注文）の状態を変更する処理であり、概念的に注文エンティティに属するためです。ドメインサービスは複数のエンティティをまたがる処理や、特定のエンティティに属さない処理のために使います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ドメインサービスは、エンティティや値オブジェクトに自然に属さないビジネスロジックを扱う</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>複数のエンティティをまたがる処理、特定のエンティティに属さない処理で使用する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>送金処理、在庫確認、重複チェックなどが代表的な使用例</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>過度な使用は「貧血ドメインモデル」を招くため、基本はエンティティに配置する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ドメインサービスはビジネスロジック、アプリケーションサービスはユースケース調整を担当する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="ddd-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">リポジトリ</span>
+                        </div>
+                    </a>
+                    <a href="ddd-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ファクトリ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

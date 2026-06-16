@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第5章 - PostgreSQLの便利な関数</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第5章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第5章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">PostgreSQLの便利な関数 - 文字列・日付・数値の操作</h1>
+                    <p class="text-slate-600">PostgreSQLが提供する豊富な組み込み関数を学習します。文字列関数（CONCAT、SUBSTRING、TRIMなど）、日付関数（NOW、AGE、DATE_TRUNCなど）、数値関数（ROUND、CEIL、FLOORなど）の実践的な使い方を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>文字列関数を使ったテキストデータの加工方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>日付・時刻関数を使った日時データの操作と計算方法を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>数値関数を使った計算と丸め処理の方法を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>実務で頻繁に使う関数の組み合わせパターンを身につける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.1 文字列関数の基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLは、テキストデータを加工・変換するための豊富な文字列関数を提供しています。
+                        文字列の連結、切り出し、検索、置換など、実務で頻繁に使う操作を簡単に行うことができます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">主な文字列関数</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">関数</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">CONCAT</td>
+                                    <td class="px-4 py-3">文字列を連結する</td>
+                                    <td class="px-4 py-3 font-mono text-sm">CONCAT('Hello', ' ', 'World')</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">LENGTH</td>
+                                    <td class="px-4 py-3">文字列の長さを返す</td>
+                                    <td class="px-4 py-3 font-mono text-sm">LENGTH('PostgreSQL')</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">UPPER / LOWER</td>
+                                    <td class="px-4 py-3">大文字/小文字に変換</td>
+                                    <td class="px-4 py-3 font-mono text-sm">UPPER('hello')</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">SUBSTRING</td>
+                                    <td class="px-4 py-3">部分文字列を切り出す</td>
+                                    <td class="px-4 py-3 font-mono text-sm">SUBSTRING('PostgreSQL', 1, 6)</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">TRIM</td>
+                                    <td class="px-4 py-3">前後の空白を削除</td>
+                                    <td class="px-4 py-3 font-mono text-sm">TRIM('  hello  ')</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm">REPLACE</td>
+                                    <td class="px-4 py-3">文字列を置換する</td>
+                                    <td class="px-4 py-3 font-mono text-sm">REPLACE('Hello', 'e', 'a')</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">文字列連結の実践例</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 社員テーブルから氏名を結合して表示
+SELECT
+    last_name,
+    first_name,
+    CONCAT(last_name, ' ', first_name) AS full_name
+FROM employees;
+
+-- 結果例:
+-- last_name | first_name | full_name
+-- ----------+------------+------------
+-- 山田      | 太郎       | 山田 太郎
+-- 佐藤      | 花子       | 佐藤 花子</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">CONCAT vs ||演算子</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    PostgreSQLでは文字列連結に<code class="px-1 py-0.5 bg-blue-100 rounded">||</code>演算子も使えます。
+                                    例: <code class="px-1 py-0.5 bg-blue-100 rounded">last_name || ' ' || first_name</code>
+                                    CONCATはNULL値を空文字として扱いますが、||演算子はNULLが含まれると結果もNULLになります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.2 文字列の切り出しと検索
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        文字列の一部を取り出したり、特定の文字列が含まれているかを調べる操作は、データ処理で頻繁に必要になります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">SUBSTRING関数</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 郵便番号から前3桁を取り出す
+SELECT
+    postal_code,
+    SUBSTRING(postal_code, 1, 3) AS area_code
+FROM addresses;
+
+-- メールアドレスからドメイン部分を取り出す
+SELECT
+    email,
+    SUBSTRING(email FROM POSITION('@' IN email) + 1) AS domain
+FROM users;
+
+-- 結果例:
+-- email              | domain
+-- -------------------+-------------
+-- user@example.com   | example.com
+-- admin@company.co.jp| company.co.jp</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">LEFT・RIGHT関数</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 商品コードの先頭3文字でカテゴリを判別
+SELECT
+    product_code,
+    LEFT(product_code, 3) AS category_code,
+    product_name
+FROM products;
+
+-- ファイル名の拡張子を取得（後ろから4文字）
+SELECT
+    filename,
+    RIGHT(filename, 4) AS extension
+FROM files;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">パターンマッチング（LIKE・ILIKE）</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 「田」で終わる名字を検索（LIKE: 大文字小文字を区別）
+SELECT * FROM employees
+WHERE last_name LIKE '%田';
+
+-- 「postgres」を含む文字列を検索（ILIKE: 大文字小文字を区別しない）
+SELECT * FROM products
+WHERE description ILIKE '%postgres%';
+
+-- メールアドレスがgmail.comのユーザーを検索
+SELECT * FROM users
+WHERE email LIKE '%@gmail.com';</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ワイルドカード記号</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    <code class="px-1 py-0.5 bg-emerald-100 rounded">%</code>: 0文字以上の任意の文字列<br>
+                                    <code class="px-1 py-0.5 bg-emerald-100 rounded">_</code>: 任意の1文字<br>
+                                    例: <code class="px-1 py-0.5 bg-emerald-100 rounded">'A%'</code>はAで始まる全て、<code class="px-1 py-0.5 bg-emerald-100 rounded">'A_'</code>はAで始まる2文字
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.3 日付・時刻関数
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        日付や時刻の計算、フォーマット変換は、業務システムで非常によく使われます。
+                        PostgreSQLは日時操作のための強力な関数群を提供しています。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">現在日時の取得</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">関数</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">戻り値の型</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">NOW()</td>
+                                    <td class="px-4 py-3">現在の日時（タイムゾーン付き）</td>
+                                    <td class="px-4 py-3">TIMESTAMP WITH TIME ZONE</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">CURRENT_DATE</td>
+                                    <td class="px-4 py-3">現在の日付</td>
+                                    <td class="px-4 py-3">DATE</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">CURRENT_TIME</td>
+                                    <td class="px-4 py-3">現在の時刻</td>
+                                    <td class="px-4 py-3">TIME WITH TIME ZONE</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm">CURRENT_TIMESTAMP</td>
+                                    <td class="px-4 py-3">現在の日時（NOW()と同じ）</td>
+                                    <td class="px-4 py-3">TIMESTAMP WITH TIME ZONE</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 現在日時の取得
+SELECT
+    NOW() AS current_datetime,
+    CURRENT_DATE AS today,
+    CURRENT_TIME AS now_time;
+
+-- 結果例:
+-- current_datetime        | today      | now_time
+-- -----------------------+------------+-----------
+-- 2025-01-15 14:30:25+09 | 2025-01-15 | 14:30:25+09</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">日付の加算・減算</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 7日後の日付を計算
+SELECT
+    CURRENT_DATE AS today,
+    CURRENT_DATE + INTERVAL '7 days' AS next_week;
+
+-- 注文日から30日以内の配送予定日を計算
+SELECT
+    order_date,
+    order_date + INTERVAL '3 days' AS estimated_delivery
+FROM orders;
+
+-- 過去1ヶ月分のデータを抽出
+SELECT * FROM sales
+WHERE sale_date >= CURRENT_DATE - INTERVAL '1 month';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">日付の差分計算</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 年齢を計算（AGE関数）
+SELECT
+    birth_date,
+    AGE(CURRENT_DATE, birth_date) AS age,
+    EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date)) AS age_years
+FROM employees;
+
+-- 勤続年数を計算
+SELECT
+    employee_id,
+    hire_date,
+    EXTRACT(YEAR FROM AGE(CURRENT_DATE, hire_date)) AS years_of_service
+FROM employees;</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    A[現在日時<br/>2025-01-15] --> B{操作}
+    B -->|+7 days| C[7日後<br/>2025-01-22]
+    B -->|-30 days| D[30日前<br/>2024-12-16]
+    B -->|+1 month| E[1ヶ月後<br/>2025-02-15]
+
+    style A fill:#dbeafe,stroke:#3b82f6
+    style C fill:#d1fae5,stroke:#10b981
+    style D fill:#fef3c7,stroke:#f59e0b
+    style E fill:#e9d5ff,stroke:#a855f7
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.4 日付のフォーマット変換
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        TO_CHAR関数を使うと、日付を様々な形式の文字列に変換できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">よく使うフォーマットパターン</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">パターン</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">YYYY-MM-DD</td>
+                                    <td class="px-4 py-3">ISO標準形式</td>
+                                    <td class="px-4 py-3">2025-01-15</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">YYYY/MM/DD</td>
+                                    <td class="px-4 py-3">スラッシュ区切り</td>
+                                    <td class="px-4 py-3">2025/01/15</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">YYYY年MM月DD日</td>
+                                    <td class="px-4 py-3">日本語形式</td>
+                                    <td class="px-4 py-3">2025年01月15日</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">Day</td>
+                                    <td class="px-4 py-3">曜日名</td>
+                                    <td class="px-4 py-3">Wednesday</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm">HH24:MI:SS</td>
+                                    <td class="px-4 py-3">24時間形式の時刻</td>
+                                    <td class="px-4 py-3">14:30:25</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 様々な形式で日付を表示
+SELECT
+    NOW() AS original,
+    TO_CHAR(NOW(), 'YYYY-MM-DD') AS iso_format,
+    TO_CHAR(NOW(), 'YYYY/MM/DD') AS slash_format,
+    TO_CHAR(NOW(), 'YYYY年MM月DD日') AS japanese_format,
+    TO_CHAR(NOW(), 'HH24:MI:SS') AS time_only;
+
+-- 売上レポート用に月ごとの形式で表示
+SELECT
+    TO_CHAR(sale_date, 'YYYY-MM') AS month,
+    SUM(amount) AS total_sales
+FROM sales
+GROUP BY TO_CHAR(sale_date, 'YYYY-MM')
+ORDER BY month;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">DATE_TRUNC関数 - 日付の切り捨て</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 月初、年初に切り捨て
+SELECT
+    NOW() AS current_time,
+    DATE_TRUNC('month', NOW()) AS month_start,
+    DATE_TRUNC('year', NOW()) AS year_start,
+    DATE_TRUNC('day', NOW()) AS day_start;
+
+-- 月ごとの集計
+SELECT
+    DATE_TRUNC('month', order_date) AS month,
+    COUNT(*) AS order_count
+FROM orders
+GROUP BY DATE_TRUNC('month', order_date);</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.5 数値関数
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        数値の丸め処理、絶対値、平方根など、数学的な計算を行う関数群です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">丸め処理関数</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">関数</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">ROUND</td>
+                                    <td class="px-4 py-3">四捨五入</td>
+                                    <td class="px-4 py-3">ROUND(3.7) → 4</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">CEIL / CEILING</td>
+                                    <td class="px-4 py-3">切り上げ</td>
+                                    <td class="px-4 py-3">CEIL(3.2) → 4</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-mono text-sm">FLOOR</td>
+                                    <td class="px-4 py-3">切り捨て</td>
+                                    <td class="px-4 py-3">FLOOR(3.8) → 3</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm">TRUNC</td>
+                                    <td class="px-4 py-3">指定桁数で切り捨て</td>
+                                    <td class="px-4 py-3">TRUNC(3.789, 2) → 3.78</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 商品価格の消費税計算（四捨五入）
+SELECT
+    product_name,
+    price,
+    ROUND(price * 1.10) AS price_with_tax
+FROM products;
+
+-- 送料計算（100円未満切り上げ）
+SELECT
+    order_id,
+    weight_kg,
+    CEIL(weight_kg / 5) * 500 AS shipping_fee
+FROM orders;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">その他の数値関数</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span class="code-block-title">SQL</span>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 絶対値（ABS）
+SELECT ABS(-10) AS absolute_value;  -- 結果: 10
+
+-- べき乗（POWER）
+SELECT POWER(2, 3) AS result;  -- 結果: 8 (2の3乗)
+
+-- 平方根（SQRT）
+SELECT SQRT(16) AS result;  -- 結果: 4
+
+-- 剰余（MOD）
+SELECT MOD(10, 3) AS remainder;  -- 結果: 1 (10÷3の余り)</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A[元の値: 3.7] --> B{丸め処理}
+    B -->|ROUND| C[四捨五入: 4]
+    B -->|CEIL| D[切り上げ: 4]
+    B -->|FLOOR| E[切り捨て: 3]
+    B -->|TRUNC全2桁全| F[切り捨て: 3.70]
+
+    style A fill:#dbeafe,stroke:#3b82f6
+    style C fill:#d1fae5,stroke:#10b981
+    style D fill:#fef3c7,stroke:#f59e0b
+    style E fill:#fecaca,stroke:#ef4444
+    style F fill:#e9d5ff,stroke:#a855f7
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: 社員情報の加工</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                以下のemployeesテーブルを使って、様々な関数を試してみましょう。
+                            </p>
+
+                            <div class="code-block-wrapper my-4">
+                                <div class="code-block-header">
+                                    <span class="code-block-title">SQL</span>
+                                    <button class="copy-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre><code class="language-sql">-- サンプルテーブル作成
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    email VARCHAR(100),
+    hire_date DATE,
+    salary NUMERIC(10, 2)
+);
+
+-- データ挿入
+INSERT INTO employees VALUES
+(1, '太郎', '山田', 'yamada@example.com', '2020-04-01', 350000),
+(2, '花子', '佐藤', 'sato@example.com', '2021-07-15', 380000),
+(3, '次郎', '鈴木', 'suzuki@example.com', '2019-10-01', 420000);</code></pre>
+                            </div>
+
+                            <p class="text-purple-900 font-medium mb-2 break-words">練習問題:</p>
+                            <ol class="list-decimal list-inside space-y-2 text-purple-900 break-words">
+                                <li>氏名を「姓 名」形式で結合して表示してください</li>
+                                <li>メールアドレスからドメイン部分のみを抽出してください</li>
+                                <li>入社日から現在までの勤続年数を計算してください</li>
+                                <li>給与に10%の賞与を加算し、千円未満を四捨五入してください</li>
+                            </ol>
+
+                            <details class="mt-4">
+                                <summary class="cursor-pointer text-purple-600 hover:text-purple-700 font-medium break-words">
+                                    解答例を表示
+                                </summary>
+                                <div class="mt-3 bg-purple-100 rounded-lg p-4">
+                                    <div class="code-block-wrapper">
+                                        <div class="code-block-header">
+                                            <span class="code-block-title">SQL</span>
+                                            <button class="copy-btn" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre><code class="language-sql">SELECT
+    -- 1. 氏名結合
+    CONCAT(last_name, ' ', first_name) AS full_name,
+    -- 2. ドメイン抽出
+    SUBSTRING(email FROM POSITION('@' IN email) + 1) AS domain,
+    -- 3. 勤続年数
+    EXTRACT(YEAR FROM AGE(CURRENT_DATE, hire_date)) AS years_of_service,
+    -- 4. 賞与計算
+    salary,
+    ROUND(salary * 1.10 / 1000) * 1000 AS salary_with_bonus
+FROM employees;</code></pre>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. CONCAT関数と||演算子の違いは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> CONCAT関数はNULL値を空文字として扱いますが、||演算子はNULLが含まれると結果もNULLになります。例えば、CONCAT('Hello', NULL, 'World')は'HelloWorld'になりますが、'Hello' || NULL || 'World'はNULLになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. DATE_TRUNC('month', '2025-03-15')の結果は何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> 2025-03-01 00:00:00<br>
+                                            DATE_TRUNC関数は指定した精度（この場合は'month'）まで切り捨てます。月単位で切り捨てると、その月の1日0時0分0秒になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ROUND、CEIL、FLOORの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            - ROUND: 四捨五入（3.5 → 4、3.4 → 3）<br>
+                                            - CEIL: 切り上げ（3.1 → 4、3.9 → 4）<br>
+                                            - FLOOR: 切り捨て（3.1 → 3、3.9 → 3）<br>
+                                            ROUNDは0.5を境に丸め方向が変わりますが、CEILは常に上、FLOORは常に下に丸めます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第5章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>文字列関数（CONCAT、SUBSTRING、TRIM、REPLACEなど）でテキストデータを自在に加工できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>日付関数（NOW、AGE、DATE_TRUNCなど）で日時の計算とフォーマット変換が行える</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>INTERVALを使って日付の加算・減算が簡単にできる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>数値関数（ROUND、CEIL、FLOORなど）で適切な丸め処理ができる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>これらの関数を組み合わせることで、実務で必要なデータ加工がSQL内で完結できる</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-04.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">テーブル設計</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">JSONデータの操作</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

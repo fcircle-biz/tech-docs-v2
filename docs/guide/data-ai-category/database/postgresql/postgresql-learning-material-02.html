@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第2章 - PostgreSQLの環境構築</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第2章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第2章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">PostgreSQLの環境構築 - インストールとpgAdminの使い方</h1>
+                    <p class="text-slate-600">PostgreSQLのダウンロードからインストール、初期設定までを画面キャプチャ付きで丁寧に解説します。pgAdminの基本操作（サーバー接続、データベース作成、SQLエディタの使い方）を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PostgreSQLのインストール方法（Windows/Mac/Linux）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>初期設定（ポート番号、スーパーユーザーパスワード）の方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>pgAdminの基本操作（サーバー接続、データベース作成）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SQLエディタでクエリを実行する方法</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.1 PostgreSQLのインストール
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLは、Windows、Mac、Linuxの各OSに対応しています。
+                        公式サイトから各OS用のインストーラーをダウンロードしてインストールできます。
+                        ここでは、各OSごとのインストール手順を解説します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    Start["PostgreSQLをインストールする"] --> OS{お使いのOSは？}
+    OS -->|Windows| Win["Windows版インストーラー"]
+    OS -->|macOS| Mac["macOS版インストーラー/Homebrew"]
+    OS -->|Linux| Linux["パッケージマネージャー<br/>全apt/yum/dnf全"]
+
+    Win --> Download["公式サイトからダウンロード"]
+    Mac --> Download
+    Linux --> PackageManager["パッケージマネージャーで<br/>インストール"]
+
+    Download --> Install["インストーラー実行"]
+    PackageManager --> Install
+    Install --> Config["初期設定"]
+    Config --> Complete["インストール完了"]
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ダウンロード先</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    PostgreSQL公式ダウンロードページ: <a href="https://www.postgresql.org/download/" target="_blank" class="underline">https://www.postgresql.org/download/</a><br>
+                                    お使いのOSを選択して、最新の安定版（Stable Release）をダウンロードしてください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.2 Windowsへのインストール手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        Windows環境では、EnterpriseDB社が提供するインストーラーを使用します。
+                        GUIベースのウィザード形式で、簡単にインストールできます。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- 手順1 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">1</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">インストーラーのダウンロード</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        公式サイトから「Windows x86-64」版のインストーラーをダウンロードします。
+                                        バージョンは最新の安定版（例: PostgreSQL 16.x）を選択してください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順2 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">2</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">インストーラーの実行</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        ダウンロードしたインストーラー（postgresql-16.x-windows-x64.exe）をダブルクリックして実行します。
+                                        「このアプリがデバイスに変更を加えることを許可しますか？」と表示されたら「はい」をクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順3 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">3</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">インストール先の選択</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        インストール先ディレクトリを指定します。特に理由がなければデフォルト（C:\Program Files\PostgreSQL\16）のまま「Next」をクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順4 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">4</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">コンポーネントの選択</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        インストールするコンポーネントを選択します。以下をすべてチェックして「Next」をクリック：<br>
+                                        ・PostgreSQL Server（本体）<br>
+                                        ・pgAdmin 4（管理ツール）<br>
+                                        ・Command Line Tools（コマンドラインツール）<br>
+                                        ・Stack Builder（追加機能インストーラー、任意）
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順5 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">5</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">スーパーユーザーパスワードの設定</h3>
+                                    <p class="text-slate-600 text-sm mb-2">
+                                        PostgreSQLの管理者（postgres）のパスワードを設定します。
+                                        このパスワードは忘れないようにメモしておいてください。
+                                    </p>
+                                    <div class="bg-red-50 border-l-4 border-red-500 p-3 mt-2 rounded-r-lg overflow-hidden">
+                                        <p class="text-red-800 text-sm break-words">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                                            <strong>重要:</strong> このパスワードは後で使用するため、必ず覚えておくか安全な場所にメモしてください。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順6 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">6</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">ポート番号の設定</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        PostgreSQLが使用するポート番号を指定します。デフォルトは5432です。
+                                        特に理由がなければデフォルトのまま「Next」をクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順7 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">7</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">ロケールの設定</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        文字コードとロケールを設定します。デフォルト（Default locale）のまま「Next」をクリックします。
+                                        日本語環境では自動的に「Japanese_Japan」が選択されます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順8 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">8</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">インストール実行</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        設定内容を確認して「Next」をクリックすると、インストールが開始されます。
+                                        インストールには数分かかります。完了したら「Finish」をクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.3 macOSへのインストール手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        macOS環境では、公式インストーラーまたはHomebrewを使用してインストールできます。
+                        ここでは両方の方法を紹介しますが、初心者には公式インストーラーをお勧めします。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- 方法1: 公式インストーラー -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-download text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-blue-900 font-semibold mb-2">方法1: 公式インストーラー（推奨）</h3>
+                                    <p class="text-blue-800 text-sm">GUIベースで簡単にインストールできます。pgAdminも同時にインストールされます。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 方法2: Homebrew -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-terminal text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-emerald-900 font-semibold mb-2">方法2: Homebrew</h3>
+                                    <p class="text-emerald-800 text-sm">コマンドラインで素早くインストールできます。開発者向けの方法です。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">方法1: 公式インストーラーを使用</h3>
+                    <p class="text-slate-600 text-sm mb-3">
+                        Windows版とほぼ同じ手順でインストールできます。公式サイトから「macOS」版インストーラーをダウンロードして実行してください。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">方法2: Homebrewを使用</h3>
+                    <p class="text-slate-600 text-sm mb-3">
+                        Homebrewがインストールされている場合、以下のコマンドでPostgreSQLをインストールできます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">
+                                <i class="fas fa-terminal mr-2"></i>ターミナル
+                            </span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-bash"># PostgreSQLのインストール
+brew install postgresql@16
+
+# サービスとして起動
+brew services start postgresql@16
+
+# pgAdminのインストール（別途）
+brew install --cask pgadmin4</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.4 pgAdminの起動と初期設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pgAdminは、PostgreSQLを視覚的に操作できる管理ツールです。
+                        データベースの作成、テーブルの管理、SQLクエリの実行など、様々な操作をGUIで行えます。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    Start["pgAdminを起動"] --> Browser["Webブラウザで<br/>管理画面が開く"]
+    Browser --> MasterPW["マスターパスワード設定<br/>全初回のみ全"]
+    MasterPW --> AddServer["サーバー接続設定"]
+    AddServer --> Connect["PostgreSQLに接続"]
+    Connect --> Ready["管理画面を使用可能"]
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 my-6">
+                        <!-- 手順1 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">1</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">pgAdminの起動</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        <strong>Windows:</strong> スタートメニューから「pgAdmin 4」を検索して起動<br>
+                                        <strong>macOS:</strong> Launchpadまたはアプリケーションフォルダから「pgAdmin 4」を起動<br>
+                                        起動すると、Webブラウザが自動的に開き、pgAdminの管理画面が表示されます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順2 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">2</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">マスターパスワードの設定（初回のみ）</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        初回起動時、pgAdminのマスターパスワードを設定するよう求められます。
+                                        このパスワードは、pgAdminを起動するたびに入力が必要になります。
+                                        覚えやすいパスワードを設定してください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順3 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">3</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">サーバー接続設定</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        左側のツリーから「Servers」を展開し、「PostgreSQL 16」（バージョン番号は環境により異なる）をクリックします。
+                                        パスワードを求められたら、インストール時に設定したスーパーユーザー（postgres）のパスワードを入力して「OK」をクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">接続成功</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    正常に接続されると、左側のツリーに「Databases」「Login/Group Roles」などの項目が表示されます。
+                                    これでPostgreSQLの管理ができる状態になりました。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.5 pgAdminでデータベースを作成する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pgAdminを使って、練習用のデータベースを作成してみましょう。
+                        データベースは、テーブルやデータを格納する箱のようなものです。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- 手順1 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">1</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">Databasesを右クリック</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        左側のツリーから「Servers」→「PostgreSQL 16」→「Databases」を右クリックして、「Create」→「Database...」を選択します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順2 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">2</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">データベース名を入力</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        「Database」欄に、作成したいデータベース名を入力します。例: <code class="bg-slate-100 px-2 py-1 rounded text-sm">practice_db</code><br>
+                                        その他の設定（Owner、Encoding等）はデフォルトのままで構いません。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順3 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">3</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">Saveをクリック</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        右下の「Save」ボタンをクリックすると、データベースが作成されます。
+                                        左側のツリーに作成したデータベース名が表示されれば成功です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">
+                                <i class="fas fa-database mr-2"></i>SQL（参考: コマンドラインで作成する場合）
+                            </span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- データベースの作成
+CREATE DATABASE practice_db;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.6 SQLエディタでクエリを実行する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        pgAdminのSQLエディタを使って、SQLクエリを実行してみましょう。
+                        ここでは、簡単なテーブルを作成し、データを挿入・取得する操作を行います。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- 手順1 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">1</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">Query Toolを開く</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        左側のツリーから作成したデータベース（practice_db）を選択し、上部メニューの「Tools」→「Query Tool」をクリックします。
+                                        またはデータベースを選択した状態で、ツールバーの「Query Tool」アイコンをクリックします。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順2 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">2</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">SQLを入力</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        Query Toolの上部エリアに、実行したいSQLを入力します。
+                                        複数のSQL文を入力できますが、セミコロン（;）で区切る必要があります。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 手順3 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">3</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-2">実行ボタンをクリック</h3>
+                                    <p class="text-slate-600 text-sm">
+                                        ツールバーの「Execute/Refresh」ボタン（▶アイコン）をクリックすると、SQLが実行されます。
+                                        実行結果は下部の「Data Output」タブに表示されます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: テーブルを作成してデータを操作する</h3>
+                                <p class="text-purple-900 mb-3 break-words">
+                                    以下のSQLを実行して、テーブルの作成とデータ操作を体験しましょう。
+                                </p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span class="code-block-title">
+                                            <i class="fas fa-database mr-2"></i>SQL
+                                        </span>
+                                        <button class="code-copy-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                            <span>コピー</span>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- テーブルの作成
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- データの挿入
+INSERT INTO users (name, email) VALUES
+('山田太郎', 'yamada@example.com'),
+('佐藤花子', 'sato@example.com'),
+('鈴木一郎', 'suzuki@example.com');
+
+-- データの取得
+SELECT * FROM users;</code></pre>
+                                </div>
+
+                                <p class="text-purple-900 mt-3 break-words">
+                                    Query Toolに上記のSQLをコピー&ペーストして、▶ボタンをクリックしてください。
+                                    下部に3件のユーザーデータが表示されれば成功です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.7 トラブルシューティング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        インストールや接続時によくあるエラーとその対処法を紹介します。
+                    </p>
+
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-tools text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">よくあるエラーと対処法</h3>
+
+                                <div class="space-y-4">
+                                    <!-- エラー1 -->
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-orange-900 mb-2">エラー1: pgAdminでサーバーに接続できない</h4>
+                                        <p class="text-orange-800 text-sm mb-2">
+                                            <strong>原因:</strong> PostgreSQLサービスが起動していない可能性があります。
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処法:</strong><br>
+                                            ・Windows: サービス（services.msc）から「postgresql-x64-16」を確認し、停止していれば起動<br>
+                                            ・macOS: ターミナルで <code class="bg-orange-200 px-2 py-1 rounded text-sm">brew services start postgresql@16</code> を実行
+                                        </p>
+                                    </div>
+
+                                    <!-- エラー2 -->
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-orange-900 mb-2">エラー2: パスワード認証に失敗する</h4>
+                                        <p class="text-orange-800 text-sm mb-2">
+                                            <strong>原因:</strong> パスワードが間違っている、またはユーザー名が間違っている可能性があります。
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処法:</strong><br>
+                                            ・ユーザー名が「postgres」になっているか確認<br>
+                                            ・インストール時に設定したパスワードを再確認<br>
+                                            ・どうしても思い出せない場合は、PostgreSQLを再インストール
+                                        </p>
+                                    </div>
+
+                                    <!-- エラー3 -->
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-orange-900 mb-2">エラー3: ポート5432が既に使用されている</h4>
+                                        <p class="text-orange-800 text-sm mb-2">
+                                            <strong>原因:</strong> 他のアプリケーションがポート5432を使用しています。
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処法:</strong><br>
+                                            ・PostgreSQLの設定ファイル（postgresql.conf）でポート番号を変更（例: 5433）<br>
+                                            ・または、ポートを使用している他のアプリケーションを停止
+                                        </p>
+                                    </div>
+
+                                    <!-- エラー4 -->
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <h4 class="font-semibold text-orange-900 mb-2">エラー4: pgAdminが起動しない（Webページが開かない）</h4>
+                                        <p class="text-orange-800 text-sm mb-2">
+                                            <strong>原因:</strong> pgAdminのサービスが起動していない可能性があります。
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処法:</strong><br>
+                                            ・pgAdmin 4を再起動<br>
+                                            ・ブラウザで手動でアクセス: <code class="bg-orange-200 px-2 py-1 rounded text-sm">http://127.0.0.1:5050</code><br>
+                                            ・それでもダメな場合は、pgAdmin 4を再インストール
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. PostgreSQLのデフォルトポート番号は何番ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> 5432番<br>
+                                            PostgreSQLはデフォルトで5432番ポートを使用します。インストール時に変更することもできますが、特に理由がなければデフォルトのまま使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. pgAdminとは何ですか？その役割を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> pgAdminは、PostgreSQLを視覚的に操作できるGUI管理ツールです。<br>
+                                            主な役割は、データベースの作成・削除、テーブルの管理、SQLクエリの実行、データのインポート/エクスポート、ユーザー権限の管理など、PostgreSQLの様々な操作をGUIで簡単に行えるようにすることです。コマンドラインに不慣れな初心者でも直感的に操作できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. PostgreSQLのスーパーユーザーのデフォルトユーザー名は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> postgres<br>
+                                            PostgreSQLをインストールすると、デフォルトで「postgres」という名前のスーパーユーザーが作成されます。このユーザーはすべての権限を持ち、データベースの作成・削除、ユーザー管理など、すべての管理操作を実行できます。pgAdminでの初回接続時にもこのユーザー名を使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第2章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>PostgreSQLは公式インストーラーまたはパッケージマネージャーで簡単にインストールできる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>インストール時にスーパーユーザー（postgres）のパスワードを設定し、必ずメモしておく</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>pgAdminはWebブラウザベースのGUI管理ツールで、直感的にデータベースを操作できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Query ToolでSQLを実行し、テーブルの作成やデータ操作ができる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>接続エラーやパスワード認証エラーは、サービスの起動状態や設定を確認して対処する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-01.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">PostgreSQLとは</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">PostgreSQLのデータ型</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

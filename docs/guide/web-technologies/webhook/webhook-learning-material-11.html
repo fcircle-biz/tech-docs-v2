@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第11章 - Webhookのエラーとリトライ 〜失敗した時の対処〜</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        Webhookのエラーとリトライ 〜失敗した時の対処〜
+                    </h1>
+                    <p class="text-slate-600">
+                        Webhookの配信が失敗する原因と、その対処方法について学びます。リトライ（再送）の仕組み、べき等性（同じデータが複数回届いても問題ない設計）の考え方を理解します。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookの配信が失敗する主な原因を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リトライ（再送）の仕組みと「指数バックオフ」の意味を理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>べき等性とは何か、なぜ重要なのかを自分の言葉で説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>デッドレターキューなどの失敗時の対処パターンを知っている</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 11.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 Webhookの配信が失敗するとはどういうこと？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookは「イベントが起きたら指定URLにHTTPリクエストを送る」仕組みですが、このリクエストが相手に届かないことがあります。
+                        これを <strong>「Webhook配信の失敗」</strong> と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        宅配便の例で考えると、「配達員が荷物を運んだけれど、受取人が不在だった」状況に似ています。
+                        荷物（データ）は送り出したが、受け取ってもらえなかったというイメージです。
+                    </p>
+
+                    <!-- 失敗の判断基準 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                            Webhookが「失敗した」と判断される条件
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-times text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-red-800">接続できない</p>
+                                    <p class="text-red-700 text-sm mt-1">受信サーバーがダウンしていたり、ネットワーク障害でリクエストが届かない場合</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-hourglass-half text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-orange-800">タイムアウト</p>
+                                    <p class="text-orange-700 text-sm mt-1">受信サーバーが一定時間内にレスポンスを返さない場合（一般的に5〜30秒以内）</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <div class="flex-shrink-0 w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-yellow-800">エラーステータスコード</p>
+                                    <p class="text-yellow-700 text-sm mt-1">受信サーバーが 4xx や 5xx のHTTPステータスコードを返した場合</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    Webhookの送信側は、受信側から <strong>200〜299番台のHTTPステータスコード</strong> が返ってきた場合のみ
+                                    「正常に受け取ってもらえた」と判断します。それ以外はすべて「失敗」として扱います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 失敗の主な原因を知ろう
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhook配信が失敗する原因はいくつかあります。原因を知ることで、対処法が見えてきます。
+                    </p>
+
+                    <!-- 原因分類 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- 受信側の問題 -->
+                        <div class="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-server text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-red-800">受信側（自分のサーバー）の問題</h3>
+                            </div>
+                            <ul class="space-y-2 text-red-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-red-400 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーがメンテナンス中・停止中</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-red-400 mt-1 flex-shrink-0"></i>
+                                    <span>アプリケーションのバグでエラーが発生</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-red-400 mt-1 flex-shrink-0"></i>
+                                    <span>処理が重くタイムアウトしてしまう</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-red-400 mt-1 flex-shrink-0"></i>
+                                    <span>URLが変更されエンドポイントが存在しない</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- ネットワーク・その他の問題 -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-network-wired text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-orange-800">ネットワーク・その他の問題</h3>
+                            </div>
+                            <ul class="space-y-2 text-orange-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-orange-400 mt-1 flex-shrink-0"></i>
+                                    <span>インターネット回線の一時的な障害</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-orange-400 mt-1 flex-shrink-0"></i>
+                                    <span>ファイアウォールでブロックされている</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-orange-400 mt-1 flex-shrink-0"></i>
+                                    <span>SSL証明書の期限切れ（HTTPS通信エラー）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-dot-circle text-orange-400 mt-1 flex-shrink-0"></i>
+                                    <span>リクエストの急増によるサーバー過負荷</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 失敗フロー図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            Webhook配信失敗の流れ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant S as 送信元サービス
+    participant R as 受信サーバー
+
+    S->>R: Webhookリクエスト送信
+    note over R: サーバーダウン or 処理エラー
+    R-->>S: 接続エラー or 5xx エラー
+    note over S: 配信失敗を検知
+    S->>S: 失敗ログ記録
+        </div>
+    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">豆知識</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    受信側が「処理中に時間がかかる」場合は、まず素早く 200 OK を返してから処理を非同期で行う
+                                    <strong>「即時レスポンス」</strong> という設計パターンがよく使われます。
+                                    タイムアウトを防ぐための重要なテクニックです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 リトライ（再送）の仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhook配信が失敗した場合、ほとんどのサービスは自動的に再送信（リトライ）を行います。
+                        「宅配便が不在だったので、翌日また配達に来る」イメージです。
+                    </p>
+
+                    <!-- リトライの概念 -->
+                    <div class="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-redo text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary-800 mb-2">リトライとは</h3>
+                                <p class="text-primary-900 leading-relaxed">
+                                    Webhookの配信が失敗した場合に、<strong>一定時間をおいて再度同じリクエストを送信する</strong>仕組みです。
+                                    一時的なサーバー障害やネットワーク問題の場合に、時間をおけば成功することが多いため、
+                                    多くのWebhookサービスがこの機能を提供しています。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 指数バックオフの説明 -->
+                    <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <i class="fas fa-chart-line text-primary-500"></i>
+                        指数バックオフとは？
+                    </h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リトライを行う際、毎回すぐに再送してしまうと、障害中のサーバーにさらに負荷をかけてしまいます。
+                        そこで多くのシステムでは <strong>「指数バックオフ（Exponential Backoff）」</strong> という方式を使います。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「指数バックオフ」とは、<strong>リトライのたびに待ち時間を指数関数的に増やしていく</strong>方式です。
+                        失敗が続くほど間隔を長くすることで、障害中のサーバーへの過負荷を防ぎます。
+                    </p>
+
+                    <!-- 指数バックオフの具体例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-primary-500"></i>
+                            指数バックオフの例（Stripe等のサービス参考）
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100">
+                                        <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">リトライ回数</th>
+                                        <th class="text-left px-4 py-3 text-slate-700">待ち時間の目安</th>
+                                        <th class="text-left px-4 py-3 rounded-tr-lg text-slate-700">イメージ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">1回目</td>
+                                        <td class="px-4 py-3 text-slate-600">5秒後</td>
+                                        <td class="px-4 py-3 text-slate-500">すぐもう一度</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200 bg-slate-50">
+                                        <td class="px-4 py-3 font-medium text-slate-700">2回目</td>
+                                        <td class="px-4 py-3 text-slate-600">30秒後</td>
+                                        <td class="px-4 py-3 text-slate-500">少し待ってから</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">3回目</td>
+                                        <td class="px-4 py-3 text-slate-600">5分後</td>
+                                        <td class="px-4 py-3 text-slate-500">しばらく待ってから</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200 bg-slate-50">
+                                        <td class="px-4 py-3 font-medium text-slate-700">4回目</td>
+                                        <td class="px-4 py-3 text-slate-600">30分後</td>
+                                        <td class="px-4 py-3 text-slate-500">かなり待ってから</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">5回目以降</td>
+                                        <td class="px-4 py-3 text-slate-600">数時間後〜最終的に諦め</td>
+                                        <td class="px-4 py-3 text-slate-500">長期間待ってから / 最終的に失敗確定</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-slate-500 text-xs mt-3">※ 実際の間隔はサービスによって異なります。上記はイメージを掴むための参考値です。</p>
+                    </div>
+
+                    <!-- リトライフロー -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            リトライの流れ
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A([Webhookイベント発生]) --> B[リクエスト送信]
+    B --> C{200番台のレスポンス？}
+    C -- はい --> D([配信成功])
+    C -- いいえ --> E{最大リトライ回数に達した？}
+    E -- いいえ --> F["待機（指数バックオフ）"]
+    F --> B
+    E -- はい --> G([最終的に配信失敗])
+    G --> H[失敗ログに記録]
+
+    style D fill:#ecfdf5,stroke:#10b981
+    style G fill:#fef2f2,stroke:#ef4444
+        </div>
+    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">注意事項</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    リトライによって<strong>同じWebhookが複数回届く可能性があります。</strong>
+                                    「支払い完了」通知が2回届いたのに2回分の処理をしてしまうと大変です。
+                                    次のセクションで学ぶ「べき等性」が重要になります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 べき等性とは何か？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リトライによって同じWebhookが複数回届く可能性があります。
+                        このとき「何回受け取っても結果が同じになる」ように設計することを
+                        <strong>「べき等性（Idempotency）を保つ」</strong>と言います。
+                    </p>
+
+                    <!-- べき等性の概念 -->
+                    <div class="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-equals text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary-800 mb-2">べき等性（Idempotency）の定義</h3>
+                                <p class="text-primary-900 leading-relaxed">
+                                    「同じ操作を何回繰り返しても、1回実行したときと同じ結果になること」をべき等性と言います。
+                                    Webhookにおいては、<strong>同じ通知が複数回届いても、処理が重複して実行されない</strong>ことを意味します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 良い例・悪い例の比較 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- べき等性なしの例 -->
+                        <div class="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-times text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-red-800">べき等性なし（危険）</h3>
+                            </div>
+                            <p class="text-red-900 text-sm leading-relaxed mb-3">
+                                同じ「支払い完了」通知が2回届くと、
+                                「注文確定メール」が2通送られ、
+                                「在庫を1個減らす処理」が2回実行されてしまう。
+                            </p>
+                            <div class="bg-red-100 rounded-lg p-3">
+                                <p class="text-red-800 text-xs font-medium">問題</p>
+                                <p class="text-red-700 text-xs">2通のメール送信、在庫が2個分減少する</p>
+                            </div>
+                        </div>
+
+                        <!-- べき等性ありの例 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">べき等性あり（安全）</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed mb-3">
+                                同じ通知IDを持つWebhookが2回届いたとき、
+                                「もう処理済みのIDだ」と判断し、
+                                2回目の処理をスキップする。
+                            </p>
+                            <div class="bg-emerald-100 rounded-lg p-3">
+                                <p class="text-emerald-800 text-xs font-medium">結果</p>
+                                <p class="text-emerald-700 text-xs">1通のメール送信、在庫は1個分のみ減少</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- べき等性を実現する方法 -->
+                    <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <i class="fas fa-key text-primary-500"></i>
+                        べき等性を実現するための基本的なアプローチ
+                    </h3>
+                    <div class="space-y-3 mb-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">方法1</span>
+                                <div>
+                                    <p class="font-medium text-slate-700 mb-1">一意のIDで重複チェック</p>
+                                    <p class="text-slate-600 text-sm">
+                                        Webhookには通常、一意の識別子（ID）が含まれています。
+                                        受信したIDを記録しておき、同じIDが来たら処理をスキップします。
+                                        最もシンプルで確実な方法です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">方法2</span>
+                                <div>
+                                    <p class="font-medium text-slate-700 mb-1">ステータスを確認してから処理</p>
+                                    <p class="text-slate-600 text-sm">
+                                        処理を実行する前に「この注文はすでに処理済みか？」を確認します。
+                                        例：注文のステータスが「完了」になっていれば処理を行わない。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="flex-shrink-0 px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded">方法3</span>
+                                <div>
+                                    <p class="font-medium text-slate-700 mb-1">Idempotency Keyの活用</p>
+                                    <p class="text-slate-600 text-sm">
+                                        サービスによっては「Idempotency-Key」というHTTPヘッダーを使って、
+                                        同じリクエストの重複処理を防ぐ仕組みを提供しています。
+                                        Stripeなどの決済APIで使われています。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 Webhook IDを使ったべき等性の実装イメージ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際にどのようにべき等性を実現するか、Webhook IDを使った基本的なイメージを見てみましょう。
+                        プログラムを書かない場合でも「何をしているか」のイメージは大切です。
+                    </p>
+
+                    <!-- Webhook IDの例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-file-code text-primary-500"></i>
+                            WebhookのJSONデータ例（Webhook IDが含まれる）
+                        </h3>
+                        <div class="code-block-wrapper">
+                            <button class="copy-btn absolute top-2 right-2 px-2 py-1 bg-slate-600 text-white text-xs rounded hover:bg-slate-500"
+                                    onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').innerText)">
+                                コピー
+                            </button>
+                            <pre class="bg-slate-900 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code class="language-json">{
+  "id": "evt_1234567890abcdef",
+  "type": "payment.completed",
+  "created": 1700000000,
+  "data": {
+    "order_id": "order_001",
+    "amount": 5000,
+    "currency": "jpy"
+  }
+}</code></pre>
+                        </div>
+                        <p class="text-slate-500 text-sm mt-3">
+                            <code class="bg-slate-100 px-1 rounded text-xs">id</code> フィールドがWebhookの一意識別子です。
+                            同じ <code class="bg-slate-100 px-1 rounded text-xs">id</code> が届いたら「リトライ」と判断できます。
+                        </p>
+                    </div>
+
+                    <!-- 処理フロー -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            Webhook IDによる重複チェックの流れ
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A([Webhookを受信]) --> B["Webhook IDを取得<br/>（例: evt_1234567890）"]
+    B --> C{このIDは処理済み？}
+    C -- はい --> D["処理をスキップ<br/>（200 OK を返す）"]
+    C -- いいえ --> E[本来の処理を実行]
+    E --> F[IDを処理済みとして記録]
+    F --> G["200 OK を返す"]
+
+    style D fill:#f0fdfa,stroke:#14b8a6
+    style G fill:#ecfdf5,stroke:#10b981
+        </div>
+    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    スキップした場合でも <strong>200 OK を返す</strong>ことが重要です。
+                                    エラーコードを返してしまうと、送信元は「失敗した」と判断してさらにリトライを繰り返してしまいます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 最終的な失敗への対処 〜デッドレターキューとアラート〜
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リトライをすべて試みても配信に失敗した場合、そのWebhookはどこへ行くのでしょうか？
+                        本節では「最終的な失敗」にどう備えるかを学びます。
+                    </p>
+
+                    <!-- デッドレターキューの説明 -->
+                    <div class="space-y-4 mb-6">
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-slate-600 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-inbox text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">デッドレターキュー（DLQ）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        全リトライが失敗したWebhookを蓄積しておく「隔離場所」です。
+                                        「Dead Letter Queue（死んだ手紙の箱）」という名前通り、配達できなかったデータを一時保管します。
+                                        後で手動で確認・再処理することができます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-bell text-red-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">アラート・通知</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        配信失敗が続く場合に、管理者にメールやSlackで通知を送ります。
+                                        問題を早期発見し、手動での対処や調査のきっかけになります。
+                                        多くのWebhookサービスがこの機能を提供しています。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-history text-blue-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">配信履歴の確認</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        Stripeや GitHubなど多くのサービスでは、Webhookの配信履歴を管理画面で確認できます。
+                                        「いつ、どのイベントが、何回試みて失敗したか」を確認し、
+                                        手動で「再配信」ボタンを押すことも可能です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 全体像の図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            リトライと最終失敗対処の全体像
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A([イベント発生]) --> B[Webhookを送信]
+    B --> C{配信成功？}
+    C -- 成功 --> D([完了])
+    C -- 失敗 --> E{リトライ残り？}
+    E -- あり --> F["待機（指数バックオフ）"] --> B
+    E -- なし --> G[デッドレターキューへ保存]
+    G --> H[管理者にアラート送信]
+    H --> I{原因調査・解決}
+    I -- 解決済み --> J[手動で再配信] --> B
+
+    style D fill:#ecfdf5,stroke:#10b981
+    style G fill:#fef2f2,stroke:#ef4444
+    style J fill:#f0fdfa,stroke:#14b8a6
+        </div>
+    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-tools text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-orange-800 mb-4">よくある問題と対処法</h3>
+                                <div class="space-y-4">
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <p class="font-medium text-orange-900 mb-1">
+                                            <i class="fas fa-exclamation-circle mr-2"></i>
+                                            問題: 同じWebhookが何度も届いて二重処理が発生する
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処:</strong> べき等性の実装が必要です。Webhook IDを使った重複チェック処理を追加しましょう。
+                                            データベースに「処理済みIDテーブル」を作るのが基本的なアプローチです。
+                                        </p>
+                                    </div>
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <p class="font-medium text-orange-900 mb-1">
+                                            <i class="fas fa-exclamation-circle mr-2"></i>
+                                            問題: タイムアウトエラーが頻発する
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処:</strong> Webhookを受け取ったら即座に 200 OK を返し、重い処理は「非同期」で行うよう設計を変更します。
+                                            キューを使った非同期処理が有効です。
+                                        </p>
+                                    </div>
+                                    <div class="bg-orange-100 rounded-lg p-4">
+                                        <p class="font-medium text-orange-900 mb-1">
+                                            <i class="fas fa-exclamation-circle mr-2"></i>
+                                            問題: 配信失敗が多すぎてデータが失われそう
+                                        </p>
+                                        <p class="text-orange-800 text-sm">
+                                            <strong>対処:</strong> サービスのダッシュボードで配信履歴を確認し、失敗の原因を特定します。
+                                            サーバーが安定したら「手動再配信」機能を使ってデータを再送してもらいましょう。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第11章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">Webhook配信の失敗は「接続エラー」「タイムアウト」「エラーステータスコード」が主な原因です</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">多くのサービスは失敗時に「リトライ（再送）」を行います。「指数バックオフ」で間隔を広げながら再試行します</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700">リトライにより同じWebhookが複数回届く可能性があるため、「べき等性（同じ処理が重複実行されない設計）」が重要です</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700">全リトライ失敗後は「デッドレターキュー」「アラート通知」「配信履歴の手動確認・再配信」で対処します</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Webhook送信側が「配信成功」と判断するのは、受信側がどのレスポンスを返した場合ですか？
+                                        (A) 100番台のステータスコード
+                                        (B) 200〜299番台のステータスコード
+                                        (C) 500番台のステータスコード</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。200〜299番台のHTTPステータスコードは「正常に処理された」ことを意味します。
+                                            それ以外のコード（4xx、5xxなど）やタイムアウトは「失敗」と判断されます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 「指数バックオフ」とはどのような方式ですか？
+                                        (A) リトライのたびに毎回同じ間隔（例: 1秒）で再送する
+                                        (B) リトライのたびに間隔を指数的に増やす（例: 5秒→30秒→5分）
+                                        (C) リトライは1回のみ行い、失敗したら即座に諦める</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) です。指数バックオフは失敗するたびに待ち時間を指数的に増やす方式です。
+                                            障害中のサーバーへの過負荷を防ぎつつ、一時的な障害からの回復を待つことができます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. べき等性を保つ実装として最も一般的な方法はどれですか？
+                                        (A) Webhookを受け取るたびに必ず処理を実行する
+                                        (B) Webhookの受信をランダムに半分だけ処理する
+                                        (C) WebhookのIDを記録して、同じIDが来たらスキップする</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (C) です。WebhookのIDを「処理済み」として記録しておき、
+                                            同じIDが再度届いた場合はスキップすることで、リトライによる二重処理を防ぎます。
+                                            スキップの場合も 200 OK を返すことを忘れずに。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第12章では、プログラミングなしでWebhookの動作を実際に体験します。
+                                Webhook.siteなどの無料ツールを使って、実際にWebhookのデータを受け取り、
+                                リクエストの中身を観察する方法を学びます。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              border border-slate-200 hover:border-primary-300 hover:bg-primary-50
+                              text-slate-600 hover:text-primary-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-400 block">前の章</span>
+                            <span class="font-medium">Webhookのセキュリティ</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">Webhookを体験しよう</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

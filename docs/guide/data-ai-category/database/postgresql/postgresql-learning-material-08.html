@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第8章 - トランザクションとロック</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクションとロック - データの整合性を守る</h1>
+                    <p class="text-slate-600">トランザクション（BEGIN、COMMIT、ROLLBACK）の基本概念と実践的な使い方を学習します。ACID特性、分離レベル、ロックの仕組みを理解し、データの整合性を保つ方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションの基本概念（BEGIN、COMMIT、ROLLBACK）を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ACID特性（原子性、一貫性、独立性、永続性）を把握する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクション分離レベルの違いと使い分けを知る</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロックの仕組みと同時実行制御について理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 トランザクションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        トランザクションとは、データベースに対する一連の操作（複数のSQLコマンド)をひとまとまりとして扱う仕組みです。
+                        「全ての操作が成功するか、全てが失敗するか」のどちらかだけが保証されます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        例えば、銀行の送金処理を考えてみましょう。
+                        「A口座から1万円引き出す」と「B口座に1万円入金する」という2つの操作があります。
+                        もし「A口座から引き出し」だけ成功して「B口座への入金」が失敗したら、1万円が消えてしまいます。
+                        トランザクションを使えば、両方成功するか、両方失敗するかのどちらかになるため、データの整合性が保たれます。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant User as ユーザー
+    participant DB as データベース
+    participant Account as 口座テーブル
+
+    User->>DB: BEGIN（トランザクション開始）
+    User->>Account: A口座から1万円引き出し
+    Account-->>DB: 成功
+    User->>Account: B口座に1万円入金
+    Account-->>DB: 成功
+    User->>DB: COMMIT（確定）
+    DB-->>User: トランザクション完了
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">トランザクションがないと？</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    トランザクションを使わない場合、各SQL文は実行された直後にデータベースに反映されます（自動コミット）。
+                                    複数の操作をまとめて管理できないため、途中でエラーが発生すると中途半端な状態になり、データの不整合が発生します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 トランザクションの基本操作
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQLでトランザクションを使うには、以下の3つのコマンドを覚えましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <!-- BEGIN -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-play text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-blue-900 font-semibold mb-1">BEGIN</h3>
+                                    <p class="text-blue-800 text-sm">トランザクションの開始を宣言します。この後のSQL文はトランザクション内で実行されます。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COMMIT -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-emerald-900 font-semibold mb-1">COMMIT</h3>
+                                    <p class="text-emerald-800 text-sm">トランザクション内の全ての変更を確定し、データベースに反映します。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ROLLBACK -->
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-undo text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-red-900 font-semibold mb-1">ROLLBACK</h3>
+                                    <p class="text-red-800 text-sm">トランザクション内の全ての変更を取り消し、トランザクション開始前の状態に戻します。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">基本的な使い方の例</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- トランザクション開始
+BEGIN;
+
+-- A口座から1万円引き出し
+UPDATE accounts SET balance = balance - 10000 WHERE account_id = 'A';
+
+-- B口座に1万円入金
+UPDATE accounts SET balance = balance + 10000 WHERE account_id = 'B';
+
+-- 全ての操作が成功したら確定
+COMMIT;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">エラー時のロールバック例</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- トランザクション開始
+BEGIN;
+
+-- 商品の在庫を減らす
+UPDATE products SET stock = stock - 1 WHERE product_id = 101;
+
+-- 何らかの理由でエラーが発生した場合
+-- （例: 在庫が足りない、など）
+
+-- トランザクションを取り消す
+ROLLBACK;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">自動ロールバック</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    トランザクション内でSQL実行エラーが発生した場合、PostgreSQLは自動的にトランザクションをエラー状態にします。
+                                    その後はCOMMITできなくなり、ROLLBACKする必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 ACID特性 - トランザクションの4つの性質
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        トランザクションが保証すべき4つの性質を「ACID特性」と呼びます。
+                        PostgreSQLはこのACID特性を完全にサポートしているため、信頼性の高いデータ管理が可能です。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- Atomicity -->
+                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold">A</span>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-blue-800 mb-2">Atomicity（原子性）</h3>
+                                    <p class="text-blue-900 text-sm">
+                                        トランザクション内の全ての操作が成功するか、全てが失敗するかのどちらかであることを保証します。
+                                        「部分的に成功」という状態は発生しません。
+                                    </p>
+                                    <p class="text-blue-800 text-xs mt-2 italic">
+                                        例: 送金処理で「引き出し」だけ成功して「入金」が失敗することはない
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Consistency -->
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold">C</span>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-emerald-800 mb-2">Consistency（一貫性）</h3>
+                                    <p class="text-emerald-900 text-sm">
+                                        トランザクション実行前後で、データベースの整合性が保たれることを保証します。
+                                        制約（PRIMARY KEY、FOREIGN KEYなど）に違反する状態にはなりません。
+                                    </p>
+                                    <p class="text-emerald-800 text-xs mt-2 italic">
+                                        例: 外部キー制約により、存在しない顧客IDを注文テーブルに登録できない
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Isolation -->
+                        <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold">I</span>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-purple-800 mb-2">Isolation（独立性・分離性）</h3>
+                                    <p class="text-purple-900 text-sm">
+                                        複数のトランザクションが同時に実行されても、互いに影響を及ぼさないことを保証します。
+                                        あるトランザクションの途中経過は、他のトランザクションからは見えません。
+                                    </p>
+                                    <p class="text-purple-800 text-xs mt-2 italic">
+                                        例: ユーザーAが商品価格を更新中に、ユーザーBは古い価格か新しい価格のどちらかを見る（中途半端な値は見えない）
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Durability -->
+                        <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white font-bold">D</span>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-orange-800 mb-2">Durability（永続性）</h3>
+                                    <p class="text-orange-900 text-sm">
+                                        COMMITされたトランザクションの結果は、システム障害が発生しても永続的に保存されることを保証します。
+                                        一度確定したデータは消えません。
+                                    </p>
+                                    <p class="text-orange-800 text-xs mt-2 italic">
+                                        例: 注文をCOMMITした直後に停電が発生しても、注文データは失われない
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+graph TD
+    A[トランザクション開始] --> B{全ての操作成功?}
+    B -->|Yes| C[COMMIT]
+    B -->|No| D[ROLLBACK]
+    C --> E[ACID特性により<br/>データの整合性保証]
+    D --> F[トランザクション開始前の<br/>状態に戻る]
+
+    style C fill:#86efac,stroke:#22c55e
+    style D fill:#fca5a5,stroke:#ef4444
+    style E fill:#bfdbfe,stroke:#3b82f6
+    style F fill:#fde68a,stroke:#f59e0b
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 トランザクション分離レベル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        複数のトランザクションが同時に実行される際、どの程度「独立性（Isolation）」を保つかを決めるのが「分離レベル」です。
+                        PostgreSQLでは4つの分離レベルが定義されていますが、実際には3つがサポートされています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">分離レベル</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">ダーティリード</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">ノンリピータブルリード</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">ファントムリード</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">READ UNCOMMITTED<br><span class="text-xs text-slate-500">（PostgreSQLは未サポート）</span></td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">READ COMMITTED<br><span class="text-xs text-emerald-600">（デフォルト）</span></td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">REPEATABLE READ</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                    <td class="px-4 py-3 text-red-600">発生する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SERIALIZABLE</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-check-circle"></i> 防止</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">分離レベルの設定方法</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- トランザクション開始時に分離レベルを設定
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+-- ここにSQL文を記述
+SELECT * FROM products WHERE product_id = 1;
+
+COMMIT;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">補足: 問題の種類</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1 break-words">
+                                    <li><strong>ダーティリード:</strong> 他のトランザクションの未確定の変更が見えてしまう</li>
+                                    <li><strong>ノンリピータブルリード:</strong> 同じクエリを2回実行すると異なる結果が返る（他が更新した）</li>
+                                    <li><strong>ファントムリード:</strong> 同じクエリを2回実行すると行数が変わる（他が追加/削除した）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 ロックの仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        複数のユーザーが同時にデータベースを操作する際、データの不整合を防ぐために「ロック」が使われます。
+                        ロックとは、あるトランザクションがデータを使用中は、他のトランザクションがそのデータを変更できないようにする仕組みです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">主なロックの種類</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- 行レベルロック -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-align-justify text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-blue-900 font-semibold mb-1">行レベルロック</h3>
+                                    <p class="text-blue-800 text-sm">特定の行だけをロックします。同じテーブルの他の行は別のトランザクションが操作できます。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- テーブルレベルロック -->
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-table text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-purple-900 font-semibold mb-1">テーブルレベルロック</h3>
+                                    <p class="text-purple-800 text-sm">テーブル全体をロックします。大規模な操作（テーブル構造変更など）で使用されます。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 共有ロック -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-users text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-emerald-900 font-semibold mb-1">共有ロック（Shared Lock）</h3>
+                                    <p class="text-emerald-800 text-sm">読み取り専用のロック。複数のトランザクションが同時に読み取れますが、更新はできません。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 排他ロック -->
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-lock text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-red-900 font-semibold mb-1">排他ロック（Exclusive Lock）</h3>
+                                    <p class="text-red-800 text-sm">更新用のロック。ロックしたトランザクションだけが読み書きでき、他は待機します。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">明示的なロックの取得</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">BEGIN;
+
+-- 行レベルの排他ロックを取得（更新前に確保）
+SELECT * FROM products WHERE product_id = 1 FOR UPDATE;
+
+-- この行は他のトランザクションからロックされる
+UPDATE products SET stock = stock - 1 WHERE product_id = 1;
+
+COMMIT;</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant T1 as トランザクション1
+    participant DB as データベース
+    participant T2 as トランザクション2
+
+    T1->>DB: BEGIN
+    T1->>DB: SELECT * FROM products WHERE id=1 FOR UPDATE
+    DB-->>T1: ロック取得（排他ロック）
+
+    T2->>DB: BEGIN
+    T2->>DB: SELECT * FROM products WHERE id=1 FOR UPDATE
+    Note over T2,DB: 待機（T1がロック中）
+
+    T1->>DB: UPDATE products SET stock=5 WHERE id=1
+    T1->>DB: COMMIT
+    DB-->>T1: ロック解放
+
+    DB-->>T2: ロック取得
+    T2->>DB: UPDATE products SET stock=4 WHERE id=1
+    T2->>DB: COMMIT
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">デッドロックに注意</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    2つのトランザクションが互いにロックを待ち合う状態を「デッドロック」と呼びます。
+                                    PostgreSQLはデッドロックを自動検出し、一方のトランザクションをロールバックして解決します。
+                                    デッドロックを防ぐには、複数テーブルを更新する際は常に同じ順序でロックを取得するなどの工夫が必要です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: トランザクションを試してみよう</h3>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">ステップ1: テスト用テーブルを作成</h4>
+                                    <div class="code-block-wrapper">
+                                        <div class="code-block-header">
+                                            <span>SQL</span>
+                                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre><code class="language-sql">-- 口座テーブルを作成
+CREATE TABLE accounts (
+    account_id VARCHAR(10) PRIMARY KEY,
+    account_name VARCHAR(100) NOT NULL,
+    balance INTEGER NOT NULL CHECK (balance >= 0)
+);
+
+-- テストデータを挿入
+INSERT INTO accounts VALUES ('A', '太郎の口座', 50000);
+INSERT INTO accounts VALUES ('B', '花子の口座', 30000);</code></pre>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">ステップ2: トランザクションで送金処理</h4>
+                                    <div class="code-block-wrapper">
+                                        <div class="code-block-header">
+                                            <span>SQL</span>
+                                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre><code class="language-sql">-- トランザクション開始
+BEGIN;
+
+-- 現在の残高を確認
+SELECT * FROM accounts;
+
+-- A口座から10000円引き出し
+UPDATE accounts SET balance = balance - 10000 WHERE account_id = 'A';
+
+-- B口座に10000円入金
+UPDATE accounts SET balance = balance + 10000 WHERE account_id = 'B';
+
+-- 結果を確認
+SELECT * FROM accounts;
+
+-- 確定
+COMMIT;</code></pre>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 class="font-semibold text-purple-900 mb-2 break-words">ステップ3: ロールバックを試す</h4>
+                                    <div class="code-block-wrapper">
+                                        <div class="code-block-header">
+                                            <span>SQL</span>
+                                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <pre><code class="language-sql">BEGIN;
+
+-- A口座から5000円引き出し
+UPDATE accounts SET balance = balance - 5000 WHERE account_id = 'A';
+
+-- 残高を確認（まだコミット前）
+SELECT * FROM accounts;
+
+-- やっぱり取り消す
+ROLLBACK;
+
+-- 残高を確認（元に戻っている）
+SELECT * FROM accounts;</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ACID特性の「A」が表す「Atomicity（原子性）」とはどのような性質ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> トランザクション内の全ての操作が成功するか、全てが失敗するかのどちらかであることを保証する性質です。<br>
+                                            「部分的に成功」という中途半端な状態は発生しません。例えば、送金処理で「引き出し」だけ成功して「入金」が失敗することはなく、両方成功するか両方失敗するかのどちらかになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. PostgreSQLのデフォルトのトランザクション分離レベルは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> READ COMMITTED（リードコミッティド）<br>
+                                            このレベルでは、他のトランザクションがCOMMITした後のデータだけが読み取れます。ダーティリード（未確定データの読み取り）は防止されますが、ノンリピータブルリードやファントムリードは発生する可能性があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 行レベルの排他ロックを取得するSQLコマンドを書いてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            <code>SELECT * FROM テーブル名 WHERE 条件 FOR UPDATE;</code><br><br>
+                                            例: <code>SELECT * FROM products WHERE product_id = 1 FOR UPDATE;</code><br>
+                                            このコマンドにより、指定した行に排他ロックがかかり、他のトランザクションはこの行を更新できなくなります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第8章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>トランザクションは複数の操作をひとまとまりとして扱い、全て成功か全て失敗かを保証する仕組み</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>BEGIN、COMMIT、ROLLBACKの3つのコマンドでトランザクションを制御する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ACID特性（原子性、一貫性、独立性、永続性）によりデータの整合性が保たれる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>分離レベルにより、同時実行時の独立性の程度を調整できる（デフォルトはREAD COMMITTED）</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ロック機能により複数ユーザーの同時操作でもデータの不整合を防ぐ</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">ビューとマテリアライズドビュー</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">PostgreSQLのインデックス詳解</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

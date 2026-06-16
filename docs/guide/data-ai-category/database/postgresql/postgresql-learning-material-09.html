@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第9章 - PostgreSQLのインデックス詳解</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">PostgreSQLのインデックス詳解 - クエリを高速化する</h1>
+                    <p class="text-slate-600">B-treeインデックス、GINインデックス、GiSTインデックスなど、PostgreSQLが提供する様々なインデックスの種類と使い分けを学習します。EXPLAINコマンドでクエリの実行計画を分析する方法も習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>インデックスの基本概念と動作原理を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>B-tree、GIN、GiST、BRIN、Hashなど各種インデックスの特徴と使い分けを習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>EXPLAINコマンドを使ったクエリ実行計画の読み方を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>部分インデックスや複合インデックスの効果的な活用方法を習得する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 インデックスとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        インデックスは、データベース内のデータを高速に検索するための補助的なデータ構造です。
+                        本棚の索引や辞書の見出しに似ており、データを効率的に探すための「目印」を提供します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        インデックスがない場合、PostgreSQLはテーブル内のすべての行を順番に調べる「フルスキャン」を行います。
+                        これは小さなテーブルでは問題ありませんが、数百万行のテーブルでは非常に時間がかかります。
+                        適切なインデックスを作成することで、必要なデータに直接アクセスできるようになり、クエリのパフォーマンスが劇的に向上します。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">インデックスの基本原理</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    インデックスは検索を速くする代わりに、追加のディスク容量とデータ挿入・更新時のオーバーヘッドが発生します。
+                                    すべてのカラムにインデックスを作成すればよいというものではなく、検索頻度やデータの特性を考慮して適切に設計する必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TB
+    subgraph NoIndex["インデックスなし全フルスキャン全"]
+        A1[クエリ実行] --> B1[全行を順番にスキャン]
+        B1 --> C1[10万行チェック]
+        C1 --> D1["結果返却（遅い）"]
+    end
+
+    subgraph WithIndex["インデックスあり全高速検索全"]
+        A2[クエリ実行] --> B2[インデックスで検索]
+        B2 --> C2[該当行を直接アクセス]
+        C2 --> D2["結果返却（速い）"]
+    end
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 B-treeインデックス（デフォルト）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        B-tree（Balanced Tree）は、PostgreSQLのデフォルトのインデックスタイプです。
+                        ほとんどの一般的な検索条件に対応でき、等号比較（=）、範囲検索（&lt;、&gt;、BETWEEN）、並び替え（ORDER BY）などで効率的に動作します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 基本的なB-treeインデックスの作成
+-- ユーザーテーブルのメールアドレスにインデックスを作成
+CREATE INDEX idx_users_email ON users(email);
+
+-- 複数カラムの複合インデックス
+-- 注文テーブルのユーザーIDと注文日時にインデックスを作成
+CREATE INDEX idx_orders_user_date ON orders(user_id, order_date);
+
+-- ユニークインデックス（重複を許さない）
+CREATE UNIQUE INDEX idx_products_code ON products(product_code);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">B-treeが適している場面</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>• 等号検索: WHERE user_id = 100</li>
+                                    <li>• 範囲検索: WHERE age BETWEEN 20 AND 30</li>
+                                    <li>• パターンマッチ（前方一致）: WHERE name LIKE 'Tanaka%'</li>
+                                    <li>• 並び替え: ORDER BY created_at DESC</li>
+                                    <li>• MIN/MAXの取得</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 GINインデックス（配列・JSON・全文検索）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        GIN（Generalized Inverted Index）は、配列、JSON/JSONB、全文検索など、複数の値を含むデータに対して効率的に動作するインデックスです。
+                        PostgreSQLの高度な機能を活用する際に重要なインデックスタイプです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 配列型カラムへのGINインデックス
+-- タグ検索を高速化
+CREATE INDEX idx_articles_tags ON articles USING GIN(tags);
+
+-- JSONBカラムへのGINインデックス
+-- JSON内の任意のキーを高速検索
+CREATE INDEX idx_products_attrs ON products USING GIN(attributes);
+
+-- 全文検索用のGINインデックス
+-- 日本語テキストの全文検索を高速化
+CREATE INDEX idx_documents_search ON documents
+USING GIN(to_tsvector('japanese', content));</code></pre>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- GINの利点 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-plus text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-emerald-900 font-semibold mb-2">GINの利点</h3>
+                                    <ul class="text-emerald-800 text-sm space-y-1">
+                                        <li>• 複数値の高速検索</li>
+                                        <li>• JSON内の部分一致検索</li>
+                                        <li>• 全文検索のパフォーマンス向上</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GINの欠点 -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-orange-900 font-semibold mb-2">GINの注意点</h3>
+                                    <ul class="text-orange-800 text-sm space-y-1">
+                                        <li>• インデックスサイズが大きい</li>
+                                        <li>• 更新時のオーバーヘッド</li>
+                                        <li>• B-treeより作成に時間がかかる</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - GINインデックスの使用例</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 配列型の検索（タグ検索）
+SELECT * FROM articles
+WHERE tags @> ARRAY['PostgreSQL', 'Database'];
+
+-- JSONBの検索
+SELECT * FROM products
+WHERE attributes @> '{"color": "red", "size": "L"}';
+
+-- 全文検索
+SELECT * FROM documents
+WHERE to_tsvector('japanese', content) @@ to_tsquery('japanese', 'データベース');</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 その他のインデックスタイプ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQLには、B-tree、GIN以外にも特定の用途に特化したインデックスタイプがあります。
+                        データの特性とクエリパターンに応じて適切なタイプを選択しましょう。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <!-- GiSTインデックス -->
+                        <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-map-marked-alt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-purple-800 mb-2">GiST（地理空間・範囲検索）</h3>
+                                    <p class="text-purple-900 text-sm mb-3">
+                                        GiST（Generalized Search Tree）は、地理空間データ、範囲型、テキスト検索など、複雑なデータ構造の検索に対応したインデックスです。
+                                    </p>
+                                    <div class="bg-purple-100 rounded-lg p-3">
+                                        <p class="text-purple-900 text-xs font-medium mb-2">使用例:</p>
+                                        <pre class="text-purple-800 text-xs overflow-x-auto"><code>-- 地理空間検索用
+CREATE INDEX idx_locations_geom ON locations USING GIST(geom);
+
+-- 範囲型の重なり検索
+CREATE INDEX idx_events_period ON events USING GIST(event_period);</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BRINインデックス -->
+                        <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-compress-arrows-alt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-cyan-800 mb-2">BRIN（大規模テーブル・時系列データ）</h3>
+                                    <p class="text-cyan-900 text-sm mb-3">
+                                        BRIN（Block Range Index）は、物理的に順序付けられた大規模テーブルに対して、非常に小さなサイズで効率的な範囲検索を提供します。
+                                        時系列データやログデータに最適です。
+                                    </p>
+                                    <div class="bg-cyan-100 rounded-lg p-3">
+                                        <p class="text-cyan-900 text-xs font-medium mb-2">使用例:</p>
+                                        <pre class="text-cyan-800 text-xs overflow-x-auto"><code>-- 時系列データの範囲検索用（非常に小さいインデックス）
+CREATE INDEX idx_logs_timestamp ON access_logs USING BRIN(timestamp);</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hashインデックス -->
+                        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-hashtag text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-amber-800 mb-2">Hash（等号検索専用）</h3>
+                                    <p class="text-amber-900 text-sm mb-3">
+                                        Hashインデックスは等号検索（=）専用のインデックスです。
+                                        以前はWALログに記録されず信頼性が低かったですが、PostgreSQL 10以降は改善され実用的になりました。
+                                        ただし、ほとんどの場合はB-treeで十分です。
+                                    </p>
+                                    <div class="bg-amber-100 rounded-lg p-3">
+                                        <p class="text-amber-900 text-xs font-medium mb-2">使用例:</p>
+                                        <pre class="text-amber-800 text-xs overflow-x-auto"><code>-- 等号検索のみの場合
+CREATE INDEX idx_users_uuid ON users USING HASH(user_uuid);</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">タイプ</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">主な用途</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">サイズ</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">推奨度</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">B-tree</td>
+                                    <td class="px-4 py-3">一般的な検索、範囲検索、並び替え</td>
+                                    <td class="px-4 py-3 text-blue-600">中</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-star"></i> デフォルト</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">GIN</td>
+                                    <td class="px-4 py-3">配列、JSON、全文検索</td>
+                                    <td class="px-4 py-3 text-orange-600">大</td>
+                                    <td class="px-4 py-3 text-emerald-600"><i class="fas fa-star"></i> 高機能データ</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">GiST</td>
+                                    <td class="px-4 py-3">地理空間、範囲型、近傍検索</td>
+                                    <td class="px-4 py-3 text-blue-600">中</td>
+                                    <td class="px-4 py-3 text-blue-600">特定用途</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">BRIN</td>
+                                    <td class="px-4 py-3">時系列、大規模テーブル</td>
+                                    <td class="px-4 py-3 text-emerald-600">極小</td>
+                                    <td class="px-4 py-3 text-blue-600">大規模データ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Hash</td>
+                                    <td class="px-4 py-3">等号検索のみ</td>
+                                    <td class="px-4 py-3 text-blue-600">中</td>
+                                    <td class="px-4 py-3 text-slate-400">稀</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 EXPLAINコマンド - 実行計画の分析
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        EXPLAINコマンドは、PostgreSQLがクエリをどのように実行するかを表示する非常に重要なツールです。
+                        インデックスが使われているか、フルスキャンが発生していないかを確認し、パフォーマンス問題を特定できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - EXPLAIN基本構文</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 基本的なEXPLAIN（実行計画を表示、クエリは実行しない）
+EXPLAIN SELECT * FROM users WHERE email = 'test@example.com';
+
+-- EXPLAIN ANALYZE（実際にクエリを実行して詳細な統計を表示）
+EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 100;
+
+-- より詳細な情報を表示
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
+SELECT u.name, COUNT(o.id)
+FROM users u
+JOIN orders o ON u.id = o.user_id
+GROUP BY u.name;</code></pre>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-microscope text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: EXPLAINで実行計画を確認しよう</h3>
+
+                                <div class="space-y-4">
+                                    <div>
+                                        <p class="text-purple-900 font-medium mb-2">ステップ1: サンプルテーブル作成</p>
+                                        <div class="bg-purple-100 rounded-lg p-3">
+                                            <pre class="text-purple-800 text-sm overflow-x-auto"><code>-- テーブル作成
+CREATE TABLE customers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100),
+    age INT,
+    city VARCHAR(50)
+);
+
+-- サンプルデータ挿入（10万件）
+INSERT INTO customers (name, email, age, city)
+SELECT
+    'Customer ' || i,
+    'user' || i || '@example.com',
+    20 + (i % 60),
+    CASE (i % 5)
+        WHEN 0 THEN '東京'
+        WHEN 1 THEN '大阪'
+        WHEN 2 THEN '名古屋'
+        WHEN 3 THEN '福岡'
+        ELSE '札幌'
+    END
+FROM generate_series(1, 100000) AS i;</code></pre>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-purple-900 font-medium mb-2">ステップ2: インデックスなしでクエリを実行</p>
+                                        <div class="bg-purple-100 rounded-lg p-3">
+                                            <pre class="text-purple-800 text-sm overflow-x-auto"><code>EXPLAIN ANALYZE
+SELECT * FROM customers WHERE email = 'user50000@example.com';
+
+-- 結果例: Seq Scan（順次スキャン = 遅い）
+-- Seq Scan on customers (actual time=10.2..25.4 rows=1)
+-- 全行をスキャンしているため時間がかかる</code></pre>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-purple-900 font-medium mb-2">ステップ3: インデックスを作成して再実行</p>
+                                        <div class="bg-purple-100 rounded-lg p-3">
+                                            <pre class="text-purple-800 text-sm overflow-x-auto"><code>-- インデックス作成
+CREATE INDEX idx_customers_email ON customers(email);
+
+-- 再度実行
+EXPLAIN ANALYZE
+SELECT * FROM customers WHERE email = 'user50000@example.com';
+
+-- 結果例: Index Scan（インデックススキャン = 速い）
+-- Index Scan using idx_customers_email (actual time=0.05..0.06 rows=1)
+-- インデックスを使って直接アクセス！</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- よく見る実行計画 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-list text-primary-500"></i>
+                                主な実行計画のタイプ
+                            </h3>
+                            <ul class="space-y-2 text-slate-600 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-emerald-600 font-mono">Index Scan</span>
+                                    <span class="flex-1">インデックスを使った高速検索</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-red-600 font-mono">Seq Scan</span>
+                                    <span class="flex-1">全行スキャン（遅い）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600 font-mono">Bitmap Scan</span>
+                                    <span class="flex-1">複数インデックスの組み合わせ</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-purple-600 font-mono">Hash Join</span>
+                                    <span class="flex-1">ハッシュ表を使った結合</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- コスト値の読み方 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-chart-bar text-primary-500"></i>
+                                コスト値の見方
+                            </h3>
+                            <div class="text-slate-600 text-sm space-y-3">
+                                <div>
+                                    <p class="font-mono text-xs bg-slate-100 p-2 rounded">
+                                        cost=0.00..100.00
+                                    </p>
+                                    <p class="mt-1">開始コスト..完了コスト（小さいほど速い）</p>
+                                </div>
+                                <div>
+                                    <p class="font-mono text-xs bg-slate-100 p-2 rounded">
+                                        rows=1000
+                                    </p>
+                                    <p class="mt-1">推定行数</p>
+                                </div>
+                                <div>
+                                    <p class="font-mono text-xs bg-slate-100 p-2 rounded">
+                                        actual time=0.5..10.2
+                                    </p>
+                                    <p class="mt-1">実際の実行時間（ミリ秒）</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 複合インデックスと部分インデックス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        より高度なインデックス設計テクニックとして、複合インデックスと部分インデックスがあります。
+                        これらを適切に活用することで、インデックスのサイズを抑えながら検索パフォーマンスを最大化できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">複合インデックス（複数カラム）</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        複合インデックスは、複数のカラムを組み合わせたインデックスです。
+                        カラムの順序が重要で、最初のカラムから順番に条件を指定するクエリで効果を発揮します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - 複合インデックス</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 複合インデックスの作成（user_id, created_atの順）
+CREATE INDEX idx_orders_user_created ON orders(user_id, created_at);
+
+-- このクエリは複合インデックスを使える
+SELECT * FROM orders
+WHERE user_id = 100 AND created_at > '2024-01-01';
+
+-- このクエリも複合インデックスを使える（最初のカラムのみ）
+SELECT * FROM orders WHERE user_id = 100;
+
+-- このクエリは複合インデックスを使えない（2番目のカラムのみ）
+SELECT * FROM orders WHERE created_at > '2024-01-01';</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">複合インデックスの順序の決め方</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    一般的には、「等号条件（=）のカラム → 範囲条件（&lt;、&gt;）のカラム → 並び替え（ORDER BY）のカラム」の順で配置すると効果的です。
+                                    また、選択性が高い（値の種類が多い）カラムを先に配置するのも有効です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">部分インデックス（条件付きインデックス）</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        部分インデックスは、WHERE句で条件を指定して、テーブルの一部の行だけにインデックスを作成する機能です。
+                        インデックスサイズを削減しながら、特定の検索条件に最適化できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - 部分インデックス</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- アクティブなユーザーだけにインデックスを作成
+CREATE INDEX idx_users_active ON users(email)
+WHERE is_active = true;
+
+-- 未完了の注文だけにインデックスを作成
+CREATE INDEX idx_orders_pending ON orders(user_id, created_at)
+WHERE status = 'pending';
+
+-- NULL以外の値だけにインデックスを作成
+CREATE INDEX idx_products_discount ON products(discount_rate)
+WHERE discount_rate IS NOT NULL;</code></pre>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    subgraph Full["通常のインデックス"]
+        F1[全100万行] --> F2[インデックス: 100万エントリ]
+    end
+
+    subgraph Partial["部分インデックス"]
+        P1[全100万行] --> P2[条件に一致: 10万行]
+        P2 --> P3[インデックス: 10万エントリ]
+    end
+
+    Full --> |サイズ大| Result1[検索速度: 速い<br/>容量: 大]
+    Partial --> |サイズ小| Result2[検索速度: より速い<br/>容量: 小]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 インデックスのメンテナンスとベストプラクティス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        インデックスは作成して終わりではありません。
+                        適切なメンテナンスとベストプラクティスに従うことで、長期的に高いパフォーマンスを維持できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">インデックスの再構築（REINDEX）</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        時間が経つとインデックスが肥大化したり、断片化したりします。
+                        REINDEXコマンドでインデックスを再構築することで、パフォーマンスを回復できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - インデックスのメンテナンス</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 特定のインデックスを再構築
+REINDEX INDEX idx_users_email;
+
+-- テーブルの全インデックスを再構築
+REINDEX TABLE users;
+
+-- データベース全体のインデックスを再構築（注意: 時間がかかる）
+REINDEX DATABASE mydb;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">インデックスの統計情報更新（ANALYZE）</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        PostgreSQLのクエリプランナーは、統計情報をもとに最適な実行計画を選択します。
+                        データが大きく変化したら、ANALYZEコマンドで統計情報を更新しましょう。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="code-block-header">
+                            <span>SQL - 統計情報の更新</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 特定のテーブルの統計情報を更新
+ANALYZE users;
+
+-- データベース全体の統計情報を更新
+ANALYZE;</code></pre>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-tools text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-orange-800 mb-3 break-words">インデックス設計のベストプラクティス</h3>
+                                <ul class="space-y-2">
+                                    <li class="flex items-start gap-2 text-orange-900">
+                                        <i class="fas fa-check-circle text-orange-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>頻繁に検索されるカラムにインデックスを作成</strong>: WHERE句やJOIN条件でよく使われるカラムが対象</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-orange-900">
+                                        <i class="fas fa-check-circle text-orange-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>選択性の高いカラムを優先</strong>: 値の種類が多い（ユニークに近い）カラムほど効果が高い</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-orange-900">
+                                        <i class="fas fa-check-circle text-orange-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>不要なインデックスは削除</strong>: インデックスは更新時のオーバーヘッドになる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-orange-900">
+                                        <i class="fas fa-check-circle text-orange-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>EXPLAINで効果を確認</strong>: 作成したインデックスが実際に使われているか検証する</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-orange-900">
+                                        <i class="fas fa-check-circle text-orange-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>定期的にメンテナンス</strong>: REINDEX、ANALYZE、VACUUMを定期実行</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">よくあるアンチパターン</p>
+                                <ul class="text-red-800 text-sm mt-2 space-y-1">
+                                    <li>• すべてのカラムにインデックスを作成する（更新が遅くなる）</li>
+                                    <li>• 複合インデックスの順序を間違える（インデックスが使われない）</li>
+                                    <li>• EXPLAINで確認せずにインデックスを作成する（効果不明）</li>
+                                    <li>• 小さなテーブルにインデックスを作成する（オーバーヘッドの方が大きい）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 動作確認 -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flask text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-4 break-words">動作確認: インデックスの効果を測定しよう</h3>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="text-emerald-900 font-medium mb-2">1. 大量データのテーブルを作成</p>
+                                    <div class="bg-emerald-100 rounded-lg p-3">
+                                        <pre class="text-emerald-800 text-sm overflow-x-auto"><code>CREATE TABLE performance_test (
+    id SERIAL PRIMARY KEY,
+    user_id INT,
+    product_id INT,
+    purchase_date DATE,
+    amount NUMERIC(10, 2)
+);
+
+-- 100万件のサンプルデータ挿入
+INSERT INTO performance_test (user_id, product_id, purchase_date, amount)
+SELECT
+    (random() * 10000)::INT,
+    (random() * 1000)::INT,
+    CURRENT_DATE - (random() * 365)::INT,
+    (random() * 10000)::NUMERIC(10, 2)
+FROM generate_series(1, 1000000);</code></pre>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-emerald-900 font-medium mb-2">2. インデックスなしでクエリを実行</p>
+                                    <div class="bg-emerald-100 rounded-lg p-3">
+                                        <pre class="text-emerald-800 text-sm overflow-x-auto"><code>EXPLAIN ANALYZE
+SELECT * FROM performance_test WHERE user_id = 5000;
+
+-- 実行時間をメモしておく（例: 150ms）</code></pre>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-emerald-900 font-medium mb-2">3. インデックスを作成して再実行</p>
+                                    <div class="bg-emerald-100 rounded-lg p-3">
+                                        <pre class="text-emerald-800 text-sm overflow-x-auto"><code>CREATE INDEX idx_perf_user ON performance_test(user_id);
+
+EXPLAIN ANALYZE
+SELECT * FROM performance_test WHERE user_id = 5000;
+
+-- 実行時間を比較（例: 5ms → 約30倍高速化！）</code></pre>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p class="text-emerald-900 font-medium mb-2">4. 複合インデックスの効果を確認</p>
+                                    <div class="bg-emerald-100 rounded-lg p-3">
+                                        <pre class="text-emerald-800 text-sm overflow-x-auto"><code>CREATE INDEX idx_perf_user_date
+ON performance_test(user_id, purchase_date);
+
+EXPLAIN ANALYZE
+SELECT * FROM performance_test
+WHERE user_id = 5000 AND purchase_date > '2024-01-01';</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. PostgreSQLのデフォルトのインデックスタイプは何ですか？どのような検索に適していますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> B-treeインデックス<br>
+                                            等号検索（=）、範囲検索（&lt;、&gt;、BETWEEN）、前方一致検索（LIKE 'text%'）、並び替え（ORDER BY）、MIN/MAX取得など、ほとんどの一般的な検索に適しています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. JSON/JSONBカラムの検索を高速化するには、どのタイプのインデックスを使うべきですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> GINインデックス<br>
+                                            GINインデックスは、JSON/JSONB型、配列型、全文検索など、複数の値を含むデータに対して効率的に動作します。
+                                            JSON内の任意のキーを高速に検索できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. EXPLAINコマンドで「Seq Scan」が表示されました。これは何を意味しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> 順次スキャン（Sequential Scan）を意味し、テーブルの全行を順番にスキャンしていることを示します。<br>
+                                            大量データの場合は遅くなるため、適切なインデックスを作成することで「Index Scan」に変更できないか検討すべきです。
+                                            ただし、小さなテーブルや条件に合う行が多い場合は、Seq Scanの方が効率的なこともあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 複合インデックス `CREATE INDEX idx ON orders(user_id, order_date)` は、どのクエリで使われますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            使われる: `WHERE user_id = 100`, `WHERE user_id = 100 AND order_date > '2024-01-01'`<br>
+                                            使われない: `WHERE order_date > '2024-01-01'`（2番目のカラムのみ）<br>
+                                            複合インデックスは、最初のカラムから順番に条件を指定するクエリで効果を発揮します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第9章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>インデックスはデータを高速に検索するための補助的なデータ構造で、適切に使うことでクエリパフォーマンスが劇的に向上する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>B-tree（デフォルト）、GIN（JSON・配列）、GiST（地理空間）、BRIN（時系列）、Hash（等号検索）など、用途に応じた選択が重要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>EXPLAINコマンドでクエリの実行計画を分析し、インデックスが効果的に使われているか確認できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>複合インデックスはカラムの順序が重要で、部分インデックスは条件付きでインデックスサイズを削減できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>REINDEX、ANALYZE、VACUUMなどのメンテナンスを定期的に実行し、長期的なパフォーマンスを維持する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">トランザクションとロック</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">バックアップとリストア</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Flutter学習教材 第16章 - 非同期処理の基礎</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Flutter - Cyan (Reactと同系統)
+                        primary: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-cyan-400/30 to-blue-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-mobile-alt text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Flutter学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>モバイルアプリ開発</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約40時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">Flutter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第16章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第16章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">非同期処理の基礎</h1>
+                    <p class="text-slate-600">Future、async/awaitを使った非同期処理の基本を学びます。API通信の準備として、待機処理の概念を理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>同期処理と非同期処理の違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Futureの概念と使い方を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>async/awaitキーワードで非同期処理を記述する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>待機処理とローディング表示を実装する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: 非同期処理とは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.1 非同期処理とは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>非同期処理（ひどうきしょり）</strong>とは、ある処理の完了を待たずに次の処理を実行する仕組みです。モバイルアプリでは、ネットワーク通信やファイル読み込みなど、時間のかかる処理を行う際に必須の概念です。
+                    </p>
+
+                    <!-- 同期処理と非同期処理の比較 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 rounded-lg p-4 border border-red-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-pause text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-red-900 mb-1">同期処理</h3>
+                                    <p class="text-sm text-red-800 mb-2">1つの処理が完了するまで次の処理を待機</p>
+                                    <ul class="text-xs text-red-800 space-y-1">
+                                        <li>• 処理Aが終わるまで処理Bを開始できない</li>
+                                        <li>• 時間のかかる処理でアプリがフリーズする</li>
+                                        <li>• ユーザー操作が受け付けられない</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-play text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-emerald-900 mb-1">非同期処理</h3>
+                                    <p class="text-sm text-emerald-800 mb-2">処理の完了を待たずに次の処理を実行</p>
+                                    <ul class="text-xs text-emerald-800 space-y-1">
+                                        <li>• 処理Aの完了を待たずに処理Bを実行</li>
+                                        <li>• アプリが応答性を保つ</li>
+                                        <li>• ユーザー操作を継続できる</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 処理の流れ比較図 -->
+                    <div class="my-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">同期処理 vs. 非同期処理の流れ</h3>
+                        <div class="mermaid bg-white p-4 rounded-lg border border-slate-200">
+graph TB
+    subgraph 同期処理
+        A1["処理開始"] --> A2["処理A（3秒）"]
+        A2 --> A3["待機中..."]
+        A3 --> A4["処理B（1秒）"]
+        A4 --> A5["完了（4秒後）"]
+    end
+
+    subgraph 非同期処理
+        B1["処理開始"] --> B2["処理A（3秒）<br/>バックグラウンド実行"]
+        B1 --> B3["処理B（1秒）<br/>すぐ実行"]
+        B2 --> B4["処理A完了時に通知"]
+        B3 --> B5["完了（1秒後）"]
+    end
+                        </div>
+                    </div>
+
+                    <!-- 実例説明 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">実生活での例</h3>
+                                <p class="text-blue-900 text-sm mb-2">
+                                    <strong>同期処理:</strong> レストランで注文した料理が完成するまで、他の客の注文を一切受け付けない（非効率）
+                                </p>
+                                <p class="text-blue-900 text-sm">
+                                    <strong>非同期処理:</strong> 複数の注文を並行して調理し、完成したものから順に提供する（効率的）
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: Futureとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.2 Futureとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Future</strong>は、「未来に得られる値」を表すDartのクラスです。非同期処理の結果をラップ（包む）し、処理が完了したときに値を受け取ることができます。
+                    </p>
+
+                    <!-- Future概念図 -->
+                    <div class="my-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-3">Futureの概念</h3>
+                        <div class="mermaid bg-white p-4 rounded-lg border border-slate-200">
+flowchart LR
+    A["非同期処理を開始"] --> B["Future&lt;String&gt;を返す"]
+    B --> C{"処理完了?"}
+    C -->|完了| D["値を取得"]
+    C -->|未完了| E["待機中..."]
+    E --> C
+                        </div>
+                    </div>
+
+                    <!-- Futureの基本例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">basic_future.dart</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// 3秒後に文字列を返す非同期関数
+Future&lt;String&gt; fetchData() {
+  // Future.delayed: 指定時間後に値を返す
+  return Future.delayed(
+    Duration(seconds: 3), // 3秒待機
+    () => 'データ取得完了!', // 完了時に返す値
+  );
+}
+
+void main() {
+  print('処理開始');
+
+  // fetchDataを呼び出し（すぐに返る）
+  fetchData().then((data) {
+    print(data); // 3秒後に表示: データ取得完了!
+  });
+
+  print('処理継続中...');
+}
+// 実行結果の順序:
+// 処理開始
+// 処理継続中...
+// （3秒待機）
+// データ取得完了!</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ポイント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    <code class="bg-blue-100 px-1 rounded text-blue-900">Future.delayed()</code> は指定した時間後に処理を実行する関数です。API通信のシミュレーションに便利です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: async/awaitの使い方 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.3 async/awaitの使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>async/await</strong>は、非同期処理をより直感的に記述するためのキーワードです。<code class="bg-slate-100 px-2 py-0.5 rounded text-slate-800">.then()</code>を使うよりも読みやすく、同期処理のように書けます。
+                    </p>
+
+                    <!-- async/awaitの基本ルール -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-purple-900 mb-1">async</h3>
+                                    <p class="text-sm text-purple-800">非同期関数であることを宣言するキーワード</p>
+                                    <code class="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-900 block mt-2">
+                                        Future&lt;void&gt; funcName() async { }
+                                    </code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-hourglass-half text-white text-sm"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-orange-900 mb-1">await</h3>
+                                    <p class="text-sm text-orange-800">Futureの完了を待つキーワード（async内でのみ使用可能）</p>
+                                    <code class="text-xs bg-orange-100 px-2 py-0.5 rounded text-orange-900 block mt-2">
+                                        var data = await fetchData();
+                                    </code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- async/awaitの例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">async_await_example.dart</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// ユーザー情報を取得する非同期関数
+Future&lt;String&gt; fetchUserName() async {
+  // 2秒待機してユーザー名を返す
+  await Future.delayed(Duration(seconds: 2));
+  return '山田太郎';
+}
+
+// メイン処理
+void main() async {
+  print('ユーザー情報取得開始');
+
+  // awaitで完了を待つ
+  String userName = await fetchUserName();
+
+  print('ユーザー名: $userName'); // 2秒後に表示
+  print('処理完了');
+}
+// 実行結果:
+// ユーザー情報取得開始
+// （2秒待機）
+// ユーザー名: 山田太郎
+// 処理完了</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    <code class="bg-emerald-100 px-1 rounded text-emerald-900">await</code>を使うことで、非同期処理を同期処理のように上から順に読めるコードで記述できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: 複数の非同期処理を扱う -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.4 複数の非同期処理を扱う
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際のアプリでは、複数のAPIを呼び出したり、複数のデータを並行して取得することがあります。Dartでは<code class="bg-slate-100 px-2 py-0.5 rounded text-slate-800">Future.wait()</code>を使って複数の非同期処理を効率的に実行できます。
+                    </p>
+
+                    <!-- 順次実行 vs. 並列実行 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 rounded-lg p-4 border border-red-200">
+                            <h3 class="font-semibold text-red-900 mb-2">順次実行（遅い）</h3>
+                            <div class="code-block-wrapper">
+                                <pre class="!mt-0 text-xs"><code class="language-javascript">// 処理Aが完了してから処理Bを実行
+var dataA = await fetchA(); // 2秒
+var dataB = await fetchB(); // 2秒
+// 合計: 4秒</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                            <h3 class="font-semibold text-emerald-900 mb-2">並列実行（速い）</h3>
+                            <div class="code-block-wrapper">
+                                <pre class="!mt-0 text-xs"><code class="language-javascript">// 処理AとBを同時に実行
+var results = await Future.wait([
+  fetchA(), // 2秒
+  fetchB(), // 2秒
+]);
+// 合計: 2秒</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Future.waitの例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">future_wait_example.dart</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// ユーザー情報を取得
+Future&lt;String&gt; fetchUserName() async {
+  await Future.delayed(Duration(seconds: 2));
+  return '山田太郎';
+}
+
+// 投稿件数を取得
+Future&lt;int&gt; fetchPostCount() async {
+  await Future.delayed(Duration(seconds: 2));
+  return 42;
+}
+
+void main() async {
+  print('データ取得開始');
+
+  // 並列実行
+  var results = await Future.wait([
+    fetchUserName(),
+    fetchPostCount(),
+  ]);
+
+  String userName = results[0] as String;
+  int postCount = results[1] as int;
+
+  print('ユーザー名: $userName');
+  print('投稿件数: $postCount');
+}
+// 実行時間: 約2秒（並列実行のため）</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5: Flutterでの非同期処理とローディング表示 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.5 Flutterでの非同期処理とローディング表示
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Flutterアプリでは、データ取得中にローディングインジケーター（読み込み中の表示）を表示することで、ユーザーに処理中であることを伝えます。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 16-1: ローディング表示を伴うデータ取得</h3>
+                                <p class="text-purple-900 mb-4 break-words">3秒後にメッセージを表示するアプリを作成し、待機中はローディングインジケーターを表示します。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">新しいFlutterプロジェクトを作成または既存プロジェクトの<code class="bg-purple-100 px-1 rounded">lib/main.dart</code>を開く</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">以下のコードを入力</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実装例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.dart</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">import 'package:flutter/material.dart';
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: AsyncLoadingPage(),
+    );
+  }
+}
+
+class AsyncLoadingPage extends StatefulWidget {
+  @override
+  _AsyncLoadingPageState createState() => _AsyncLoadingPageState();
+}
+
+class _AsyncLoadingPageState extends State&lt;AsyncLoadingPage&gt; {
+  String _message = ''; // 取得したメッセージ
+  bool _isLoading = false; // ローディング状態
+
+  // データ取得をシミュレート
+  Future&lt;String&gt; fetchMessage() async {
+    await Future.delayed(Duration(seconds: 3));
+    return 'データ取得完了しました！';
+  }
+
+  // ボタン押下時の処理
+  void _loadData() async {
+    setState(() {
+      _isLoading = true; // ローディング開始
+      _message = '';
+    });
+
+    // データ取得（3秒待機）
+    String result = await fetchMessage();
+
+    setState(() {
+      _isLoading = false; // ローディング終了
+      _message = result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('非同期処理デモ'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // ローディング中はCircularProgressIndicator表示
+            if (_isLoading)
+              CircularProgressIndicator()
+            else if (_message.isNotEmpty)
+              Text(
+                _message,
+                style: TextStyle(fontSize: 18),
+              )
+            else
+              Text('ボタンを押してデータ取得'),
+            SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _loadData,
+              child: Text('データ取得'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}</code></pre>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-4 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                                <p class="text-emerald-900 mb-4 break-words">アプリを実行し、「データ取得」ボタンを押します。</p>
+                                <h4 class="font-medium text-emerald-800 mb-2 break-words">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される結果
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <ul class="text-emerald-900 text-sm space-y-1">
+                                        <li>1. ボタンを押すと円形のローディングインジケーターが表示される</li>
+                                        <li>2. 3秒間待機（ボタンは無効化される）</li>
+                                        <li>3. 「データ取得完了しました！」というメッセージが表示される</li>
+                                        <li>4. 再度ボタンを押すと同じ動作を繰り返す</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ポイント</p>
+                                <ul class="text-blue-800 text-sm mt-1 space-y-1">
+                                    <li>• <code class="bg-blue-100 px-1 rounded text-blue-900">CircularProgressIndicator()</code>: 円形のローディング表示</li>
+                                    <li>• <code class="bg-blue-100 px-1 rounded text-blue-900">_isLoading</code>でローディング状態を管理</li>
+                                    <li>• ローディング中はボタンを無効化（<code class="bg-blue-100 px-1 rounded text-blue-900">onPressed: _isLoading ? null : _loadData</code>）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: エラーハンドリング -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        16.6 エラーハンドリング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        非同期処理では、ネットワークエラーやタイムアウトなど、様々なエラーが発生する可能性があります。<code class="bg-slate-100 px-2 py-0.5 rounded text-slate-800">try-catch</code>文を使ってエラーを適切に処理します。
+                    </p>
+
+                    <!-- エラーハンドリングの例 -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">error_handling.dart</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-javascript">// エラーが発生する可能性がある非同期関数
+Future&lt;String&gt; fetchDataWithError() async {
+  await Future.delayed(Duration(seconds: 2));
+
+  // エラーを発生させる
+  throw Exception('サーバーに接続できません');
+}
+
+void main() async {
+  try {
+    // エラーが発生する可能性がある処理
+    String data = await fetchDataWithError();
+    print('データ: $data');
+  } catch (e) {
+    // エラーが発生した場合の処理
+    print('エラーが発生しました: $e');
+  } finally {
+    // 成功・失敗に関わらず実行される処理
+    print('処理終了');
+  }
+}
+// 実行結果:
+// （2秒待機）
+// エラーが発生しました: Exception: サーバーに接続できません
+// 処理終了</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">注意</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    実際のアプリでは、エラー発生時にユーザーにわかりやすいメッセージを表示することが重要です。「エラーが発生しました」だけでなく、「ネットワークに接続できません。Wi-Fiまたはモバイルデータ通信を確認してください」のような具体的な案内を心がけましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- クイズセクション -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        理解度チェッククイズ
+                    </h2>
+
+                    <!-- クイズ1 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q1
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">非同期処理の主な利点は何ですか？</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>A. プログラムの実行速度が速くなる</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>B. 時間のかかる処理中もアプリの応答性を保てる</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q1" class="mt-1">
+                                        <span>C. コードが短くなる</span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: B</strong><br>
+                                        非同期処理の主な利点は、時間のかかる処理（ネットワーク通信など）を実行中も、UIが固まらずユーザー操作を受け付け続けられることです。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- クイズ2 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q2
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">次のうち正しいコードはどれですか？</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>A. <code class="bg-blue-100 px-1 rounded">void main() { var data = await fetchData(); }</code></span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>B. <code class="bg-blue-100 px-1 rounded">void main() async { var data = await fetchData(); }</code></span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q2" class="mt-1">
+                                        <span>C. <code class="bg-blue-100 px-1 rounded">void main() { var data = fetchData(); }</code></span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: B</strong><br>
+                                        <code class="bg-blue-200 px-1 rounded">await</code>を使うには、関数に<code class="bg-blue-200 px-1 rounded">async</code>キーワードを付ける必要があります。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- クイズ3 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                Q3
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-blue-900 mb-2">複数の非同期処理を並列実行するために使う関数は？</h3>
+                                <div class="space-y-2 text-sm">
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>A. Future.parallel()</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>B. Future.wait()</span>
+                                    </label>
+                                    <label class="flex items-start gap-2 cursor-pointer text-blue-800">
+                                        <input type="radio" name="q3" class="mt-1">
+                                        <span>C. Future.all()</span>
+                                    </label>
+                                </div>
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">解答を見る</summary>
+                                    <div class="mt-2 p-3 bg-blue-100 rounded-lg text-sm text-blue-900">
+                                        <strong>正解: B</strong><br>
+                                        <code class="bg-blue-200 px-1 rounded">Future.wait()</code>を使うと、複数のFutureを並列実行し、すべての完了を待つことができます。
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 章まとめ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-bookmark text-primary-500"></i>
+                            第16章のまとめ
+                        </h2>
+                        <ul class="space-y-2 text-slate-700">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>非同期処理</strong>は時間のかかる処理を実行中もアプリの応答性を保つ仕組み</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>Future</strong>は「未来に得られる値」を表すクラス</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>async/await</strong>を使うと非同期処理を同期処理のように記述できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><code class="bg-slate-200 px-1 rounded text-slate-800">Future.wait()</code>で複数の非同期処理を<strong>並列実行</strong>できる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span>データ取得中は<strong>CircularProgressIndicator</strong>でローディング表示を行う</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                <span><strong>try-catch</strong>でエラーを適切にハンドリングする</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 border-t border-slate-200">
+                    <a href="flutter-learning-material-15.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第15章: フォームとバリデーション</span>
+                        </div>
+                    </a>
+                    <a href="flutter-learning-material-17.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第17章: HTTP通信とAPI連携</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript読み込み -->
+    <script src="sidebar-content.js"></script>
+    <script src="main.js"></script>
+    <script src="drawing-tool.js"></script>
+
+    <!-- Highlight.js初期化 -->
+    <script>
+        hljs.highlightAll();
+    </script>
+
+    <!-- Mermaid初期化 -->
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+        });
+    </script>
+
+    <!-- コードコピー機能 -->
+    <script>
+        function copyCode(btn) {
+            const code = btn.closest('.code-block-wrapper').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = btn.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

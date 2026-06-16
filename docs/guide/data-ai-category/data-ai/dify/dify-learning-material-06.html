@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Dify入門 第6章 - ナレッジベース入門 - RAGの基礎を理解する</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Dify用カラー: fuchsia (生成AI/LLM)
+                        primary: {
+                            50: '#fdf4ff',
+                            100: '#fae8ff',
+                            200: '#f5d0fe',
+                            300: '#f0abfc',
+                            400: '#e879f9',
+                            500: '#d946ef',
+                            600: '#c026d3',
+                            700: '#a21caf',
+                            800: '#86198f',
+                            900: '#701a75',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-robot text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Dify入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級〜中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-brain text-[9px]"></i>
+                                <span>データ・AI</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/data-ai-category/data-ai/dify/" class="hover:text-primary-600 transition-colors">Dify入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ナレッジベース入門 - RAGの基礎を理解する</h1>
+                    <p class="text-slate-600">RAG（検索拡張生成）の概念と、Difyでのナレッジベース機能を理解し、独自のドキュメントをAIに参照させる仕組みの基本を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>RAG（検索拡張生成）とは何か、なぜ重要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>LLMの限界とRAGによる解決方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ベクトルデータベース、埋め込み、セマンティック検索の基本概念</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Difyのナレッジベース機能の概要と仕組み</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 RAGとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>RAG（Retrieval Augmented Generation：検索拡張生成）</strong>は、外部の知識ソースから関連情報を検索し、その情報を基にLLMが回答を生成する技術です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通常のLLMは、学習時点のデータに基づいて回答を生成するため、以下のような限界があります：
+                    </p>
+
+                    <!-- LLMの限界リスト -->
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium mb-2">LLMの限界</p>
+                                <ul class="space-y-2 text-red-800 text-sm">
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-bold">•</span>
+                                        <span><strong>古い情報:</strong> 学習データの時点以降の情報を知らない（知識カットオフ）</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-bold">•</span>
+                                        <span><strong>企業固有の情報がない:</strong> 社内文書、製品マニュアル、業務規定などは学習していない</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-bold">•</span>
+                                        <span><strong>ハルシネーション:</strong> 知らない情報について事実のように創作してしまう</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-bold">•</span>
+                                        <span><strong>根拠が不明:</strong> 回答の出典や参照元を示せない</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>RAGは、これらの限界を解決します。</strong>
+                        独自のドキュメント（社内マニュアル、製品文書、最新ニュースなど）から関連情報を検索し、その情報を元にLLMが回答を生成するため、
+                        正確性が高く、根拠が明確な回答が得られます。
+                    </p>
+
+                    <!-- RAGのメリットカード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">RAGのメリット</h3>
+                                <ul class="space-y-2 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>最新情報に対応:</strong> ドキュメントを更新すれば即座に最新情報を参照可能</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>独自情報の活用:</strong> 社内文書や製品マニュアルなど企業固有の情報を利用できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>ハルシネーション抑制:</strong> 実際のドキュメントに基づいて回答するため、創作が減る</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>出典の明示:</strong> どのドキュメントを参照したかを示せる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>コスト効率:</strong> 大規模モデルの再学習不要</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 RAGの仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RAGは、大きく分けて2つのフェーズで動作します。
+                    </p>
+
+                    <!-- RAGの2つのフェーズ図 -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">RAGの動作フロー</h3>
+                        <div class="mermaid">
+graph TB
+    subgraph 事前準備["フェーズ1: 事前準備（インデックス作成）"]
+        A[ドキュメント<br/>PDF、Word、テキスト] --> B[チャンク分割<br/>小さな断片に分ける]
+        B --> C[埋め込み<br/>ベクトル化]
+        C --> D[ベクトルDB保存<br/>検索可能な形で保存]
+    end
+
+    subgraph 実行時["フェーズ2: 実行時（検索と生成）"]
+        E[ユーザー質問] --> F[質問を埋め込み<br/>ベクトル化]
+        F --> G[セマンティック検索<br/>類似ベクトルを検索]
+        D --> G
+        G --> H[関連文書断片を取得<br/>上位N件]
+        H --> I[プロンプトに挿入<br/>コンテキストとして付与]
+        I --> J[LLMが生成<br/>文書を参照して回答]
+        J --> K[回答+出典]
+    end
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フェーズ1: 事前準備（インデックス作成）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RAGを使う前に、参照したいドキュメントを検索可能な形に変換します。
+                    </p>
+
+                    <ol class="space-y-3 text-slate-700 ml-4">
+                        <li>
+                            <strong>ドキュメント読み込み:</strong> PDF、Word、テキストファイルなどを読み込む
+                        </li>
+                        <li>
+                            <strong>チャンク分割:</strong> 長い文書を小さな断片（チャンク）に分割する
+                            <div class="bg-slate-100 p-3 rounded-lg mt-2 text-sm">
+                                <p class="text-slate-600">例: 1000文字ごと、段落ごと、セクションごとなど</p>
+                            </div>
+                        </li>
+                        <li>
+                            <strong>埋め込み（Embedding）:</strong> 各チャンクをベクトル（数値の配列）に変換する
+                            <div class="bg-slate-100 p-3 rounded-lg mt-2 text-sm">
+                                <p class="text-slate-600">意味が似ている文章は似たベクトルになる</p>
+                            </div>
+                        </li>
+                        <li>
+                            <strong>ベクトルデータベース保存:</strong> ベクトル化されたチャンクをベクトルデータベースに保存
+                        </li>
+                    </ol>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フェーズ2: 実行時（検索と生成）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザーが質問すると、以下の流れで回答が生成されます。
+                    </p>
+
+                    <ol class="space-y-3 text-slate-700 ml-4">
+                        <li>
+                            <strong>質問をベクトル化:</strong> ユーザーの質問を埋め込みモデルでベクトルに変換
+                        </li>
+                        <li>
+                            <strong>セマンティック検索:</strong> 質問ベクトルと似たベクトルを持つチャンクをベクトルDBから検索
+                            <div class="bg-slate-100 p-3 rounded-lg mt-2 text-sm">
+                                <p class="text-slate-600">キーワード一致ではなく、意味的に関連するチャンクを探す</p>
+                            </div>
+                        </li>
+                        <li>
+                            <strong>関連文書を取得:</strong> 類似度が高い上位N件のチャンクを取得
+                        </li>
+                        <li>
+                            <strong>プロンプトに挿入:</strong> 取得したチャンクをコンテキストとしてプロンプトに挿入
+                        </li>
+                        <li>
+                            <strong>LLMが生成:</strong> コンテキスト付きプロンプトをLLMに送り、回答を生成
+                        </li>
+                        <li>
+                            <strong>回答+出典:</strong> 回答とともに参照した文書の出典情報を返す
+                        </li>
+                    </ol>
+
+                    <!-- 重要ポイント -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">セマンティック検索の重要性</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    従来のキーワード検索では「犬」と「イヌ」は別の単語として扱われますが、
+                                    セマンティック検索では意味的に同じと理解します。
+                                    これにより、質問の表現が異なっても関連する情報を正確に見つけられます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 重要な構成要素
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RAGを理解する上で重要な3つの構成要素を詳しく見ていきましょう。
+                    </p>
+
+                    <!-- 構成要素1: ベクトルデータベース -->
+                    <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-database text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-800 mb-2">1. ベクトルデータベース（Vector Database）</h3>
+                                <p class="text-purple-900 mb-3">
+                                    ベクトル（数値の配列）を効率的に保存・検索するためのデータベースです。
+                                    従来のリレーショナルDBとは異なり、ベクトル間の距離や類似度を高速に計算できます。
+                                </p>
+                                <div class="bg-purple-100 p-3 rounded-lg mt-3">
+                                    <p class="text-purple-800 text-sm font-medium mb-2">代表的なベクトルDB:</p>
+                                    <ul class="text-purple-900 text-sm space-y-1">
+                                        <li>• <strong>Weaviate:</strong> Difyのデフォルト、高速でスケーラブル</li>
+                                        <li>• <strong>Qdrant:</strong> Rust製、高性能</li>
+                                        <li>• <strong>Chroma:</strong> シンプルで使いやすい</li>
+                                        <li>• <strong>Pinecone:</strong> クラウドマネージドサービス</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 構成要素2: 埋め込みモデル -->
+                    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-brain text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-800 mb-2">2. 埋め込みモデル（Embedding Model）</h3>
+                                <p class="text-blue-900 mb-3">
+                                    テキストをベクトルに変換するためのAIモデルです。
+                                    意味が似ている文章は似たベクトルになるように学習されています。
+                                </p>
+                                <div class="bg-blue-100 p-3 rounded-lg mt-3">
+                                    <p class="text-blue-800 text-sm font-medium mb-2">代表的な埋め込みモデル:</p>
+                                    <ul class="text-blue-900 text-sm space-y-1">
+                                        <li>• <strong>text-embedding-3-small:</strong> OpenAI、コスパ良好</li>
+                                        <li>• <strong>text-embedding-3-large:</strong> OpenAI、高精度</li>
+                                        <li>• <strong>voyage-large-2:</strong> Voyage AI、最高精度クラス</li>
+                                        <li>• <strong>multilingual-e5-large:</strong> 多言語対応、無料で利用可能</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 構成要素3: チャンク分割 -->
+                    <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-cut text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">3. チャンク分割（Chunking）</h3>
+                                <p class="text-emerald-900 mb-3">
+                                    長いドキュメントを小さな断片に分割する処理です。
+                                    チャンクのサイズと分割方法は、RAGの精度に大きく影響します。
+                                </p>
+                                <div class="bg-emerald-100 p-3 rounded-lg mt-3">
+                                    <p class="text-emerald-800 text-sm font-medium mb-2">チャンク分割の戦略:</p>
+                                    <ul class="text-emerald-900 text-sm space-y-1">
+                                        <li>• <strong>固定サイズ:</strong> 500文字、1000文字など固定長で分割</li>
+                                        <li>• <strong>段落ベース:</strong> 段落の区切りで分割</li>
+                                        <li>• <strong>セクションベース:</strong> 見出しや章ごとに分割</li>
+                                        <li>• <strong>オーバーラップ:</strong> チャンク間で一部重複させて文脈を保持</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- チャンク分割の図解 -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">チャンク分割の例</h3>
+                        <div class="mermaid">
+graph LR
+    A["長いドキュメント<br/>全文5000文字"] --> B["チャンク1<br/>0-1000文字"]
+    A --> C["チャンク2<br/>900-1900文字<br/>100文字オーバーラップ"]
+    A --> D["チャンク3<br/>1800-2800文字<br/>100文字オーバーラップ"]
+    A --> E["チャンク4<br/>2700-3700文字"]
+    A --> F["チャンク5<br/>3600-4600文字"]
+
+    B --> G["埋め込み<br/>ベクトル化"]
+    C --> G
+    D --> G
+    E --> G
+    F --> G
+
+    G --> H["ベクトルDB保存<br/>検索可能"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 Difyのナレッジベース機能
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Difyでは、RAGの複雑な仕組みが「ナレッジベース」という機能として抽象化されています。
+                        開発者はベクトルDBや埋め込みモデルの詳細を意識することなく、ドキュメントをアップロードするだけでRAGを利用できます。
+                    </p>
+
+                    <!-- Difyナレッジベースの特徴 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-star text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-800 mb-3">Difyナレッジベースの特徴</h3>
+                                <ul class="space-y-2 text-blue-900">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>多様なファイル形式対応:</strong> PDF、Word、Markdown、TXT、HTML、CSVなど</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>自動チャンク分割:</strong> ドキュメントアップロード時に自動で適切なサイズに分割</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>埋め込みモデル選択:</strong> 複数の埋め込みモデルから選択可能</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>ベクトルDB統合:</strong> Weaviate、Qdrant、Chromaなどに対応</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>インデックス管理:</strong> GUIでインデックスの追加・削除・更新が可能</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-blue-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>複数ナレッジベース:</strong> 用途ごとに複数のナレッジベースを作成・管理できる</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Difyでのナレッジベース利用フロー -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">Difyでのナレッジベース利用フロー</h3>
+                        <div class="mermaid">
+graph TB
+    A[ナレッジベース作成] --> B[ドキュメントアップロード<br/>PDF、Word、TXTなど]
+    B --> C[チャンク設定<br/>サイズとオーバーラップ]
+    C --> D[埋め込みモデル選択<br/>text-embedding-3-small等]
+    D --> E[インデックス作成<br/>自動処理]
+    E --> F[ナレッジベース完成<br/>検索可能]
+
+    F --> G[アプリに接続]
+    G --> H[ユーザー質問]
+    H --> I[セマンティック検索<br/>関連チャンク取得]
+    I --> J[LLMが回答生成<br/>文書参照]
+    J --> K[回答+出典表示]
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ナレッジベースの再利用</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    一度作成したナレッジベースは、複数のアプリで共有・再利用できます。
+                                    例えば、社内マニュアルのナレッジベースを作れば、FAQチャットボット、社内検索エンジン、
+                                    新人教育アシスタントなど、様々なアプリで活用できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 RAGの活用シーン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RAGは実務において非常に幅広い用途で活用されています。
+                    </p>
+
+                    <!-- 活用シーンのグリッド -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- シーン1 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-question-circle text-emerald-600"></i>
+                                </div>
+                                <h3 class="font-semibold text-slate-800">社内FAQ・ヘルプデスク</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                社内マニュアル、業務手順書、過去のQ&Aをナレッジベース化し、社員からの問い合わせに自動で回答。
+                                サポート担当者の負担を軽減しながら、24時間対応可能なヘルプシステムを構築。
+                            </p>
+                        </div>
+
+                        <!-- シーン2 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-book text-blue-600"></i>
+                                </div>
+                                <h3 class="font-semibold text-slate-800">製品ドキュメント検索</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                製品仕様書、技術マニュアル、APIドキュメントをナレッジベースに登録し、
+                                開発者やサポート担当者が必要な情報を自然言語で検索。キーワード検索より直感的。
+                            </p>
+                        </div>
+
+                        <!-- シーン3 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-contract text-purple-600"></i>
+                                </div>
+                                <h3 class="font-semibold text-slate-800">法務・契約書分析</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                契約書、社内規定、法令文書をナレッジベース化し、特定の条項や規定を検索・要約。
+                                法務担当者の調査時間を大幅に短縮し、見落としを防ぐ。
+                            </p>
+                        </div>
+
+                        <!-- シーン4 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-newspaper text-orange-600"></i>
+                                </div>
+                                <h3 class="font-semibold text-slate-800">業界ニュース分析</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                業界ニュース、レポート、論文をナレッジベースに登録し、特定のトピックに関する情報を抽出・要約。
+                                市場調査や競合分析の効率化に活用。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 実装例の比較 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="min-w-full border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">活用シーン</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">RAG無しの場合</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">RAG有りの場合</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">カスタマーサポート</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">一般的な回答のみ、製品固有情報は不正確</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">製品マニュアルに基づいた正確な回答、出典明示</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">法務調査</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">全文検索で手動確認、時間がかかる</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">関連条項を自動抽出、要約して提示</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">新入社員教育</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">先輩社員に質問、回答待ち時間が発生</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">社内規定・マニュアルを即座に検索、自己解決可能</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. RAG（検索拡張生成）とは何ですか？通常のLLMとの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            RAGは、外部の知識ソースから関連情報を検索し、その情報を基にLLMが回答を生成する技術です。
+                                            通常のLLMは学習時点のデータのみに依存しますが、RAGは独自のドキュメントを参照できるため、
+                                            最新情報や企業固有の情報に対応でき、ハルシネーションが抑制され、出典を明示できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ベクトルデータベースと埋め込みモデルの役割は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            埋め込みモデルは、テキストをベクトル（数値の配列）に変換する役割を持ちます。
+                                            ベクトルデータベースは、そのベクトルを効率的に保存・検索し、類似度が高いベクトルを高速に見つけます。
+                                            これにより、セマンティック検索（意味的に関連する情報の検索）が可能になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. チャンク分割とは何ですか？なぜ重要なのですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            チャンク分割は、長いドキュメントを小さな断片に分割する処理です。
+                                            適切なサイズに分割することで、検索精度が向上し、LLMのコンテキスト長制限にも対応できます。
+                                            分割サイズが大きすぎると関連性が低い情報が混ざり、小さすぎると文脈が失われるため、バランスが重要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. Difyのナレッジベース機能の主なメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            DifyのナレッジベースはRAGの複雑な仕組みを抽象化し、ドキュメントをアップロードするだけで
+                                            自動的にチャンク分割、埋め込み、ベクトルDB保存を行います。
+                                            技術的な知識がなくても簡単にRAGアプリを構築でき、複数のナレッジベースを管理・再利用できる点が大きなメリットです。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第6章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>RAGは外部文書を検索し参照することで、LLMの限界（古い情報、企業固有情報の欠如、ハルシネーション）を解決する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>RAGは事前準備（インデックス作成）と実行時（検索と生成）の2つのフェーズで動作する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ベクトルデータベース、埋め込みモデル、チャンク分割がRAGの重要な構成要素</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Difyのナレッジベース機能により、複雑なRAGの仕組みを意識せず簡単に実装できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>FAQ、製品ドキュメント検索、法務調査、業界ニュース分析など、幅広い活用シーンがある</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="dify-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第5章: モデルプロバイダーの設定</span>
+                        </div>
+                    </a>
+                    <a href="dify-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第7章: ナレッジベースの構築</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

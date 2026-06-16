@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next.js学習教材 第5章 - データフェッチングとレンダリング戦略</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #667eea; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #667eea; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; }
+        .section-title { color: #764ba2; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: rgba(102, 126, 234, 0.1); border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #667eea; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #764ba2; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #667eea; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #667eea !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand"><strong>Next.js学習教材</strong></a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-01.html">第1章: Next.js入門と環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-02.html">第2章: Reactの基礎とコンポーネント設計</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-03.html">第3章: ページとルーティング（App Router）</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-04.html">第4章: サーバーコンポーネントとクライアントコンポーネント</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="nextjs-learning-material-05.html">第5章: データフェッチングとレンダリング戦略</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-06.html">第6章: APIルートとサーバーアクション</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-07.html">第7章: スタイリングと画像最適化</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-08.html">第8章: 認証とミドルウェア</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-09.html">第9章: パフォーマンス最適化とベストプラクティス</a></li>
+                        <li class="nav-item"><a class="nav-link" href="nextjs-learning-material-10.html">第10章: デプロイメントと本番環境設定</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第5章: データフェッチングとレンダリング戦略</h1>
+                </div>
+
+                <div id="chapter5">
+                    <h2 class="chapter-title">パフォーマンスを最大化するレンダリング戦略</h2>
+
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>サーバーコンポーネントでのデータフェッチング方法を理解する</li>
+                            <li>SSG（Static Site Generation）の概念と使い方を習得する</li>
+                            <li>SSR（Server-Side Rendering）の動作を理解する</li>
+                            <li>ISR（Incremental Static Regeneration）の実装方法を学ぶ</li>
+                            <li>キャッシング戦略とrevalidateの使い方を理解する</li>
+                            <li>SuspenseとStreamingによるUX改善手法を習得する</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">5.1 Next.jsのレンダリング戦略概要</h3>
+
+                    <h4>5.1.1 3つの主要なレンダリング方式</h4>
+                    <p>
+                        Next.jsは、ページごとに最適なレンダリング方式を選択できます：
+                    </p>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>レンダリング方式</th>
+                                    <th>タイミング</th>
+                                    <th>用途</th>
+                                    <th>パフォーマンス</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>SSG（Static Site Generation）</td>
+                                    <td>ビルド時</td>
+                                    <td>静的コンテンツ</td>
+                                    <td>★★★★★</td>
+                                </tr>
+                                <tr>
+                                    <td>ISR（Incremental Static Regeneration）</td>
+                                    <td>ビルド時+定期更新</td>
+                                    <td>定期的に更新されるコンテンツ</td>
+                                    <td>★★★★☆</td>
+                                </tr>
+                                <tr>
+                                    <td>SSR（Server-Side Rendering）</td>
+                                    <td>リクエスト時</td>
+                                    <td>動的コンテンツ</td>
+                                    <td>★★★☆☆</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mermaid">
+                        flowchart TB
+                            A["ページリクエスト"]
+                            A --> B{"レンダリング方式"}
+                            B -->|SSG| C["ビルド済みHTML<br/>を即座に返す"]
+                            B -->|ISR| D["キャッシュ確認<br/>期限切れなら再生成"]
+                            B -->|SSR| E["毎回サーバーで<br/>HTMLを生成"]
+                            C --> F["超高速"]
+                            D --> G["高速"]
+                            E --> H["中速"]
+                    </div>
+
+                    <h3 class="section-title">5.2 サーバーコンポーネントでのデータフェッチ</h3>
+
+                    <h4>5.2.1 基本的なデータ取得</h4>
+                    <p>
+                        サーバーコンポーネントでは、async/awaitを使って直接データを取得できます：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">// app/posts/page.js
+export default async function PostsPage() {
+  // サーバーで実行されるデータ取得
+  const res = await fetch('https://jsonplaceholder.typicode.com/posts');
+  const posts = await res.json();
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;ブログ記事一覧&lt;/h1&gt;
+      &lt;ul&gt;
+        {posts.slice(0, 10).map(post =&gt; (
+          &lt;li key={post.id}&gt;
+            &lt;h2&gt;{post.title}&lt;/h2&gt;
+            &lt;p&gt;{post.body.substring(0, 100)}...&lt;/p&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <h4>5.2.2 複数のデータソースの並列取得</h4>
+                    <pre class="code-block"><code class="language-javascript">// Promise.allで並列実行
+export default async function DashboardPage() {
+  const [posts, users, comments] = await Promise.all([
+    fetch('https://api.example.com/posts').then(r =&gt; r.json()),
+    fetch('https://api.example.com/users').then(r =&gt; r.json()),
+    fetch('https://api.example.com/comments').then(r =&gt; r.json()),
+  ]);
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;ダッシュボード&lt;/h1&gt;
+      &lt;p&gt;投稿数: {posts.length}&lt;/p&gt;
+      &lt;p&gt;ユーザー数: {users.length}&lt;/p&gt;
+      &lt;p&gt;コメント数: {comments.length}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <h3 class="section-title">5.3 Static Site Generation（SSG）</h3>
+
+                    <h4>5.3.1 SSGの基本</h4>
+                    <p>
+                        デフォルトでは、fetchは<strong>キャッシュされる</strong>ため、ビルド時にデータを取得してHTMLを生成します：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">// app/about/page.js
+// デフォルトでSSG（キャッシュあり）
+export default async function AboutPage() {
+  const res = await fetch('https://api.example.com/company-info');
+  const info = await res.json();
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;{info.name}&lt;/h1&gt;
+      &lt;p&gt;{info.description}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <h4>5.3.2 動的ルートのSSG：generateStaticParams</h4>
+                    <p>
+                        動的ルートでSSGを使用する場合、<code>generateStaticParams</code>で事前生成するパスを指定します：
+                    </p>
+
+                    <div class="exercise-container">
+                        <h5>実習 5-1: ブログ記事の静的生成</h5>
+
+                        <pre class="code-block"><code class="language-javascript">// app/blog/[slug]/page.js
+
+// ビルド時に生成するページのパスを指定
+export async function generateStaticParams() {
+  const posts = await fetch('https://api.example.com/posts').then(r =&gt; r.json());
+
+  return posts.map((post) =&gt; ({
+    slug: post.slug,
+  }));
+}
+
+// 各ページの内容を生成
+export default async function BlogPost({ params }) {
+  const post = await fetch(`https://api.example.com/posts/${params.slug}`)
+    .then(r =&gt; r.json());
+
+  return (
+    &lt;article&gt;
+      &lt;h1&gt;{post.title}&lt;/h1&gt;
+      &lt;p&gt;{post.content}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+                        <p>この設定により、ビルド時にすべての記事ページが事前生成されます。</p>
+                    </div>
+
+                    <h3 class="section-title">5.4 Server-Side Rendering（SSR）</h3>
+
+                    <h4>5.4.1 動的レンダリングの有効化</h4>
+                    <p>
+                        fetchに<code>{ cache: 'no-store' }</code>オプションを指定すると、毎回サーバーで実行されます：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">// app/dashboard/page.js
+export default async function DashboardPage() {
+  // 毎回サーバーでデータ取得（SSR）
+  const res = await fetch('https://api.example.com/dashboard', {
+    cache: 'no-store'
+  });
+  const data = await res.json();
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;ダッシュボード&lt;/h1&gt;
+      &lt;p&gt;最終更新: {new Date().toLocaleString()}&lt;/p&gt;
+      &lt;p&gt;データ: {JSON.stringify(data)}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <h4>5.4.2 動的関数を使った強制SSR</h4>
+                    <p>
+                        以下の関数を使用すると、自動的にSSRになります：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">import { cookies, headers } from 'next/headers';
+
+export default async function Page() {
+  // cookiesやheadersを使用するとSSRになる
+  const cookieStore = cookies();
+  const headersList = headers();
+
+  return &lt;div&gt;動的にレンダリングされます&lt;/div&gt;;
+}</code></pre>
+
+                    <h3 class="section-title">5.5 Incremental Static Regeneration（ISR）</h3>
+
+                    <h4>5.5.1 ISRの基本</h4>
+                    <p>
+                        ISRは、<strong>静的生成の利点</strong>と<strong>動的更新の柔軟性</strong>を組み合わせた戦略です：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">// app/news/page.js
+export default async function NewsPage() {
+  // 60秒ごとに再検証（revalidate）
+  const res = await fetch('https://api.example.com/news', {
+    next: { revalidate: 60 }
+  });
+  const news = await res.json();
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;最新ニュース&lt;/h1&gt;
+      &lt;p&gt;このページは60秒ごとに更新されます&lt;/p&gt;
+      {news.map(item =&gt; (
+        &lt;article key={item.id}&gt;
+          &lt;h2&gt;{item.title}&lt;/h2&gt;
+          &lt;p&gt;{item.summary}&lt;/p&gt;
+        &lt;/article&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <div class="highlight">
+                        <h6>ISRの動作</h6>
+                        <ol>
+                            <li>初回リクエスト：静的に生成されたページを返す（超高速）</li>
+                            <li>revalidate期間内：キャッシュされたページを返す</li>
+                            <li>期間経過後の次回リクエスト：
+                                <ul>
+                                    <li>古いページを即座に返す</li>
+                                    <li>バックグラウンドで新しいページを生成</li>
+                                    <li>次回以降は新しいページを表示</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h4>5.5.2 ルートセグメントでのrevalidate設定</h4>
+                    <pre class="code-block"><code class="language-javascript">// app/blog/page.js
+export const revalidate = 3600; // 1時間ごとに再検証
+
+export default async function BlogPage() {
+  const posts = await fetch('https://api.example.com/posts').then(r =&gt; r.json());
+
+  return (
+    &lt;div&gt;
+      {posts.map(post =&gt; (
+        &lt;article key={post.id}&gt;
+          &lt;h2&gt;{post.title}&lt;/h2&gt;
+        &lt;/article&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <h3 class="section-title">5.6 SuspenseとStreaming</h3>
+
+                    <h4>5.6.1 React Suspenseの活用</h4>
+                    <p>
+                        Suspenseを使うと、データ読み込み中に代替UIを表示できます：
+                    </p>
+
+                    <pre class="code-block"><code class="language-javascript">// app/page.js
+import { Suspense } from 'react';
+import Posts from './components/Posts';
+import Comments from './components/Comments';
+
+export default function HomePage() {
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;ホームページ&lt;/h1&gt;
+
+      {/* 投稿リストが読み込まれるまで「読み込み中...」を表示 */}
+      &lt;Suspense fallback={&lt;p&gt;投稿を読み込み中...&lt;/p&gt;}&gt;
+        &lt;Posts /&gt;
+      &lt;/Suspense&gt;
+
+      {/* コメントは独立して読み込まれる */}
+      &lt;Suspense fallback={&lt;p&gt;コメントを読み込み中...&lt;/p&gt;}&gt;
+        &lt;Comments /&gt;
+      &lt;/Suspense&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                    <pre class="code-block"><code class="language-javascript">// app/components/Posts.js
+export default async function Posts() {
+  // 時間のかかるデータ取得
+  const posts = await fetch('https://api.example.com/posts').then(r =&gt; r.json());
+
+  return (
+    &lt;ul&gt;
+      {posts.map(post =&gt; (
+        &lt;li key={post.id}&gt;{post.title}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</code></pre>
+
+                    <h4>5.6.2 Streamingによる段階的表示</h4>
+                    <p>
+                        Suspenseを使用すると、ページの一部が準備できた段階で順次表示されます（ストリーミング）：
+                    </p>
+
+                    <div class="mermaid">
+                        flowchart LR
+                            A["リクエスト"] --> B["ヘッダー<br/>即座に表示"]
+                            B --> C["投稿リスト<br/>1秒後に表示"]
+                            C --> D["コメント<br/>2秒後に表示"]
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>
+                                <strong>SSG、ISR、SSRの中で、最もパフォーマンスが高いのはどれですか？</strong>
+                                <div style="margin-top: 10px; padding: 10px; background-color: white; border-radius: 5px;">
+                                    回答：SSG（ビルド時に生成されたHTMLを即座に返すため）
+                                </div>
+                            </li>
+                            <li>
+                                <strong>fetchでSSRを有効にするオプションは何ですか？</strong>
+                                <div style="margin-top: 10px; padding: 10px; background-color: white; border-radius: 5px;">
+                                    回答：{ cache: 'no-store' }
+                                </div>
+                            </li>
+                            <li>
+                                <strong>ISRで再検証の間隔を指定するプロパティは何ですか？</strong>
+                                <div style="margin-top: 10px; padding: 10px; background-color: white; border-radius: 5px;">
+                                    回答：revalidate（秒単位で指定）
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 class="section-title">5.7 まとめ</h3>
+                    <p>この章では、データフェッチングとレンダリング戦略について学びました：</p>
+                    <ul>
+                        <li>サーバーコンポーネントでasync/awaitを使った直接的なデータ取得</li>
+                        <li>SSG：ビルド時に静的HTML生成（最速）</li>
+                        <li>ISR：静的生成+定期更新（柔軟性とパフォーマンスの両立）</li>
+                        <li>SSR：リクエストごとに動的生成（最新データ）</li>
+                        <li>SuspenseとStreamingによるUX改善</li>
+                    </ul>
+
+                    <div class="highlight">
+                        <h6>次の章の予告</h6>
+                        <p>
+                            第6章では、<strong>APIルートとServer Actions</strong>について学びます。バックエンド機能の実装、フォーム処理、データの更新方法を習得していきます。
+                        </p>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="nextjs-learning-material-04.html" class="btn btn-secondary">← 前の章</a>
+                        <a href="nextjs-learning-material-06.html" class="btn btn-primary">次の章 →</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white mt-5">
+        <div class="container-fluid py-3">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="mb-0">© 2025 F-Circle. All rights reserved.<br>
+本資料はAIツールを活用し、人間による編集・監修のもと作成されています。無断転載・再配布を禁じます。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default'
+        });
+    </script>
+</body>
+</html>

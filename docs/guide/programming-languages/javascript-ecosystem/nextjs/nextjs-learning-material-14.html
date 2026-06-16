@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Next.js学習教材 第14章 - デプロイメントとCI/CD</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-react text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Next.js学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Webフレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約36時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Next.js</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第14章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第14章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">デプロイメントとCI/CD</h1>
+                    <p class="text-slate-600">Vercelへのデプロイ、環境変数の管理、GitHub Actionsによる自動化、Docker化、エッジ関数、監視とアラート、ロールバック戦略など、本番運用に必要な知識を総合的に学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Vercelへのデプロイ手順と本番環境の最適化設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>環境変数の管理とセキュリティベストプラクティス</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GitHub ActionsによるCI/CDパイプラインの構築</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Docker化とコンテナデプロイの実装方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>監視・アラート設定とパフォーマンス分析</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: デプロイメントの選択肢 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.1 デプロイメントの選択肢
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Next.jsアプリケーションは、さまざまなプラットフォームにデプロイできます。それぞれの特徴を理解し、プロジェクトに最適な選択をしましょう。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TB
+    A[Next.jsアプリ] --> B{デプロイ先の選択}
+    B -->|推奨| C["Vercel<br/>公式プラットフォーム"]
+    B -->|汎用| D["AWS/GCP/Azure<br/>クラウドプロバイダー"]
+    B -->|コンテナ| E["Docker + K8s<br/>コンテナ環境"]
+    B -->|セルフホスト| F["VPS/オンプレミス<br/>自前サーバー"]
+
+    C --> C1["自動デプロイ<br/>エッジ最適化"]
+    D --> D1["柔軟な構成<br/>大規模対応"]
+    E --> E1["ポータビリティ<br/>マイクロサービス"]
+    F --> F1["完全制御<br/>カスタマイズ"]
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-slate-500"></i>
+                            デプロイメント選択肢の比較
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b-2 border-slate-300">
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">プラットフォーム</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">難易度</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">コスト</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">特徴</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-600">
+                                    <tr class="border-b border-slate-200 bg-emerald-50">
+                                        <td class="py-2 px-3 font-medium">Vercel</td>
+                                        <td class="py-2 px-3">⭐ 簡単</td>
+                                        <td class="py-2 px-3">無料プランあり</td>
+                                        <td class="py-2 px-3">公式、自動最適化、エッジ対応</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">AWS/GCP/Azure</td>
+                                        <td class="py-2 px-3">⚠️ 中級</td>
+                                        <td class="py-2 px-3">従量課金</td>
+                                        <td class="py-2 px-3">柔軟な構成、エンタープライズ向け</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">Docker</td>
+                                        <td class="py-2 px-3">⚠️ 中級</td>
+                                        <td class="py-2 px-3">インフラ次第</td>
+                                        <td class="py-2 px-3">ポータブル、マイクロサービス対応</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3 font-medium">セルフホスト</td>
+                                        <td class="py-2 px-3">❌ 上級</td>
+                                        <td class="py-2 px-3">サーバー費用</td>
+                                        <td class="py-2 px-3">完全制御、カスタマイズ自由</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">この章での学習方針</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    初めての方には<strong>Vercel</strong>を推奨します。Next.jsの公式プラットフォームとして、最も簡単で強力な機能を提供します。その後、GitHub ActionsによるCI/CDとDocker化についても学習します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: Vercelへのデプロイ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.2 Vercelへのデプロイ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Vercelは、Next.jsの開発元であるVercel社が提供するホスティングプラットフォームです。GitHubとの連携により、コミットするだけで自動デプロイされます。
+                    </p>
+
+                    <!-- 実習カード: Vercelデプロイ -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                    実習 14-1: Vercelにデプロイする
+                                </h3>
+                                <p class="text-purple-900 mb-4 break-words">
+                                    Next.jsプロジェクトをVercelにデプロイして、本番公開してみましょう。
+                                </p>
+
+                                <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">
+                                            Vercel公式サイト（vercel.com）でアカウント作成（GitHub連携推奨）
+                                        </span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">
+                                            プロジェクトをGitHubにプッシュ
+                                        </span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">
+                                            Vercelダッシュボードで「New Project」→ GitHubリポジトリを選択
+                                        </span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">
+                                            「Deploy」ボタンをクリック（設定は自動検出されます）
+                                        </span>
+                                    </li>
+                                </ol>
+
+                                <h4 class="font-medium text-purple-800 mb-2">デプロイ後の確認</h4>
+                                <div class="bg-purple-100 rounded-lg p-4 mb-3">
+                                    <ul class="text-purple-900 text-sm space-y-1">
+                                        <li>✅ 本番URL（例: <code class="bg-purple-200 px-1 rounded">https://your-project.vercel.app</code>）が発行される</li>
+                                        <li>✅ 各コミットごとにプレビューURLが自動生成される</li>
+                                        <li>✅ ビルドログで問題がないか確認</li>
+                                        <li>✅ カスタムドメインの設定も可能</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">Vercelの自動最適化機能</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li><strong>エッジネットワーク：</strong>世界中のCDNエッジから高速配信</li>
+                                    <li><strong>自動HTTPSレスポンス：</strong>SSL証明書の自動発行と更新</li>
+                                    <li><strong>プレビューデプロイ：</strong>プルリクエストごとに専用URLを生成</li>
+                                    <li><strong>Analytics：</strong>リアルタイムのアクセス分析とCore Web Vitals計測</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: 環境変数の管理 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.3 環境変数の管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番環境では、APIキーやデータベース接続情報などの機密情報を安全に管理する必要があります。環境変数の適切な扱い方を学びましょう。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- ローカル環境 -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-laptop-code text-slate-500"></i>
+                                ローカル環境（.env.local）
+                            </h3>
+                            <div class="code-block-wrapper mb-3">
+                                <pre class="!bg-slate-800 !rounded-lg overflow-x-auto text-xs"><code class="language-bash"># .env.local（ローカル開発用）
+DATABASE_URL=postgres://localhost:5432/dev
+NEXT_PUBLIC_API_URL=http://localhost:3000
+SECRET_KEY=dev-secret-key-123</code></pre>
+                            </div>
+                            <p class="text-slate-600 text-sm">
+                                ローカル開発では<code class="bg-slate-100 px-1 rounded">.env.local</code>に記述。Gitにはコミットしません。
+                            </p>
+                        </div>
+
+                        <!-- Vercel環境 -->
+                        <div class="bg-primary-50 border border-primary-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-primary-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-cloud text-primary-500"></i>
+                                本番環境（Vercelダッシュボード）
+                            </h3>
+                            <div class="bg-primary-100 rounded-lg p-4 mb-3">
+                                <p class="text-primary-900 text-sm mb-2 font-medium">Vercelでの設定手順：</p>
+                                <ol class="text-primary-900 text-sm space-y-1 list-decimal list-inside">
+                                    <li>プロジェクト → Settings → Environment Variables</li>
+                                    <li>変数名・値を入力し、環境を選択（Production/Preview/Development）</li>
+                                    <li>「Save」で保存</li>
+                                </ol>
+                            </div>
+                            <p class="text-primary-900 text-sm">
+                                本番環境の機密情報はダッシュボードで管理し、コードには含めません。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3">環境変数のプレフィックス規則</h3>
+                        <div class="space-y-3">
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <code class="text-sm font-mono text-emerald-600">NEXT_PUBLIC_*</code>
+                                <p class="text-slate-600 text-sm mt-2">
+                                    <strong>クライアントサイドで使用可能：</strong>ブラウザにも公開される環境変数。APIのエンドポイントURL等、公開情報のみに使用します。
+                                </p>
+                                <div class="code-block-wrapper mt-2">
+                                    <pre class="!bg-slate-800 !rounded-lg overflow-x-auto text-xs"><code class="language-typescript">// ブラウザでもアクセス可能
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <code class="text-sm font-mono text-blue-600">その他（プレフィックスなし）</code>
+                                <p class="text-slate-600 text-sm mt-2">
+                                    <strong>サーバーサイド専用：</strong>APIキーやデータベース認証情報など、機密情報に使用します。クライアントからはアクセスできません。
+                                </p>
+                                <div class="code-block-wrapper mt-2">
+                                    <pre class="!bg-slate-800 !rounded-lg overflow-x-auto text-xs"><code class="language-typescript">// サーバーコンポーネントまたはAPI Routesでのみアクセス可能
+const dbUrl = process.env.DATABASE_URL;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 dark:text-red-100 font-medium">セキュリティ上の注意</p>
+                                <ul class="text-red-800 dark:text-red-200 text-sm mt-2 space-y-1">
+                                    <li>❌ <code class="bg-red-100 dark:bg-red-800/50 px-1 rounded">.env.local</code>をGitにコミットしない</li>
+                                    <li>❌ APIキーやシークレットを<code class="bg-red-100 dark:bg-red-800/50 px-1 rounded">NEXT_PUBLIC_*</code>で公開しない</li>
+                                    <li>✅ <code class="bg-red-100 dark:bg-red-800/50 px-1 rounded">.env.example</code>で変数名のテンプレートを共有</li>
+                                    <li>✅ 本番とプレビュー環境で異なる値を使用</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: GitHub ActionsによるCI/CD -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.4 GitHub ActionsによるCI/CD
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GitHub Actionsを使用すると、コミット時の自動テスト、リント、ビルド確認など、CI/CDパイプラインを構築できます。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    A[コミット &amp; プッシュ] --> B[GitHub Actions起動]
+    B --> C{CI/CDパイプライン}
+    C --> D[Lint実行]
+    C --> E[テスト実行]
+    C --> F[ビルド確認]
+    D --> G{全て成功?}
+    E --> G
+    F --> G
+    G -->|Yes| H[自動デプロイ]
+    G -->|No| I[失敗通知]
+                        </div>
+                    </div>
+
+                    <!-- 実習カード: GitHub Actions設定 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                    実習 14-2: GitHub Actions CI/CDを設定する
+                                </h3>
+                                <p class="text-purple-900 mb-4 break-words">
+                                    プルリクエスト時に自動でテストとビルドを実行するワークフローを作成します。
+                                </p>
+
+                                <h4 class="font-medium text-purple-800 mb-2">ワークフローファイルの作成</h4>
+                                <div class="code-block-wrapper mb-3">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">.github/workflows/ci.yml</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-yaml">name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm ci        # 依存関係インストール
+      - run: npm run lint  # Lint実行
+      - run: npm run build # ビルド確認</code></pre>
+                                </div>
+
+                                <h4 class="font-medium text-purple-800 mt-4 mb-2">動作確認</h4>
+                                <p class="text-purple-900 text-sm mb-2">
+                                    このファイルをコミットしてプッシュすると、GitHub Actionsが自動実行されます。リポジトリの「Actions」タブでログを確認できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">CI/CDの活用ポイント</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li><strong>テスト自動化：</strong>全てのプルリクエストでテストを実行し、品質を保証</li>
+                                    <li><strong>ビルド確認：</strong>本番ビルドが成功するか事前に確認</li>
+                                    <li><strong>自動デプロイ：</strong>mainブランチへのマージで自動デプロイ</li>
+                                    <li><strong>通知連携：</strong>Slack/Discordへの結果通知で素早い対応</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: Docker化とコンテナデプロイ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.5 Docker化とコンテナデプロイ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Next.jsアプリケーションをDockerコンテナ化することで、どこでも同じ環境で動作するポータブルなアプリケーションを作成できます。
+                    </p>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-file-code text-slate-500"></i>
+                            Next.js用Dockerfile
+                        </h3>
+                        <div class="code-block-wrapper">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">Dockerfile</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-dockerfile"># ベースイメージ
+FROM node:18-alpine AS base
+
+# 依存関係インストール
+FROM base AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+# ビルドステージ
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# 本番実行ステージ
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV production
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json ./
+EXPOSE 3000
+CMD ["npm", "start"]</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3">Dockerコマンド</h3>
+                        <div class="code-block-wrapper mb-3">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">terminal</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># イメージをビルド
+docker build -t my-nextjs-app .
+
+# コンテナを起動
+docker run -p 3000:3000 my-nextjs-app
+
+# docker-composeで起動
+docker-compose up</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">Docker化のメリット</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li><strong>環境の一貫性：</strong>開発、ステージング、本番で同じ環境を保証</li>
+                                    <li><strong>移植性：</strong>AWS、GCP、Azure、オンプレミスなどどこでも動作</li>
+                                    <li><strong>スケーラビリティ：</strong>Kubernetesと組み合わせて自動スケーリング</li>
+                                    <li><strong>CI/CD統合：</strong>Docker Registryを使った自動デプロイ</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: 監視とパフォーマンス分析 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.6 監視とパフォーマンス分析
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番環境では、アプリケーションの稼働状況を継続的に監視し、問題を早期に発見することが重要です。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TB
+    A[Next.jsアプリ] --> B[監視ツール]
+    B --> C[Vercel Analytics]
+    B --> D[Sentry<br/>エラートラッキング]
+    B --> E[Datadog/New Relic<br/>APM]
+
+    C --> C1[Core Web Vitals<br/>Real User Monitoring]
+    D --> D1[エラー検知<br/>スタックトレース]
+    E --> E1[パフォーマンス<br/>分散トレーシング]
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- Vercel Analytics -->
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-chart-line text-purple-500"></i>
+                                Vercel Analytics
+                            </h3>
+                            <ul class="text-purple-900 text-sm space-y-2">
+                                <li>✅ <strong>Core Web Vitals：</strong>LCP、FID、CLSの計測</li>
+                                <li>✅ <strong>リアルユーザー監視：</strong>実際のユーザー体験を計測</li>
+                                <li>✅ <strong>ページパフォーマンス：</strong>各ページの読み込み速度</li>
+                                <li>✅ <strong>地域別分析：</strong>地域ごとのパフォーマンス比較</li>
+                            </ul>
+                        </div>
+
+                        <!-- Sentry -->
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-bug text-orange-500"></i>
+                                Sentry（エラートラッキング）
+                            </h3>
+                            <ul class="text-orange-900 text-sm space-y-2">
+                                <li>✅ <strong>エラー検知：</strong>リアルタイムでエラーを検知</li>
+                                <li>✅ <strong>スタックトレース：</strong>詳細なエラー情報を記録</li>
+                                <li>✅ <strong>通知連携：</strong>Slack/メールで即座に通知</li>
+                                <li>✅ <strong>リリース追跡：</strong>デプロイ後のエラー発生を追跡</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 実習カード: Sentry統合 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                    実習 14-3: Sentryでエラートラッキングを設定する
+                                </h3>
+                                <p class="text-purple-900 mb-4 break-words">
+                                    Sentryを統合して、本番環境のエラーを自動で収集・通知します。
+                                </p>
+
+                                <h4 class="font-medium text-purple-800 mb-2">セットアップ手順</h4>
+                                <div class="code-block-wrapper mb-3">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">terminal</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># Sentry SDKをインストール
+npx @sentry/wizard@latest -i nextjs</code></pre>
+                                </div>
+
+                                <p class="text-purple-900 text-sm mb-3">
+                                    このコマンドを実行すると、対話形式でSentryの設定が完了し、<code class="bg-purple-100 px-1 rounded">sentry.client.config.js</code>などのファイルが自動生成されます。
+                                </p>
+
+                                <h4 class="font-medium text-purple-800 mb-2">環境変数の設定</h4>
+                                <div class="code-block-wrapper">
+                                    <pre class="!bg-slate-800 !rounded-lg overflow-x-auto text-xs"><code class="language-bash"># .env.local
+NEXT_PUBLIC_SENTRY_DSN=your-dsn-here</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">監視のベストプラクティス</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1">
+                                    <li><strong>アラート設定：</strong>エラー率が閾値を超えたら即座に通知</li>
+                                    <li><strong>定期レビュー：</strong>週次でパフォーマンスレポートを確認</li>
+                                    <li><strong>ユーザー体験重視：</strong>Core Web Vitalsを継続的に改善</li>
+                                    <li><strong>ロールバック準備：</strong>問題発生時の即座のロールバック体制</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Vercelでデプロイする際、プルリクエストごとに自動生成される機能の名前は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>プレビューデプロイメント</strong>です。各プルリクエストに専用のURLが自動生成され、本番環境に影響を与えずに変更内容を確認できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Next.jsの環境変数で、クライアントサイドからもアクセス可能にするプレフィックスは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200 px-1 rounded">NEXT_PUBLIC_</code>プレフィックスを付けた環境変数は、ブラウザからもアクセス可能になります。ただし、APIキーなどの機密情報には使用しないでください。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. GitHub Actionsを使ったCI/CDの主なメリットを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ①コミット時に自動でテスト・リント・ビルドを実行し、品質を保証できる。②本番デプロイ前に問題を検出できるため、バグの早期発見と修正が可能になる。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-tools text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">トラブルシューティング</h3>
+                            <div class="space-y-4">
+                                <details class="group bg-white rounded-lg overflow-hidden border border-orange-200">
+                                    <summary class="cursor-pointer p-4 hover:bg-orange-50 transition-colors font-medium text-orange-900 flex items-center gap-2">
+                                        <i class="fas fa-chevron-right transition-transform group-open:rotate-90 text-orange-500"></i>
+                                        Vercelでビルドが失敗する
+                                    </summary>
+                                    <div class="p-4 border-t border-orange-200 bg-orange-50">
+                                        <p class="text-orange-900 text-sm mb-2">
+                                            <strong>原因：</strong>環境変数の未設定、依存関係のバージョン不一致、TypeScriptエラーなど。
+                                        </p>
+                                        <p class="text-orange-900 text-sm">
+                                            <strong>解決策：</strong>Vercelのビルドログを確認し、エラーメッセージを特定します。環境変数が必要な場合はVercelダッシュボードで設定してください。ローカルで<code class="bg-orange-100 px-1 rounded">npm run build</code>を実行し、同じエラーが再現するか確認します。
+                                        </p>
+                                    </div>
+                                </details>
+
+                                <details class="group bg-white rounded-lg overflow-hidden border border-orange-200">
+                                    <summary class="cursor-pointer p-4 hover:bg-orange-50 transition-colors font-medium text-orange-900 flex items-center gap-2">
+                                        <i class="fas fa-chevron-right transition-transform group-open:rotate-90 text-orange-500"></i>
+                                        環境変数が反映されない
+                                    </summary>
+                                    <div class="p-4 border-t border-orange-200 bg-orange-50">
+                                        <p class="text-orange-900 text-sm mb-2">
+                                            <strong>原因：</strong>環境変数の設定後に再デプロイしていない、または誤った環境（Production/Preview/Development）に設定している。
+                                        </p>
+                                        <p class="text-orange-900 text-sm">
+                                            <strong>解決策：</strong>Vercelダッシュボードで正しい環境に変数が設定されているか確認し、変更後は必ず再デプロイ（Deployments → Redeploy）を実行してください。
+                                        </p>
+                                    </div>
+                                </details>
+
+                                <details class="group bg-white rounded-lg overflow-hidden border border-orange-200">
+                                    <summary class="cursor-pointer p-4 hover:bg-orange-50 transition-colors font-medium text-orange-900 flex items-center gap-2">
+                                        <i class="fas fa-chevron-right transition-transform group-open:rotate-90 text-orange-500"></i>
+                                        Dockerコンテナが起動しない
+                                    </summary>
+                                    <div class="p-4 border-t border-orange-200 bg-orange-50">
+                                        <p class="text-orange-900 text-sm mb-2">
+                                            <strong>原因：</strong>Dockerfileの設定ミス、ポートの競合、メモリ不足など。
+                                        </p>
+                                        <p class="text-orange-900 text-sm">
+                                            <strong>解決策：</strong><code class="bg-orange-100 px-1 rounded">docker logs [container-id]</code>でログを確認します。ポート3000が既に使用されている場合は<code class="bg-orange-100 px-1 rounded">docker run -p 3001:3000</code>のように別ポートを指定してください。
+                                        </p>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Vercelは公式プラットフォームとして、最も簡単で強力なデプロイメント環境を提供する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>環境変数は機密情報を安全に管理するために不可欠で、NEXT_PUBLIC_プレフィックスの使い分けが重要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>GitHub ActionsでCI/CDパイプラインを構築すると、品質保証と自動デプロイが実現できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Docker化により、環境の一貫性とポータビリティが向上し、複雑なインフラ構成にも対応可能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>SentryやVercel Analyticsによる監視で、本番環境の問題を早期発見・対応できる</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="nextjs-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-500 hover:bg-slate-600 text-white transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-200 block">前の章</span>
+                            <span class="font-medium">第13章: データベース統合とORM</span>
+                        </div>
+                    </a>
+                    <a href="nextjs-learning-material-15.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第15章: 実践プロジェクト：ブログプラットフォーム構築</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

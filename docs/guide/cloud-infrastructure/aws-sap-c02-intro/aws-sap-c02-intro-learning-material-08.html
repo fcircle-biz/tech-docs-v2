@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS SAP-C02入門 第8章 - 高度なVPC設計 - エンタープライズネットワーキング</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // AWS Orange
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS SAP-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS SAP-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">高度なVPC設計 - エンタープライズネットワーキング</h1>
+                    <p class="text-slate-600">大規模環境に対応するVPCの高度な設計パターンを習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>VPCピアリングとその制限事項</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Transit Gatewayによるハブ&スポーク構成</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>VPCエンドポイント（Gateway、Interface）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PrivateLinkによるサービス公開</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>VPC Flow Logsとネットワーク分析</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>NATゲートウェイの高可用性設計</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ネットワークACLとセキュリティグループの使い分け</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: VPCピアリングとその制限事項 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 VPCピアリングとその制限事項
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        VPCピアリングは、2つのVPC間でプライベートな通信を可能にする接続方式です。
+                        シンプルな構成に適していますが、大規模環境では制限事項を理解する必要があります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">VPCピアリングの仕組み</h3>
+                    <div class="mermaid">
+graph LR
+    subgraph VPC_A["VPC A (10.0.0.0/16)"]
+        A1[Subnet A1]
+        A2[Subnet A2]
+    end
+
+    subgraph VPC_B["VPC B (10.1.0.0/16)"]
+        B1[Subnet B1]
+        B2[Subnet B2]
+    end
+
+    VPC_A -."|VPCピアリング接続|".- VPC_B
+
+    style VPC_A fill:#dbeafe
+    style VPC_B fill:#d1fae5
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h4 class="font-semibold text-blue-800 mb-2">VPCピアリングの特徴</h4>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>• プライベートIPアドレスでの通信（インターネットを経由しない）</li>
+                                    <li>• 異なるAWSアカウント・リージョン間でも接続可能</li>
+                                    <li>• データ転送コストはクロスAZ・クロスリージョン転送と同じ</li>
+                                    <li>• 1対1の接続（1つのピアリング接続で2つのVPCのみ接続）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">VPCピアリングの制限事項</h3>
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">重要な制限事項</p>
+                                <ul class="text-red-800 text-sm mt-2 space-y-1">
+                                    <li>• <strong>推移的ピアリング不可:</strong> VPC A-B、B-Cがピアリングされていても、A-C間の通信は不可</li>
+                                    <li>• <strong>CIDRブロックの重複不可:</strong> ピアリングするVPC間でIPアドレス範囲が重複してはいけない</li>
+                                    <li>• <strong>フルメッシュ接続が必要:</strong> N個のVPCを全て接続するには N×(N-1)/2 個のピアリング接続が必要</li>
+                                    <li>• <strong>最大接続数:</strong> 1つのVPCあたり最大125個のピアリング接続</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フルメッシュ接続の課題</h3>
+                    <div class="mermaid">
+graph TB
+    VPC_A[VPC A]
+    VPC_B[VPC B]
+    VPC_C[VPC C]
+    VPC_D[VPC D]
+
+    VPC_A ---|1| VPC_B
+    VPC_A ---|2| VPC_C
+    VPC_A ---|3| VPC_D
+    VPC_B ---|4| VPC_C
+    VPC_B ---|5| VPC_D
+    VPC_C ---|6| VPC_D
+
+    Note["4つのVPCを接続するには<br/>6個のピアリング接続が必要"]
+
+    style Note fill:#fef3c7
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        VPCの数が増えると、必要なピアリング接続数が指数関数的に増加します。
+                        このような場合は、次節で説明するTransit Gatewayの利用を検討すべきです。
+                    </p>
+                </section>
+
+                <!-- セクション2: Transit Gatewayによるハブ&スポーク構成 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 Transit Gatewayによるハブ&スポーク構成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWS Transit Gateway（TGW）は、複数のVPCとオンプレミスネットワークを中央ハブ経由で接続できるマネージドサービスです。
+                        大規模なネットワーク環境において、VPCピアリングの制限を解消します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Transit Gatewayのアーキテクチャ</h3>
+                    <div class="mermaid">
+graph TB
+    TGW["Transit Gateway<br/>（ハブ）"]
+
+    VPC_A[VPC A]
+    VPC_B[VPC B]
+    VPC_C[VPC C]
+    VPC_D[VPC D]
+    OnPrem[オンプレミス<br/>VPN/Direct Connect]
+
+    VPC_A --- TGW
+    VPC_B --- TGW
+    VPC_C --- TGW
+    VPC_D --- TGW
+    OnPrem --- TGW
+
+    Note["全てのVPCがTransit Gatewayを<br/>経由して相互通信可能"]
+
+    style TGW fill:#fed7aa
+    style Note fill:#d1fae5
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">Transit Gatewayの利点</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>• <strong>スケーラビリティ:</strong> 1つのTransit Gatewayに最大5,000個のVPCをアタッチ可能</li>
+                                    <li>• <strong>シンプルな管理:</strong> フルメッシュ接続不要。各VPCは1本の接続のみ</li>
+                                    <li>• <strong>推移的ルーティング:</strong> VPC間の推移的な通信が可能</li>
+                                    <li>• <strong>ルートテーブル分離:</strong> 複数のルートテーブルで通信を制御可能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ルートテーブルによるセグメンテーション</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Transit Gatewayでは、複数のルートテーブルを使用してトラフィックを分離できます。
+                        これにより、セキュリティやコンプライアンス要件に応じたネットワーク分離が可能です。
+                    </p>
+
+                    <div class="mermaid">
+graph TB
+    TGW["Transit Gateway"]
+
+    RT_Prod["Production<br/>ルートテーブル"]
+    RT_Dev["Development<br/>ルートテーブル"]
+
+    VPC_Prod1[VPC 本番1]
+    VPC_Prod2[VPC 本番2]
+    VPC_Dev1[VPC 開発1]
+    VPC_Dev2[VPC 開発2]
+
+    TGW -.-> RT_Prod
+    TGW -.-> RT_Dev
+
+    RT_Prod --- VPC_Prod1
+    RT_Prod --- VPC_Prod2
+    RT_Dev --- VPC_Dev1
+    RT_Dev --- VPC_Dev2
+
+    Note["本番環境と開発環境を<br/>ルートテーブルで分離"]
+
+    style RT_Prod fill:#fecaca
+    style RT_Dev fill:#bfdbfe
+    style Note fill:#fef3c7
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Transit Gatewayの料金</h3>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-dollar-sign text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h4 class="font-semibold text-blue-800 mb-2">料金体系</h4>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>• アタッチメント時間課金: VPCアタッチメント1時間あたり約0.05 USD</li>
+                                    <li>• データ転送課金: Transit Gateway経由のデータ転送1GBあたり約0.02 USD</li>
+                                    <li>• VPCピアリングよりコストは高いが、管理の簡素化とスケーラビリティで相殺</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: VPCエンドポイント -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 VPCエンドポイント（Gateway、Interface）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        VPCエンドポイントは、インターネットゲートウェイやNATゲートウェイを経由せずに、AWSサービスにプライベートに接続できる機能です。
+                        セキュリティ向上とコスト削減に貢献します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">VPCエンドポイントの種類</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">種類</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">Gateway Endpoint</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">Interface Endpoint</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">対象サービス</td>
+                                    <td class="border border-slate-300 px-4 py-2">S3、DynamoDB</td>
+                                    <td class="border border-slate-300 px-4 py-2">多くのAWSサービス（EC2、SNS、SQS等）</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">実装方式</td>
+                                    <td class="border border-slate-300 px-4 py-2">ルートテーブルにエントリを追加</td>
+                                    <td class="border border-slate-300 px-4 py-2">ENI（Elastic Network Interface）をサブネットに配置</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">料金</td>
+                                    <td class="border border-slate-300 px-4 py-2">無料</td>
+                                    <td class="border border-slate-300 px-4 py-2">時間課金 + データ転送課金</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">アクセス元</td>
+                                    <td class="border border-slate-300 px-4 py-2">VPC内のみ</td>
+                                    <td class="border border-slate-300 px-4 py-2">VPC内、オンプレミス、他VPC（PrivateLink経由）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Gateway Endpointの仕組み</h3>
+                    <div class="mermaid">
+graph LR
+    subgraph VPC["VPC"]
+        EC2[EC2 Instance]
+        RT[Route Table]
+        GW_EP["Gateway Endpoint<br/>for S3"]
+    end
+
+    S3[(S3 Bucket)]
+
+    EC2 --> RT
+    RT -."|プライベート接続|".- GW_EP
+    GW_EP --> S3
+
+    Internet[インターネット経由なし]
+
+    style GW_EP fill:#d1fae5
+    style Internet fill:#fecaca
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Interface Endpointの仕組み</h3>
+                    <div class="mermaid">
+graph LR
+    subgraph VPC["VPC"]
+        subgraph Subnet["Subnet"]
+            EC2[EC2 Instance]
+            ENI["Interface Endpoint<br/>（ENI）"]
+        end
+    end
+
+    SNS[Amazon SNS]
+
+    EC2 -."|Private IP|".- ENI
+    ENI --> SNS
+
+    style ENI fill:#bfdbfe
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">VPCエンドポイントのメリット</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>• インターネットゲートウェイ不要 → セキュリティ向上</li>
+                                    <li>• NATゲートウェイ不要 → コスト削減</li>
+                                    <li>• AWSバックボーンネットワーク経由 → 低レイテンシー</li>
+                                    <li>• エンドポイントポリシーでアクセス制御可能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">実習: S3向けGateway Endpointの作成</h3>
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-flask text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-lg font-semibold text-purple-800 mb-3">ハンズオン</h4>
+                                <p class="text-purple-900 mb-3">VPC内のEC2インスタンスからS3へプライベートにアクセスできるGateway Endpointを作成します。</p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span>bash</span>
+                                        <button class="copy-button" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                            <span>コピー</span>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-bash"># VPC IDとルートテーブルIDを取得
+VPC_ID=$(aws ec2 describe-vpcs \
+  --filters "Name=tag:Name,Values=MyVPC" \
+  --query "Vpcs[0].VpcId" --output text)
+
+RT_ID=$(aws ec2 describe-route-tables \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
+  --query "RouteTables[0].RouteTableId" --output text)
+
+# S3向けGateway Endpointを作成
+aws ec2 create-vpc-endpoint \
+  --vpc-id $VPC_ID \
+  --service-name com.amazonaws.ap-northeast-1.s3 \
+  --route-table-ids $RT_ID</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: PrivateLinkによるサービス公開 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 PrivateLinkによるサービス公開
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWS PrivateLinkは、VPC内のサービスを他のVPCやAWSアカウントに安全に公開できる機能です。
+                        VPCピアリングやTransit Gatewayを使わずに、特定のサービスのみを公開できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">PrivateLinkのアーキテクチャ</h3>
+                    <div class="mermaid">
+graph LR
+    subgraph Provider["サービス提供側VPC"]
+        NLB["Network Load<br/>Balancer"]
+        EP_Service["Endpoint Service"]
+        App[アプリケーション]
+
+        App --> NLB
+        NLB --> EP_Service
+    end
+
+    subgraph Consumer["サービス利用側VPC"]
+        Interface_EP["Interface Endpoint"]
+        Client[クライアント]
+
+        Client --> Interface_EP
+    end
+
+    Interface_EP -."|PrivateLink|".- EP_Service
+
+    style EP_Service fill:#fed7aa
+    style Interface_EP fill:#bfdbfe
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h4 class="font-semibold text-blue-800 mb-2">PrivateLinkのユースケース</h4>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>• SaaS提供者が顧客VPCにサービスを提供</li>
+                                    <li>• マルチアカウント環境で特定のサービスのみを共有</li>
+                                    <li>• パートナー企業とのプライベートAPI連携</li>
+                                    <li>• オンプレミスから特定のAWSサービスへのプライベートアクセス</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">PrivateLinkの利点</h3>
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <ul class="text-emerald-800 text-sm space-y-1">
+                                    <li>• <strong>セキュリティ:</strong> インターネット経由不要、プライベートIPのみ</li>
+                                    <li>• <strong>CIDRブロック重複OK:</strong> VPC間でIPアドレス範囲が重複しても利用可能</li>
+                                    <li>• <strong>最小権限:</strong> 特定のサービスのみを公開、VPC全体の公開不要</li>
+                                    <li>• <strong>スケーラビリティ:</strong> 数千のコンシューマーVPCから接続可能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: VPC Flow Logsとネットワーク分析 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 VPC Flow Logsとネットワーク分析
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        VPC Flow Logsは、VPC内のネットワークインターフェースを通過するIPトラフィックに関する情報をキャプチャする機能です。
+                        セキュリティ分析、トラブルシューティング、ネットワーク最適化に活用できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">VPC Flow Logsの仕組み</h3>
+                    <div class="mermaid">
+graph TB
+    subgraph VPC["VPC"]
+        ENI1[ENI 1]
+        ENI2[ENI 2]
+        ENI3[ENI 3]
+    end
+
+    Flow_Logs["VPC Flow Logs"]
+
+    CW_Logs["CloudWatch Logs"]
+    S3["S3 Bucket"]
+
+    ENI1 --> Flow_Logs
+    ENI2 --> Flow_Logs
+    ENI3 --> Flow_Logs
+
+    Flow_Logs --> CW_Logs
+    Flow_Logs --> S3
+
+    Athena["Amazon Athena<br/>（S3データ分析）"]
+    CW_Insights["CloudWatch Logs Insights<br/>（ログ分析）"]
+
+    S3 --> Athena
+    CW_Logs --> CW_Insights
+
+    style Flow_Logs fill:#fed7aa
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Flow Logのフォーマット</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Flow Logレコードには、以下の情報が含まれます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>Flow Logレコード例</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-text">version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes start end action log-status
+2 123456789012 eni-abc123de 10.0.1.5 10.0.2.10 49152 80 6 10 5000 1620000000 1620000060 ACCEPT OK</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">フィールド</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">srcaddr</td>
+                                    <td class="border border-slate-300 px-4 py-2">送信元IPアドレス</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">dstaddr</td>
+                                    <td class="border border-slate-300 px-4 py-2">宛先IPアドレス</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">srcport / dstport</td>
+                                    <td class="border border-slate-300 px-4 py-2">送信元・宛先ポート番号</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">protocol</td>
+                                    <td class="border border-slate-300 px-4 py-2">プロトコル番号（6=TCP, 17=UDP）</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">packets / bytes</td>
+                                    <td class="border border-slate-300 px-4 py-2">転送されたパケット数・バイト数</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-mono">action</td>
+                                    <td class="border border-slate-300 px-4 py-2">ACCEPT または REJECT</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">VPC Flow Logsの活用例</h3>
+                    <div class="space-y-4">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shield-alt text-blue-500"></i>
+                                セキュリティ分析
+                            </h4>
+                            <p class="text-sm text-slate-600">
+                                不審なIPアドレスからのアクセス、ポートスキャン、DDoS攻撃の検知
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-wrench text-emerald-500"></i>
+                                トラブルシューティング
+                            </h4>
+                            <p class="text-sm text-slate-600">
+                                接続失敗の原因特定（セキュリティグループ、ネットワークACLの設定ミス）
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-chart-line text-orange-500"></i>
+                                ネットワーク最適化
+                            </h4>
+                            <p class="text-sm text-slate-600">
+                                トラフィックパターンの分析、帯域幅使用量の最適化
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-balance-scale text-purple-500"></i>
+                                コンプライアンス
+                            </h4>
+                            <p class="text-sm text-slate-600">
+                                監査証跡の保持、ネットワークアクセスの記録
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">実習: CloudWatch Logs Insightsでの分析</h3>
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-flask text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-lg font-semibold text-purple-800 mb-3">ハンズオン</h4>
+                                <p class="text-purple-900 mb-3">CloudWatch Logs Insightsを使用して、REJECTされたトラフィックを分析します。</p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span>CloudWatch Logs Insightsクエリ</span>
+                                        <button class="copy-button" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                            <span>コピー</span>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">fields @timestamp, srcAddr, dstAddr, dstPort, action
+| filter action = "REJECT"
+| stats count() by srcAddr, dstPort
+| sort count desc
+| limit 20</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: NATゲートウェイの高可用性設計 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.6 NATゲートウェイの高可用性設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        NAT（Network Address Translation）ゲートウェイは、プライベートサブネット内のインスタンスがインターネットにアクセスするために使用されます。
+                        高可用性を確保するには、各アベイラビリティゾーンにNATゲートウェイを配置する必要があります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">単一AZのNATゲートウェイ（非推奨）</h3>
+                    <div class="mermaid">
+graph TB
+    subgraph VPC["VPC"]
+        subgraph AZ_A["AZ A"]
+            PubSub_A["Public Subnet A"]
+            PrivSub_A["Private Subnet A"]
+            NAT_A["NAT Gateway"]
+        end
+
+        subgraph AZ_B["AZ B"]
+            PubSub_B["Public Subnet B"]
+            PrivSub_B["Private Subnet B"]
+        end
+
+        IGW["Internet Gateway"]
+
+        NAT_A --> PubSub_A
+        PubSub_A --> IGW
+        PrivSub_A --> NAT_A
+        PrivSub_B -."|単一障害点|".- NAT_A
+    end
+
+    Warning["⚠ AZ Aが障害すると<br/>AZ Bもインターネット接続不可"]
+
+    style Warning fill:#fecaca
+    style NAT_A fill:#fef3c7
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">マルチAZのNATゲートウェイ（推奨）</h3>
+                    <div class="mermaid">
+graph TB
+    subgraph VPC["VPC"]
+        subgraph AZ_A["AZ A"]
+            PubSub_A["Public Subnet A"]
+            PrivSub_A["Private Subnet A"]
+            NAT_A["NAT Gateway A"]
+        end
+
+        subgraph AZ_B["AZ B"]
+            PubSub_B["Public Subnet B"]
+            PrivSub_B["Private Subnet B"]
+            NAT_B["NAT Gateway B"]
+        end
+
+        IGW["Internet Gateway"]
+
+        NAT_A --> PubSub_A
+        NAT_B --> PubSub_B
+        PubSub_A --> IGW
+        PubSub_B --> IGW
+        PrivSub_A --> NAT_A
+        PrivSub_B --> NAT_B
+    end
+
+    Note["✅ 各AZが独立して<br/>インターネットにアクセス"]
+
+    style Note fill:#d1fae5
+    style NAT_A fill:#bfdbfe
+    style NAT_B fill:#bfdbfe
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">NATゲートウェイ高可用性のベストプラクティス</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1">
+                                    <li>• 各AZに1つのNATゲートウェイを配置</li>
+                                    <li>• 各プライベートサブネットのルートテーブルは、同じAZ内のNATゲートウェイを参照</li>
+                                    <li>• クロスAZトラフィック（データ転送料金）を回避</li>
+                                    <li>• NATゲートウェイは自動的に冗長化されている（単一AZ内での高可用性）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">NATゲートウェイのコスト最適化</h3>
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">コスト考慮事項</p>
+                                <ul class="text-orange-800 text-sm mt-2 space-y-1">
+                                    <li>• NATゲートウェイは時間課金（約0.045 USD/時間）+ データ処理課金（約0.045 USD/GB）</li>
+                                    <li>• VPCエンドポイントの活用でNATゲートウェイ経由のトラフィックを削減</li>
+                                    <li>• 開発環境では、必要な時間帯のみNATゲートウェイを起動する運用も検討</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7: ネットワークACLとセキュリティグループの使い分け -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.7 ネットワークACLとセキュリティグループの使い分け
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        AWSでは、セキュリティグループとネットワークACLの2つのファイアウォール機能が提供されています。
+                        それぞれの特性を理解し、多層防御を実現することが重要です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">セキュリティグループ vs ネットワークACL</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">観点</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">セキュリティグループ</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">ネットワークACL</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">適用レベル</td>
+                                    <td class="border border-slate-300 px-4 py-2">インスタンス（ENI）レベル</td>
+                                    <td class="border border-slate-300 px-4 py-2">サブネットレベル</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">ルールタイプ</td>
+                                    <td class="border border-slate-300 px-4 py-2">許可ルールのみ</td>
+                                    <td class="border border-slate-300 px-4 py-2">許可・拒否ルール両方</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">ステートフル/レス</td>
+                                    <td class="border border-slate-300 px-4 py-2">ステートフル（戻りトラフィック自動許可）</td>
+                                    <td class="border border-slate-300 px-4 py-2">ステートレス（明示的に戻りルール必要）</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">ルール評価</td>
+                                    <td class="border border-slate-300 px-4 py-2">全ルールを評価（OR条件）</td>
+                                    <td class="border border-slate-300 px-4 py-2">ルール番号順に評価（最初にマッチしたルールを適用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2 font-medium">デフォルト動作</td>
+                                    <td class="border border-slate-300 px-4 py-2">全て拒否（明示的に許可が必要）</td>
+                                    <td class="border border-slate-300 px-4 py-2">デフォルトACL: 全て許可</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">多層防御のアーキテクチャ</h3>
+                    <div class="mermaid">
+graph TB
+    Internet[インターネット]
+    IGW["Internet Gateway"]
+
+    subgraph Subnet["Public Subnet"]
+        NACL["Network ACL<br/>（サブネットレベル）"]
+        SG["Security Group<br/>（インスタンスレベル）"]
+        EC2[EC2 Instance]
+    end
+
+    Internet --> IGW
+    IGW --> NACL
+    NACL --> SG
+    SG --> EC2
+
+    Note["2層のファイアウォールで<br/>多層防御を実現"]
+
+    style NACL fill:#fed7aa
+    style SG fill:#bfdbfe
+    style Note fill:#d1fae5
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">使い分けのベストプラクティス</h3>
+                    <div class="space-y-4">
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shield-alt"></i>
+                                セキュリティグループの用途
+                            </h4>
+                            <ul class="text-blue-900 text-sm space-y-1">
+                                <li>• アプリケーションレベルのアクセス制御（通常のファイアウォール）</li>
+                                <li>• きめ細かいインスタンス単位の制御</li>
+                                <li>• 動的なルール管理（IPアドレス変更が頻繁な環境）</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-ban"></i>
+                                ネットワークACLの用途
+                            </h4>
+                            <ul class="text-orange-900 text-sm space-y-1">
+                                <li>• サブネット全体に対する追加の防御層</li>
+                                <li>• 特定IPアドレスからのアクセス拒否（ブラックリスト）</li>
+                                <li>• コンプライアンス要件でサブネットレベルの制御が必要な場合</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ネットワークACLのルール例</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full border-collapse border border-slate-300">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">ルール番号</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">種類</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">プロトコル</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">ポート範囲</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">送信元</th>
+                                    <th class="border border-slate-300 px-4 py-2 text-left">許可/拒否</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2">100</td>
+                                    <td class="border border-slate-300 px-4 py-2">インバウンド</td>
+                                    <td class="border border-slate-300 px-4 py-2">TCP</td>
+                                    <td class="border border-slate-300 px-4 py-2">80</td>
+                                    <td class="border border-slate-300 px-4 py-2">0.0.0.0/0</td>
+                                    <td class="border border-slate-300 px-4 py-2 text-emerald-600 font-semibold">許可</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2">110</td>
+                                    <td class="border border-slate-300 px-4 py-2">インバウンド</td>
+                                    <td class="border border-slate-300 px-4 py-2">TCP</td>
+                                    <td class="border border-slate-300 px-4 py-2">443</td>
+                                    <td class="border border-slate-300 px-4 py-2">0.0.0.0/0</td>
+                                    <td class="border border-slate-300 px-4 py-2 text-emerald-600 font-semibold">許可</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2">120</td>
+                                    <td class="border border-slate-300 px-4 py-2">インバウンド</td>
+                                    <td class="border border-slate-300 px-4 py-2">TCP</td>
+                                    <td class="border border-slate-300 px-4 py-2">22</td>
+                                    <td class="border border-slate-300 px-4 py-2">192.0.2.100/32</td>
+                                    <td class="border border-slate-300 px-4 py-2 text-red-600 font-semibold">拒否</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2">130</td>
+                                    <td class="border border-slate-300 px-4 py-2">インバウンド</td>
+                                    <td class="border border-slate-300 px-4 py-2">TCP</td>
+                                    <td class="border border-slate-300 px-4 py-2">22</td>
+                                    <td class="border border-slate-300 px-4 py-2">10.0.0.0/8</td>
+                                    <td class="border border-slate-300 px-4 py-2 text-emerald-600 font-semibold">許可</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-2">*</td>
+                                    <td class="border border-slate-300 px-4 py-2">インバウンド</td>
+                                    <td class="border border-slate-300 px-4 py-2">すべて</td>
+                                    <td class="border border-slate-300 px-4 py-2">すべて</td>
+                                    <td class="border border-slate-300 px-4 py-2">0.0.0.0/0</td>
+                                    <td class="border border-slate-300 px-4 py-2 text-red-600 font-semibold">拒否</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ルール番号のベストプラクティス</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ルール番号は100, 110, 120...のように10刻みで設定します。
+                                    これにより、後から中間にルールを追加する余地が生まれます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. VPCピアリングの推移的ルーティングが不可とはどういう意味ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            VPC A-B、B-Cがピアリング接続されていても、A-C間の直接通信はできません。
+                                            A-C間で通信したい場合は、別途A-Cのピアリング接続を作成する必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Transit GatewayとVPCピアリングの主な違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Transit Gatewayは中央ハブとして機能し、推移的ルーティングが可能です。
+                                            多数のVPCを接続する場合、VPCピアリングではフルメッシュ接続が必要ですが、Transit Gatewayでは各VPCが1本の接続のみで済みます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Gateway EndpointとInterface Endpointの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Gateway Endpointは、S3とDynamoDBのみに対応し、ルートテーブルにエントリを追加します（無料）。<br>
+                                            Interface Endpointは、多くのAWSサービスに対応し、ENIをサブネットに配置します（有料）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. なぜNATゲートウェイを各AZに配置する必要がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            単一AZにNATゲートウェイを配置すると、そのAZが障害した場合、他のAZのプライベートサブネットもインターネットにアクセスできなくなります（単一障害点）。
+                                            各AZにNATゲートウェイを配置することで、AZ障害時でも他のAZは影響を受けません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q5. セキュリティグループとネットワークACLの最も大きな違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            セキュリティグループはステートフルで、戻りトラフィックを自動的に許可します。
+                                            ネットワークACLはステートレスで、明示的に戻りトラフィックのルールを追加する必要があります。
+                                            また、セキュリティグループは許可ルールのみですが、ネットワークACLは拒否ルールも設定できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-emerald-500"></i>
+                        第8章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>VPCピアリングはシンプルだが推移的ルーティング不可、フルメッシュ接続が必要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>Transit Gatewayはハブ&スポーク構成で大規模環境に対応、推移的ルーティング可能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>VPCエンドポイントでAWSサービスへプライベート接続、セキュリティ向上とコスト削減</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>PrivateLinkで特定のサービスのみを他VPCに安全に公開</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>VPC Flow Logsでネットワークトラフィックを記録、セキュリティ分析とトラブルシューティングに活用</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>NATゲートウェイは各AZに配置して高可用性を確保</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>セキュリティグループ（ステートフル）とネットワークACL（ステートレス）で多層防御</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 次のステップ -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-compass text-blue-600 mt-1"></i>
+                        <div>
+                            <p class="text-blue-900 font-medium">次のステップ</p>
+                            <p class="text-blue-800 text-sm mt-1">
+                                第9章では、オンプレミス環境とAWSを安全に接続するハイブリッドアーキテクチャを設計します。
+                                Site-to-Site VPN、Direct Connect、Direct Connect Gatewayなど、企業ネットワークとの統合に必要な技術を学びましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-sap-c02-intro-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第7章: Global Accelerator</span>
+                        </div>
+                    </a>
+                    <a href="aws-sap-c02-intro-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第9章: ハイブリッドクラウド接続</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

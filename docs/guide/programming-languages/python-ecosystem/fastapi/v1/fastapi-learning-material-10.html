@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI学習教材 第10章 - デプロイメントと本番環境</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #2e7d32; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #2e7d32; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #2e7d32; padding-bottom: 0.5rem; }
+        .section-title { color: #4caf50; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #2e7d32; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #2e7d32 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid"><a class="navbar-brand"><strong>FastAPI学習教材</strong></a></div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-01.html">第1章: FastAPI入門と環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-02.html">第2章: ルーティングとリクエスト処理</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-03.html">第3章: Pydanticモデルとデータ検証</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-04.html">第4章: レスポンス処理と例外ハンドリング</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-05.html">第5章: 依存性注入とミドルウェア</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-06.html">第6章: データベース連携とORM</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-07.html">第7章: 認証とセキュリティ</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-08.html">第8章: 非同期処理とパフォーマンス最適化</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-09.html">第9章: テストとドキュメント</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="fastapi-learning-material-10.html">第10章: デプロイメントと本番環境</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第10章: デプロイメントと本番環境</h1>
+                </div>
+
+                <div id="chapter10">
+                    <h2 class="chapter-title">本番運用：Dockerコンテナ化とCI/CDパイプライン</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>Dockerを使用したアプリケーションコンテナ化</li>
+                            <li>Uvicorn/Gunicornによる本番サーバー設定</li>
+                            <li>環境変数とシークレット管理</li>
+                            <li>ロギングと監視システムの構築</li>
+                            <li>CI/CDパイプラインとゼロダウンタイムデプロイ</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">10.1 Dockerによるコンテナ化</h3>
+                    <p>Dockerを使用することで、開発環境と本番環境の差異を無くし、一貫性のあるデプロイメントが可能になります。</p>
+
+                    <div class="mermaid">
+                        graph TB
+                            subgraph "開発フロー"
+                                A["ソースコード"] --> B["Dockerfile"]
+                                B --> C["Docker Image"]
+                                C --> D["Docker Container"]
+                            end
+                            
+                            subgraph "本番デプロイ"
+                                E["Container Registry"] --> F["本番環境"]
+                                C --> E
+                                F --> G["Load Balancer"]
+                                G --> H["複数インスタンス"]
+                            end
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-1: Dockerファイルと本番環境設定</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-bash"># Dockerfile
+FROM python:3.11-slim
+
+# 作業ディレクトリ設定
+WORKDIR /app
+
+# システムの依存関係をインストール
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pythonの依存関係をコピー
+COPY requirements.txt .
+
+# Python依存関係をインストール
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションコードをコピー
+COPY . .
+
+# 非rootユーザーを作成
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
+# ヘルスチェック設定
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# ポート公開
+EXPOSE 8000
+
+# 本番用コマンド
+CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]</code></pre>
+
+<pre class="code-block"><code class="language-bash"># docker-compose.yml（開発環境用）
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/fastapi_dev
+      - SECRET_KEY=dev-secret-key
+      - DEBUG=true
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: fastapi_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+      
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:</code></pre>
+
+<pre class="code-block"><code class="language-bash"># docker-compose.prod.yml（本番環境用）
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=false
+      - LOG_LEVEL=info
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    networks:
+      - app-network
+      
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - app-network
+
+volumes:
+  postgres_prod_data:
+
+networks:
+  app-network:
+    driver: bridge</code></pre>
+
+<pre class="code-block"><code class="language-bash"># nginx.prod.conf（本番用Nginx設定）
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream fastapi {
+        server api:8000;
+    }
+
+    # レート制限設定
+    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    server {
+        listen 80;
+        server_name your-domain.com;
+        
+        # HTTPSにリダイレクト
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name your-domain.com;
+
+        # SSL設定
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+
+        # セキュリティヘッダー
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+        # 静的ファイル配信
+        location /static/ {
+            alias /app/static/;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # API プロキシ
+        location / {
+            # レート制限適用
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://fastapi;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # タイムアウト設定
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        # ログイン エンドポイントのレート制限
+        location /token {
+            limit_req zone=login burst=3 nodelay;
+            proxy_pass http://fastapi;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.2 環境設定とシークレット管理</h3>
+                    <p>本番環境では、設定値とシークレット情報を適切に管理することが重要です。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-2: 環境変数管理とセキュリティ設定</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python"># config.py
+import os
+from typing import Optional
+from pydantic import BaseSettings, PostgresDsn, validator
+
+class Settings(BaseSettings):
+    """アプリケーション設定"""
+    
+    # 基本設定
+    app_name: str = "FastAPI Application"
+    app_version: str = "1.0.0"
+    debug: bool = False
+    
+    # サーバー設定
+    host: str = "0.0.0.0"
+    port: int = 8000
+    workers: int = 4
+    
+    # データベース設定
+    database_url: PostgresDsn
+    database_pool_size: int = 20
+    database_max_overflow: int = 30
+    
+    # セキュリティ設定
+    secret_key: str
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    
+    # Redis設定
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: Optional[str] = None
+    
+    # ログ設定
+    log_level: str = "info"
+    log_file: Optional[str] = None
+    
+    # メール設定
+    smtp_host: str = "localhost"
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: bool = True
+    
+    # 外部API設定
+    api_rate_limit: int = 1000
+    api_rate_limit_window: int = 3600
+    
+    # ファイルアップロード設定
+    max_file_size: int = 10 * 1024 * 1024  # 10MB
+    upload_dir: str = "/tmp/uploads"
+    
+    @validator("database_url", pre=True)
+    def assemble_db_connection(cls, v: Optional[str]) -> str:
+        if isinstance(v, str):
+            return v
+        raise ValueError("DATABASE_URLが設定されていません")
+    
+    @validator("secret_key", pre=True)
+    def validate_secret_key(cls, v: Optional[str]) -> str:
+        if not v or len(v) < 32:
+            raise ValueError("SECRET_KEYは32文字以上である必要があります")
+        return v
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+# settings.py
+from functools import lru_cache
+from config import Settings
+
+@lru_cache()
+def get_settings() -> Settings:
+    """設定シングルトン取得"""
+    return Settings()
+
+settings = get_settings()
+
+# logging_config.py
+import logging.config
+from settings import settings
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
+        },
+        "detailed": {
+            "format": "[%(asctime)s] %(levelname)s in %(name)s:%(lineno)d: %(message)s",
+        },
+        "json": {
+            "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(module)s", "message": "%(message)s"}',
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": settings.log_level.upper(),
+            "formatter": "default",
+            "stream": "ext://sys.stdout",
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "INFO",
+            "formatter": "detailed",
+            "filename": settings.log_file or "/var/log/fastapi/app.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+        },
+    },
+    "root": {
+        "level": "INFO",
+        "handlers": ["console", "file"] if settings.log_file else ["console"],
+    },
+    "loggers": {
+        "uvicorn": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "uvicorn.error": {
+            "level": "INFO",
+        },
+        "uvicorn.access": {
+            "level": "INFO",
+            "handlers": ["file"] if settings.log_file else ["console"],
+            "propagate": False,
+        },
+    },
+}
+
+def setup_logging():
+    """ログ設定初期化"""
+    logging.config.dictConfig(LOGGING_CONFIG)</code></pre>
+
+<pre class="code-block"><code class="language-bash"># .env.example（環境変数テンプレート）
+# アプリケーション設定
+APP_NAME=FastAPI Application
+APP_VERSION=1.0.0
+DEBUG=false
+
+# サーバー設定
+HOST=0.0.0.0
+PORT=8000
+WORKERS=4
+
+# データベース設定
+DATABASE_URL=postgresql://username:password@localhost:5432/dbname
+DATABASE_POOL_SIZE=20
+DATABASE_MAX_OVERFLOW=30
+
+# セキュリティ設定
+SECRET_KEY=your-super-secret-key-here-must-be-32-chars-minimum
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# Redis設定
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+
+# ログ設定
+LOG_LEVEL=info
+LOG_FILE=/var/log/fastapi/app.log
+
+# メール設定
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_USE_TLS=true
+
+# レート制限設定
+API_RATE_LIMIT=1000
+API_RATE_LIMIT_WINDOW=3600
+
+# ファイルアップロード設定
+MAX_FILE_SIZE=10485760
+UPLOAD_DIR=/app/uploads</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.3 ロギングと監視システム</h3>
+                    <p>本番環境では適切なログ出力と監視が不可欠です。問題の早期発見と原因調査のための仕組みを構築します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-3: ロギングと監視システム実装</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python"># monitoring.py
+import time
+import psutil
+import logging
+from fastapi import Request, Response
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from typing import Dict, Any
+from datetime import datetime
+import asyncio
+
+logger = logging.getLogger(__name__)
+
+# Prometheus メトリクス
+request_count = Counter('fastapi_requests_total', 'Total requests', ['method', 'endpoint', 'status_code'])
+request_duration = Histogram('fastapi_request_duration_seconds', 'Request duration', ['method', 'endpoint'])
+active_connections = Gauge('fastapi_active_connections', 'Active connections')
+system_memory_usage = Gauge('fastapi_memory_usage_bytes', 'Memory usage in bytes')
+system_cpu_usage = Gauge('fastapi_cpu_usage_percent', 'CPU usage percentage')
+
+class MetricsMiddleware:
+    """メトリクス収集ミドルウェア"""
+    
+    def __init__(self):
+        self.active_requests = 0
+    
+    async def __call__(self, request: Request, call_next):
+        start_time = time.time()
+        self.active_requests += 1
+        active_connections.set(self.active_requests)
+        
+        # リクエスト情報取得
+        method = request.method
+        url_path = request.url.path
+        
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        except Exception as e:
+            status_code = 500
+            logger.error(f"Request failed: {method} {url_path} - {str(e)}")
+            raise
+        finally:
+            # メトリクス更新
+            duration = time.time() - start_time
+            self.active_requests -= 1
+            active_connections.set(self.active_requests)
+            
+            request_count.labels(method=method, endpoint=url_path, status_code=status_code).inc()
+            request_duration.labels(method=method, endpoint=url_path).observe(duration)
+        
+        return response
+
+class HealthChecker:
+    """ヘルスチェック管理"""
+    
+    def __init__(self):
+        self.checks: Dict[str, Any] = {}
+    
+    async def check_database(self, db_session) -> bool:
+        """データベース接続チェック"""
+        try:
+            await db_session.execute("SELECT 1")
+            return True
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            return False
+    
+    async def check_redis(self, redis_client) -> bool:
+        """Redis接続チェック"""
+        try:
+            await redis_client.ping()
+            return True
+        except Exception as e:
+            logger.error(f"Redis health check failed: {e}")
+            return False
+    
+    async def check_external_api(self) -> bool:
+        """外部API接続チェック"""
+        # 外部API依存がある場合の実装例
+        return True
+    
+    def get_system_info(self) -> Dict[str, Any]:
+        """システム情報取得"""
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # Prometheus メトリクス更新
+        system_memory_usage.set(memory.used)
+        system_cpu_usage.set(cpu_percent)
+        
+        return {
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory.percent,
+            "memory_used": memory.used,
+            "memory_total": memory.total,
+            "disk_usage": psutil.disk_usage('/').percent,
+            "boot_time": datetime.fromtimestamp(psutil.boot_time()).isoformat()
+        }
+    
+    async def perform_health_checks(self, db_session=None, redis_client=None) -> Dict[str, Any]:
+        """全体ヘルスチェック実行"""
+        checks = {}
+        
+        # データベースチェック
+        if db_session:
+            checks["database"] = await self.check_database(db_session)
+        
+        # Redisチェック
+        if redis_client:
+            checks["redis"] = await self.check_redis(redis_client)
+        
+        # 外部APIチェック
+        checks["external_api"] = await self.check_external_api()
+        
+        # システム情報
+        system_info = self.get_system_info()
+        
+        # 総合ステータス
+        all_healthy = all(checks.values())
+        
+        return {
+            "status": "healthy" if all_healthy else "unhealthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "checks": checks,
+            "system": system_info,
+            "version": settings.app_version
+        }
+
+health_checker = HealthChecker()
+
+# APIエンドポイント追加
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """ヘルスチェックエンドポイント"""
+    health_status = await health_checker.perform_health_checks(db_session=db)
+    
+    if health_status["status"] == "unhealthy":
+        raise HTTPException(status_code=503, detail=health_status)
+    
+    return health_status
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheusメトリクスエンドポイント"""
+    return Response(
+        generate_latest(),
+        media_type="text/plain"
+    )
+
+@app.get("/info")
+async def app_info():
+    """アプリケーション情報"""
+    return {
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+        "debug": settings.debug,
+        "python_version": "3.11",
+        "fastapi_version": "0.104.1"
+    }</code></pre>
+
+<pre class="code-block"><code class="language-python"># structured_logging.py
+import json
+import logging
+from datetime import datetime
+from typing import Dict, Any, Optional
+from contextvars import ContextVar
+from fastapi import Request
+import uuid
+
+# リクエストコンテキスト
+request_id_contextvar: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
+user_id_contextvar: ContextVar[Optional[str]] = ContextVar('user_id', default=None)
+
+class StructuredLogger:
+    """構造化ログ出力"""
+    
+    def __init__(self, logger_name: str):
+        self.logger = logging.getLogger(logger_name)
+    
+    def _create_log_entry(
+        self,
+        level: str,
+        message: str,
+        extra_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """ログエントリ作成"""
+        entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": level,
+            "message": message,
+            "request_id": request_id_contextvar.get(),
+            "user_id": user_id_contextvar.get(),
+        }
+        
+        if extra_data:
+            entry.update(extra_data)
+        
+        return entry
+    
+    def info(self, message: str, **kwargs):
+        """情報ログ"""
+        entry = self._create_log_entry("INFO", message, kwargs)
+        self.logger.info(json.dumps(entry, ensure_ascii=False))
+    
+    def error(self, message: str, exception: Optional[Exception] = None, **kwargs):
+        """エラーログ"""
+        extra_data = kwargs
+        if exception:
+            extra_data["exception"] = {
+                "type": exception.__class__.__name__,
+                "message": str(exception),
+                "traceback": self._format_traceback(exception)
+            }
+        
+        entry = self._create_log_entry("ERROR", message, extra_data)
+        self.logger.error(json.dumps(entry, ensure_ascii=False))
+    
+    def warning(self, message: str, **kwargs):
+        """警告ログ"""
+        entry = self._create_log_entry("WARNING", message, kwargs)
+        self.logger.warning(json.dumps(entry, ensure_ascii=False))
+    
+    def debug(self, message: str, **kwargs):
+        """デバッグログ"""
+        entry = self._create_log_entry("DEBUG", message, kwargs)
+        self.logger.debug(json.dumps(entry, ensure_ascii=False))
+    
+    def _format_traceback(self, exception: Exception) -> str:
+        """トレースバック情報フォーマット"""
+        import traceback
+        return ''.join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+
+# 構造化ロガーインスタンス
+app_logger = StructuredLogger("fastapi_app")
+security_logger = StructuredLogger("fastapi_security")
+performance_logger = StructuredLogger("fastapi_performance")
+
+class LoggingMiddleware:
+    """ロギングミドルウェア"""
+    
+    async def __call__(self, request: Request, call_next):
+        # リクエストID生成
+        req_id = str(uuid.uuid4())
+        request_id_contextvar.set(req_id)
+        
+        start_time = time.time()
+        
+        # リクエストログ
+        app_logger.info(
+            "Request started",
+            method=request.method,
+            url=str(request.url),
+            headers=dict(request.headers),
+            client_ip=request.client.host
+        )
+        
+        try:
+            response = await call_next(request)
+            
+            process_time = time.time() - start_time
+            
+            # レスポンスログ
+            app_logger.info(
+                "Request completed",
+                method=request.method,
+                url=str(request.url),
+                status_code=response.status_code,
+                process_time=process_time
+            )
+            
+            # パフォーマンス警告
+            if process_time > 1.0:
+                performance_logger.warning(
+                    "Slow request detected",
+                    method=request.method,
+                    url=str(request.url),
+                    process_time=process_time
+                )
+            
+            return response
+            
+        except Exception as e:
+            process_time = time.time() - start_time
+            
+            app_logger.error(
+                "Request failed",
+                method=request.method,
+                url=str(request.url),
+                process_time=process_time,
+                exception=e
+            )
+            
+            raise
+        
+        finally:
+            request_id_contextvar.set(None)</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.4 CI/CDパイプラインの構築</h3>
+                    <p>継続的インテグレーション・継続的デプロイメントにより、品質を保ちながら迅速なデリバリーを実現します。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-4: GitHub ActionsによるCI/CDパイプライン</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-bash"># .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Type checking with mypy
+      run: mypy .
+
+    - name: Security check with bandit
+      run: bandit -r . -f json -o bandit-report.json
+
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        SECRET_KEY: test-secret-key-for-ci-testing-only
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+      run: |
+        pytest --cov=./ --cov-report=xml --cov-report=html
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max</code></pre>
+
+<pre class="code-block"><code class="language-bash"># .github/workflows/deploy.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Deploy to production server
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USER }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          # アプリケーションディレクトリに移動
+          cd /opt/fastapi-app
+
+          # 最新コードをプル
+          git pull origin main
+
+          # 新しいDockerイメージをプル
+          docker-compose -f docker-compose.prod.yml pull
+
+          # アプリケーション更新（ゼロダウンタイム）
+          docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          # 古いイメージを削除
+          docker image prune -f
+
+          # ヘルスチェック
+          sleep 30
+          curl -f http://localhost/health || exit 1
+
+          echo "Deployment completed successfully!"
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    
+    steps:
+    - name: Notify Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ needs.deploy.result }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        message: |
+          Deployment to production: ${{ needs.deploy.result }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}</code></pre>
+                    </div>
+
+                    <div class="warning">
+                        <h6>本番環境運用時の重要な考慮事項</h6>
+                        <ul>
+                            <li><strong>バックアップ戦略</strong>: データベースとファイルの定期バックアップ</li>
+                            <li><strong>災害復旧計画</strong>: システム障害時の復旧手順とRTO/RPO設定</li>
+                            <li><strong>セキュリティ更新</strong>: 依存関係とOS の定期的なセキュリティ更新</li>
+                            <li><strong>容量計画</strong>: トラフィック増加に対応するスケーリング計画</li>
+                            <li><strong>監視とアラート</strong>: 24/7監視体制とエスカレーション設定</li>
+                        </ul>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>
+                                <strong>FastAPI本番環境で推奨される ASGI サーバーの組み合わせは？</strong>
+                                <details><summary>解答</summary><p>Gunicorn + Uvicorn Worker (gunicorn -w 4 -k uvicorn.workers.UvicornWorker)</p></details>
+                            </li>
+                            <li>
+                                <strong>Dockerコンテナのヘルスチェックで使用するDockerfile命令は？</strong>
+                                <details><summary>解答</summary><p>HEALTHCHECK</p></details>
+                            </li>
+                            <li>
+                                <strong>本番環境で機密情報を管理する最も安全な方法は？</strong>
+                                <details><summary>解答</summary><p>環境変数またはシークレット管理サービス (AWS Secrets Manager、HashiCorp Vault等)</p></details>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 class="section-title">10.5 まとめ</h3>
+                    <div class="highlight">
+                        <h6>この章で習得したスキル</h6>
+                        <ul>
+                            <li>Dockerによるアプリケーションコンテナ化</li>
+                            <li>本番レベルのサーバー設定（Nginx + Gunicorn/Uvicorn）</li>
+                            <li>環境変数とシークレットの適切な管理</li>
+                            <li>構造化ログとメトリクス監視の実装</li>
+                            <li>CI/CDパイプラインによる自動デプロイ</li>
+                            <li>本番環境でのセキュリティとパフォーマンス対策</li>
+                        </ul>
+                    </div>
+
+                    <div class="highlight">
+                        <h6>🎉 FastAPI学習コース完了</h6>
+                        <p>お疲れさまでした！この10章にわたる学習で、FastAPIを使用した本格的なWeb API開発スキルを習得されました。</p>
+                        
+                        <p><strong>習得した主要スキル：</strong></p>
+                        <ul>
+                            <li>FastAPI フレームワークの基礎から応用まで</li>
+                            <li>Pydantic による型安全なデータモデリング</li>
+                            <li>JWT認証とセキュリティ実装</li>
+                            <li>SQLAlchemy による データベース連携</li>
+                            <li>非同期処理とパフォーマンス最適化</li>
+                            <li>テスト自動化と品質保証</li>
+                            <li>Docker コンテナ化と本番デプロイメント</li>
+                        </ul>
+                        
+                        <p>これらのスキルを活用して、高品質で高性能なWeb APIを開発し、現代のソフトウェア開発プロジェクトで活躍してください！</p>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="fastapi-learning-material-09.html" class="btn btn-secondary">← 前の章: テストとドキュメント</a>
+                        <a href="../README.html" class="btn btn-success">学習コース一覧に戻る →</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <footer class="bg-dark text-white mt-5">
+        <div class="container-fluid py-3">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="mb-0">© 2025 F-Circle. All rights reserved.<br>
+本資料はAIツールを活用し、人間による編集・監修のもと作成されています。無断転載・再配布を禁じます。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>

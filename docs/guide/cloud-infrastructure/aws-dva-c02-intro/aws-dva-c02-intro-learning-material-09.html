@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS DVA-C02入門 第9章 - イベント駆動アーキテクチャ</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS DVA-C02入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cloud text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約18時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS DVA-C02入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">イベント駆動アーキテクチャ - EventBridge、SQS、SNS</h1>
+                    <p class="text-slate-600">イベント駆動型アプリケーションの設計パターンを習得します。疎結合で拡張性の高いシステムを構築するためのAWSメッセージングサービスを理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Amazon EventBridgeのイベントバスとルール</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>スケジュール式とイベントパターン</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Amazon SQSの標準キューとFIFOキュー</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>デッドレターキュー（DLQ）とリドライブポリシー</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Amazon SNSのトピックとサブスクリプション</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ファンアウトパターンとメッセージフィルタリング</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Lambda + SQS/SNS/EventBridgeの統合</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 イベント駆動アーキテクチャとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        イベント駆動アーキテクチャ（Event-Driven Architecture）は、サービス間の結合度を下げ、拡張性と保守性を向上させる設計パターンです。従来の同期的なAPI呼び出しとは異なり、**イベントの発生と処理を非同期で行う**ことで、システムの柔軟性を高めます。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart LR
+    subgraph Traditional["従来型（同期処理）"]
+        direction LR
+        A1["クライアント"] -->|API呼び出し| B1["サービスA"]
+        B1 -->|API呼び出し| C1["サービスB"]
+        C1 -->|API呼び出し| D1["サービスC"]
+        D1 -->|レスポンス| C1
+        C1 -->|レスポンス| B1
+        B1 -->|レスポンス| A1
+    end
+
+    subgraph EventDriven["イベント駆動型（非同期処理）"]
+        direction LR
+        A2["クライアント"] -->|イベント発行| E["イベントバス"]
+        E -->|イベント配信| B2["サービスA"]
+        E -->|イベント配信| C2["サービスB"]
+        E -->|イベント配信| D2["サービスC"]
+    end
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">イベント駆動アーキテクチャのメリット</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1 list-disc list-inside break-words">
+                                    <li><strong>疎結合</strong>: サービス間の依存関係が最小化され、独立した開発・デプロイが可能</li>
+                                    <li><strong>拡張性</strong>: 新しいサービスを追加しても既存のサービスに影響しない</li>
+                                    <li><strong>耐障害性</strong>: 一部のサービスが停止しても全体が停止しない</li>
+                                    <li><strong>スケーラビリティ</strong>: 各サービスを個別にスケーリング可能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">イベント駆動アーキテクチャの3つの主要サービス</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                EventBridge
+                            </h4>
+                            <p class="text-purple-900 text-sm">
+                                イベントバスとルールを使用したイベントルーティング。AWSサービスやSaaSとの統合が容易。
+                            </p>
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-inbox"></i>
+                                SQS
+                            </h4>
+                            <p class="text-blue-900 text-sm">
+                                メッセージキューサービス。非同期処理とバッファリングに使用。標準キューとFIFOキューの2種類。
+                            </p>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bullhorn"></i>
+                                SNS
+                            </h4>
+                            <p class="text-emerald-900 text-sm">
+                                Pub/Subメッセージングサービス。1対多の通知配信に使用。ファンアウトパターンで活用。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 Amazon EventBridge - イベントバスとルール
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon EventBridgeは、AWSサービス、SaaSアプリケーション、カスタムアプリケーション間でイベントをルーティングするサーバーレスイベントバスサービスです。CloudWatch Eventsの後継サービスとして、より強力なイベント管理機能を提供します。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart TD
+    subgraph Sources["イベントソース"]
+        S1["AWSサービス<br/>EC2, S3, Lambda等"]
+        S2["SaaSパートナー<br/>Zendesk, Datadog等"]
+        S3["カスタムアプリ<br/>独自のイベント"]
+    end
+
+    subgraph EventBridge["EventBridge"]
+        EB["イベントバス"]
+        R1["ルール1<br/>パターンマッチング"]
+        R2["ルール2<br/>スケジュール式"]
+        R3["ルール3<br/>フィルタ条件"]
+    end
+
+    subgraph Targets["ターゲット"]
+        T1["Lambda関数"]
+        T2["Step Functions"]
+        T3["SQSキュー"]
+        T4["SNSトピック"]
+    end
+
+    S1 --> EB
+    S2 --> EB
+    S3 --> EB
+    EB --> R1
+    EB --> R2
+    EB --> R3
+    R1 --> T1
+    R2 --> T2
+    R3 --> T3
+    R3 --> T4
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">イベントパターンの例</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EventBridgeルールでは、イベントパターンを使用して特定のイベントをフィルタリングできます。以下はS3バケットへのオブジェクト作成イベントを検出する例です。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">eventbridge-pattern.json</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-json">{
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
+  "detail": {
+    "bucket": {
+      "name": ["my-application-bucket"]
+    },
+    "object": {
+      "key": [{"prefix": "uploads/"}]
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">スケジュール式による定期実行</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EventBridgeは、cron式またはrate式を使用して定期的にLambda関数を実行できます。
+                    </p>
+
+                    <div class="overflow-x-auto mb-4">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">式の種類</th>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">構文例</th>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr>
+                                    <td class="px-4 py-2 border-b">rate式</td>
+                                    <td class="px-4 py-2 border-b"><code class="text-sm bg-slate-100 px-2 py-1 rounded">rate(5 minutes)</code></td>
+                                    <td class="px-4 py-2 border-b">5分ごとに実行</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border-b">rate式</td>
+                                    <td class="px-4 py-2 border-b"><code class="text-sm bg-slate-100 px-2 py-1 rounded">rate(1 hour)</code></td>
+                                    <td class="px-4 py-2 border-b">1時間ごとに実行</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border-b">cron式</td>
+                                    <td class="px-4 py-2 border-b"><code class="text-sm bg-slate-100 px-2 py-1 rounded">cron(0 9 * * ? *)</code></td>
+                                    <td class="px-4 py-2 border-b">毎日午前9時（UTC）に実行</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2">cron式</td>
+                                    <td class="px-4 py-2"><code class="text-sm bg-slate-100 px-2 py-1 rounded">cron(0 0 1 * ? *)</code></td>
+                                    <td class="px-4 py-2">毎月1日の午前0時に実行</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 Amazon SQS - メッセージキューサービス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon Simple Queue Service（SQS）は、フルマネージドメッセージキューサービスです。アプリケーション間でメッセージを非同期に送受信し、疎結合なシステムを構築できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">標準キューとFIFOキューの比較</h3>
+                    <div class="overflow-x-auto mb-4">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">特性</th>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">標準キュー</th>
+                                    <th class="px-4 py-2 text-left text-slate-700 font-semibold border-b">FIFOキュー</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr>
+                                    <td class="px-4 py-2 border-b font-medium">スループット</td>
+                                    <td class="px-4 py-2 border-b">ほぼ無制限</td>
+                                    <td class="px-4 py-2 border-b">最大3,000メッセージ/秒<br>（バッチ処理で30,000/秒）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border-b font-medium">順序保証</td>
+                                    <td class="px-4 py-2 border-b">ベストエフォート</td>
+                                    <td class="px-4 py-2 border-b">厳密な順序保証（FIFO）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border-b font-medium">重複排除</td>
+                                    <td class="px-4 py-2 border-b">メッセージが重複する可能性あり</td>
+                                    <td class="px-4 py-2 border-b">5分間の重複排除</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 font-medium">ユースケース</td>
+                                    <td class="px-4 py-2">高スループットが必要で、順序が重要でない処理</td>
+                                    <td class="px-4 py-2">金融取引、注文処理など順序が重要な処理</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mermaid mb-6">
+sequenceDiagram
+    participant Producer as プロデューサー
+    participant SQS as SQSキュー
+    participant Consumer as コンシューマー<br/>Lambda関数
+    participant DLQ as デッドレター<br/>キュー
+
+    Producer->>SQS: メッセージ送信
+    Note over SQS: メッセージを保持<br/>最大14日間
+    SQS->>Consumer: メッセージ受信
+    Consumer->>Consumer: 処理成功
+    Consumer->>SQS: メッセージ削除
+
+    SQS->>Consumer: 別メッセージ受信
+    Consumer->>Consumer: 処理失敗
+    Note over SQS: 可視性タイムアウト後<br/>再試行
+    SQS->>Consumer: 再試行（最大3回）
+    Consumer->>Consumer: 処理失敗
+    SQS->>DLQ: 最大試行回数超過<br/>DLQへ移動
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">デッドレターキュー（DLQ）の設定</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        処理に失敗したメッセージを別のキュー（DLQ）に移動することで、エラー分析と再処理が可能になります。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">sqs-dlq-config.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import boto3
+
+# SQSクライアント作成
+sqs = boto3.client('sqs')
+
+# DLQのARNを指定してリドライブポリシーを設定
+response = sqs.set_queue_attributes(
+    QueueUrl='https://sqs.ap-northeast-1.amazonaws.com/123456789012/MyQueue',
+    Attributes={
+        'RedrivePolicy': json.dumps({
+            'deadLetterTargetArn': 'arn:aws:sqs:ap-northeast-1:123456789012:MyDLQ',
+            'maxReceiveCount': '3'  # 3回失敗したらDLQへ移動
+        })
+    }
+)</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ベストプラクティス: 可視性タイムアウトの設定</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    可視性タイムアウトは、Lambda関数のタイムアウト値の6倍に設定することが推奨されます。例えば、Lambda関数のタイムアウトが30秒の場合、可視性タイムアウトは180秒（3分）に設定します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 Amazon SNS - Pub/Subメッセージング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Amazon Simple Notification Service（SNS）は、Pub/Sub（パブリッシュ/サブスクライブ）モデルに基づくメッセージングサービスです。1つのメッセージを複数のサブスクライバーに配信する**ファンアウトパターン**に最適です。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart TD
+    Publisher["パブリッシャー<br/>アプリケーション"] -->|メッセージ発行| Topic["SNSトピック"]
+
+    Topic -->|サブスクリプション1| Sub1["Lambda関数<br/>処理A"]
+    Topic -->|サブスクリプション2| Sub2["SQSキュー<br/>非同期処理"]
+    Topic -->|サブスクリプション3| Sub3["HTTPエンドポイント<br/>Webhook"]
+    Topic -->|サブスクリプション4| Sub4["Emailアドレス<br/>通知"]
+    Topic -->|サブスクリプション5| Sub5["SMSメッセージ<br/>モバイル通知"]
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">メッセージフィルタリング</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SNSサブスクリプションにフィルタポリシーを設定することで、特定の条件に一致するメッセージのみを受信できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">sns-filter-policy.json</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-json">{
+  "eventType": ["order"],
+  "price": [{"numeric": [">", 100]}],
+  "region": ["ap-northeast-1", "us-east-1"]
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4 mt-4">
+                        上記のフィルタポリシーは、以下の条件をすべて満たすメッセージのみを配信します：
+                    </p>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4">
+                        <li><code class="text-sm bg-slate-100 px-2 py-1 rounded">eventType</code>が「order」</li>
+                        <li><code class="text-sm bg-slate-100 px-2 py-1 rounded">price</code>が100より大きい</li>
+                        <li><code class="text-sm bg-slate-100 px-2 py-1 rounded">region</code>が「ap-northeast-1」または「us-east-1」</li>
+                    </ul>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 ファンアウトパターン - SNS + SQSの組み合わせ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SNSとSQSを組み合わせることで、**耐障害性の高いファンアウトパターン**を実装できます。SNSトピックに複数のSQSキューをサブスクライブさせることで、各サービスが独立してメッセージを処理できます。
+                    </p>
+
+                    <div class="mermaid mb-6">
+flowchart TD
+    subgraph Producer["イベント発生"]
+        E["注文完了イベント"]
+    end
+
+    subgraph SNS["SNSトピック"]
+        T["OrderCompletedTopic"]
+    end
+
+    subgraph Consumer1["在庫管理サービス"]
+        Q1["InventoryQueue<br/>SQS"]
+        L1["UpdateInventory<br/>Lambda関数"]
+    end
+
+    subgraph Consumer2["配送サービス"]
+        Q2["ShippingQueue<br/>SQS"]
+        L2["CreateShipment<br/>Lambda関数"]
+    end
+
+    subgraph Consumer3["通知サービス"]
+        Q3["NotificationQueue<br/>SQS"]
+        L3["SendEmail<br/>Lambda関数"]
+    end
+
+    E --> T
+    T -->|サブスクリプション| Q1
+    T -->|サブスクリプション| Q2
+    T -->|サブスクリプション| Q3
+    Q1 --> L1
+    Q2 --> L2
+    Q3 --> L3
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">ファンアウトパターンのメリット</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1 list-disc list-inside break-words">
+                                    <li><strong>疎結合</strong>: 各サービスが独立して動作し、相互依存しない</li>
+                                    <li><strong>耐障害性</strong>: 1つのサービスが停止しても他のサービスは継続</li>
+                                    <li><strong>独立したスケーリング</strong>: 各サービスのトラフィックに応じてスケール</li>
+                                    <li><strong>メッセージ永続化</strong>: SQSがメッセージを保持するため処理の再試行が可能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">ファンアウトパターンの実装例</h3>
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">publish-to-sns.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import boto3
+import json
+
+# SNSクライアント作成
+sns = boto3.client('sns')
+
+# 注文完了イベントを発行
+response = sns.publish(
+    TopicArn='arn:aws:sns:ap-northeast-1:123456789012:OrderCompletedTopic',
+    Message=json.dumps({
+        'orderId': 'ORD-12345',
+        'customerId': 'CUST-67890',
+        'items': [
+            {'productId': 'PROD-001', 'quantity': 2},
+            {'productId': 'PROD-002', 'quantity': 1}
+        ],
+        'totalAmount': 15000
+    }),
+    MessageAttributes={
+        'eventType': {'DataType': 'String', 'StringValue': 'order'},
+        'priority': {'DataType': 'String', 'StringValue': 'high'}
+    }
+)</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 Lambda統合パターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Lambda関数は、EventBridge、SQS、SNSすべてと統合できます。各サービスとの統合パターンを理解することで、適切なアーキテクチャを選択できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda + EventBridge</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        EventBridgeルールのターゲットとしてLambda関数を指定することで、特定のイベント発生時に自動的に関数を実行できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">lambda-eventbridge-handler.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">def lambda_handler(event, context):
+    # EventBridgeから渡されたイベントを処理
+    detail = event['detail']
+    source = event['source']
+
+    # S3オブジェクト作成イベントの場合
+    if source == 'aws.s3' and event['detail-type'] == 'Object Created':
+        bucket_name = detail['bucket']['name']
+        object_key = detail['object']['key']
+
+        print(f"新しいオブジェクトが作成されました: {bucket_name}/{object_key}")
+        # 処理ロジックをここに記述
+
+    return {'statusCode': 200}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda + SQS（ポーリング）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        LambdaはSQSキューを自動的にポーリングし、メッセージを受信して処理します。バッチサイズを調整することで処理効率を最適化できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">lambda-sqs-handler.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import json
+
+def lambda_handler(event, context):
+    # SQSから受信したメッセージをバッチ処理
+    for record in event['Records']:
+        # メッセージボディを取得
+        body = json.loads(record['body'])
+
+        # メッセージIDと受信時刻を取得
+        message_id = record['messageId']
+        receipt_handle = record['receiptHandle']
+
+        print(f"メッセージ処理: {message_id}")
+        print(f"内容: {body}")
+
+        # 処理ロジックをここに記述
+        # 処理が成功すると、Lambdaが自動的にメッセージを削除
+
+    return {'statusCode': 200}</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">注意: バッチ処理の部分失敗</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    Lambda関数がSQSメッセージをバッチ処理する場合、1件でも処理に失敗するとバッチ全体が再試行されます。部分失敗を許容する場合は、<code class="text-sm bg-red-100 px-2 py-1 rounded">ReportBatchItemFailures</code>を有効化してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mb-3 mt-6">Lambda + SNS（プッシュ）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SNSトピックのサブスクリプションとしてLambda関数を登録することで、メッセージ発行時に即座に関数を実行できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">lambda-sns-handler.py</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                                <span>コピー</span>
+                            </button>
+                        </div>
+                        <pre><code class="language-python">import json
+
+def lambda_handler(event, context):
+    # SNSから受信したメッセージを処理
+    for record in event['Records']:
+        sns_message = record['Sns']
+        message = json.loads(sns_message['Message'])
+
+        # メッセージ属性を取得
+        subject = sns_message.get('Subject', 'No Subject')
+        attributes = sns_message.get('MessageAttributes', {})
+
+        print(f"件名: {subject}")
+        print(f"メッセージ: {message}")
+
+        # 処理ロジックをここに記述
+
+    return {'statusCode': 200}</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: SNS + SQS + Lambdaでファンアウトパターン構築</h3>
+                            <div class="space-y-4 text-purple-900">
+                                <div>
+                                    <p class="font-medium mb-2 break-words">目標</p>
+                                    <p class="text-sm break-words">
+                                        SNSトピックに2つのSQSキューをサブスクライブさせ、それぞれのキューにLambda関数を接続して、ファンアウトパターンを実装します。
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="font-medium mb-2 break-words">手順</p>
+                                    <ol class="text-sm space-y-2 list-decimal list-inside break-words">
+                                        <li>SNSトピック「OrderEventsTopic」を作成</li>
+                                        <li>2つのSQSキュー「InventoryQueue」「NotificationQueue」を作成</li>
+                                        <li>各キューをSNSトピックにサブスクライブ</li>
+                                        <li>各キューにトリガーされるLambda関数を作成</li>
+                                        <li>SNSトピックにテストメッセージを発行し、両方のLambda関数が実行されることを確認</li>
+                                    </ol>
+                                </div>
+                                <div>
+                                    <p class="font-medium mb-2 break-words">確認ポイント</p>
+                                    <ul class="text-sm space-y-1 list-disc list-inside break-words">
+                                        <li>1つのメッセージが2つのキューに配信されるか</li>
+                                        <li>各Lambda関数が独立して実行されるか</li>
+                                        <li>CloudWatch Logsで実行ログを確認できるか</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. SQS標準キューとFIFOキューの主な違いは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>標準キュー</strong>は、ほぼ無制限のスループットを提供しますが、メッセージの順序保証やベストエフォートであり、重複が発生する可能性があります。<strong>FIFOキュー</strong>は、厳密な順序保証と重複排除を提供しますが、スループットは最大3,000メッセージ/秒（バッチ処理で30,000/秒）に制限されます。金融取引や注文処理など順序が重要な場合はFIFOキューを使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. SNS + SQSのファンアウトパターンを使用する主なメリットは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ファンアウトパターンの主なメリットは、<strong>疎結合、耐障害性、独立したスケーリング、メッセージ永続化</strong>です。SNSが1つのメッセージを複数のSQSキューに配信し、各サービスが独立してメッセージを処理できます。1つのサービスが停止しても他のサービスは影響を受けず、SQSがメッセージを保持するため処理の再試行が可能です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. EventBridgeのルールで使用できる2種類の式は何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            EventBridgeルールでは、<strong>イベントパターン</strong>と<strong>スケジュール式</strong>の2種類を使用できます。イベントパターンは特定のイベントをフィルタリングし、スケジュール式（rate式またはcron式）は定期的にターゲットを実行します。例: <code>rate(5 minutes)</code>は5分ごと、<code>cron(0 9 * * ? *)</code>は毎日午前9時（UTC）に実行します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="aws-dva-c02-intro-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第8章: AWS Step Functions</span>
+                        </div>
+                    </a>
+                    <a href="aws-dva-c02-intro-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: アプリケーションセキュリティ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

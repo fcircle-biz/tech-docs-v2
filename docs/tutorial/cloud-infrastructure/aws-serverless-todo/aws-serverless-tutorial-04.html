@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS サーバーレス Todoアプリチュートリアル ステップ4 - Lambda関数の作成（基礎）</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // チュートリアル推奨カラー: Emerald（緑系）
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS サーバーレス実践チュートリアル</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS サーバーレス</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ4</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">4</span>
+                            ステップ4
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">Lambda関数の作成（基礎）</h1>
+                    <p class="text-slate-600">AWSの中核サービスであるLambda関数を作成します。まずは簡単な関数から始めて、Lambda関数の基本的な仕組みを理解します。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>AWS Lambdaの基本概念を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>Lambda関数を新規作成する（Python）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>テストイベントで関数を実行する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>CloudWatch Logsでログを確認する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>IAMロールと権限の基本を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Step 1: AWSアカウントが作成済みで、IAMユーザーでログインできる</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Step 2: 開発環境が準備できている</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Step 3: DynamoDBテーブルが作成済み</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: AWS Lambdaとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.1 AWS Lambdaとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        AWS Lambda（ラムダ）は、サーバーの管理を一切せずにコードを実行できる「サーバーレスコンピューティングサービス」です。コードをアップロードするだけで、AWSが自動的にリソースを用意して実行してくれます。
+                    </p>
+
+                    <!-- Lambdaの特徴 -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium">AWS Lambdaの特徴</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4">
+                                    <li>• サーバーの用意・管理が不要</li>
+                                    <li>• 必要な時だけ実行され、使った分だけ課金</li>
+                                    <li>• 自動的にスケール（アクセスが増えても対応可能）</li>
+                                    <li>• 多数のプログラミング言語に対応（Python、Node.js、Javaなど）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lambda関数の仕組み -->
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A([イベント発生<br/>API呼び出し、スケジュール等]) --> B[Lambda関数が起動]
+    B --> C[コード実行<br/>処理を行う]
+    C --> D[DynamoDB等にアクセス<br/>データ操作]
+    D --> E([レスポンスを返す])
+    E --> F[Lambda関数終了]
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">Lambda関数の実行フロー</p>
+                    </div>
+
+                    <!-- 従来のサーバーとの比較 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">従来のサーバーとの違い</h3>
+                    <div class="overflow-x-auto mb-6">
+                        <table class="w-full border border-slate-300 bg-white rounded-lg">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="border border-slate-300 px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="border border-slate-300 px-4 py-3 text-left font-semibold">従来のサーバー</th>
+                                    <th class="border border-slate-300 px-4 py-3 text-left font-semibold">AWS Lambda</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-3 font-medium">サーバー管理</td>
+                                    <td class="border border-slate-300 px-4 py-3">必要（OS更新、セキュリティ対応など）</td>
+                                    <td class="border border-slate-300 px-4 py-3 text-emerald-600">不要（AWSが管理）</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="border border-slate-300 px-4 py-3 font-medium">起動時間</td>
+                                    <td class="border border-slate-300 px-4 py-3">24時間稼働</td>
+                                    <td class="border border-slate-300 px-4 py-3 text-emerald-600">必要な時だけ起動</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-slate-300 px-4 py-3 font-medium">料金体系</td>
+                                    <td class="border border-slate-300 px-4 py-3">稼働時間に応じて課金</td>
+                                    <td class="border border-slate-300 px-4 py-3 text-emerald-600">実行時間に応じて課金（使わなければ無料）</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="border border-slate-300 px-4 py-3 font-medium">スケーリング</td>
+                                    <td class="border border-slate-300 px-4 py-3">手動で台数を増減</td>
+                                    <td class="border border-slate-300 px-4 py-3 text-emerald-600">自動でスケール</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション2: Lambda関数の作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.2 最初のLambda関数を作成する
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-1: Hello World Lambda関数の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">まずはシンプルな「Hello World」を返すLambda関数を作成し、基本操作を学びます。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Lambdaコンソールを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            AWSマネジメントコンソールにログインし、検索ボックスで「Lambda」と入力して、Lambdaコンソールを開きます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数の作成を開始</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「関数の作成」ボタンをクリックし、以下の設定を行います。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• <strong>オプション</strong>: 「一から作成」を選択</li>
+                                            <li>• <strong>関数名</strong>: <code class="bg-purple-100 px-1 rounded">HelloWorldFunction</code></li>
+                                            <li>• <strong>ランタイム</strong>: <code class="bg-purple-100 px-1 rounded">Python 3.12</code> を選択</li>
+                                            <li>• <strong>アーキテクチャ</strong>: <code class="bg-purple-100 px-1 rounded">x86_64</code> のまま</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">実行ロールの設定</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「アクセス権限」セクションで、以下を選択します。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• <strong>実行ロール</strong>: 「基本的な Lambda アクセス権限で新しいロールを作成」を選択</li>
+                                        </ul>
+                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-blue-800 text-sm">
+                                                <i class="fas fa-lightbulb mr-1"></i>
+                                                IAMロールは、Lambda関数がAWSの他のサービスにアクセスするための権限を定義します。ここでは自動的に基本的なロールが作成されます。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            画面下部の「関数の作成」ボタンをクリックします。数秒で関数が作成されます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: Lambda関数のコード編集 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.3 Lambda関数のコードを理解する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        関数が作成されると、自動的にサンプルコードが表示されます。このコードの仕組みを理解しましょう。
+                    </p>
+
+                    <!-- デフォルトのコード -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">デフォルトのコード（自動生成）</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">lambda_function.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import json
+
+def lambda_handler(event, context):
+    # TODO implement
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello from Lambda!')
+    }</code></pre>
+                    </div>
+
+                    <!-- コードの解説 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">コードの仕組み</h3>
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-code text-slate-500"></i>
+                            各部分の説明
+                        </h4>
+                        <div class="space-y-4">
+                            <div>
+                                <h5 class="font-medium text-slate-700 mb-2">1. <code class="bg-slate-200 px-2 py-1 rounded">lambda_handler</code> 関数</h5>
+                                <p class="text-slate-600 text-sm">
+                                    Lambda関数のエントリーポイント（実行開始地点）です。この関数名は設定で変更可能ですが、デフォルトでは <code class="bg-slate-200 px-1 rounded">lambda_handler</code> が使われます。
+                                </p>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-slate-700 mb-2">2. <code class="bg-slate-200 px-2 py-1 rounded">event</code> パラメータ</h5>
+                                <p class="text-slate-600 text-sm">
+                                    Lambda関数を呼び出した際に渡されるデータ（入力情報）が格納されています。API Gatewayから呼び出される場合、リクエストの内容がここに入ります。
+                                </p>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-slate-700 mb-2">3. <code class="bg-slate-200 px-2 py-1 rounded">context</code> パラメータ</h5>
+                                <p class="text-slate-600 text-sm">
+                                    実行環境に関する情報（関数名、実行時間の残り時間、メモリサイズなど）が格納されています。
+                                </p>
+                            </div>
+                            <div>
+                                <h5 class="font-medium text-slate-700 mb-2">4. <code class="bg-slate-200 px-2 py-1 rounded">return</code> 値</h5>
+                                <p class="text-slate-600 text-sm">
+                                    Lambda関数の実行結果を返します。<code class="bg-slate-200 px-1 rounded">statusCode</code> にHTTPステータスコード、<code class="bg-slate-200 px-1 rounded">body</code> にレスポンス内容を設定します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- カスタマイズしたコード -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">コードをカスタマイズしてみる</h3>
+                    <p class="text-slate-600 text-sm mb-4">
+                        以下のコードに書き換えて、もう少し詳しい情報を返すようにしてみましょう。
+                    </p>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">lambda_function.py（カスタマイズ版）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import json
+import datetime
+
+def lambda_handler(event, context):
+    # 現在時刻を取得
+    current_time = datetime.datetime.now().isoformat()
+
+    # レスポンスメッセージを作成
+    message = {
+        'message': 'Hello from Lambda!',
+        'timestamp': current_time,
+        'function_name': context.function_name,
+        'memory_limit': context.memory_limit_in_mb
+    }
+
+    # レスポンスを返す
+    return {
+        'statusCode': 200,
+        'body': json.dumps(message, ensure_ascii=False)
+    }</code></pre>
+                    </div>
+
+                    <!-- コード変更手順 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-2: コードの編集とデプロイ
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">Lambda関数のコードを編集して、変更を適用します。</p>
+
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">コードエディタで編集</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数の詳細画面で「コード」タブを開き、上記のカスタマイズ版コードをコピーして貼り付けます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">変更をデプロイ</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            コードを編集したら、画面上部の「Deploy」ボタンをクリックして変更を保存します。
+                                        </p>
+                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-blue-800 text-sm">
+                                                <i class="fas fa-lightbulb mr-1"></i>
+                                                「Deploy」をクリックしないと変更が反映されないので注意してください。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: テスト実行 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.4 Lambda関数をテスト実行する
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-3: テストイベントの作成と実行
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">テストイベントを作成して、Lambda関数を実行してみます。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">テストタブを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数の詳細画面で「Test」タブをクリックします。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">テストイベントの作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「新しいイベントを作成」を選択し、以下の設定を行います。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• <strong>イベント名</strong>: <code class="bg-purple-100 px-1 rounded">TestEvent</code></li>
+                                            <li>• <strong>テンプレート</strong>: <code class="bg-purple-100 px-1 rounded">hello-world</code> のまま</li>
+                                        </ul>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            イベントJSON（デフォルトのまま使用）:
+                                        </p>
+                                        <div class="code-block-wrapper mt-2">
+                                            <pre class="!mt-0"><code class="language-json">{
+  "key1": "value1",
+  "key2": "value2",
+  "key3": "value3"
+}</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">テストを実行</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「Test」ボタンをクリックして、Lambda関数を実行します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">実行結果を確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            画面に実行結果が表示されます。以下のような内容が確認できます。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• <strong>Execution result</strong>: succeeded（成功）</li>
+                                            <li>• <strong>Response</strong>: 関数が返したレスポンス内容</li>
+                                            <li>• <strong>Duration</strong>: 実行時間</li>
+                                            <li>• <strong>Billed Duration</strong>: 課金対象時間</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: CloudWatch Logs -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.5 CloudWatch Logsでログを確認する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        Lambda関数が実行されると、自動的にログがCloudWatch Logsに記録されます。エラーが発生した時やデバッグ時に非常に役立ちます。
+                    </p>
+
+                    <!-- ログの確認手順 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-4: ログの確認とprintデバッグ
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">CloudWatch Logsでログを確認し、print文でデバッグする方法を学びます。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">print文を追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数のコードにprint文を追加してみます。
+                                        </p>
+                                        <div class="code-block-wrapper mt-2">
+                                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                                <span class="text-slate-400 text-sm">lambda_function.py</span>
+                                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre class="!mt-0 !rounded-t-none"><code class="language-python">import json
+import datetime
+
+def lambda_handler(event, context):
+    # デバッグ用のログ出力
+    print("Lambda関数が開始されました")
+    print(f"受信したイベント: {event}")
+
+    # 現在時刻を取得
+    current_time = datetime.datetime.now().isoformat()
+    print(f"現在時刻: {current_time}")
+
+    # レスポンスメッセージを作成
+    message = {
+        'message': 'Hello from Lambda!',
+        'timestamp': current_time,
+        'function_name': context.function_name,
+        'memory_limit': context.memory_limit_in_mb
+    }
+
+    print(f"レスポンス: {message}")
+
+    # レスポンスを返す
+    return {
+        'statusCode': 200,
+        'body': json.dumps(message, ensure_ascii=False)
+    }</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">デプロイして再実行</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「Deploy」ボタンをクリックして保存し、再度「Test」ボタンでテスト実行します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">CloudWatch Logsを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数の詳細画面で「Monitor」タブをクリックし、「CloudWatch Logsを表示」をクリックします。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ログストリームを確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            最新のログストリームをクリックすると、print文で出力した内容が確認できます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ログ出力の例 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">ログ出力の例</h3>
+                    <div class="bg-slate-900 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto mb-6">
+<pre class="text-slate-100">START RequestId: 12345678-1234-1234-1234-123456789012 Version: $LATEST
+Lambda関数が開始されました
+受信したイベント: {'key1': 'value1', 'key2': 'value2', 'key3': 'value3'}
+現在時刻: 2025-01-24T10:30:45.123456
+レスポンス: {'message': 'Hello from Lambda!', 'timestamp': '2025-01-24T10:30:45.123456', 'function_name': 'HelloWorldFunction', 'memory_limit': 128}
+END RequestId: 12345678-1234-1234-1234-123456789012
+REPORT RequestId: 12345678-1234-1234-1234-123456789012  Duration: 25.34 ms  Billed Duration: 26 ms  Memory Size: 128 MB  Max Memory Used: 38 MB</pre>
+                    </div>
+                </section>
+
+                <!-- セクション6: IAMロールと権限 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.6 IAMロールと権限の基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        Lambda関数が他のAWSサービス（DynamoDB、S3など）にアクセスするには、適切な権限を持つIAMロールが必要です。
+                    </p>
+
+                    <!-- IAMロールの仕組み -->
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    A[Lambda関数] --> B[IAMロール<br/>実行ロール]
+    B --> C[ポリシー<br/>権限設定]
+    C --> D[DynamoDB]
+    C --> E[S3]
+    C --> F[CloudWatch Logs]
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">Lambda関数とIAMロールの関係</p>
+                    </div>
+
+                    <!-- 自動作成されたロールの確認 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">自動作成されたロールの確認</h3>
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-5: IAMロールの確認
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">Lambda関数に自動作成されたIAMロールを確認します。</p>
+
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">設定タブを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数の詳細画面で「設定」タブをクリックし、左サイドバーから「アクセス権限」を選択します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ロール名を確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「実行ロール」セクションに、自動作成されたロール名が表示されます（例: <code class="bg-purple-100 px-1 rounded">HelloWorldFunction-role-xxxxx</code>）。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ポリシーを確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            ロール名のリンクをクリックすると、IAMコンソールが開きます。デフォルトで以下のポリシーがアタッチされています。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• <code class="bg-purple-100 px-1 rounded">AWSLambdaBasicExecutionRole</code>: CloudWatch Logsへのログ出力権限</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DynamoDBアクセス権限の追加 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">DynamoDBアクセス権限の追加（次のステップで使用）</h3>
+                    <p class="text-slate-600 text-sm mb-4">
+                        次のステップでDynamoDBにアクセスするため、今のうちに権限を追加しておきます。
+                    </p>
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 4-6: DynamoDBアクセス権限の追加
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">Lambda関数がDynamoDBにアクセスできるように権限を追加します。</p>
+
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">IAMロールのページを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambda関数の「設定 > アクセス権限」から、ロール名のリンクをクリックしてIAMコンソールを開きます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">ポリシーをアタッチ</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「許可を追加」→「ポリシーをアタッチ」をクリックし、検索ボックスで「DynamoDB」と入力します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">AmazonDynamoDBFullAccessを選択</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <code class="bg-purple-100 px-1 rounded">AmazonDynamoDBFullAccess</code> にチェックを入れて、「許可を追加」をクリックします。
+                                        </p>
+                                        <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-orange-800 text-sm">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                本番環境では、必要最小限の権限のみを付与する「最小権限の原則」に従うことが推奨されますが、学習用途ではFullAccessを使用します。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 動作確認 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        4.7 動作確認
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">Lambda関数の動作確認</h3>
+                                <p class="text-emerald-900 mb-4">作成したLambda関数が正しく動作することを確認します。</p>
+
+                                <ol class="space-y-3 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">1.</span>
+                                        <span>Lambda関数の「Test」タブで、テストイベントを実行します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">2.</span>
+                                        <span>実行結果が「succeeded」になることを確認します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">3.</span>
+                                        <span>CloudWatch Logsでprint文の出力が確認できることを確認します。</span>
+                                    </li>
+                                </ol>
+
+                                <h4 class="font-medium text-emerald-800 mb-2 mt-6">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される結果
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <p class="text-emerald-900 text-sm mb-2"><strong>Response:</strong></p>
+                                    <pre class="text-emerald-900 text-sm bg-white rounded p-3 overflow-x-auto"><code class="language-json">{
+  "statusCode": 200,
+  "body": {
+    "message": "Hello from Lambda!",
+    "timestamp": "2025-01-24T10:30:45.123456",
+    "function_name": "HelloWorldFunction",
+    "memory_limit": 128
+  }
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">テスト実行でエラーが出る</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> コードに文法エラーがある、またはDeployを忘れている</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• コードを再確認し、インデントやカンマの抜けがないかチェック</li>
+                                        <li>• 「Deploy」ボタンをクリックして変更を保存</li>
+                                        <li>• CloudWatch Logsでエラーの詳細を確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">CloudWatch Logsが表示されない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> Lambda関数が一度も実行されていない、またはIAMロールにCloudWatch Logsへの書き込み権限がない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• まずテストを実行してから、ログを確認</li>
+                                        <li>• IAMロールに「AWSLambdaBasicExecutionRole」ポリシーが含まれているか確認</li>
+                                        <li>• 数分待ってから再度確認（ログ反映に時間がかかる場合がある）</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">IAMロールにポリシーをアタッチできない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> IAMユーザーに十分な権限がない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• 管理者権限のあるIAMユーザーでログインしているか確認</li>
+                                        <li>• ルートユーザーでログインして、IAMユーザーに「IAMFullAccess」ポリシーを追加</li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください：</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            Lambda関数「HelloWorldFunction」が作成されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            カスタマイズしたコードがデプロイされている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            テストイベントで関数が正常に実行できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            CloudWatch Logsでprint文の出力が確認できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            IAMロールにDynamoDBFullAccessポリシーが追加されている
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 次のステップ -->
+                <section class="mb-10">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">次のステップ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ステップ5では、Lambda関数をインターネットから呼び出せるようにするため、API Gatewayを設定します。HTTPメソッド（GET、POST、PUT、DELETE）の基本やCORS設定について学びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="aws-serverless-tutorial-03.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">DynamoDBテーブルの作成</span>
+                        </div>
+                    </a>
+                    <a href="aws-serverless-tutorial-05.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">API Gatewayの設定</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+
+    <!-- コードコピー機能 -->
+    <script>
+        function copyCode(btn) {
+            const code = btn.closest('.code-block-wrapper').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = btn.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

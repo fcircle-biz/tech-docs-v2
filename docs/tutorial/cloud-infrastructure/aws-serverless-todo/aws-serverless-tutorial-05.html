@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS サーバーレス Todoアプリチュートリアル ステップ5 - API Gatewayの設定</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // チュートリアル推奨カラー: Emerald(緑系)
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS サーバーレス実践チュートリアル</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS サーバーレス</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ5</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">5</span>
+                            ステップ5
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">API Gatewayの設定</h1>
+                    <p class="text-slate-600">Lambda関数をインターネットから呼び出せるように、API Gatewayを設定します。REST APIを作成し、ブラウザからアクセスできるWebエンドポイントを公開します。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>REST APIの作成とリソース設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>HTTPメソッド(GET, POST, PUT, DELETE)の定義</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>Lambda関数との統合設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>CORS(Cross-Origin Resource Sharing)の設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>APIのデプロイとエンドポイントURL取得</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>ステップ4でLambda関数が作成済み</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>AWSマネジメントコンソールにログイン可能</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>REST APIの基本概念を理解している(このステップで説明)</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: API Gatewayとは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.1 API Gatewayとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        API Gatewayは、Lambda関数やその他のAWSサービスをHTTP/HTTPSエンドポイントとして公開するマネージドサービスです。いわば「お店の受付窓口」のような役割を果たします。
+                    </p>
+
+                    <!-- API Gatewayの役割 -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium">API Gatewayの役割</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4">
+                                    <li>• HTTPリクエストをLambda関数に転送</li>
+                                    <li>• 認証・認可の管理</li>
+                                    <li>• リクエスト/レスポンスの変換</li>
+                                    <li>• レート制限(DDoS対策)</li>
+                                    <li>• APIのバージョン管理</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- システム構成図 -->
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    subgraph Browser[ブラウザ]
+        U[ユーザー]
+    end
+    subgraph Gateway[API Gateway]
+        G1[エンドポイント受付]
+        G2[ルーティング]
+        G3[認証・検証]
+    end
+    subgraph Lambda[Lambda関数]
+        L1[getTodos]
+        L2[createTodo]
+        L3[updateTodo]
+        L4[deleteTodo]
+    end
+    U -->|HTTPリクエスト| G1
+    G1 --> G2
+    G2 --> G3
+    G3 -->|GET /todos| L1
+    G3 -->|POST /todos| L2
+    G3 -->|"PUT /todos/{id}"| L3
+    G3 -->|"DELETE /todos/{id}"| L4
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">API Gatewayがリクエストを振り分ける仕組み</p>
+                    </div>
+
+                    <!-- REST APIとは -->
+                    <div class="bg-purple-50 border border-purple-200 rounded-xl p-5 my-6">
+                        <h3 class="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-book"></i>
+                            REST APIとは
+                        </h3>
+                        <p class="text-purple-900 mb-4">
+                            REST(REpresentational State Transfer)は、Webシステムで広く使われるAPI設計のルールです。HTTPメソッドとURLを組み合わせて、データの操作を表現します。
+                        </p>
+                        <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-purple-300">
+                                        <th class="text-left py-2 px-3 text-purple-800">HTTPメソッド</th>
+                                        <th class="text-left py-2 px-3 text-purple-800">操作</th>
+                                        <th class="text-left py-2 px-3 text-purple-800">例</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-purple-900">
+                                    <tr class="border-b border-purple-200">
+                                        <td class="py-2 px-3"><code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">GET</code></td>
+                                        <td class="py-2 px-3">データの取得</td>
+                                        <td class="py-2 px-3">タスク一覧を取得</td>
+                                    </tr>
+                                    <tr class="border-b border-purple-200">
+                                        <td class="py-2 px-3"><code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">POST</code></td>
+                                        <td class="py-2 px-3">データの新規作成</td>
+                                        <td class="py-2 px-3">新しいタスクを作成</td>
+                                    </tr>
+                                    <tr class="border-b border-purple-200">
+                                        <td class="py-2 px-3"><code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">PUT</code></td>
+                                        <td class="py-2 px-3">データの更新</td>
+                                        <td class="py-2 px-3">タスクを更新</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3"><code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">DELETE</code></td>
+                                        <td class="py-2 px-3">データの削除</td>
+                                        <td class="py-2 px-3">タスクを削除</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: REST APIの作成 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.2 REST APIの作成
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 5-1: REST APIの新規作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">API Gatewayで新しいREST APIを作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API Gatewayコンソールを開く</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            AWSマネジメントコンソールで「API Gateway」と検索し、API Gatewayのダッシュボードを開きます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">REST APIを選択</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「APIを作成」ボタンをクリックし、<strong>「REST API」</strong>(プライベートではない方)の「構築」をクリックします。
+                                        </p>
+                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg">
+                                            <p class="text-blue-800 text-sm">
+                                                <i class="fas fa-lightbulb mr-1"></i>
+                                                「HTTP API」ではなく「REST API」を選択してください。REST APIの方が機能が豊富です。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API設定の入力</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下の情報を入力します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-2">
+                                                <li>• <strong>プロトコル</strong>: REST</li>
+                                                <li>• <strong>新しいAPIの作成</strong>: 新しいAPI</li>
+                                                <li>• <strong>API名</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">TodoAPI</code></li>
+                                                <li>• <strong>説明</strong>: Todoアプリ用のREST API(任意)</li>
+                                                <li>• <strong>エンドポイントタイプ</strong>: リージョン</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">APIの作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「APIの作成」をクリックします。API Gatewayのリソース画面が表示されます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: リソースとメソッドの設定 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.3 リソースとメソッドの設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        APIのエンドポイントとなるリソース(<code>/todos</code>、<code>/todos/{id}</code>)を作成し、それぞれにHTTPメソッドを設定します。
+                    </p>
+
+                    <!-- API設計 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-6">
+                        <h3 class="font-semibold text-slate-800 mb-3">今回作成するAPI設計</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-300">
+                                        <th class="text-left py-2 px-3 text-slate-700">HTTPメソッド</th>
+                                        <th class="text-left py-2 px-3 text-slate-700">パス</th>
+                                        <th class="text-left py-2 px-3 text-slate-700">説明</th>
+                                        <th class="text-left py-2 px-3 text-slate-700">Lambda関数</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-800">
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3"><code class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">GET</code></td>
+                                        <td class="py-2 px-3"><code>/todos</code></td>
+                                        <td class="py-2 px-3">タスク一覧取得</td>
+                                        <td class="py-2 px-3">getTodos</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3"><code class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">POST</code></td>
+                                        <td class="py-2 px-3"><code>/todos</code></td>
+                                        <td class="py-2 px-3">タスク作成</td>
+                                        <td class="py-2 px-3">createTodo</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3"><code class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded">PUT</code></td>
+                                        <td class="py-2 px-3"><code>/todos/{id}</code></td>
+                                        <td class="py-2 px-3">タスク更新</td>
+                                        <td class="py-2 px-3">updateTodo</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 px-3"><code class="bg-red-100 text-red-800 px-2 py-0.5 rounded">DELETE</code></td>
+                                        <td class="py-2 px-3"><code>/todos/{id}</code></td>
+                                        <td class="py-2 px-3">タスク削除</td>
+                                        <td class="py-2 px-3">deleteTodo</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 実装手順カード: /todosリソース作成 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 5-2: /todosリソースの作成とメソッド設定
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">タスク一覧取得・作成用の<code>/todos</code>リソースを作成し、GETとPOSTメソッドを設定します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">/todosリソースの作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            左のリソースツリーで「/」(ルート)を選択し、「アクション」→「リソースの作成」をクリックします。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>リソース名</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">todos</code></li>
+                                                <li>• <strong>リソースパス</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">todos</code>(自動入力)</li>
+                                                <li>• 「APIゲートウェイCORSを有効にする」にチェック</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「リソースの作成」をクリックします。</p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">GETメソッドの作成(タスク一覧取得)</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            作成した<code>/todos</code>リソースを選択し、「アクション」→「メソッドの作成」→「GET」を選択します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>統合タイプ</strong>: Lambda関数</li>
+                                                <li>• <strong>Lambdaプロキシ統合の使用</strong>: チェックを入れる</li>
+                                                <li>• <strong>Lambda関数</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">getTodos</code>(ステップ6で作成予定)</li>
+                                                <li>• <strong>デフォルトタイムアウトの使用</strong>: チェックを入れる</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「保存」をクリックします。</p>
+                                        <div class="bg-orange-50 border-l-4 border-orange-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-orange-800 text-sm">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                ステップ6でLambda関数を作成するため、現時点ではエラーが表示されますが問題ありません。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">POSTメソッドの作成(タスク作成)</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            同様に<code>/todos</code>リソースで「アクション」→「メソッドの作成」→「POST」を選択します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>統合タイプ</strong>: Lambda関数</li>
+                                                <li>• <strong>Lambdaプロキシ統合の使用</strong>: チェックを入れる</li>
+                                                <li>• <strong>Lambda関数</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">createTodo</code>(ステップ6で作成予定)</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「保存」をクリックします。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実装手順カード: /todos/{id}リソース作成 -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 5-3: /todos/{id}リソースの作成とメソッド設定
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">特定タスクの更新・削除用の<code>/todos/{id}</code>リソースを作成し、PUTとDELETEメソッドを設定します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">/todos/{id}リソースの作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <code>/todos</code>リソースを選択し、「アクション」→「リソースの作成」をクリックします。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>リソース名</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">{id}</code></li>
+                                                <li>• <strong>リソースパス</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">{id}</code></li>
+                                                <li>• 「APIゲートウェイCORSを有効にする」にチェック</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「リソースの作成」をクリックします。</p>
+                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-blue-800 text-sm">
+                                                <i class="fas fa-lightbulb mr-1"></i>
+                                                <code>{id}</code>は「パスパラメータ」と呼ばれ、URLの一部として動的な値を受け取れます。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">PUTメソッドの作成(タスク更新)</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <code>/todos/{id}</code>リソースで「アクション」→「メソッドの作成」→「PUT」を選択します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>統合タイプ</strong>: Lambda関数</li>
+                                                <li>• <strong>Lambdaプロキシ統合の使用</strong>: チェックを入れる</li>
+                                                <li>• <strong>Lambda関数</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">updateTodo</code>(ステップ6で作成予定)</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「保存」をクリックします。</p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">DELETEメソッドの作成(タスク削除)</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            同様に<code>/todos/{id}</code>リソースで「アクション」→「メソッドの作成」→「DELETE」を選択します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>統合タイプ</strong>: Lambda関数</li>
+                                                <li>• <strong>Lambdaプロキシ統合の使用</strong>: チェックを入れる</li>
+                                                <li>• <strong>Lambda関数</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">deleteTodo</code>(ステップ6で作成予定)</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「保存」をクリックします。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: CORS設定 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.4 CORS(Cross-Origin Resource Sharing)の設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        CORSは、異なるドメイン(オリジン)からのHTTPリクエストを許可するセキュリティ機能です。フロントエンド(Amplify)からAPI Gateway(異なるドメイン)へのアクセスを可能にするため、CORS設定が必須です。
+                    </p>
+
+                    <!-- CORSとは -->
+                    <div class="bg-purple-50 border border-purple-200 rounded-xl p-5 mb-6">
+                        <h3 class="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-book"></i>
+                            CORSが必要な理由
+                        </h3>
+                        <p class="text-purple-900 mb-4">
+                            ブラウザは、セキュリティのため、異なるドメイン間の通信を制限します(同一オリジンポリシー)。<br>
+                            例えば、<code>https://your-app.amplifyapp.com</code>(フロントエンド)から<code>https://api-id.execute-api.us-east-1.amazonaws.com</code>(API Gateway)にアクセスする際、CORSが必要です。
+                        </p>
+                        <div class="my-4">
+                            <div class="mermaid">
+flowchart LR
+    A[フロントエンド<br/>your-app.amplifyapp.com] -->|リクエスト| B[API Gateway<br/>api-id.execute-api...]
+    B -->|CORS無し| C[エラー]
+    B -->|CORS有り| D[正常応答]
+    style C fill:#fee,stroke:#f66
+    style D fill:#efe,stroke:#6f6
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 5-4: CORSの有効化
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">各リソースでCORSを有効にし、ブラウザからのアクセスを許可します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">/todosリソースのCORS設定</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <code>/todos</code>リソースを選択し、「アクション」→「CORSの有効化」をクリックします。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <p class="text-purple-900 text-sm mb-2">以下の設定を確認します:</p>
+                                            <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                                <li>• <strong>Access-Control-Allow-Origin</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">*</code>(すべてのドメインを許可)</li>
+                                                <li>• <strong>Access-Control-Allow-Headers</strong>: デフォルト値のまま</li>
+                                                <li>• <strong>Access-Control-Allow-Methods</strong>: GET, POST, OPTIONS</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「CORSを有効にして既存のCORSヘッダーを置換」をクリックします。</p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">/todos/{id}リソースのCORS設定</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            同様に<code>/todos/{id}</code>リソースで「アクション」→「CORSの有効化」を実行します。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                                <li>• <strong>Access-Control-Allow-Methods</strong>: PUT, DELETE, OPTIONS</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「CORSを有効にして既存のCORSヘッダーを置換」をクリックします。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">本番環境では</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <code>Access-Control-Allow-Origin: *</code>はすべてのドメインを許可するため、本番環境では特定のドメインに制限することが推奨されます。<br>
+                                    例: <code>https://your-app.amplifyapp.com</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: APIのデプロイ -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.5 APIのデプロイ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        API Gatewayで設定した変更は、デプロイするまで反映されません。本番環境で使えるようにするため、APIをデプロイします。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 5-5: APIを本番環境にデプロイ
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">作成したAPIを本番ステージにデプロイし、エンドポイントURLを取得します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">APIのデプロイ</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            リソースツリーでルート「/」を選択し、「アクション」→「APIのデプロイ」をクリックします。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <ul class="text-purple-900 text-sm space-y-1">
+                                                <li>• <strong>デプロイされるステージ</strong>: [新しいステージ]</li>
+                                                <li>• <strong>ステージ名</strong>: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded">prod</code></li>
+                                                <li>• <strong>ステージの説明</strong>: 本番環境(任意)</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">「デプロイ」をクリックします。</p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">エンドポイントURLの確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            デプロイが完了すると、ステージエディタ画面が表示されます。画面上部に「URLの呼び出し」が表示されます。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-3 border border-purple-200">
+                                            <p class="text-purple-900 text-sm font-mono break-all">
+                                                例: https://abc123def.execute-api.us-east-1.amazonaws.com/prod
+                                            </p>
+                                        </div>
+                                        <p class="text-purple-900 text-sm mt-3">
+                                            このURLをコピーして、メモ帳などに保存しておきます。<strong>ステップ8で使用します。</strong>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">エンドポイントの完全なURLを確認</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            各APIエンドポイントのURLは以下のようになります。
+                                        </p>
+                                        <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                                            <ul class="text-purple-900 dark:text-purple-100 text-sm space-y-2 font-mono">
+                                                <li>• GET タスク一覧: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded break-all">{ベースURL}/todos</code></li>
+                                                <li>• POST タスク作成: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded break-all">{ベースURL}/todos</code></li>
+                                                <li>• PUT タスク更新: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded break-all">{ベースURL}/todos/{id}</code></li>
+                                                <li>• DELETE タスク削除: <code class="bg-purple-200 dark:bg-purple-900 dark:text-purple-100 px-2 py-0.5 rounded break-all">{ベースURL}/todos/{id}</code></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 動作確認 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        5.6 動作確認
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">API Gatewayのテスト機能を使う</h3>
+                                <p class="text-emerald-900 mb-4">現時点ではLambda関数がまだ作成されていないため、エラーが出ますが、API Gatewayの設定が正しいか確認できます。</p>
+
+                                <ol class="space-y-3 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">1.</span>
+                                        <span>リソースツリーで<code>/todos</code> → <code>GET</code>を選択します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">2.</span>
+                                        <span>「テスト」リンクをクリックします。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">3.</span>
+                                        <span>画面下部の「テスト」ボタンをクリックします。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">4.</span>
+                                        <span>Lambda関数がまだ存在しないため、エラーが表示されます(現時点では正常)。</span>
+                                    </li>
+                                </ol>
+
+                                <h4 class="font-medium text-emerald-800 mb-2 mt-6">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される動作
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <p class="text-emerald-900 text-sm mb-2">現時点(Lambda関数未作成):</p>
+                                    <ul class="text-emerald-800 text-sm space-y-1 ml-4">
+                                        <li>• ステータスコード: 502(Bad Gateway)または500</li>
+                                        <li>• エラーメッセージ: Lambda関数が見つからない旨のエラー</li>
+                                        <li>• <strong>これは正常です。ステップ6でLambda関数を作成すると動作します。</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">デプロイ後もAPIが動作しない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> デプロイが正しく完了していない、またはキャッシュが残っている</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• 「アクション」→「APIのデプロイ」を再度実行</li>
+                                        <li>• ブラウザのキャッシュをクリア</li>
+                                        <li>• エンドポイントURLが正しいか確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">CORSエラーが発生する</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> CORS設定が不完全、またはデプロイされていない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• 各リソースで「CORSの有効化」を再実行</li>
+                                        <li>• OPTIONSメソッドが自動作成されているか確認</li>
+                                        <li>• APIを再デプロイ</li>
+                                        <li>• ブラウザの開発者ツールでエラー内容を確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">Lambda統合でエラーが出る</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> Lambda関数名が間違っている、または権限が不足している</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• Lambda関数名のスペルを確認</li>
+                                        <li>• Lambda関数のリージョンがAPI Gatewayと同じか確認</li>
+                                        <li>• 統合設定画面で「Lambda関数にアクセス許可を追加する」ダイアログが表示されたら「OK」をクリック</li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください:</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            REST API「TodoAPI」が作成されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            /todosリソースにGETとPOSTメソッドが設定されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            /todos/{id}リソースにPUTとDELETEメソッドが設定されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            各リソースでCORSが有効化されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            APIが「prod」ステージにデプロイされている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check6"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check6" class="text-blue-900 cursor-pointer">
+                                            エンドポイントURLをメモしている
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 次のステップ -->
+                <section class="mb-10">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">次のステップ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ステップ6では、DynamoDBと連携してタスクの作成・取得・更新・削除(CRUD操作)を行うLambda関数を実装します。boto3を使った実践的なデータ操作を学びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="aws-serverless-tutorial-04.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">Lambda関数の作成(基礎)</span>
+                        </div>
+                    </a>
+                    <a href="aws-serverless-tutorial-06.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">Lambda関数でCRUD操作を実装</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

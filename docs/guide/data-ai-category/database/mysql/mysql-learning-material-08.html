@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>MySQL入門 第8章 - ビューとストアドプロシージャ - 再利用可能なSQLを作る</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">MySQL入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-database text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">MySQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ビューとストアドプロシージャ - 再利用可能なSQLを作る</h1>
+                    <p class="text-slate-600">複雑なクエリを再利用可能な形で保存するビューと、処理ロジックをデータベース側に実装するストアドプロシージャの基礎を学びます。日常的なデータ操作を効率化する方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューの概念と作成方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューの活用場面と注意点</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ストアドプロシージャとストアドファンクションの基礎</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>パラメータと変数の使い方</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: ビューとは -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 ビューとは - 仮想的なテーブル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビュー（View）は、SELECT文の結果をテーブルのように扱えるようにしたものです。実際のデータを保存するのではなく、クエリの定義だけを保存する「仮想テーブル」として機能します。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ビューのメリット</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>複雑なクエリの簡略化</strong> - 長いJOINやサブクエリを1つのビューにまとめられる</li>
+                                    <li><strong>セキュリティ向上</strong> - 必要なカラムだけを公開し、機密情報を隠せる</li>
+                                    <li><strong>コードの一貫性</strong> - 同じクエリを複数箇所で使う際、ビューを使えば定義が統一される</li>
+                                    <li><strong>抽象化</strong> - テーブル構造の変更をビューで吸収し、アプリ側の変更を最小化</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart LR
+    A[実テーブル<br/>products] --> B[ビュー<br/>view_product_list]
+    C[実テーブル<br/>categories] --> B
+    B --> D[SELECT文で参照]
+    D --> E[結果セット<br/>仮想テーブルとして利用]
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビューを作成すると、あたかも実際のテーブルが存在するかのようにSELECT文で参照できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ビューの作成例
+CREATE VIEW view_product_list AS
+SELECT
+    p.id,
+    p.name AS product_name,
+    c.name AS category_name,
+    p.price
+FROM products p
+INNER JOIN categories c ON p.category_id = c.id;
+
+-- ビューを通常のテーブルのように参照
+SELECT * FROM view_product_list;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション2: ビューの作成と管理 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 ビューの作成と管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQLでは<code>CREATE VIEW</code>文でビューを作成し、<code>DROP VIEW</code>で削除、<code>ALTER VIEW</code>で変更できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ビューの作成
+CREATE VIEW view_high_price_products AS
+SELECT
+    id,
+    name,
+    price
+FROM products
+WHERE price >= 10000;
+
+-- ビューの参照
+SELECT * FROM view_high_price_products;
+
+-- ビューの削除
+DROP VIEW IF EXISTS view_high_price_products;
+
+-- ビューの再作成（OR REPLACEで既存を上書き）
+CREATE OR REPLACE VIEW view_high_price_products AS
+SELECT
+    id,
+    name,
+    price
+FROM products
+WHERE price >= 5000;  -- 条件を変更</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">ビューの更新制約</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    ビューを通じてINSERT、UPDATE、DELETEを行うことも可能ですが、集計関数、GROUP BY、DISTINCT、JOINなどを含むビューでは更新できない場合があります。基本的にビューは参照専用として使うことをお勧めします。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習: ビューの作成 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: 売上レポート用ビューを作成しよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">ordersテーブルとorder_itemsテーブルを結合し、注文ごとの合計金額を表示するビューを作成してみましょう。</p>
+
+                            <div class="bg-purple-100 rounded-lg p-4 my-4">
+                                <p class="text-purple-900 font-medium mb-2 break-words">ステップ1: テーブルとデータを準備</p>
+                                <div class="code-block-wrapper">
+                                    <div class="code-header">
+                                        <span>SQL</span>
+                                        <button onclick="copyCode(this)" class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">CREATE TABLE orders (
+    id INT PRIMARY KEY,
+    customer_name VARCHAR(100),
+    order_date DATE
+);
+
+CREATE TABLE order_items (
+    id INT PRIMARY KEY,
+    order_id INT,
+    product_name VARCHAR(100),
+    quantity INT,
+    price DECIMAL(10, 2)
+);
+
+INSERT INTO orders VALUES
+(1, '山田太郎', '2024-01-10'),
+(2, '佐藤花子', '2024-01-12');
+
+INSERT INTO order_items VALUES
+(1, 1, 'ノートPC', 1, 80000),
+(2, 1, 'マウス', 2, 1500),
+(3, 2, 'キーボード', 1, 5000);</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4 my-4">
+                                <p class="text-purple-900 font-medium mb-2 break-words">ステップ2: 注文ごとの合計金額を表示するビューを作成</p>
+                                <div class="code-block-wrapper">
+                                    <div class="code-header">
+                                        <span>SQL</span>
+                                        <button onclick="copyCode(this)" class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">CREATE VIEW view_order_summary AS
+SELECT
+    o.id AS order_id,
+    o.customer_name,
+    o.order_date,
+    SUM(oi.quantity * oi.price) AS total_amount
+FROM orders o
+INNER JOIN order_items oi ON o.id = oi.order_id
+GROUP BY o.id, o.customer_name, o.order_date;</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4 my-4">
+                                <p class="text-purple-900 font-medium mb-2 break-words">ステップ3: ビューを参照</p>
+                                <div class="code-block-wrapper">
+                                    <div class="code-header">
+                                        <span>SQL</span>
+                                        <button onclick="copyCode(this)" class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">SELECT * FROM view_order_summary;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション3: ストアドプロシージャとは -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 ストアドプロシージャとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ストアドプロシージャ（Stored Procedure）は、一連のSQL文をひとまとめにして、データベース内に保存したものです。プログラミング言語の関数に似た役割を果たし、複雑な処理を再利用可能な形で保存できます。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ストアドプロシージャのメリット</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>処理のカプセル化</strong> - 複雑なビジネスロジックをDB側に集約できる</li>
+                                    <li><strong>パフォーマンス向上</strong> - コンパイル済みの処理が実行され、ネットワーク通信も削減</li>
+                                    <li><strong>保守性向上</strong> - ロジック変更時、プロシージャを修正するだけで全アプリに反映</li>
+                                    <li><strong>セキュリティ</strong> - テーブルへの直接アクセスを制限し、プロシージャ経由のみに限定できる</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- シンプルなストアドプロシージャの作成
+DELIMITER //
+
+CREATE PROCEDURE GetAllProducts()
+BEGIN
+    SELECT * FROM products;
+END //
+
+DELIMITER ;
+
+-- ストアドプロシージャの実行
+CALL GetAllProducts();</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">DELIMITERとは</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    MySQLのコマンドラインクライアントでは、通常セミコロン（;）が文の終わりを示します。しかし、ストアドプロシージャ内部でもセミコロンを使うため、一時的に区切り文字を「//」などに変更する必要があります。MySQL Workbenchではこの記述は不要な場合もあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: パラメータを持つストアドプロシージャ -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 パラメータを持つストアドプロシージャ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ストアドプロシージャはパラメータを受け取ることができます。パラメータには3種類あります：IN（入力）、OUT（出力）、INOUT（入出力）。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- INパラメータ: 価格で商品を検索
+DELIMITER //
+
+CREATE PROCEDURE GetProductsByPrice(IN min_price DECIMAL(10, 2))
+BEGIN
+    SELECT id, name, price
+    FROM products
+    WHERE price >= min_price;
+END //
+
+DELIMITER ;
+
+-- 実行例
+CALL GetProductsByPrice(5000);
+
+-- OUTパラメータ: 商品数を取得
+DELIMITER //
+
+CREATE PROCEDURE GetProductCount(OUT product_count INT)
+BEGIN
+    SELECT COUNT(*) INTO product_count FROM products;
+END //
+
+DELIMITER ;
+
+-- 実行例（変数に結果を格納）
+CALL GetProductCount(@count);
+SELECT @count;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">パラメータ種類</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">役割</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">使用例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">IN</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">入力パラメータ（デフォルト）</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">検索条件、フィルタ値</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">OUT</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">出力パラメータ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">集計結果、カウント値</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-700 font-medium">INOUT</td>
+                                    <td class="px-4 py-3 text-slate-600">入出力パラメータ</td>
+                                    <td class="px-4 py-3 text-slate-600">計算処理、値の更新</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション5: 変数と制御構文 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 変数と制御構文
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ストアドプロシージャ内では変数を宣言し、IF文やCASE文などの制御構文を使えます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 変数とIF文の例
+DELIMITER //
+
+CREATE PROCEDURE CheckPrice(IN product_id INT)
+BEGIN
+    DECLARE v_price DECIMAL(10, 2);
+    DECLARE v_message VARCHAR(100);
+
+    -- 価格を取得
+    SELECT price INTO v_price
+    FROM products
+    WHERE id = product_id;
+
+    -- 条件分岐
+    IF v_price >= 10000 THEN
+        SET v_message = '高価格商品です';
+    ELSEIF v_price >= 5000 THEN
+        SET v_message = '中価格商品です';
+    ELSE
+        SET v_message = '低価格商品です';
+    END IF;
+
+    SELECT v_message AS message, v_price AS price;
+END //
+
+DELIMITER ;
+
+-- 実行例
+CALL CheckPrice(1);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">よく使う制御構文</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 break-words">
+                                    <li><strong>IF...THEN...ELSE</strong> - 条件分岐</li>
+                                    <li><strong>CASE</strong> - 複数条件の分岐</li>
+                                    <li><strong>WHILE</strong> - ループ処理</li>
+                                    <li><strong>LOOP</strong> - 無限ループ（LEAVE文で脱出）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: ストアドファンクション -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.6 ストアドファンクション
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ストアドファンクション（Stored Function）は、ストアドプロシージャと似ていますが、必ず1つの値を返し、SELECT文の中で直接使えるという特徴があります。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 消費税を計算するファンクション
+DELIMITER //
+
+CREATE FUNCTION CalcTax(price DECIMAL(10, 2))
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+BEGIN
+    RETURN price * 1.10;  -- 10%の消費税
+END //
+
+DELIMITER ;
+
+-- SELECT文内で使用
+SELECT
+    name,
+    price,
+    CalcTax(price) AS price_with_tax
+FROM products;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">項目</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">ストアドプロシージャ</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">ストアドファンクション</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">返り値</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">複数の結果セット可</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">単一の値</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">呼び出し方</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">CALL文</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">SELECT文内</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-700 font-medium">主な用途</td>
+                                    <td class="px-4 py-3 text-slate-600">複雑な処理、データ更新</td>
+                                    <td class="px-4 py-3 text-slate-600">計算、値の変換</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">DETERMINISTICの指定</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    ストアドファンクションを作成する際、DETERMINISTIC（同じ入力に対して常に同じ結果を返す）またはNOT DETERMINISTIC（結果が変わる可能性がある）の指定が必要です。MySQL 8.0以降、省略するとエラーになる場合があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習: ストアドプロシージャの作成 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: 在庫更新プロシージャを作成しよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">商品の在庫を更新し、在庫が0以下になった場合は警告メッセージを返すストアドプロシージャを作成してみましょう。</p>
+
+                            <div class="bg-purple-100 rounded-lg p-4 my-4">
+                                <div class="code-block-wrapper">
+                                    <div class="code-header">
+                                        <span>SQL</span>
+                                        <button onclick="copyCode(this)" class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- テーブル作成
+CREATE TABLE inventory (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(100),
+    stock INT
+);
+
+INSERT INTO inventory VALUES
+(1, 'ノートPC', 5),
+(2, 'マウス', 10);
+
+-- ストアドプロシージャ作成
+DELIMITER //
+
+CREATE PROCEDURE UpdateStock(
+    IN p_product_id INT,
+    IN p_quantity INT,
+    OUT p_message VARCHAR(200)
+)
+BEGIN
+    DECLARE v_current_stock INT;
+
+    -- 現在の在庫を取得
+    SELECT stock INTO v_current_stock
+    FROM inventory
+    WHERE product_id = p_product_id;
+
+    -- 在庫を更新
+    UPDATE inventory
+    SET stock = stock + p_quantity
+    WHERE product_id = p_product_id;
+
+    -- 更新後の在庫を確認
+    SELECT stock INTO v_current_stock
+    FROM inventory
+    WHERE product_id = p_product_id;
+
+    -- メッセージ作成
+    IF v_current_stock <= 0 THEN
+        SET p_message = '警告: 在庫切れです';
+    ELSEIF v_current_stock <= 3 THEN
+        SET p_message = '注意: 在庫が少なくなっています';
+    ELSE
+        SET p_message = '在庫は十分にあります';
+    END IF;
+END //
+
+DELIMITER ;
+
+-- 実行例
+CALL UpdateStock(1, -3, @msg);
+SELECT @msg;</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7: ビューとプロシージャの削除・確認 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.7 ビューとプロシージャの削除・確認
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作成したビュー、ストアドプロシージャ、ストアドファンクションを確認・削除する方法を覚えておきましょう。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-header">
+                            <span>SQL</span>
+                            <button onclick="copyCode(this)" class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ビューの一覧表示
+SHOW FULL TABLES WHERE Table_type = 'VIEW';
+
+-- ビューの定義を確認
+SHOW CREATE VIEW view_product_list;
+
+-- ビューの削除
+DROP VIEW IF EXISTS view_product_list;
+
+-- ストアドプロシージャの一覧表示
+SHOW PROCEDURE STATUS WHERE Db = 'データベース名';
+
+-- プロシージャの定義を確認
+SHOW CREATE PROCEDURE GetAllProducts;
+
+-- プロシージャの削除
+DROP PROCEDURE IF EXISTS GetAllProducts;
+
+-- ストアドファンクションの一覧表示
+SHOW FUNCTION STATUS WHERE Db = 'データベース名';
+
+-- ファンクションの削除
+DROP FUNCTION IF EXISTS CalcTax;</code></pre>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ビューとは何ですか？また、どのようなメリットがありますか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ビューはSELECT文の結果を仮想的なテーブルとして扱えるようにしたものです。メリットは、複雑なクエリの簡略化、セキュリティ向上（必要なカラムだけを公開）、コードの一貫性確保、テーブル構造変更の影響を吸収する抽象化などがあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ストアドプロシージャのパラメータ種類（IN、OUT、INOUT）の違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            IN（入力）パラメータは呼び出し側から値を受け取る、OUTパラメータは処理結果を呼び出し側に返す、INOUTパラメータは入力と出力の両方に使える、という違いがあります。INが最も一般的で、OUTは集計結果やカウント値を返す際に使います。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ストアドプロシージャとストアドファンクションの違いは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ストアドプロシージャは複数の結果セットを返すことができ、CALL文で呼び出します。一方、ストアドファンクションは単一の値のみを返し、SELECT文の中で直接使えます。ファンクションは計算や値の変換に適しており、プロシージャは複雑な処理やデータ更新に適しています。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>ビューは複雑なクエリを仮想テーブルとして再利用でき、セキュリティや保守性の向上に役立つ</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>ストアドプロシージャは一連のSQL文をカプセル化し、パラメータや制御構文を使った複雑な処理を実装できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>パラメータにはIN（入力）、OUT（出力）、INOUT（入出力）の3種類がある</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>ストアドファンクションは単一の値を返し、SELECT文内で直接使える</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="mysql-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">トランザクションとロック</span>
+                        </div>
+                    </a>
+                    <a href="mysql-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">MySQLの文字コードと照合順序</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

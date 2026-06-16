@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Terraform学習教材 第8章 - Terraformモジュールとコードの再利用</title>
+
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/hcl.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムCSS -->
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            padding-top: 56px;
+            background-color: #f8f9fa;
+        }
+
+        .navbar {
+            background-color: #FF9900;
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+        }
+
+        .navbar-brand i {
+            margin-right: 10px;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+            background-color: white;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .chapter-title {
+            color: #FF9900;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #FF9900;
+            padding-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .section-title {
+            color: #FF6600;
+            margin-top: 1.2rem;
+            margin-bottom: 0.8rem;
+            font-weight: 500;
+        }
+
+        .quiz-container {
+            background-color: #FFF3E0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid #FF9900;
+        }
+
+        .exercise-container {
+            background-color: #f3e5f5;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid #9c27b0;
+        }
+
+        .highlight {
+            background-color: #ffecb3;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .warning {
+            background-color: #ffebee;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #f44336;
+        }
+
+        .info {
+            background-color: #e3f2fd;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #2196f3;
+        }
+
+        .best-practice {
+            background-color: #e8f5e9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-left: 4px solid #4caf50;
+        }
+
+        .code-block {
+            background-color: #282c34;
+            color: #abb2bf;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .quiz-option {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .quiz-option:hover {
+            background-color: #f5f5f5;
+        }
+
+        .quiz-option.correct {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .quiz-option.incorrect {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .concept-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+            margin: 1.5rem 0;
+        }
+
+        .nav-link.active {
+            background-color: #FF9900;
+            color: white !important;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fab fa-aws"></i>
+                AWS Terraform学習教材
+            </a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- サイドバー -->
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>学習章</span>
+                    </h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-01.html">
+                                第1章: Terraform入門とAWS環境設定
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-02.html">
+                                第2章: HCL構文とTerraformの基本操作
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-03.html">
+                                第3章: VPCとネットワークインフラの構築
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-04.html">
+                                第4章: EC2インスタンスとコンピューティングリソース
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-05.html">
+                                第5章: ストレージとデータベースサービス
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-06.html">
+                                第6章: IAMとセキュリティ管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-07.html">
+                                第7章: Terraformステート管理とバックエンド
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="aws-terraform-learning-material-08.html">
+                                第8章: Terraformモジュールとコードの再利用
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-09.html">
+                                第9章: CI/CDパイプラインとの統合
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="aws-terraform-learning-material-10.html">
+                                第10章: 実践プロジェクトとベストプラクティス
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- メインコンテンツ -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <!-- 章ヘッダー -->
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第8章: Terraformモジュールとコードの再利用</h1>
+                </div>
+
+                <div id="chapter8">
+                    <h2 class="chapter-title">効率的なインフラストラクチャ管理のための再利用可能なコード設計</h2>
+
+                    <!-- 学習目標 -->
+                    <div class="highlight">
+                        <h5><i class="fas fa-graduation-cap"></i> この章で学ぶこと</h5>
+                        <ul>
+                            <li>Terraformモジュールの概念と利点を理解する</li>
+                            <li>再利用可能なモジュールの設計パターンを習得する</li>
+                            <li>Terraform Registryの活用方法を学ぶ</li>
+                            <li>モジュールのバージョニングとベストプラクティスを実践する</li>
+                        </ul>
+                    </div>
+
+                    <!-- Section 8.1 -->
+                    <h3 class="section-title">8.1 Terraformモジュールとは</h3>
+
+                    <div class="concept-card">
+                        <h4>モジュール化の重要性</h4>
+                        <p>
+                            Terraformモジュールは、関連するリソースをグループ化し、再利用可能なコンポーネントとして
+                            パッケージ化する仕組みです。プログラミングにおける関数やクラスと同様に、
+                            インフラストラクチャコードをモジュール化することで、DRY原則（Don't Repeat Yourself）を実践できます。
+                        </p>
+
+                        <div class="mermaid">
+                            graph TD
+                                A[モジュール化されていない構成] --> B[同じコードの重複]
+                                A --> C[管理が複雑]
+                                A --> D[変更の影響範囲が不明確]
+
+                                E[モジュール化された構成] --> F[コードの再利用]
+                                E --> G[簡潔な管理]
+                                E --> H[明確な責任分離]
+
+                                F --> I[開発効率の向上]
+                                G --> I
+                                H --> I
+
+                                B --> J[メンテナンスコストの増大]
+                                C --> J
+                                D --> J
+                        </div>
+
+                        <h5 class="mt-4">モジュールの基本構造</h5>
+                        <p>
+                            Terraformモジュールは、ディレクトリに配置された一連の`.tf`ファイルで構成されます。
+                            各モジュールには、入力変数（variables）、出力値（outputs）、およびリソース定義が含まれます。
+                        </p>
+                    </div>
+
+                    <!-- Section 8.2 -->
+                    <h3 class="section-title">8.2 モジュールの作成と構造</h3>
+
+                    <div class="concept-card">
+                        <h4>標準的なモジュール構造</h4>
+                        <p>
+                            効果的なモジュールを作成するには、一貫性のある構造が重要です。
+                            以下は、VPCモジュールの例を通じて、推奨される構造を示します：
+                        </p>
+
+                        <pre class="code-block"><code class="language-bash"># モジュールディレクトリ構造
+modules/
+  └── vpc/
+      ├── main.tf        # メインのリソース定義
+      ├── variables.tf   # 入力変数の定義
+      ├── outputs.tf     # 出力値の定義
+      ├── versions.tf    # Terraformとプロバイダのバージョン制約
+      └── README.md      # モジュールのドキュメント</code></pre>
+
+                        <h5 class="mt-4">variables.tf - 入力変数の定義</h5>
+                        <pre class="code-block"><code class="language-hcl"># modules/vpc/variables.tf
+variable "vpc_cidr" {
+  description = "VPCのCIDRブロック"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "environment" {
+  description = "環境名（dev, staging, prod）"
+  type        = string
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "環境名はdev、staging、prodのいずれかである必要があります。"
+  }
+}
+
+variable "availability_zones" {
+  description = "使用するアベイラビリティゾーンのリスト"
+  type        = list(string)
+  default     = ["ap-northeast-1a", "ap-northeast-1c"]
+}</code></pre>
+
+                        <h5 class="mt-4">main.tf - リソースの定義</h5>
+                        <pre class="code-block"><code class="language-hcl"># modules/vpc/main.tf
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name        = "${var.environment}-vpc"
+    Environment = var.environment
+  }
+}
+
+resource "aws_subnet" "public" {
+  count                   = length(var.availability_zones)
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
+  availability_zone       = var.availability_zones[count.index]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = "${var.environment}-public-subnet-${count.index + 1}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name        = "${var.environment}-igw"
+    Environment = var.environment
+  }
+}</code></pre>
+
+                        <h5 class="mt-4">outputs.tf - 出力値の定義</h5>
+                        <pre class="code-block"><code class="language-hcl"># modules/vpc/outputs.tf
+output "vpc_id" {
+  description = "作成されたVPCのID"
+  value       = aws_vpc.main.id
+}
+
+output "public_subnet_ids" {
+  description = "パブリックサブネットのIDリスト"
+  value       = aws_subnet.public[*].id
+}
+
+output "vpc_cidr_block" {
+  description = "VPCのCIDRブロック"
+  value       = aws_vpc.main.cidr_block
+}</code></pre>
+                    </div>
+
+                    <!-- Section 8.3 -->
+                    <h3 class="section-title">8.3 モジュールの呼び出しと使用</h3>
+
+                    <div class="concept-card">
+                        <h4>モジュールの使用方法</h4>
+                        <p>
+                            作成したモジュールは、メインの設定ファイルから`module`ブロックを使用して呼び出します。
+                            モジュールには、ローカルモジュール、Git リポジトリ、Terraform Registry など、
+                            様々なソースから取得できます。
+                        </p>
+
+                        <div class="mermaid">
+                            graph LR
+                                A[ルートモジュール] --> B[module ブロック]
+                                B --> C[ローカルモジュール]
+                                B --> D[Git リポジトリ]
+                                B --> E[Terraform Registry]
+
+                                C --> F[./modules/vpc]
+                                D --> G[github.com/org/module]
+                                E --> H[terraform-aws-modules/vpc/aws]
+                        </div>
+
+                        <h5 class="mt-4">ローカルモジュールの使用</h5>
+                        <pre class="code-block"><code class="language-hcl"># main.tf
+module "vpc" {
+  source = "./modules/vpc"
+
+  vpc_cidr           = "10.0.0.0/16"
+  environment        = "production"
+  availability_zones = data.aws_availability_zones.available.names
+}
+
+module "dev_vpc" {
+  source = "./modules/vpc"
+
+  vpc_cidr    = "10.1.0.0/16"
+  environment = "dev"
+}
+
+# モジュールの出力値を参照
+resource "aws_instance" "web" {
+  subnet_id = module.vpc.public_subnet_ids[0]
+  # 他の設定...
+}</code></pre>
+
+                        <h5 class="mt-4">Gitリポジトリからの使用</h5>
+                        <pre class="code-block"><code class="language-hcl"># Gitリポジトリのモジュール使用
+module "vpc" {
+  source = "git::https://github.com/myorg/terraform-modules//vpc?ref=v1.2.0"
+
+  vpc_cidr    = "10.0.0.0/16"
+  environment = var.environment
+}
+
+# プライベートリポジトリの場合（SSH）
+module "app" {
+  source = "git::ssh://git@github.com/myorg/modules.git//app"
+
+  # モジュール変数
+}</code></pre>
+                    </div>
+
+                    <!-- Section 8.4 -->
+                    <h3 class="section-title">8.4 Terraform Registryの活用</h3>
+
+                    <div class="concept-card">
+                        <h4>公式モジュールの利用</h4>
+                        <p>
+                            Terraform Registryは、コミュニティや HashiCorp が提供する検証済みモジュールの
+                            リポジトリです。これらのモジュールは、ベストプラクティスに従って作成され、
+                            広範なテストが行われています。
+                        </p>
+
+                        <h5 class="mt-4">人気のあるAWSモジュール</h5>
+                        <pre class="code-block"><code class="language-hcl"># VPCモジュール（公式）
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "my-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["ap-northeast-1a", "ap-northeast-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = true
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+  }
+}
+
+# RDSモジュール
+module "db" {
+  source  = "terraform-aws-modules/rds/aws"
+  version = "~> 6.0"
+
+  identifier = "demodb"
+
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+
+  db_name  = "myapp"
+  username = "admin"
+  port     = "3306"
+
+  vpc_security_group_ids = [module.security_group.sg_id]
+  subnet_ids            = module.vpc.database_subnets
+}</code></pre>
+                    </div>
+
+                    <!-- Section 8.5 -->
+                    <h3 class="section-title">8.5 モジュールのベストプラクティス</h3>
+
+                    <div class="best-practice">
+                        <h4><i class="fas fa-star"></i> モジュール設計のベストプラクティス</h4>
+
+                        <h5>1. 単一責任の原則</h5>
+                        <p>
+                            各モジュールは、1つの明確な責任を持つべきです。例えば、VPCモジュールはネットワーク関連のリソースのみを管理し、
+                            EC2インスタンスやデータベースは別のモジュールで管理します。
+                        </p>
+
+                        <h5>2. 適切な抽象化レベル</h5>
+                        <p>
+                            モジュールは、詳細すぎず、かつ汎用的すぎない適切なレベルで抽象化する必要があります。
+                            使用者が必要な設定を簡単にカスタマイズできる柔軟性を提供しましょう。
+                        </p>
+
+                        <h5>3. 明確な命名規則</h5>
+                        <pre class="code-block"><code class="language-hcl"># 良い例：明確で一貫性のある命名
+module "production_vpc" {
+  source = "./modules/vpc"
+  # ...
+}
+
+module "production_web_servers" {
+  source = "./modules/ec2-cluster"
+  # ...
+}
+
+# 避けるべき例：曖昧な命名
+module "network" {
+  # ...
+}
+
+module "servers" {
+  # ...
+}</code></pre>
+
+                        <h5>4. バージョニング戦略</h5>
+                        <p>
+                            モジュールには必ずバージョンタグを付け、セマンティックバージョニングに従います：
+                        </p>
+                        <ul>
+                            <li><strong>メジャーバージョン（v1.0.0）</strong>：破壊的変更を含む</li>
+                            <li><strong>マイナーバージョン（v1.1.0）</strong>：後方互換性のある機能追加</li>
+                            <li><strong>パッチバージョン（v1.1.1）</strong>：バグ修正</li>
+                        </ul>
+                    </div>
+
+                    <!-- 実習セクション -->
+                    <div class="exercise-container">
+                        <h4><i class="fas fa-laptop-code"></i> 実践演習：再利用可能なEC2モジュールの作成</h4>
+
+                        <h5>演習の目標</h5>
+                        <p>
+                            本番環境、ステージング環境、開発環境で再利用できる EC2 インスタンスモジュールを作成し、
+                            各環境に適した設定で展開する方法を学びます。
+                        </p>
+
+                        <h5>ステップ1：モジュール構造の作成</h5>
+                        <pre class="code-block"><code class="language-bash"># ディレクトリ構造を作成
+mkdir -p modules/ec2-instance
+cd modules/ec2-instance
+touch main.tf variables.tf outputs.tf versions.tf</code></pre>
+
+                        <h5>ステップ2：モジュールの実装</h5>
+                        <pre class="code-block"><code class="language-hcl"># modules/ec2-instance/variables.tf
+variable "instance_name" {
+  description = "EC2インスタンスの名前"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "EC2インスタンスタイプ"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "environment" {
+  description = "環境名"
+  type        = string
+}
+
+variable "subnet_id" {
+  description = "サブネットID"
+  type        = string
+}
+
+# modules/ec2-instance/main.tf
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+
+resource "aws_instance" "this" {
+  ami           = data.aws_ami.amazon_linux.id
+  instance_type = var.instance_type
+  subnet_id     = var.subnet_id
+
+  tags = {
+    Name        = var.instance_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}</code></pre>
+
+                        <h5>ステップ3：環境別の展開</h5>
+                        <pre class="code-block"><code class="language-hcl"># environments/dev/main.tf
+module "dev_web_server" {
+  source = "../../modules/ec2-instance"
+
+  instance_name = "dev-web-server"
+  instance_type = "t3.micro"
+  environment   = "development"
+  subnet_id     = module.vpc.public_subnet_ids[0]
+}
+
+# environments/prod/main.tf
+module "prod_web_servers" {
+  count  = 3  # 本番環境では3台のインスタンス
+  source = "../../modules/ec2-instance"
+
+  instance_name = "prod-web-server-${count.index + 1}"
+  instance_type = "t3.large"  # 本番環境ではより大きいインスタンス
+  environment   = "production"
+  subnet_id     = module.vpc.private_subnet_ids[count.index]
+}</code></pre>
+                    </div>
+
+                    <!-- クイズセクション -->
+                    <div class="quiz-container">
+                        <h4><i class="fas fa-question-circle"></i> 理解度チェッククイズ</h4>
+
+                        <div class="mb-3">
+                            <p><strong>問題1：</strong> Terraformモジュールの主な利点として適切でないものはどれですか？</p>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">A. コードの再利用性が向上する</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">B. 保守性が向上する</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, true)">C. Terraformの実行速度が大幅に向上する</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">D. チーム間での共有が容易になる</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <p><strong>問題2：</strong> モジュールのバージョニングで、後方互換性のない変更を含む場合に更新すべきバージョン番号は？</p>
+                            <div class="quiz-option" onclick="checkAnswer(this, true)">A. メジャーバージョン</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">B. マイナーバージョン</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">C. パッチバージョン</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">D. ビルド番号</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <p><strong>問題3：</strong> Terraform Registryからモジュールを使用する際の記述として正しいものは？</p>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">A. source = "./modules/vpc"</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, true)">B. source = "terraform-aws-modules/vpc/aws"</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">C. source = "git::https://registry.terraform.io/vpc"</div>
+                            <div class="quiz-option" onclick="checkAnswer(this, false)">D. source = "registry://vpc"</div>
+                        </div>
+                    </div>
+
+                    <!-- まとめ -->
+                    <div class="concept-card">
+                        <h4><i class="fas fa-check-circle"></i> この章のまとめ</h4>
+                        <p>
+                            第8章では、Terraformモジュールの概念と実践的な使用方法について学びました。
+                            モジュール化により、インフラストラクチャコードの再利用性、保守性、そして拡張性が
+                            大幅に向上します。
+                        </p>
+
+                        <h5>重要なポイント</h5>
+                        <ul>
+                            <li><strong>モジュール化の利点</strong>：DRY原則の実践、コードの再利用、保守性の向上</li>
+                            <li><strong>標準的な構造</strong>：main.tf、variables.tf、outputs.tf による構成</li>
+                            <li><strong>様々なソース</strong>：ローカル、Git、Terraform Registry からの利用</li>
+                            <li><strong>ベストプラクティス</strong>：単一責任、適切な抽象化、セマンティックバージョニング</li>
+                        </ul>
+
+                        <p class="mt-3">
+                            モジュールを効果的に使用することで、チーム全体の生産性が向上し、
+                            一貫性のあるインフラストラクチャを構築できます。次章では、これらのモジュールを
+                            CI/CDパイプラインに統合する方法を学びます。
+                        </p>
+                    </div>
+
+                    <!-- ナビゲーション -->
+                    <div class="d-flex justify-content-between mt-5 mb-3">
+                        <a href="aws-terraform-learning-material-07.html" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left"></i> 前の章へ
+                        </a>
+                        <a href="aws-terraform-learning-material-09.html" class="btn btn-primary">
+                            次の章へ <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Highlight.js の初期化
+        hljs.highlightAll();
+
+        // Mermaid.js の初期化
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default'
+        });
+
+        // クイズの回答チェック
+        function checkAnswer(element, isCorrect) {
+            // すでに回答済みの場合は何もしない
+            if (element.classList.contains('answered')) {
+                return;
+            }
+
+            // 全ての選択肢を無効化
+            const options = element.parentElement.querySelectorAll('.quiz-option');
+            options.forEach(opt => {
+                opt.classList.add('answered');
+                opt.style.cursor = 'default';
+            });
+
+            // 選択した回答のスタイルを設定
+            if (isCorrect) {
+                element.classList.add('correct');
+                // 正解メッセージを表示
+                const message = document.createElement('div');
+                message.className = 'alert alert-success mt-2';
+                message.innerHTML = '<i class="fas fa-check-circle"></i> 正解です！';
+                element.parentElement.appendChild(message);
+            } else {
+                element.classList.add('incorrect');
+                // 不正解メッセージを表示
+                const message = document.createElement('div');
+                message.className = 'alert alert-danger mt-2';
+                message.innerHTML = '<i class="fas fa-times-circle"></i> 不正解です。もう一度考えてみましょう。';
+                element.parentElement.appendChild(message);
+            }
+        }
+
+        // スムーススクロール
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

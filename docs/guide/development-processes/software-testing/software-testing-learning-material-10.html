@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>ソフトウェアテスト入門 第10章 - バグ報告と不具合管理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // テスト/QA - Emerald/Green
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-vial text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">ソフトウェアテスト入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>開発プロセス</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約22時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">ソフトウェアテスト入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">バグ報告と不具合管理</h1>
+                    <p class="text-slate-600">バグを発見した際の報告方法と、不具合の管理プロセスを学びます。再現手順の記載方法、重要度・優先度の判断基準、不具合のライフサイクル管理について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>効果的なバグ報告書の書き方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>バグの再現手順の記載方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>重要度と優先度の違いと判断基準</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>不具合のライフサイクルと管理プロセス</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション10.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 バグ報告の重要性
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バグを発見した際、適切に報告しなければ、開発者はバグを修正できません。<strong>効果的なバグ報告</strong>は、バグの早期修正と品質向上に不可欠です。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">良いバグ報告の特徴</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li><strong>明確</strong> - 誰が読んでも理解できる</li>
+                                    <li><strong>簡潔</strong> - 必要な情報が過不足なくまとめられている</li>
+                                    <li><strong>再現可能</strong> - 手順に従えば誰でも同じバグを再現できる</li>
+                                    <li><strong>客観的</strong> - 事実に基づいた記述で、憶測や感情は含まない</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">不適切なバグ報告の例</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    「画面がおかしい」「動かない」「エラーが出た」といった曖昧な報告では、開発者は原因を特定できず、バグ修正に時間がかかってしまいます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 バグ報告に含めるべき情報
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        効果的なバグ報告には、以下の情報を含める必要があります。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-clipboard-list text-slate-500"></i>
+                            バグ報告の必須項目
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-tag text-blue-500 mr-2"></i>1. タイトル（概要）</p>
+                                <p class="text-slate-600 text-sm">バグの内容を一目で理解できる簡潔な表題</p>
+                                <p class="text-slate-500 text-xs mt-1 italic">例: 「ログイン画面で正しいパスワードを入力してもエラーメッセージが表示される」</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-redo text-purple-500 mr-2"></i>2. 再現手順</p>
+                                <p class="text-slate-600 text-sm">バグを発生させるための具体的なステップ（番号付きリストで記載）</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-check-double text-emerald-500 mr-2"></i>3. 期待結果</p>
+                                <p class="text-slate-600 text-sm">本来どのように動作すべきか</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-times-circle text-red-500 mr-2"></i>4. 実際の結果</p>
+                                <p class="text-slate-600 text-sm">実際にどのような動作・エラーが発生したか</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-laptop text-amber-500 mr-2"></i>5. テスト環境</p>
+                                <p class="text-slate-600 text-sm">OS、ブラウザ、バージョン、デバイスなどの環境情報</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2"><i class="fas fa-image text-indigo-500 mr-2"></i>6. 添付資料（任意）</p>
+                                <p class="text-slate-600 text-sm">スクリーンショット、ログファイル、動画など</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要なポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    再現手順は、<strong>初めてそのシステムを触る人でも再現できる</strong>レベルで詳細に書くことが重要です。前提条件（ログイン状態、事前データ登録など）も忘れずに記載しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 バグ報告書の具体例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        以下に、効果的なバグ報告書の例を示します。
+                    </p>
+
+                    <div class="bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-300 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-file-alt text-blue-500"></i>
+                            良いバグ報告書の例
+                        </h3>
+                        <div class="bg-white rounded-lg p-5 border border-slate-200 space-y-4 text-sm">
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【タイトル】</p>
+                                <p class="text-slate-600">ログイン画面で正しいパスワードを入力してもエラーメッセージが表示される</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【再現手順】</p>
+                                <ol class="text-slate-600 list-decimal list-inside space-y-1 ml-2">
+                                    <li>ログイン画面にアクセスする</li>
+                                    <li>ユーザー名: "test_user01" を入力する</li>
+                                    <li>パスワード: "Test@1234" を入力する（正しいパスワード）</li>
+                                    <li>「ログイン」ボタンをクリックする</li>
+                                </ol>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【期待結果】</p>
+                                <p class="text-slate-600">ダッシュボード画面に遷移する</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【実際の結果】</p>
+                                <p class="text-slate-600">「ユーザー名またはパスワードが正しくありません」というエラーメッセージが表示され、ログインできない</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【テスト環境】</p>
+                                <ul class="text-slate-600 list-disc list-inside space-y-1 ml-2">
+                                    <li>OS: Windows 11 Pro</li>
+                                    <li>ブラウザ: Google Chrome バージョン 120.0.6099.130</li>
+                                    <li>画面解像度: 1920×1080</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【添付資料】</p>
+                                <p class="text-slate-600">スクリーンショット: login_error.png</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-700 mb-1">【補足情報】</p>
+                                <p class="text-slate-600">他のユーザーアカウント (test_user02, test_user03) でも同じ現象を確認しました</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-5 my-6">
+                        <h3 class="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-times-circle text-red-500"></i>
+                            悪いバグ報告書の例
+                        </h3>
+                        <div class="bg-white rounded-lg p-5 border border-red-200 space-y-2 text-sm">
+                            <p class="text-slate-700"><strong>【タイトル】</strong> ログインできない</p>
+                            <p class="text-slate-700"><strong>【内容】</strong> ログイン画面でエラーが出てログインできませんでした</p>
+                        </div>
+                        <p class="text-red-800 text-sm mt-3">
+                            <strong>問題点:</strong> 再現手順、期待結果、実際の結果、テスト環境が記載されていないため、開発者が原因を特定できません。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- セクション10.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 重要度と優先度の違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バグには<strong>重要度（Severity）</strong>と<strong>優先度（Priority）</strong>という2つの評価軸があります。この2つは混同されがちですが、明確に異なる概念です。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-exclamation-circle text-red-500"></i>
+                                重要度（Severity）
+                            </h4>
+                            <p class="text-red-900 text-sm mb-3">バグがシステムやユーザーに与える<strong>影響の大きさ</strong></p>
+                            <ul class="text-red-900 text-sm space-y-1">
+                                <li><strong>致命的</strong> - システムが停止、データ損失</li>
+                                <li><strong>重大</strong> - 主要機能が使用不可</li>
+                                <li><strong>中程度</strong> - 一部機能に影響</li>
+                                <li><strong>軽微</strong> - 見た目の不具合など</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-sort-amount-up text-blue-500"></i>
+                                優先度（Priority）
+                            </h4>
+                            <p class="text-blue-900 text-sm mb-3">バグを修正する<strong>順序・緊急性</strong></p>
+                            <ul class="text-blue-900 text-sm space-y-1">
+                                <li><strong>最優先</strong> - 即座に対応が必要</li>
+                                <li><strong>高</strong> - 次のリリースまでに修正</li>
+                                <li><strong>中</strong> - 将来のリリースで修正</li>
+                                <li><strong>低</strong> - 時間があれば修正</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-lightbulb text-amber-500"></i>
+                            重要度と優先度の関係例
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2">ケース1: 重要度「高」+ 優先度「高」</p>
+                                <p class="text-slate-600 text-sm">本番環境でシステムが停止するバグ → すぐに修正が必要</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2">ケース2: 重要度「高」+ 優先度「低」</p>
+                                <p class="text-slate-600 text-sm">めったに使われない機能の致命的なバグ → 影響範囲が限定的なので後回し</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2">ケース3: 重要度「低」+ 優先度「高」</p>
+                                <p class="text-slate-600 text-sm">デモ画面のロゴ表示ミス（翌日の重要プレゼンで使用） → 影響は軽微だが緊急対応</p>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-slate-700 font-medium mb-2">ケース4: 重要度「低」+ 優先度「低」</p>
+                                <p class="text-slate-600 text-sm">文字の微妙な位置ずれ → 余裕があれば修正</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">誰が決めるのか</h3>
+                                <p class="text-blue-900 text-sm">
+                                    <strong>重要度</strong>は主にテスト担当者が評価し、<strong>優先度</strong>はプロジェクトマネージャーやプロダクトオーナーがビジネス判断に基づいて決定することが一般的です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 不具合のライフサイクル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バグは発見されてから修正、検証、クローズまで、一連のライフサイクルを経ます。以下の図は、典型的な不具合管理のフローです。
+                    </p>
+
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 my-6">
+                        <div class="mermaid">
+flowchart TD
+    A[新規バグ登録] --> B{トリアージ}
+    B -->|受理| C[オープン]
+    B -->|却下| D[却下・クローズ]
+    C --> E[開発者に割り当て]
+    E --> F[修正中]
+    F --> G[修正完了]
+    G --> H[再テスト]
+    H --> I{修正確認}
+    I -->|OK| J[検証済み]
+    I -->|NG| K[再オープン]
+    K --> E
+    J --> L[クローズ]
+
+    style A fill:#e0f2fe
+    style B fill:#fef3c7
+    style C fill:#dbeafe
+    style D fill:#fee2e2
+    style E fill:#bfdbfe
+    style F fill:#fde68a
+    style G fill:#a7f3d0
+    style H fill:#d1fae5
+    style I fill:#fef3c7
+    style J fill:#a7f3d0
+    style K fill:#fecaca
+    style L fill:#d1d5db
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-stream text-slate-500"></i>
+                            各ステータスの説明
+                        </h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="text-slate-700 font-medium">新規（New）</p>
+                                <p class="text-slate-600">バグが報告された直後の状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">トリアージ（Triage）</p>
+                                <p class="text-slate-600">バグを受理するか却下するか、重要度・優先度を判断する段階</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">オープン（Open）</p>
+                                <p class="text-slate-600">バグが受理され、修正対象として承認された状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">修正中（In Progress）</p>
+                                <p class="text-slate-600">開発者がバグの修正作業を進めている状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">修正完了（Fixed）</p>
+                                <p class="text-slate-600">開発者が修正を完了し、テストチームに返却した状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">再テスト（Retest）</p>
+                                <p class="text-slate-600">テスト担当者が修正内容を検証している状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">検証済み（Verified）</p>
+                                <p class="text-slate-600">修正が正しく行われたことが確認された状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">再オープン（Reopen）</p>
+                                <p class="text-slate-600">修正が不十分で、再度修正が必要な状態</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-700 font-medium">クローズ（Closed）</p>
+                                <p class="text-slate-600">バグが完全に解決され、対応が終了した状態</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">トリアージの重要性</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    報告されたすべてのバグを修正するわけではありません。仕様通りの動作であれば却下されたり、リスクや影響が小さいバグは「既知の制限事項」として受け入れられることもあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 不具合管理ツール
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の開発現場では、バグ報告や管理を効率化するために専用ツールを使用します。代表的なツールを紹介します。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fab fa-jira text-blue-500"></i>
+                                Jira
+                            </h4>
+                            <p class="text-blue-900 text-sm mb-2">Atlassian社の統合プロジェクト管理ツール</p>
+                            <p class="text-blue-800 text-xs">課題管理、バグトラッキング、スプリント管理に広く使用される</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                                <i class="fab fa-github text-purple-500"></i>
+                                GitHub Issues
+                            </h4>
+                            <p class="text-purple-900 text-sm mb-2">GitHubに統合された課題管理機能</p>
+                            <p class="text-purple-800 text-xs">オープンソースプロジェクトで広く利用される</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bug text-orange-500"></i>
+                                Bugzilla
+                            </h4>
+                            <p class="text-orange-900 text-sm mb-2">Mozilla開発のオープンソースバグ管理ツール</p>
+                            <p class="text-orange-800 text-xs">高機能で長い歴史を持つツール</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-clipboard-list text-emerald-500"></i>
+                                Redmine
+                            </h4>
+                            <p class="text-emerald-900 text-sm mb-2">オープンソースのプロジェクト管理ツール</p>
+                            <p class="text-emerald-800 text-xs">日本で人気の高い課題管理システム</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">ツールの共通機能</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li>バグの登録・検索・フィルタリング</li>
+                                    <li>ステータス管理（新規→修正中→完了など）</li>
+                                    <li>担当者の割り当て</li>
+                                    <li>コメント機能（議論・質問の履歴）</li>
+                                    <li>添付ファイルの管理</li>
+                                    <li>通知機能（メール、Slack連携など）</li>
+                                    <li>レポート・統計機能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.7 バグ報告時の注意点とベストプラクティス
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">ベストプラクティス</h3>
+                                <ul class="space-y-2 text-emerald-900 text-sm">
+                                    <li><strong>1つのバグ報告には1つの問題</strong> - 複数の問題を1つの報告にまとめない</li>
+                                    <li><strong>重複確認</strong> - 報告前に既存のバグと重複していないか確認する</li>
+                                    <li><strong>迅速な報告</strong> - バグを発見したらできるだけ早く報告する</li>
+                                    <li><strong>客観的な記述</strong> - 感情的な表現や推測は避け、事実のみを記載する</li>
+                                    <li><strong>証拠の提供</strong> - スクリーンショットやログファイルを添付する</li>
+                                    <li><strong>再現性の確認</strong> - 報告前に自分で再現できることを確認する</li>
+                                    <li><strong>コミュニケーション</strong> - 開発者からの質問には迅速に回答する</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border border-red-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-times-circle text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-red-800 mb-3">避けるべきこと</h3>
+                                <ul class="space-y-2 text-red-900 text-sm">
+                                    <li><strong>曖昧な記述</strong> - 「画面がおかしい」「動かない」など具体性のない表現</li>
+                                    <li><strong>感情的な表現</strong> - 「ひどいバグ」「信じられない」など主観的な言葉</li>
+                                    <li><strong>原因の憶測</strong> - 「たぶん〇〇が原因」など根拠のない推測</li>
+                                    <li><strong>重複報告</strong> - 既存のバグを確認せずに同じ内容を報告する</li>
+                                    <li><strong>放置</strong> - 開発者からの質問に回答しない、議論に参加しない</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pencil-alt text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: バグ報告書を作成してみよう</h3>
+                            <div class="bg-purple-100 rounded-lg p-4 mb-4">
+                                <p class="text-purple-900 font-medium mb-2 break-words">シナリオ:</p>
+                                <p class="text-purple-800 text-sm break-words">
+                                    あなたはECサイトのテストを行っています。カートに商品を追加後、「購入手続きに進む」ボタンをクリックすると、エラーページが表示されてしまいました。この問題をバグ報告書として記述してください。
+                                </p>
+                            </div>
+                            <details class="mt-4">
+                                <summary class="cursor-pointer text-purple-600 hover:text-purple-700 font-medium break-words">
+                                    報告例を表示
+                                </summary>
+                                <div class="mt-3 pl-4 text-purple-900 bg-purple-100 rounded-lg p-4 text-sm break-words">
+                                    <p class="font-semibold mb-2">【タイトル】</p>
+                                    <p class="mb-3">カートから購入手続きに進むとエラーページが表示される</p>
+
+                                    <p class="font-semibold mb-2">【再現手順】</p>
+                                    <ol class="list-decimal list-inside space-y-1 mb-3 ml-2">
+                                        <li>ECサイトのトップページにアクセスする</li>
+                                        <li>任意の商品をクリックして商品詳細ページに移動する</li>
+                                        <li>「カートに追加」ボタンをクリックする</li>
+                                        <li>画面右上のカートアイコンをクリックしてカート画面を表示する</li>
+                                        <li>「購入手続きに進む」ボタンをクリックする</li>
+                                    </ol>
+
+                                    <p class="font-semibold mb-2">【期待結果】</p>
+                                    <p class="mb-3">配送先情報の入力画面に遷移する</p>
+
+                                    <p class="font-semibold mb-2">【実際の結果】</p>
+                                    <p class="mb-3">「500 Internal Server Error」と表示されたエラーページが表示される</p>
+
+                                    <p class="font-semibold mb-2">【テスト環境】</p>
+                                    <ul class="list-disc list-inside space-y-1 mb-3 ml-2">
+                                        <li>OS: macOS Sonoma 14.2</li>
+                                        <li>ブラウザ: Safari 17.2</li>
+                                    </ul>
+
+                                    <p class="font-semibold mb-2">【添付資料】</p>
+                                    <p class="mb-3">スクリーンショット: error_page.png</p>
+
+                                    <p class="font-semibold mb-2">【補足情報】</p>
+                                    <p>ブラウザのコンソールログには「TypeError: Cannot read property 'id' of undefined」というエラーメッセージが出力されています</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. バグ報告書に必ず含めるべき情報を5つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>回答:</strong><br>
+                                            1. タイトル（概要）<br>
+                                            2. 再現手順<br>
+                                            3. 期待結果<br>
+                                            4. 実際の結果<br>
+                                            5. テスト環境（OS、ブラウザ、バージョンなど）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 重要度（Severity）と優先度（Priority）の違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>回答:</strong><br>
+                                            <strong>重要度（Severity）</strong>は、バグがシステムやユーザーに与える影響の大きさを示します（致命的、重大、中程度、軽微など）。<br>
+                                            <strong>優先度（Priority）</strong>は、バグを修正する順序や緊急性を示します（最優先、高、中、低など）。<br>
+                                            例えば、影響は大きいが使用頻度が低い機能のバグは「重要度:高、優先度:低」となることがあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. バグのライフサイクルで「トリアージ」とは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>回答:</strong><br>
+                                            トリアージとは、報告されたバグを受理するか却下するか、また重要度・優先度をどう設定するかを判断する段階です。すべての報告がバグとして承認されるわけではなく、仕様通りの動作であれば却下されることもあります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 効果的なバグ報告を書くために心がけるべきことを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>回答例:</strong><br>
+                                            1. 再現手順を具体的に書く（初めて触る人でも再現できるレベル）<br>
+                                            2. 客観的な記述を心がけ、感情的な表現や憶測を避ける<br>
+                                            3. スクリーンショットやログファイルなど証拠となる資料を添付する<br>
+                                            （他にも、1つのバグ報告には1つの問題のみ含める、重複確認を行う、などがあります）
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第10章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>効果的なバグ報告には、タイトル、再現手順、期待結果、実際の結果、テスト環境が必要です</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>再現手順は初めて触る人でも再現できるレベルで詳細に記載することが重要です</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>重要度はバグの影響の大きさ、優先度は修正する順序・緊急性を示します</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>バグは新規登録からトリアージ、修正、検証、クローズまでのライフサイクルを経ます</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>Jira、GitHub Issues、Bugzilla、Redmineなどのツールを使ってバグを管理します</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-primary-500 mt-1 text-sm"></i>
+                            <span>客観的な記述、証拠の提供、迅速な報告がバグ報告のベストプラクティスです</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="software-testing-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">テストドキュメント</span>
+                        </div>
+                    </a>
+                    <a href="software-testing-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">テスト自動化の基礎</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

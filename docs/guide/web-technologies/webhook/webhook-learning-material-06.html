@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Webhook入門 第6章 - Webhookの登録と設定 〜エンドポイントとは〜</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Webhook - Teal（ネットワーク・通信系）
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-webhook text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Webhook入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-globe text-[9px]"></i>
+                                <span>Webテクノロジ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約10時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="../../../../index.html" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../README.md" class="hover:text-primary-600 transition-colors">Webhook入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約30分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+                        Webhookの登録と設定 〜エンドポイントとは〜
+                    </h1>
+                    <p class="text-slate-600">
+                        Webhookを利用するために必要な設定手順を学びます。「エンドポイントURL」「イベントの種類の選択」「登録手順」など、サービス側でWebhookを設定する一般的な流れを理解します。
+                    </p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エンドポイントURLとは何かを、「住所」の例えで理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookの登録手順（URL入力 → イベント選択 → 保存）の流れを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>イベントの種類を選択することの意味と重要性を理解できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webhookの受信先（エンドポイント）が満たすべき条件を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 6.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 エンドポイントとは？
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookを設定するとき、必ず求められるのが「エンドポイントURL」の入力です。
+                        でも、「エンドポイント」という言葉を聞いただけでは、何のことか分かりづらいですよね。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        エンドポイントを日常の言葉に置き換えると、「<strong>通知の届け先住所</strong>」です。
+                        郵便物を送るとき、宛先の住所が必要なのと同じように、
+                        Webhookを受け取るには「どこに送ればよいか」をURL（Web上の住所）で指定します。
+                    </p>
+
+                    <!-- 住所の例えカード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-orange-400 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-envelope text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-orange-800">郵便の「住所」</h3>
+                            </div>
+                            <p class="text-orange-900 text-sm leading-relaxed">
+                                郵便物を届けるには、配達先の住所（例: 東京都渋谷区〇〇町1-2-3）が必要。
+                                この住所宛に郵便物が届きます。
+                            </p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-link text-white"></i>
+                                </div>
+                                <h3 class="font-semibold text-emerald-800">Webhookの「エンドポイントURL」</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm leading-relaxed">
+                                Webhookデータを届けるには、受け取り先のURL（例: https://example.com/webhook）が必要。
+                                このURL宛にWebhookデータが届きます。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- エンドポイントURLの例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-at text-primary-500"></i>
+                            エンドポイントURLの例
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="bg-slate-50 rounded-lg p-4 font-mono text-sm">
+                                <span class="text-slate-500">// よくあるエンドポイントURLの形式</span><br>
+                                <span class="text-primary-700">https://</span><span class="text-slate-800">myapp.example.com</span><span class="text-orange-600">/webhook</span><br>
+                                <span class="text-primary-700">https://</span><span class="text-slate-800">api.example.com</span><span class="text-orange-600">/webhooks/github</span><br>
+                                <span class="text-primary-700">https://</span><span class="text-slate-800">service.example.com</span><span class="text-orange-600">/notifications/stripe</span>
+                            </div>
+                            <div class="flex flex-wrap gap-3 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-primary-500"></span>
+                                    <span class="text-slate-600"><strong class="text-primary-700">https://</strong> = 安全な通信を示すプロトコル</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-slate-500"></span>
+                                    <span class="text-slate-600"><strong>ドメイン</strong> = サーバーの名前（住所の町名）</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-orange-400"></span>
+                                    <span class="text-slate-600"><strong class="text-orange-600">パス</strong> = サーバー内の場所（住所の番地）</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    エンドポイントとは「Webhookデータを受け取るためのURL（Web上の住所）」のことです。
+                                    Webhookを設定するときは、このURLをサービス側に登録することで、
+                                    イベントが発生したときに自動でデータが届くようになります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 6.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 エンドポイントが満たすべき条件
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookのエンドポイントとして登録するURLには、いくつかの条件があります。
+                        普通のWebページのURLと少し違う点がありますので、確認しておきましょう。
+                    </p>
+
+                    <!-- 条件リスト -->
+                    <div class="space-y-4 mb-6">
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                                    <span class="text-primary-700 font-bold text-lg">1</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">公開されている（インターネットからアクセスできる）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        送信元サービスがデータを届けるために、URLがインターネット上からアクセスできる状態でなければなりません。
+                                        自分のパソコンの中だけで動いているURL（localhost）は通常使えません。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                                    <span class="text-primary-700 font-bold text-lg">2</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">HTTPSで始まる（安全な通信）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        多くのサービスはHTTPS（暗号化された安全な通信）のURLしか受け付けません。
+                                        HTTPSを使うことで、データが途中で盗み見られるリスクを減らせます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                                    <span class="text-primary-700 font-bold text-lg">3</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">POSTリクエストを受け取れる</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        WebhookはHTTPのPOSTメソッドでデータを送ってきます。
+                                        エンドポイントはこのPOSTリクエストを処理できるプログラムである必要があります。
+                                        （普通のWebページはGETメソッドで表示されますが、それとは別です）
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                                    <span class="text-primary-700 font-bold text-lg">4</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 mb-1">レスポンスを素早く返す（200 OK）</h3>
+                                    <p class="text-slate-600 text-sm leading-relaxed">
+                                        Webhookを受け取ったら、数秒以内に「受け取りました」という意味の「200 OK」を返す必要があります。
+                                        応答が遅いと、送信元サービスが「失敗した」と判断して再送する場合があります。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    開発中は自分のパソコン（localhost）でWebhookをテストしたいことがあります。
+                                    その場合は「ngrok」「webhook.site」などのツールを使うと、
+                                    インターネットからアクセスできる一時的なURLを発行できます。第12章で詳しく学びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 6.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 イベントの種類を選択する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookを登録するとき、URLの入力に加えて「どのイベントのときに送るか」を指定します。
+                        これを「イベントの種類の選択」と呼びます。
+                    </p>
+
+                    <!-- なぜイベント選択が必要か -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-question-circle text-primary-500"></i>
+                            なぜイベントを選択する必要があるのか？
+                        </h3>
+                        <p class="text-slate-600 text-sm leading-relaxed mb-4">
+                            サービスによっては、発生するイベントが非常に多くあります。
+                            たとえばGitHubでは「コードのプッシュ」「プルリクエストの作成」「Issue（課題）の登録」など、
+                            数十種類のイベントがあります。
+                        </p>
+                        <p class="text-slate-600 text-sm leading-relaxed mb-4">
+                            「すべてのイベントを送る」設定にすると、必要のないイベントのデータまで大量に届いてしまいます。
+                            自分が必要なイベントだけを選ぶことで、効率的に処理できます。
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-times-circle text-red-500"></i>
+                                    すべてのイベントを受け取る（非効率）
+                                </h4>
+                                <ul class="text-red-900 text-sm space-y-1">
+                                    <li>・コードのプッシュ → 受け取る</li>
+                                    <li>・プルリクエスト → 受け取る</li>
+                                    <li>・Issue登録 → 受け取る（不要）</li>
+                                    <li>・コメント追加 → 受け取る（不要）</li>
+                                    <li>・スター追加 → 受け取る（不要）</li>
+                                </ul>
+                            </div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-emerald-500"></i>
+                                    必要なイベントだけ選択（効率的）
+                                </h4>
+                                <ul class="text-emerald-900 text-sm space-y-1">
+                                    <li>・コードのプッシュ → 受け取る ✓</li>
+                                    <li>・プルリクエスト → 受け取る ✓</li>
+                                    <li>・Issue登録 → 受け取らない</li>
+                                    <li>・コメント追加 → 受け取らない</li>
+                                    <li>・スター追加 → 受け取らない</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- サービス別イベント例 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-list text-primary-500"></i>
+                            各サービスのイベント例
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100">
+                                        <th class="text-left px-4 py-3 rounded-tl-lg text-slate-700">サービス</th>
+                                        <th class="text-left px-4 py-3 text-slate-700">代表的なイベント</th>
+                                        <th class="text-left px-4 py-3 rounded-tr-lg text-slate-700">利用場面</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">
+                                            <i class="fab fa-github mr-2 text-slate-600"></i>GitHub
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">push, pull_request, issues</td>
+                                        <td class="px-4 py-3 text-slate-500">CI/CD自動化</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">
+                                            <i class="fas fa-credit-card mr-2 text-emerald-600"></i>Stripe
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">payment_intent.succeeded, invoice.paid</td>
+                                        <td class="px-4 py-3 text-slate-500">決済完了処理</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">
+                                            <i class="fab fa-slack mr-2 text-blue-600"></i>Slack
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">message.posted, member.joined</td>
+                                        <td class="px-4 py-3 text-slate-500">チャット連携</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-slate-700">
+                                            <i class="fab fa-line mr-2 text-emerald-500"></i>LINE
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">message, follow, unfollow</td>
+                                        <td class="px-4 py-3 text-slate-500">チャットボット</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 6.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 Webhook登録の一般的な手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookの登録方法はサービスによって多少異なりますが、基本的な流れはどのサービスでもほぼ同じです。
+                        ここでは一般的な手順を学びましょう。
+                    </p>
+
+                    <!-- 登録手順フローチャート -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            Webhook登録の一般的な流れ
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A([開始: Webhookを設定したい]) --> B["サービスの設定画面を開く<br/>（管理画面 → 設定 → Webhook）"]
+    B --> C["エンドポイントURLを入力<br/>（https://example.com/webhook）"]
+    C --> D["受け取るイベントの種類を選択<br/>（例: 支払い完了、コードのプッシュ）"]
+    D --> E["シークレットキーの設定<br/>（セキュリティのため）"]
+    E --> F["設定を保存する"]
+    F --> G{テスト送信を実行}
+    G -->|成功| H(["設定完了！"])
+    G -->|失敗| I["エラーを確認して修正"]
+    I --> C
+        </div>
+                    </div>
+
+                    <!-- 手順の詳細 -->
+                    <div class="space-y-4 mb-6">
+                        <!-- ステップ1 -->
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="flex items-center gap-4 p-4 border-b border-slate-100">
+                                <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                    1
+                                </div>
+                                <h3 class="font-semibold text-slate-800">設定画面を探す</h3>
+                            </div>
+                            <div class="p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed">
+                                サービスの管理画面やダッシュボードを開き、「設定（Settings）」「開発者（Developer）」「API」
+                                などのメニューを探します。そこに「Webhook」または「Webhooks」という項目があります。
+                                <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p class="text-blue-800 text-xs">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        GitHubなら「リポジトリ → Settings → Webhooks」、
+                                        Stripeなら「ダッシュボード → 開発者 → Webhook」から設定できます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ステップ2 -->
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="flex items-center gap-4 p-4 border-b border-slate-100">
+                                <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                    2
+                                </div>
+                                <h3 class="font-semibold text-slate-800">エンドポイントURLを入力する</h3>
+                            </div>
+                            <div class="p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed">
+                                「Payload URL（ペイロードURL）」や「エンドポイントURL」という入力欄に、
+                                Webhookデータを受け取るURLを入力します。
+                                <div class="code-block-wrapper mt-3">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-xs">入力例</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">https://myapp.example.com/webhook/github</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ステップ3 -->
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="flex items-center gap-4 p-4 border-b border-slate-100">
+                                <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                    3
+                                </div>
+                                <h3 class="font-semibold text-slate-800">イベントの種類を選択する</h3>
+                            </div>
+                            <div class="p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed">
+                                「どのイベントが発生したときにWebhookを送るか」を選択します。
+                                「すべてのイベント」を選ぶか、「特定のイベントのみ」を選ぶか指定できます。
+                                必要なイベントだけを選ぶことで、無駄な通信を減らせます。
+                            </div>
+                        </div>
+
+                        <!-- ステップ4 -->
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="flex items-center gap-4 p-4 border-b border-slate-100">
+                                <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                    4
+                                </div>
+                                <h3 class="font-semibold text-slate-800">シークレット（秘密鍵）を設定する</h3>
+                            </div>
+                            <div class="p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed">
+                                多くのサービスでは「シークレット」と呼ばれる秘密の文字列を設定できます。
+                                これを設定しておくと、Webhookが本当に正しいサービスから送られてきたものかを確認できます。
+                                セキュリティの観点から設定することを推奨します（詳しくは第10章で学びます）。
+                            </div>
+                        </div>
+
+                        <!-- ステップ5 -->
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div class="flex items-center gap-4 p-4 border-b border-slate-100">
+                                <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center text-white font-bold">
+                                    5
+                                </div>
+                                <h3 class="font-semibold text-slate-800">保存してテスト送信を確認する</h3>
+                            </div>
+                            <div class="p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed">
+                                設定を保存したら、多くのサービスが「テスト送信（Test delivery）」機能を提供しています。
+                                これを使うと、実際のイベントを待たずにWebhookの動作確認ができます。
+                                エンドポイントが正しく200 OKを返すことを確認しましょう。
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 6.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 登録時によく設定する項目まとめ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サービスによって画面や名称は異なりますが、Webhook登録でよく見かける設定項目を整理しておきましょう。
+                    </p>
+
+                    <!-- 設定項目一覧表 -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+                        <div class="bg-primary-50 px-6 py-3 border-b border-primary-200">
+                            <h3 class="font-semibold text-primary-800 flex items-center gap-2">
+                                <i class="fas fa-table"></i>
+                                Webhook設定項目一覧
+                            </h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-slate-50">
+                                        <th class="text-left px-4 py-3 text-slate-700 font-semibold">設定項目</th>
+                                        <th class="text-left px-4 py-3 text-slate-700 font-semibold">必須/任意</th>
+                                        <th class="text-left px-4 py-3 text-slate-700 font-semibold">説明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700">Payload URL</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">必須</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">Webhookデータを受け取るURLを指定します</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700">Content Type</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">推奨</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">データの形式（通常はapplication/json）を指定します</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700">Secret</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">推奨</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">署名検証に使う秘密鍵。セキュリティのために設定します</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700">イベント選択</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">必須</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">どのイベント発生時に送信するかを選びます</td>
+                                    </tr>
+                                    <tr class="border-t border-slate-200">
+                                        <td class="px-4 py-3 font-medium text-primary-700">有効/無効</td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">任意</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-600">Webhookを一時的にOFF（無効）にできます</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">ヒント</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    「Content Type」は「application/json」を選んでおくと、
+                                    受け取ったデータがJSONフォーマットで届き、プログラムから扱いやすくなります。
+                                    JSON形式については第5章で学んでいます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 6.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.6 登録後に起きること
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webhookを登録すると、どのような流れでデータが届くのかを確認しましょう。
+                    </p>
+
+                    <!-- 登録後の流れ図 -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            登録後にイベントが発生したときの流れ
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant S as 送信元サービス
+    participant E as エンドポイント<br/>（あなたのURL）
+
+    Note over S,E: Webhookが登録済みの状態
+
+    S->>S: イベント発生<br/>（例: 注文が入った）
+    S->>E: POSTリクエスト送信<br/>（JSONデータ付き）
+    E-->>S: 200 OK（受け取りました）
+    E->>E: データを処理<br/>（メール送信など）
+        </div>
+                    </div>
+
+                    <!-- 大事なポイント -->
+                    <div class="bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-200 rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-book-open text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-primary-800 mb-3">登録後の重要ポイント</h3>
+                                <ul class="space-y-2 text-primary-900 text-sm">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                        <span>登録が完了すると、指定したイベントが発生するたびに自動でWebhookが届きます</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                        <span>エンドポイントが200以外のHTTPステータスコードを返すと、送信元は「失敗」とみなしてリトライします</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                        <span>設定画面から「配信ログ（Delivery log）」を確認でき、成功・失敗の履歴が見られます</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-primary-500 mt-1 flex-shrink-0"></i>
+                                        <span>不要になったWebhookは設定画面から削除または無効化できます</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- まとめ -->
+                <section class="mb-8">
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6">
+                        <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                            <i class="fas fa-flag-checkered text-primary-500"></i>
+                            第6章のまとめ
+                        </h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">1</span>
+                                <p class="text-slate-700">エンドポイントとは「Webhookデータを受け取るためのURL（Web上の住所）」のことです</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">2</span>
+                                <p class="text-slate-700">エンドポイントは「公開されている」「HTTPSを使う」「POSTリクエストを処理できる」「素早く200 OKを返す」の4条件が必要です</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">3</span>
+                                <p class="text-slate-700">Webhookを登録するとき、イベントの種類を選択することで必要な通知だけを受け取れます</p>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center font-bold">4</span>
+                                <p class="text-slate-700">登録手順は「URL入力 → イベント選択 → シークレット設定 → 保存 → テスト確認」の流れが一般的です</p>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「エンドポイント」を日常的な言葉に置き換えると次のどれが最も近いですか？
+                                        (A) 送信するデータの内容  (B) 通知の届け先住所  (C) イベントの発生時刻</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) 通知の届け先住所 です。エンドポイントはWebhookデータを受け取るためのURLで、
+                                            郵便の宛先住所のように「どこに届けるか」を示すものです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Webhookのエンドポイントとして使えないURLはどれですか？
+                                        (A) https://myapp.example.com/webhook
+                                        (B) http://localhost:3000/webhook
+                                        (C) https://api.myservice.com/notifications</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) http://localhost:3000/webhook です。
+                                            localhostは自分のパソコン内だけでしかアクセスできないURLなので、
+                                            インターネット上の送信元サービスからはアクセスできません。
+                                            また多くのサービスはHTTPS（http:// ではなく https://）を必須としています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Webhook登録時にイベントの種類を選択する主な目的はどれですか？
+                                        (A) セキュリティを高めるため
+                                        (B) 必要なイベントの通知だけを受け取り、無駄な通信を減らすため
+                                        (C) 送信先URLを複数設定するため</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            答えは (B) 必要なイベントの通知だけを受け取り、無駄な通信を減らすため です。
+                                            サービスには多くのイベントがあるため、不要なものまで受け取ると処理が増えます。
+                                            必要なイベントだけ選ぶことで効率的なシステムが作れます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章の予告 -->
+                <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-5 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-teal-800 mb-2">次章の予告</h3>
+                            <p class="text-teal-900 text-sm leading-relaxed">
+                                第7章では、SlackやMicrosoft Teamsなどのチャットツールで使われるWebhook（Incoming Webhook）の仕組みを学びます。
+                                「特定のイベントが起きたらチャットに自動通知する」という身近なユースケースを通じて、
+                                Webhookの実践的な活用方法を理解します。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="webhook-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">JSONデータの読み方</span>
+                        </div>
+                    </a>
+                    <a href="webhook-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">チャットツール連携</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

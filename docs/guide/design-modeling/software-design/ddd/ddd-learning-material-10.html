@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>DDD学習教材 第10章 - 境界づけられたコンテキスト - ドメインの分割と統治</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // DDD - Indigo (設計手法用)
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-project-diagram text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">DDD学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-cubes text-[9px]"></i>
+                                <span>設計・モデリング</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="../" class="hover:text-primary-600 transition-colors">設計・モデリング</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1時間30分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">境界づけられたコンテキスト - ドメインの分割と統治</h1>
+                    <p class="text-slate-600">DDDの戦略的パターンの学習を開始します。大規模なシステムをどのように分割するか、「顧客」という同じ言葉が販売・配送・サポートで異なる意味を持つ場合にどう対処するかを学びます。コンテキストの境界を見極め、適切に分割する方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>境界づけられたコンテキストとは何か、なぜ必要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>同じ言葉が異なる意味を持つ問題とその解決方法を学ぶ</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンテキストの境界を見極める方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>適切なコンテキスト分割の指針とパターンを理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: 境界づけられたコンテキストとは -->
+                <section class="prose prose-slate max-w-none">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 境界づけられたコンテキストとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>境界づけられたコンテキスト（Bounded Context）</strong>は、DDDの戦略的パターンの中で最も重要な概念です。これは、「特定のドメインモデルが適用される明確な境界を持った領域」を意味します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        大規模なシステムでは、すべてを単一のモデルで表現しようとすると、矛盾や複雑性が急激に増大します。境界づけられたコンテキストは、システムを<strong>小さく管理可能な部分に分割</strong>することで、この問題を解決します。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    境界づけられたコンテキストの中では、ユビキタス言語が一貫性を持ちます。異なるコンテキスト間では、同じ言葉が異なる意味を持つことが許されます。これが「境界」の本質です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コンテキストの例示図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            ECサイトにおける境界づけられたコンテキストの例
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph SalesCtx["販売コンテキスト"]
+        SC1[商品カタログ]
+        SC2[ショッピングカート]
+        SC3[注文]
+    end
+
+    subgraph OrderCtx["受注管理コンテキスト"]
+        OC1[受注]
+        OC2[在庫引当]
+        OC3[出荷指示]
+    end
+
+    subgraph ShippingCtx["配送コンテキスト"]
+        SH1[配送先]
+        SH2[配送状況]
+        SH3[配送完了]
+    end
+
+    subgraph SupportCtx["サポートコンテキスト"]
+        SP1[問い合わせ]
+        SP2[返品受付]
+        SP3[顧客対応履歴]
+    end
+
+    SC3 -->|注文確定| OC1
+    OC3 -->|出荷依頼| SH1
+    SP2 -->|返品情報| OC1
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: なぜコンテキストを分割する必要があるのか -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 なぜコンテキストを分割する必要があるのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コンテキストを分割せず、すべてを単一のモデルで表現しようとすると、以下のような問題が発生します：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題①: 概念の衝突
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                「顧客」という言葉が、販売部門では「購入者」、配送部門では「配送先」、サポート部門では「問い合わせ元」と異なる意味を持つため、単一のモデルで統一しようとすると混乱が生じます。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題②: モデルの肥大化
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                すべての要件を1つのモデルに詰め込むと、エンティティや関連が膨れ上がり、理解・保守が困難になります。すべてのチームが同じコードベースで作業することで、変更のリスクも増大します。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題③: チーム間の調整コスト
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                複数のチームが単一のモデルを共有すると、変更のたびに全チームでの合意が必要になり、開発スピードが低下します。
+                            </p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                問題④: 技術的制約の混在
+                            </h4>
+                            <p class="text-red-900 text-sm">
+                                リアルタイム性が必要な部分とバッチ処理で良い部分、高負荷な部分と低負荷な部分が混在し、適切な技術選定が困難になります。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-star text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2 break-words">コンテキスト分割のメリット</h3>
+                                <ul class="space-y-2 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>明確な責任範囲</strong>: 各コンテキストが特定のビジネス機能に専念できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>チームの自律性</strong>: 他のチームに影響を与えずに変更・進化できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>技術の多様性</strong>: コンテキストごとに最適な技術スタックを選択できる</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check-circle text-emerald-600 mt-1 flex-shrink-0"></i>
+                                        <span><strong>スケーラビリティ</strong>: 負荷の高いコンテキストだけを独立してスケールできる</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: 「顧客」の意味が変わる実例 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 「顧客」の意味が変わる実例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じ「顧客」という言葉でも、ビジネスコンテキストによって持つ意味や属性が大きく異なります。具体例で見てみましょう。
+                    </p>
+
+                    <!-- 顧客の意味の違いを示す図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-users text-primary-500"></i>
+                            コンテキストごとの「顧客」の意味の違い
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    Word["「顧客」という言葉"]
+
+    subgraph Sales["販売コンテキスト"]
+        S1["顧客 = 購入者"]
+        S2["属性: 購買履歴、好み、<br/>ポイント残高、会員ランク"]
+        S3["関心: いくら買ってくれたか"]
+    end
+
+    subgraph Shipping["配送コンテキスト"]
+        Sh1["顧客 = 配送先"]
+        Sh2["属性: 住所、電話番号、<br/>配送時間帯指定、不在履歴"]
+        Sh3["関心: どこに届けるか"]
+    end
+
+    subgraph Support["サポートコンテキスト"]
+        Su1["顧客 = 問い合わせ元"]
+        Su2["属性: 問い合わせ履歴、<br/>クレーム回数、対応優先度"]
+        Su3["関心: どんな問題を抱えているか"]
+    end
+
+    Word --> Sales
+    Word --> Shipping
+    Word --> Support
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 my-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-blue-800 mb-2">販売コンテキストの「顧客」</h4>
+                            <div class="code-block-wrapper mb-2">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">Customer.java</span>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 販売コンテキスト
+class Customer {
+  String id;
+  String name;
+  int points; // ポイント残高
+  List&lt;Order&gt; orders; // 購買履歴
+  String memberRank; // 会員ランク
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-emerald-800 mb-2">配送コンテキストの「顧客」</h4>
+                            <div class="code-block-wrapper mb-2">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">Recipient.java</span>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 配送コンテキスト
+class Recipient {
+  String id;
+  String name;
+  Address address; // 配送先住所
+  String phone;
+  String deliveryTime; // 配送希望時間
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-purple-800 mb-2">サポートコンテキストの「顧客」</h4>
+                            <div class="code-block-wrapper mb-2">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">SupportCustomer.java</span>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-java">// サポートコンテキスト
+class SupportCustomer {
+  String id;
+  String name;
+  List&lt;Inquiry&gt; inquiries; // 問い合わせ履歴
+  int priority; // 対応優先度
+  String assignedAgent; // 担当者
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">無理に統一しようとすると...</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    すべての属性を持つ巨大な「Customer」クラスを作ると、販売では使わない配送先情報、配送では使わない問い合わせ履歴など、不要な情報が混在し、複雑性が増大します。境界づけられたコンテキストでは、それぞれの文脈で必要な情報だけを持つモデルを作ります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: コンテキストの境界を見極める方法 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 コンテキストの境界を見極める方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        では、どのようにしてコンテキストの境界を見極めればよいのでしょうか。以下の観点で検討します。
+                    </p>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-compass text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">コンテキスト境界を見極める5つの観点</h3>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <div class="flex-1 min-w-0">
+                                            <strong class="break-words">ビジネス機能の違い</strong>
+                                            <p class="text-sm mt-1 break-words">「販売」「配送」「サポート」など、異なるビジネス機能は異なるコンテキストになることが多い。それぞれが独立した価値を提供している。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <div class="flex-1 min-w-0">
+                                            <strong class="break-words">言葉の意味の違い</strong>
+                                            <p class="text-sm mt-1 break-words">同じ言葉でも異なる意味や属性を持つ場合は、別のコンテキストである可能性が高い。ユビキタス言語が一貫性を保てる範囲が1つのコンテキスト。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <div class="flex-1 min-w-0">
+                                            <strong class="break-words">チームの境界</strong>
+                                            <p class="text-sm mt-1 break-words">異なるチームが担当する領域は、異なるコンテキストになることが多い。チームの自律性を保つためにも境界を明確にする。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <div class="flex-1 min-w-0">
+                                            <strong class="break-words">変更の独立性</strong>
+                                            <p class="text-sm mt-1 break-words">ある機能の変更が他の機能に影響を与えない場合、それらは別のコンテキストとして分割できる。独立して進化できる単位。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">5</span>
+                                        <div class="flex-1 min-w-0">
+                                            <strong class="break-words">技術的要件の違い</strong>
+                                            <p class="text-sm mt-1 break-words">リアルタイム性が必要な部分とバッチ処理で良い部分、高負荷な部分と低負荷な部分など、技術的要件が大きく異なる場合も分割の指標になる。</p>
+                                        </div>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: コンテキスト分割の実践 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 コンテキスト分割の実践例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ECサイトを例に、どのようにコンテキストを分割するか見てみましょう。
+                    </p>
+
+                    <!-- ECサイトのコンテキスト分割図 -->
+                    <div class="bg-slate-100 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-sitemap text-primary-500"></i>
+                            ECサイトのコンテキスト分割例
+                        </h3>
+                        <div class="mermaid">
+flowchart TB
+    subgraph Catalog["カタログコンテキスト"]
+        C1[商品情報管理]
+        C2[カテゴリ管理]
+        C3[検索機能]
+    end
+
+    subgraph Cart["カートコンテキスト"]
+        CA1[カート管理]
+        CA2[お気に入り]
+        CA3[レコメンド]
+    end
+
+    subgraph Order["注文コンテキスト"]
+        O1[注文受付]
+        O2[在庫引当]
+        O3[決済処理]
+    end
+
+    subgraph Inventory["在庫コンテキスト"]
+        I1[在庫管理]
+        I2[入荷処理]
+        I3[棚卸]
+    end
+
+    subgraph Shipping["配送コンテキスト"]
+        S1[配送手配]
+        S2[配送追跡]
+        S3[配送完了]
+    end
+
+    subgraph Customer["顧客コンテキスト"]
+        CU1[会員情報]
+        CU2[ポイント管理]
+        CU3[購買履歴]
+    end
+
+    Catalog -->|商品情報| Cart
+    Cart -->|注文| Order
+    Order -->|在庫確認| Inventory
+    Order -->|配送依頼| Shipping
+    Order -->|顧客情報| Customer
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-box text-blue-500"></i>
+                                カタログコンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">商品情報の閲覧と検索</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> 商品マスタ管理、カテゴリ分類、検索インデックス<br>
+                                <strong>関心:</strong> 商品の魅力を伝える
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-shopping-cart text-purple-500"></i>
+                                カートコンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">購入前の商品選択</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> カート管理、お気に入り、レコメンド<br>
+                                <strong>関心:</strong> 購買を促進する
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-receipt text-emerald-500"></i>
+                                注文コンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">注文の受付と処理</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> 注文受付、決済、在庫引当<br>
+                                <strong>関心:</strong> 正確な注文処理
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-warehouse text-orange-500"></i>
+                                在庫コンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">在庫の管理と補充</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> 在庫数管理、入荷、棚卸<br>
+                                <strong>関心:</strong> 在庫の正確性
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-truck text-indigo-500"></i>
+                                配送コンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">商品の配送管理</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> 配送手配、追跡、完了確認<br>
+                                <strong>関心:</strong> 確実な配送
+                            </p>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <h4 class="font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-user text-pink-500"></i>
+                                顧客コンテキスト
+                            </h4>
+                            <p class="text-slate-700 text-sm mb-2">顧客情報の管理</p>
+                            <p class="text-slate-600 text-xs">
+                                <strong>責務:</strong> 会員情報、ポイント、購買履歴<br>
+                                <strong>関心:</strong> 顧客関係の維持
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: コンテキストの大きさと粒度 -->
+                <section class="prose prose-slate max-w-none mt-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 コンテキストの大きさと粒度
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コンテキストをどのくらいの大きさに分割すべきかは、プロジェクトの規模やチーム構成によって異なります。
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+                        <!-- 大きすぎる場合 -->
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-exclamation-circle text-orange-600"></i>
+                                コンテキストが大きすぎる場合
+                            </h4>
+                            <ul class="space-y-2 text-orange-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">●</span>
+                                    <span>複数のビジネス機能が混在し、責務が不明確になる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">●</span>
+                                    <span>ユビキタス言語の一貫性を保つのが困難になる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">●</span>
+                                    <span>変更の影響範囲が広くなり、リスクが増大する</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-orange-600">●</span>
+                                    <span>チーム間の調整コストが増える</span>
+                                </li>
+                            </ul>
+                            <p class="text-orange-800 text-sm mt-3 font-medium">→ さらに分割を検討する</p>
+                        </div>
+
+                        <!-- 小さすぎる場合 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-info-circle text-blue-600"></i>
+                                コンテキストが小さすぎる場合
+                            </h4>
+                            <ul class="space-y-2 text-blue-900 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>コンテキスト間の連携が複雑になり、オーバーヘッドが増える</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>データの重複や不整合が発生しやすくなる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>システム全体の把握が困難になる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <span class="text-blue-600">●</span>
+                                    <span>統合テストやデプロイの複雑性が増す</span>
+                                </li>
+                            </ul>
+                            <p class="text-blue-800 text-sm mt-3 font-medium">→ 統合を検討する</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">適切な粒度の目安</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    1つのチーム（5〜9人程度）が担当できる範囲を1つのコンテキストとするのが目安です。また、「2週間〜1ヶ月で機能追加できる」程度の大きさが理想的です。マイクロサービスの場合は、さらに小さく分割することもあります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 境界づけられたコンテキストとは何ですか？簡単に説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            境界づけられたコンテキストとは、特定のドメインモデルが適用される明確な境界を持った領域のことです。その境界の中では、ユビキタス言語が一貫性を持ち、同じ言葉が同じ意味で使われます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. なぜコンテキストを分割する必要があるのですか？主な理由を3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① 概念の衝突を防ぐ（同じ言葉が異なる意味を持つ問題を解決）<br>
+                                            ② モデルの肥大化を防ぐ（理解・保守が困難になるのを防ぐ）<br>
+                                            ③ チームの自律性を高める（他のチームに影響を与えずに変更できる）<br>
+                                            （その他、技術的制約の分離、スケーラビリティなども理由）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 販売コンテキストの「顧客」と配送コンテキストの「顧客」では、どのように意味が異なりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            販売コンテキストでは「顧客 = 購入者」であり、購買履歴、ポイント残高、会員ランクなどの属性を持ちます。一方、配送コンテキストでは「顧客 = 配送先」であり、住所、電話番号、配送時間帯指定などの属性を持ちます。同じ「顧客」という言葉でも、関心事や必要な情報が全く異なります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. コンテキストの境界を見極めるための5つの観点のうち、3つを挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① ビジネス機能の違い<br>
+                                            ② 言葉の意味の違い<br>
+                                            ③ チームの境界<br>
+                                            （その他、変更の独立性、技術的要件の違いも観点）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q5. コンテキストが小さすぎる場合、どのような問題が発生しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            コンテキスト間の連携が複雑になり、オーバーヘッドが増えます。また、データの重複や不整合が発生しやすくなり、システム全体の把握が困難になります。統合テストやデプロイの複雑性も増します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-primary-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>境界づけられたコンテキストは、特定のドメインモデルが適用される明確な境界を持った領域</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>コンテキスト内ではユビキタス言語が一貫性を持ち、異なるコンテキスト間では同じ言葉が異なる意味を持つことが許される</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>コンテキスト分割により、概念の衝突を防ぎ、モデルの肥大化を回避し、チームの自律性を高めることができる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>境界を見極めるには、ビジネス機能、言葉の意味、チームの境界、変更の独立性、技術的要件の5つの観点で検討する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>コンテキストの大きさは、1チームが担当できる範囲を目安とし、大きすぎても小さすぎても問題が発生する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>次章では、複数のコンテキスト間の関係を表現するコンテキストマップを学ぶ</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="ddd-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">ファクトリ</span>
+                        </div>
+                    </a>
+                    <a href="ddd-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">コンテキストマップ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Python DB-API学習教材 第7章 - トランザクション管理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Python系 - Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Python DB-API学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>プログラミング言語</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Python DB-API</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクション管理 - データの整合性を保つ</h1>
+                    <p class="text-slate-600">commit()とrollback()によるトランザクション制御の仕組みを学び、データベースの一貫性を保つ方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションとは何か、なぜ必要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>commit()とrollback()を使った明示的なトランザクション制御</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>autocommitモードと明示的トランザクションの違いと使い分け</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>エラー発生時のロールバック処理パターン</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 7.1 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 トランザクションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>トランザクション（Transaction）</strong>とは、データベースに対する<strong>一連の操作をまとめたもの</strong>です。トランザクション内のすべての操作が成功した場合のみ変更を確定し、途中でエラーが発生した場合はすべての変更を取り消します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この仕組みにより、<strong>データの整合性</strong>を保つことができます。例えば、銀行の送金処理では「A口座から引き落とし」と「B口座への入金」の2つの操作が両方成功するか、両方失敗するかのどちらかでなければなりません。
+                    </p>
+
+                    <!-- 図: トランザクションの概念 -->
+                    <div class="my-6 p-4 bg-blue-50 rounded-lg">
+                        <h3 class="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-project-diagram"></i>
+                            トランザクションの基本概念
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A([トランザクション開始]) --> B[操作1: INSERT]
+    B --> C[操作2: UPDATE]
+    C --> D[操作3: DELETE]
+    D --> E{すべて成功?}
+    E -- はい --> F[COMMIT<br/>全文字列変更を確定全文字串]
+    E -- いいえ --> G[ROLLBACK<br/>全文字列変更を取り消す全文字串]
+    F --> H([終了: 変更確定])
+    G --> I([終了: 変更なし])
+
+    style F fill:#d1fae5,stroke:#10b981,color:#065f46
+    style G fill:#fecaca,stroke:#ef4444,color:#991b1b
+                        </div>
+                        <p class="text-sm text-blue-700 mt-2">
+                            複数の操作をまとめて成功・失敗を判定し、データの一貫性を保ちます。
+                        </p>
+                    </div>
+
+                    <!-- ACID特性 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-5 my-6">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-3">トランザクションのACID特性</h3>
+                        <p class="text-blue-900 text-sm mb-4">トランザクションは以下の4つの特性（ACID）を保証します。</p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3 text-blue-900">
+                                <span class="flex-shrink-0 w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-sm font-medium">A</span>
+                                <div>
+                                    <strong>原子性（Atomicity）</strong>: トランザクション内のすべての操作が成功するか、すべて失敗するかのどちらかである
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3 text-blue-900">
+                                <span class="flex-shrink-0 w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-sm font-medium">C</span>
+                                <div>
+                                    <strong>一貫性（Consistency）</strong>: トランザクション前後でデータベースの整合性が保たれる
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3 text-blue-900">
+                                <span class="flex-shrink-0 w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-sm font-medium">I</span>
+                                <div>
+                                    <strong>独立性（Isolation）</strong>: 複数のトランザクションが同時実行されても互いに影響を与えない
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-3 text-blue-900">
+                                <span class="flex-shrink-0 w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center text-sm font-medium">D</span>
+                                <div>
+                                    <strong>永続性（Durability）</strong>: コミットされた変更は永続的に保存される
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション 7.2 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 commit()による変更の確定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        psycopg2では、デフォルトで<strong>自動コミットが無効</strong>になっています。そのため、INSERT、UPDATE、DELETEなどのデータ変更操作を行った後は、<strong>conn.commit()</strong>を呼び出して変更を確定する必要があります。
+                    </p>
+
+                    <!-- コードブロック: commit()の基本 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">commit_example.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+
+# データベースに接続
+conn = psycopg2.connect(
+    host="localhost",
+    database="testdb",
+    user="postgres",
+    password="password"
+)
+
+cursor = conn.cursor()
+
+# データを挿入
+cursor.execute(
+    "INSERT INTO products (name, price) VALUES (%s, %s)",
+    ("ノートPC", 89800)
+)
+
+# ここで変更を確定（これがないと反映されない）
+conn.commit()
+
+print("データを挿入しました")
+
+cursor.close()
+conn.close()</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    commit()を忘れると、変更はデータベースに反映されず、接続を閉じた時点で破棄されます。INSERT/UPDATE/DELETEの後は必ずcommit()を呼び出しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.3 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 rollback()による変更の取り消し
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エラーが発生した場合や、何らかの理由で変更を取り消したい場合は、<strong>conn.rollback()</strong>を使用します。これにより、トランザクション開始以降のすべての変更が取り消されます。
+                    </p>
+
+                    <!-- コードブロック: rollback()の基本 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">rollback_example.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+
+conn = psycopg2.connect(
+    host="localhost",
+    database="testdb",
+    user="postgres",
+    password="password"
+)
+
+cursor = conn.cursor()
+
+try:
+    # 複数の操作を実行
+    cursor.execute("INSERT INTO products (name, price) VALUES (%s, %s)", ("商品A", 1000))
+    cursor.execute("INSERT INTO products (name, price) VALUES (%s, %s)", ("商品B", 2000))
+
+    # 意図的にエラーを発生させる（price列にNULL制約違反）
+    cursor.execute("INSERT INTO products (name, price) VALUES (%s, %s)", ("商品C", None))
+
+    # 成功したらコミット
+    conn.commit()
+    print("すべての変更をコミットしました")
+
+except Exception as e:
+    # エラーが発生したらロールバック
+    conn.rollback()
+    print(f"エラーが発生したため変更を取り消しました: {e}")
+
+finally:
+    cursor.close()
+    conn.close()</code></pre>
+                    </div>
+
+                    <p class="text-sm text-slate-500 italic mb-4">
+                        上記の例では、3つ目のINSERTでエラーが発生するため、すべての変更（商品A、商品Bの挿入も含む）が取り消されます。
+                    </p>
+                </section>
+
+                <!-- セクション 7.4 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 実践的なトランザクション管理パターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実務では、try-except-finallyブロックを使ったトランザクション管理パターンが推奨されます。以下は銀行の送金処理を模した例です。
+                    </p>
+
+                    <!-- コードブロック: 送金処理の例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">transfer_money.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+
+def transfer_money(from_account, to_account, amount):
+    """口座間送金処理"""
+    conn = psycopg2.connect(
+        host="localhost",
+        database="bankdb",
+        user="postgres",
+        password="password"
+    )
+
+    cursor = conn.cursor()
+
+    try:
+        # 送金元口座から引き落とし
+        cursor.execute(
+            "UPDATE accounts SET balance = balance - %s WHERE account_id = %s",
+            (amount, from_account)
+        )
+
+        # 送金先口座へ入金
+        cursor.execute(
+            "UPDATE accounts SET balance = balance + %s WHERE account_id = %s",
+            (amount, to_account)
+        )
+
+        # 両方成功したらコミット
+        conn.commit()
+        print(f"送金完了: {from_account} → {to_account} ({amount}円)")
+        return True
+
+    except Exception as e:
+        # エラー発生時はロールバック
+        conn.rollback()
+        print(f"送金失敗: {e}")
+        return False
+
+    finally:
+        cursor.close()
+        conn.close()
+
+# 使用例
+transfer_money("A001", "B002", 50000)</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">トランザクション設計のヒント</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    トランザクション内では、ビジネスロジック上「同時に成功すべき操作」をまとめます。上記の例では、引き落としと入金の両方が成功するか、両方が失敗するかのどちらかになります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.5 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 autocommitモード
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        psycopg2では、<strong>autocommitモード</strong>を有効にすることもできます。このモードでは、各SQL文が実行されるたびに自動的にコミットされます。
+                    </p>
+
+                    <!-- コードブロック: autocommitの設定 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">autocommit_example.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+
+conn = psycopg2.connect(
+    host="localhost",
+    database="testdb",
+    user="postgres",
+    password="password"
+)
+
+# autocommitモードを有効化
+conn.autocommit = True
+
+cursor = conn.cursor()
+
+# この操作は即座にコミットされる
+cursor.execute("INSERT INTO logs (message) VALUES (%s)", ("ログメッセージ",))
+
+print("autocommitモードで挿入しました（commit不要）")
+
+cursor.close()
+conn.close()</code></pre>
+                    </div>
+
+                    <!-- autocommitの使い分け -->
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- 明示的トランザクション -->
+                        <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-4">
+                            <h3 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i>
+                                明示的トランザクション（推奨）
+                            </h3>
+                            <ul class="space-y-2 text-sm text-emerald-900">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>複数の操作をまとめて管理できる</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>エラー発生時に簡単にロールバック可能</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>業務処理の境界が明確</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- autocommit -->
+                        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
+                            <h3 class="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-info-circle"></i>
+                                autocommitモード（限定的）
+                            </h3>
+                            <ul class="space-y-2 text-sm text-blue-900">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>単一操作の場合に便利</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>DDL文（CREATE、ALTER等）に適している</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-times text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>複数操作の一貫性が保証されない</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">注意</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    autocommitモードでは、エラー発生時に変更を取り消すことができません。複数の操作をまとめて管理する必要がある場合は、明示的なトランザクション管理を使用してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 7.6 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 トランザクション分離レベル（発展）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQLでは、トランザクションの<strong>分離レベル</strong>を設定することができます。これは、複数のトランザクションが同時実行される際の動作を制御します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-300 rounded-lg overflow-hidden">
+                            <thead class="bg-primary-500 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">分離レベル</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                    <th class="px-4 py-3 text-left font-semibold">用途</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">READ UNCOMMITTED</td>
+                                    <td class="px-4 py-3">コミットされていない変更も読み取る</td>
+                                    <td class="px-4 py-3">PostgreSQLでは未サポート</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">READ COMMITTED</td>
+                                    <td class="px-4 py-3">コミット済みの変更のみ読み取る（デフォルト）</td>
+                                    <td class="px-4 py-3">一般的なWebアプリケーション</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">REPEATABLE READ</td>
+                                    <td class="px-4 py-3">トランザクション中は同じデータを読み取る</td>
+                                    <td class="px-4 py-3">レポート生成、バッチ処理</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">SERIALIZABLE</td>
+                                    <td class="px-4 py-3">完全な直列化（最も厳格）</td>
+                                    <td class="px-4 py-3">金融取引など高い一貫性が必要な処理</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- コードブロック: 分離レベルの設定 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">isolation_level.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+from psycopg2 import extensions
+
+conn = psycopg2.connect(
+    host="localhost",
+    database="testdb",
+    user="postgres",
+    password="password"
+)
+
+# 分離レベルをREPEATABLE READに設定
+conn.set_isolation_level(extensions.ISOLATION_LEVEL_REPEATABLE_READ)
+
+cursor = conn.cursor()
+
+# トランザクション内の処理
+cursor.execute("SELECT * FROM products")
+# ... 処理 ...
+
+conn.commit()
+cursor.close()
+conn.close()</code></pre>
+                    </div>
+
+                    <p class="text-sm text-slate-500 italic">
+                        初心者は、まずデフォルトのREAD COMMITTEDを使用することをお勧めします。より高度な要件がある場合に、他の分離レベルを検討しましょう。
+                    </p>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 7-1: トランザクション管理を実装しよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">在庫管理システムを想定し、「商品の受注」と「在庫の減少」をトランザクションで管理する関数を作成しましょう。</p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">ordersテーブル（注文）とproductsテーブル（在庫）を用意する</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">create_order(product_id, quantity)関数を作成し、INSERT（注文）とUPDATE（在庫減少）をトランザクション内で実行</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">在庫が不足している場合はrollback()を実行し、エラーメッセージを表示</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">正常に処理できた場合はcommit()を実行し、成功メッセージを表示</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <section class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        第7章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>トランザクション</strong>は、複数の操作をまとめて成功・失敗を管理する仕組みで、ACID特性を保証する</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>conn.commit()</strong>で変更を確定し、<strong>conn.rollback()</strong>で変更を取り消す</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>psycopg2では<strong>デフォルトで自動コミットが無効</strong>なので、明示的にcommit()を呼び出す必要がある</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>autocommitモード</strong>は単一操作に便利だが、複雑な処理には明示的なトランザクション管理が推奨される</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>トランザクション分離レベル</strong>で、同時実行時の動作を制御できる（デフォルトはREAD COMMITTED）</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. トランザクションのACID特性のうち、「原子性（Atomicity）」とは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            原子性とは、<strong>トランザクション内のすべての操作が成功するか、すべて失敗するかのどちらかである</strong>という特性です。一部だけ成功して一部が失敗するという中途半端な状態にはなりません。例えば、銀行の送金処理では「引き落とし」と「入金」の両方が成功するか、両方が失敗するかのどちらかになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. psycopg2で変更をデータベースに確定するメソッドは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>conn.commit()</strong>メソッドを使用します。psycopg2ではデフォルトで自動コミットが無効なので、INSERT、UPDATE、DELETEなどのデータ変更操作を行った後は、必ずcommit()を呼び出す必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. エラーが発生した場合に、トランザクション内のすべての変更を取り消すメソッドは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>conn.rollback()</strong>メソッドを使用します。これにより、トランザクション開始以降のすべての変更が取り消され、データベースは変更前の状態に戻ります。エラーハンドリングのexceptブロック内でrollback()を呼び出すのが一般的なパターンです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. autocommitモードが適している処理と適していない処理を1つずつ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>適している処理</strong>: 単一のINSERT操作や、DDL文（CREATE TABLE、ALTER TABLEなど）<br>
+                                            <strong>適していない処理</strong>: 複数の操作をまとめて管理する必要がある処理（例: 送金処理、在庫管理など）。autocommitモードでは、エラー発生時に一部の変更だけが確定されてしまい、データの整合性が保たれない可能性があります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="python-db-api-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: パラメータ化クエリ</span>
+                        </div>
+                    </a>
+                    <a href="python-db-api-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: コンテキストマネージャー</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

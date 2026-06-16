@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>FastAPI学習教材 第3章 - リクエストとレスポンスモデル（Pydantic）</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-bolt text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">FastAPI学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Python フレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約16時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/programming-languages/python-ecosystem/fastapi/" class="hover:text-primary-600 transition-colors">FastAPI</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第3章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第3章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">リクエストとレスポンスモデル（Pydantic）</h1>
+                    <p class="text-slate-600">Pydanticモデルの定義と活用、型ヒントの効果的な使用、データバリデーション、レスポンスモデルの設計方法を学習します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Pydanticの基本概念と型安全性の重要性</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>リクエストボディとレスポンスのためのモデル定義方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>データバリデーションの自動実行と検証ルールの設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ネストしたモデルの作成と実践的な活用方法</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: Pydanticとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        3.1 Pydanticとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Pydanticは、Pythonの型ヒントを使ってデータ検証とパースを行うライブラリです。FastAPIはPydanticと深く統合されており、リクエストとレスポンスのデータを安全かつ効率的に扱うことができます。
+                    </p>
+
+                    <!-- Mermaid図: Pydanticの役割 -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            FastAPIにおけるPydanticの役割
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    A[クライアント] -->|JSON| B[FastAPI]
+    B --> C{Pydantic<br/>モデル}
+    C -->|検証OK| D[エンドポイント<br/>関数]
+    C -->|検証NG| E[エラー<br/>レスポンス]
+    D --> F{Pydantic<br/>レスポンス<br/>モデル}
+    F -->|JSON変換| G[クライアント]
+
+    style C fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+    style F fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">型安全性とは</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    型安全性とは、データの型が正しいことをコンパイル時や実行時に保証する仕組みです。Pydanticは実行時に型を検証し、誤ったデータを早期に検出します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: Pydanticモデルの基本 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        3.2 Pydanticモデルの基本
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Pydanticモデルは、<code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">BaseModel</code>を継承したクラスとして定義します。各フィールドには型ヒントを付けることで、自動的にバリデーションが行われます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">models.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># Pydanticからベースモデルをインポート
+from pydantic import BaseModel
+
+# ユーザー情報を表すモデル
+class User(BaseModel):
+    """
+    ユーザーモデル
+    """
+    id: int              # 整数型のID
+    name: str            # 文字列型の名前
+    email: str           # メールアドレス
+    is_active: bool      # アクティブ状態（True/False）
+
+# モデルのインスタンス化
+user = User(
+    id=1,
+    name="山田太郎",
+    email="yamada@example.com",
+    is_active=True
+)</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Pydanticの主な機能</h3>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- 機能1: 自動型変換 -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exchange-alt text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-blue-800">自動型変換</h3>
+                            </div>
+                            <p class="text-blue-900 text-sm">
+                                文字列の"123"を整数123に自動変換するなど、可能な範囲で型変換を試みます。変換不可能な場合はエラーを返します。
+                            </p>
+                        </div>
+
+                        <!-- 機能2: データ検証 -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check-double text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-emerald-800">データ検証</h3>
+                            </div>
+                            <p class="text-emerald-900 text-sm">
+                                型だけでなく、最小値・最大値、文字列パターン、カスタムルールなど、詳細な検証ルールを設定できます。
+                            </p>
+                        </div>
+
+                        <!-- 機能3: シリアライズ -->
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-export text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-purple-800">シリアライズ</h3>
+                            </div>
+                            <p class="text-purple-900 text-sm">
+                                モデルのインスタンスを辞書やJSONに簡単に変換できます。APIレスポンスの生成に最適です。
+                            </p>
+                        </div>
+
+                        <!-- 機能4: エディタサポート -->
+                        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code text-white"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-amber-800">エディタサポート</h3>
+                            </div>
+                            <p class="text-amber-900 text-sm">
+                                型ヒントにより、IDEやエディタの補完機能が充実します。開発効率が大幅に向上します。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: リクエストボディの定義 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        3.3 リクエストボディの定義
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        POSTやPUTリクエストでクライアントから送信されるデータを、Pydanticモデルで定義します。FastAPIは自動的にリクエストボディをパースし、検証します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# アイテム作成用のリクエストモデル
+class ItemCreate(BaseModel):
+    """
+    アイテム作成リクエスト
+    """
+    name: str           # アイテム名（必須）
+    description: str    # 説明文（必須）
+    price: float        # 価格（必須）
+    tax: float = 0.0    # 税額（オプション、デフォルト0.0）
+
+# アイテム作成エンドポイント
+@app.post("/items/")
+def create_item(item: ItemCreate):
+    """
+    新しいアイテムを作成する
+    リクエストボディをItemCreateモデルで受け取る
+    """
+    # 税込み価格を計算
+    total = item.price + item.tax
+    return {
+        "name": item.name,
+        "total_price": total
+    }</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">デフォルト値の設定</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    <code class="bg-emerald-100 px-2 py-0.5 rounded text-emerald-900">tax: float = 0.0</code> のように値を指定すると、そのフィールドは省略可能になります。省略された場合はデフォルト値が使用されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">リクエスト例</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">request.json</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "name": "ノートPC",
+  "description": "高性能な開発用ノートパソコン",
+  "price": 150000,
+  "tax": 15000
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: レスポンスモデルの設計 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        3.4 レスポンスモデルの設計
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エンドポイントが返すデータの構造も、Pydanticモデルで定義することができます。<code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">response_model</code>パラメータを使用することで、レスポンスの型を保証できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# レスポンスモデル
+class ItemResponse(BaseModel):
+    """
+    アイテム情報レスポンス
+    """
+    id: int
+    name: str
+    price: float
+
+# response_modelを指定
+@app.get("/items/{item_id}", response_model=ItemResponse)
+def get_item(item_id: int):
+    """
+    アイテムを取得
+    戻り値はItemResponseモデルの形式に自動変換される
+    """
+    # 実際はDBから取得する想定
+    return {
+        "id": item_id,
+        "name": "サンプル商品",
+        "price": 1000.0
+    }</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">response_modelの利点</h3>
+                                <ul class="text-blue-900 text-sm space-y-2 ml-6">
+                                    <li class="list-disc">自動ドキュメントにレスポンス形式が明記される</li>
+                                    <li class="list-disc">余分なフィールドを自動的に除外できる</li>
+                                    <li class="list-disc">型チェックにより誤ったレスポンスを防止</li>
+                                    <li class="list-disc">一貫性のあるAPI設計が可能になる</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mermaid図: モデルの使い分け -->
+                    <div class="my-6 bg-white p-6 rounded-xl border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-sitemap text-primary-500"></i>
+                            リクエストモデルとレスポンスモデルの使い分け
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A[クライアント] -->|POST /users| B{リクエスト<br/>モデル}
+    B -->|UserCreate| C[エンドポイント]
+    C -->|処理| D[(データベース)]
+    D -->|保存完了| C
+    C -->|UserResponse| E{レスポンス<br/>モデル}
+    E -->|JSON| A
+
+    B -.->|検証項目<br/>パスワード| B1[必須フィールド]
+    E -.->|除外項目<br/>パスワード| E1[機密情報除外]
+
+    style B fill:#fef3c7,stroke:#f59e0b
+    style E fill:#dbeafe,stroke:#3b82f6
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: データバリデーション -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        3.5 データバリデーション
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Pydanticでは、<code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">Field</code>関数を使用して、詳細なバリデーションルールを設定できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">models.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from pydantic import BaseModel, Field, EmailStr
+
+class UserCreate(BaseModel):
+    """
+    ユーザー作成リクエスト（バリデーション付き）
+    """
+    # 名前: 最小1文字、最大50文字
+    name: str = Field(..., min_length=1, max_length=50)
+
+    # メールアドレス: 形式を自動検証
+    email: EmailStr
+
+    # 年齢: 0以上120以下
+    age: int = Field(..., ge=0, le=120)
+
+    # パスワード: 最小8文字
+    password: str = Field(..., min_length=8)</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">よく使う検証ルール</h3>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-300">
+                                    <th class="text-left py-2 px-3 text-slate-700 font-semibold">パラメータ</th>
+                                    <th class="text-left py-2 px-3 text-slate-700 font-semibold">説明</th>
+                                    <th class="text-left py-2 px-3 text-slate-700 font-semibold">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-200">
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">min_length</code></td>
+                                    <td class="py-2 px-3">文字列の最小長</td>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-1 rounded text-slate-800">min_length=3</code></td>
+                                </tr>
+                                <tr class="border-b border-slate-200">
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">max_length</code></td>
+                                    <td class="py-2 px-3">文字列の最大長</td>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-1 rounded text-slate-800">max_length=100</code></td>
+                                </tr>
+                                <tr class="border-b border-slate-200">
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">ge</code></td>
+                                    <td class="py-2 px-3">以上（Greater than or Equal）</td>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-1 rounded text-slate-800">ge=0</code></td>
+                                </tr>
+                                <tr class="border-b border-slate-200">
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">le</code></td>
+                                    <td class="py-2 px-3">以下（Less than or Equal）</td>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-1 rounded text-slate-800">le=100</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-2 py-0.5 rounded text-slate-800">regex</code></td>
+                                    <td class="py-2 px-3">正規表現パターン</td>
+                                    <td class="py-2 px-3"><code class="bg-slate-200 px-1 rounded text-slate-800">regex="^[A-Z]"</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ネストしたモデル</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        モデルの中に別のモデルを含めることで、複雑なデータ構造を表現できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">models.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from pydantic import BaseModel
+from typing import List
+
+# 住所モデル
+class Address(BaseModel):
+    """
+    住所情報
+    """
+    postal_code: str
+    prefecture: str
+    city: str
+    street: str
+
+# ユーザーモデル（住所を含む）
+class User(BaseModel):
+    """
+    ユーザー情報（住所付き）
+    """
+    name: str
+    email: str
+    address: Address           # Addressモデルをネスト
+    tags: List[str] = []       # 文字列のリスト</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                実習 3-1: 商品登録APIの作成
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                Pydanticモデルを使用して、商品情報を登録するAPIエンドポイントを作成しましょう。
+                            </p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">商品情報を表すPydanticモデルを定義します（名前、価格、在庫数）</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">価格は0以上、在庫数は0以上のバリデーションを追加します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">POSTエンドポイント <code class="bg-purple-100 px-1 rounded">/products/</code> を作成します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">Swagger UIでAPIをテストします</span>
+                                </li>
+                            </ol>
+
+                            <h4 class="font-medium text-purple-800 mb-2">実装例</h4>
+                            <div class="code-block-wrapper">
+                                <button onclick="copyCode(this)" class="copy-btn px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+                                    <i class="fas fa-copy mr-1"></i>コピー
+                                </button>
+                                <pre class="!bg-slate-800 !rounded-lg overflow-x-auto"><code class="language-python">from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class Product(BaseModel):
+    """
+    商品情報モデル
+    """
+    name: str = Field(..., min_length=1)
+    price: float = Field(..., ge=0)
+    stock: int = Field(..., ge=0)
+
+@app.post("/products/")
+def create_product(product: Product):
+    """
+    商品を登録
+    """
+    return {
+        "message": "商品を登録しました",
+        "product": product
+    }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Pydanticモデルを使用することで得られる利点を3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. <strong>自動データ検証</strong>: 型やバリデーションルールに合わないデータを自動的に拒否<br>
+                                            2. <strong>型安全性</strong>: 型ヒントにより、コードの誤りを早期に発見できる<br>
+                                            3. <strong>自動ドキュメント生成</strong>: リクエスト・レスポンスの形式がAPIドキュメントに反映される
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100 px-1 rounded">Field(..., ge=0, le=100)</code> のバリデーションルールの意味を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            このフィールドは必須（<code class="bg-blue-200 px-1 rounded">...</code>）で、値は0以上（<code class="bg-blue-200 px-1 rounded">ge=0</code>）かつ100以下（<code class="bg-blue-200 px-1 rounded">le=100</code>）でなければなりません。範囲外の値が送信された場合、自動的にエラーが返されます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. response_modelを指定する利点は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>1. 自動フィルタリング</strong>: モデルに定義されていないフィールドは自動的に除外されます（機密情報の漏洩防止）<br>
+                                            <strong>2. ドキュメント化</strong>: レスポンスの構造が自動ドキュメントに明記されます<br>
+                                            <strong>3. 型チェック</strong>: 誤ったレスポンスを返すコードを早期に発見できます
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. ネストしたモデルを使用する場面の例を挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            例えば、注文情報（Order）の中に商品情報（Product）や配送先住所（Address）を含める場合です。これにより、複雑なデータ構造を階層的に表現でき、各層で適切なバリデーションを行うことができます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-bookmark text-slate-600"></i>
+                        第3章のまとめ
+                    </h2>
+                    <div class="space-y-3 text-slate-700">
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>PydanticはFastAPIと統合され、リクエストとレスポンスの型安全性を保証します</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>BaseModelを継承したクラスで、型ヒント付きのフィールドを定義するだけで自動検証が行われます</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>Field関数を使用することで、詳細なバリデーションルール（最小値、最大値、文字列長など）を設定できます</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>response_modelを指定することで、レスポンスの型チェックと自動ドキュメント化が実現します</span>
+                        </p>
+                        <p class="flex items-start gap-2">
+                            <i class="fas fa-check text-emerald-500 mt-1"></i>
+                            <span>ネストしたモデルを使用することで、複雑なデータ構造を階層的に表現できます</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="fastapi-learning-material-02.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">基本的なルーティングとHTTPメソッド</span>
+                        </div>
+                    </a>
+                    <a href="fastapi-learning-material-04.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">パラメータと検証</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

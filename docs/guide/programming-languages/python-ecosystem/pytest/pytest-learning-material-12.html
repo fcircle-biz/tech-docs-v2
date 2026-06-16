@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>pytest入門 第12章 - テストカバレッジ</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Python - Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">pytest入門学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-vial text-[9px]"></i>
+                                <span>プログラミング言語 / テスト</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約20時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="./README.md" class="hover:text-primary-600 transition-colors">pytest入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">テストカバレッジ - テストの網羅率を可視化する</h1>
+                    <p class="text-slate-600">pytest-covを使ったコードカバレッジの計測方法を学びます。ステートメントカバレッジとブランチカバレッジの違い、カバレッジレポートの読み方、カバレッジ目標の設定方法、そしてカバレッジが高いだけでは十分でない理由を理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>テストカバレッジ（コードカバレッジ）とは何かを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>pytest-covをインストールし、カバレッジを計測・レポート出力できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ステートメントカバレッジとブランチカバレッジの違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>カバレッジレポート（ターミナル・HTML）の読み方を身につける</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>「カバレッジが高い = テストが良い」ではない理由を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 12.1 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 テストカバレッジとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        テストをたくさん書いても、「コードのどこがテストされていて、どこがされていないのか」を把握することは難しいです。<strong class="text-slate-800">テストカバレッジ</strong>は、テストがコードのどの割合を実行したかを数値で示す指標です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば「カバレッジ80%」は、プロダクションコード全体のうち80%の行がテスト実行中に少なくとも1回実行されたことを意味します。残りの20%は一度も実行されていない「未テスト領域」です。
+                    </p>
+
+                    <!-- 概念図 -->
+                    <div class="my-6 p-4 bg-white border border-slate-200 rounded-xl">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            テストカバレッジの概念
+                        </h3>
+                        <div class="mermaid">
+flowchart LR
+    subgraph code["プロダクションコード（全体）"]
+        A["テスト済みコード<br/>（カバレッジ内）"]
+        B["未テストコード<br/>（カバレッジ外）"]
+    end
+    T["テストスイート"] -->|実行して通過| A
+    T -.->|実行されない| B
+
+    style A fill:#d1fae5,stroke:#10b981,color:#065f46
+    style B fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">カバレッジを計測する意義</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    カバレッジを計測することで「テストが通過しているから大丈夫」という思い込みを排除できます。一度も実行されていないコードは、バグが潜んでいても気づけない危険な領域です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 12.2 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 pytest-covのインストールと基本的な使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        pytestでカバレッジを計測するには、<strong class="text-slate-800">pytest-cov</strong>プラグインを使います。これはPythonの標準カバレッジツールである<code class="bg-slate-100 px-1 rounded">coverage.py</code>をpytestに統合したプラグインです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">インストール</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># pytest-covをインストール
+pip install pytest-cov
+
+# インストール確認
+pip show pytest-cov</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">基本的なカバレッジ計測コマンド</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># テスト実行とカバレッジ計測（myapp フォルダが対象）
+pytest --cov=myapp
+
+# ターミナルに詳細を表示（テストされていない行番号を表示）
+pytest --cov=myapp --cov-report=term-missing
+
+# HTMLレポートを生成（htmlcov/index.html が作成される）
+pytest --cov=myapp --cov-report=html
+
+# ターミナル表示とHTML生成を同時に行う
+pytest --cov=myapp --cov-report=term-missing --cov-report=html</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">--cov オプションで対象フォルダを指定する</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    <code class="bg-orange-100 px-1 rounded">--cov</code> に何も指定しないと、テストコード自体もカバレッジ対象に含まれて数値が水増しされます。必ずプロダクションコードのフォルダ名（例: <code class="bg-orange-100 px-1 rounded">myapp</code>、<code class="bg-orange-100 px-1 rounded">src</code>）を指定しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 12.3 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 カバレッジレポートの読み方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">--cov-report=term-missing</code>を使うと、ターミナルにカバレッジの詳細が表示されます。このレポートの読み方を理解しましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">ターミナルレポートの例</h3>
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル出力例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">---------- coverage: platform linux, python 3.11 -----------
+Name                 Stmts   Miss  Cover   Missing
+----------------------------------------------------
+myapp/__init__.py        0      0   100%
+myapp/calculator.py     20      4    80%   15, 22-24
+myapp/utils.py          10      2    80%   8, 12
+----------------------------------------------------
+TOTAL                   30      6    80%</code></pre>
+                    </div>
+
+                    <!-- 各列の説明 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-primary-50">
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">列名</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-slate-700">Name</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">計測対象のファイル名</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 border border-slate-200 font-mono text-slate-700">Stmts</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">ファイル内のステートメント（実行可能な文）の総数</td>
+                                </tr>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-slate-700">Miss</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">テストで一度も実行されなかったステートメントの数</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 border border-slate-200 font-mono text-slate-700">Cover</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">カバレッジ率（(Stmts - Miss) / Stmts × 100）</td>
+                                </tr>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-mono text-slate-700">Missing</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600 font-medium text-red-700">テストが通過していない行番号（ここを優先的にテスト追加）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        上の例では <code class="bg-slate-100 px-1 rounded">myapp/calculator.py</code> の15行目と22〜24行目がテストされていません。この行番号をもとに、エディタでソースコードを開いてどのロジックがカバーされていないか確認します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">HTMLレポートの活用</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">--cov-report=html</code>を指定すると、<code class="bg-slate-100 px-1 rounded">htmlcov/index.html</code>にビジュアルなレポートが生成されます。ブラウザで開くと、コードが色分けされて表示されます。
+                    </p>
+
+                    <!-- 色分けの説明 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 rounded bg-emerald-200"></div>
+                                <span class="font-semibold text-slate-800 text-sm">緑色の行</span>
+                            </div>
+                            <p class="text-sm text-slate-600">テストで実行された行（カバー済み）</p>
+                        </div>
+                        <div class="bg-white border border-red-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 rounded bg-red-200"></div>
+                                <span class="font-semibold text-slate-800 text-sm">赤色の行</span>
+                            </div>
+                            <p class="text-sm text-slate-600">一度も実行されなかった行（未カバー）</p>
+                        </div>
+                        <div class="bg-white border border-yellow-200 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-4 h-4 rounded bg-yellow-200"></div>
+                                <span class="font-semibold text-slate-800 text-sm">黄色の行</span>
+                            </div>
+                            <p class="text-sm text-slate-600">部分的にカバーされた行（ブランチの片方のみ）</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 12.4 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 ステートメントカバレッジとブランチカバレッジ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        カバレッジには計測の粒度（レベル）があります。デフォルトは<strong class="text-slate-800">ステートメントカバレッジ</strong>ですが、より厳密な<strong class="text-slate-800">ブランチカバレッジ</strong>もあります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">ステートメントカバレッジ（行カバレッジ）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        各「行（ステートメント）」が少なくとも1回実行されたかどうかを計測します。最も基本的なカバレッジです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">calculator.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def classify_score(score):
+    """スコアを分類する関数"""
+    if score >= 80:
+        return "合格"        # この行だけテストされると...
+    else:
+        return "不合格"      # この行はテストされない</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">score=90</code>でテストすると、<code class="bg-slate-100 px-1 rounded">return "合格"</code>の行が実行され、<code class="bg-slate-100 px-1 rounded">if score >= 80:</code>も実行されます。ステートメントカバレッジでは「if文の行は実行済み」と判定されますが、<code class="bg-slate-100 px-1 rounded">else</code>ブランチは未テストです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">ブランチカバレッジ</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        分岐（if/else、while、try/exceptなど）の<strong class="text-slate-800">すべての経路</strong>が実行されたかを計測します。ステートメントカバレッジよりも厳密で、見落としを減らせます。
+                    </p>
+
+                    <!-- ブランチカバレッジ概念図 -->
+                    <div class="my-6 p-4 bg-white border border-slate-200 rounded-xl">
+                        <h3 class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fas fa-diagram-project text-primary-500"></i>
+                            ブランチカバレッジが検出する未テスト経路
+                        </h3>
+                        <div class="mermaid">
+flowchart TD
+    A["classify_score(score)"] --> B{"score >= 80?"}
+    B -->|"True（テスト済み）"| C["return 合格"]
+    B -->|"False（未テスト！）"| D["return 不合格"]
+
+    style C fill:#d1fae5,stroke:#10b981,color:#065f46
+    style D fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル（ブランチカバレッジを有効化）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># --cov-branch オプションでブランチカバレッジを計測
+pytest --cov=myapp --cov-branch --cov-report=term-missing</code></pre>
+                    </div>
+
+                    <!-- 比較表 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-primary-50">
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">種類</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">計測対象</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">厳密さ</th>
+                                    <th class="text-left p-3 border border-primary-200 text-primary-800 font-semibold">推奨用途</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white">
+                                    <td class="p-3 border border-slate-200 font-medium text-slate-700">ステートメント</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">各行が実行されたか</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">低め</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">最初の導入・目安として</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 border border-slate-200 font-medium text-slate-700">ブランチ</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">すべての分岐経路が実行されたか</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600 font-medium text-emerald-700">高め</td>
+                                    <td class="p-3 border border-slate-200 text-slate-600">ロジックが複雑なコード・本番システム</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント：ブランチカバレッジを習慣にする</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    実務では<code class="bg-emerald-100 px-1 rounded">--cov-branch</code>を常用することを推奨します。if/elseやtry/exceptのある処理で、テストが片方の経路しか通過していないケースを自動で検出できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 12.5 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 カバレッジ目標の設定 - --cov-fail-under
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">--cov-fail-under</code>オプションを使うと、カバレッジが指定した値を下回った場合にpytestをエラー終了させることができます。CI/CDパイプラインに組み込むことで、カバレッジの低下を自動的に検出できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># カバレッジが80%を下回った場合にエラー終了（exit code 2）
+pytest --cov=myapp --cov-report=term-missing --cov-fail-under=80</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル出力（カバレッジ不足の場合）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">FAIL Required test coverage of 80% not reached. Total coverage: 75.00%</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">設定ファイルでの目標値管理</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        毎回コマンドにオプションを付けるのは手間がかかります。<code class="bg-slate-100 px-1 rounded">.coveragerc</code>ファイルか<code class="bg-slate-100 px-1 rounded">pyproject.toml</code>に設定を書くと、コマンドを簡略化できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">pyproject.toml</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">[tool.pytest.ini_options]
+# pytestのデフォルトオプション
+addopts = "--cov=myapp --cov-report=term-missing --cov-branch --cov-fail-under=80"
+
+[tool.coverage.run]
+# カバレッジ計測の設定
+branch = true          # ブランチカバレッジを有効化
+source = ["myapp"]     # 対象フォルダ
+
+[tool.coverage.report]
+# 除外するファイルのパターン
+omit = [
+    "myapp/__init__.py",   # __init__.py は除外
+    "tests/*",             # テストフォルダ自体は除外
+]</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設定ファイルを置いておけば、<code class="bg-slate-100 px-1 rounded">pytest</code>を実行するだけで自動的にカバレッジが計測されます。
+                    </p>
+                </section>
+
+                <!-- セクション 12.6 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 カバレッジが高くても安心できない理由
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「カバレッジ100%を達成すれば、すべてのバグを発見できる」と思いたくなりますが、これは誤りです。カバレッジは「コードが実行されたか」を示すだけで、「コードが正しく動くか」は別の問題です。
+                    </p>
+
+                    <!-- 問題のあるテストの例 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">問題のある例：アサーションのないテスト</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">test_bad_coverage.py（問題のあるテスト）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def test_calculate_total():
+    """カバレッジ100%でも全く意味がないテスト"""
+    result = calculate_total([10, 20, 30])
+    # assert を書き忘れている！
+    # コードは実行される（カバレッジに貢献）が、
+    # 正しいかどうかを全く確認していない</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">カバレッジは「品質の保証」ではなく「未テスト領域の発見ツール」</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    アサーションのないテストはカバレッジを100%にできますが、バグを一切検出しません。カバレッジはあくまで「どこがテストされていないか」を見つける道具であり、「テストが正しいか」は別途レビューが必要です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- カバレッジの限界の説明 -->
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3">カバレッジの限界</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white border border-red-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-times text-red-600"></i>
+                                </div>
+                                <h4 class="font-semibold text-slate-800">カバレッジが検出できないもの</h4>
+                            </div>
+                            <ul class="text-sm text-slate-600 space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-red-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>アサーションが間違っている（assert 1 == 1 のような意味のないテスト）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-red-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>テストケースの漏れ（境界値・エッジケースの未確認）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-red-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>テスト対象のビジネスロジック自体が間違っている場合</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check text-emerald-600"></i>
+                                </div>
+                                <h4 class="font-semibold text-slate-800">カバレッジが得意なこと</h4>
+                            </div>
+                            <ul class="text-sm text-slate-600 space-y-2">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-emerald-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>「一度も実行されていないコード」の可視化</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-emerald-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>デッドコード（到達不能なコード）の発見</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-circle text-emerald-400 text-[6px] mt-2 flex-shrink-0"></i>
+                                    <span>テストが不足しているモジュールの特定</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">カバレッジへの健全な向き合い方</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    カバレッジは「80%以上を維持する」など最低ラインを設ける道具として使い、「100%を目指す」ことに執着しないことが大切です。質の高いアサーションを持つテストを、重要なロジックに集中して書くことが本質です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 12.7 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 特定コードをカバレッジ対象から除外する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        デバッグ用コードや、テストが現実的でない箇所（メインの起動コードなど）はカバレッジから除外できます。<code class="bg-slate-100 px-1 rounded"># pragma: no cover</code>コメントを使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def run_app():
+    """アプリケーション起動"""
+    print("Starting application...")
+
+if __name__ == "__main__":  # pragma: no cover
+    # スクリプト直接実行時のみ動くコードはテストが難しい
+    run_app()</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded"># pragma: no cover</code>を付けた行は、カバレッジの計算から除外されます。ただし、乱用するとカバレッジが実態を反映しなくなるため、本当にテストが困難な箇所だけに限定しましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">除外が適切なケースの例</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <code class="bg-blue-100 px-1 rounded">if __name__ == "__main__":</code>ブロック、<code class="bg-blue-100 px-1 rounded">TYPE_CHECKING</code>ブロック、コマンドライン引数のパーサー初期化など、テストより実行環境依存のコードが対象です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                実習 12-1: カバレッジを計測してみよう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                簡単な関数を作成し、pytest-covでカバレッジを計測してみましょう。意図的にテストが不足している状態からスタートし、カバレッジレポートを見ながらテストを追加していきます。
+                            </p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">以下の <code class="bg-purple-100 px-1 rounded">grader.py</code> を作成し、<code class="bg-purple-100 px-1 rounded">myapp/</code> フォルダに保存します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">最初は合格ケースだけのテストを書き、<code class="bg-purple-100 px-1 rounded">pytest --cov=myapp --cov-report=term-missing</code> を実行してカバレッジを確認します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">Missing に表示された行番号を確認し、不足しているテストを追加して100%を目指します</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">--cov-branch</code> を追加して、ブランチカバレッジの違いも確認してみましょう</span>
+                                </li>
+                            </ol>
+
+                            <div class="code-block-wrapper mb-4">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">myapp/grader.py（テスト対象コード）</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                            onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-python">def grade(score):
+    """スコアを成績に変換する"""
+    if score < 0 or score > 100:
+        raise ValueError("スコアは0〜100の範囲で指定してください")
+    if score >= 90:
+        return "A"
+    elif score >= 70:
+        return "B"
+    elif score >= 50:
+        return "C"
+    else:
+        return "D"</code></pre>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4 mt-4">
+                                <p class="text-sm text-purple-900 font-medium mb-2">
+                                    <i class="fas fa-lightbulb text-purple-600 mr-2"></i>考え方のヒント
+                                </p>
+                                <ul class="text-sm text-purple-800 space-y-1">
+                                    <li>• 最初は <code class="bg-purple-200 px-1 rounded">grade(90)</code> のみのテストからスタートし、カバレッジを確認してみましょう</li>
+                                    <li>• "Missing" 列に表示された行番号のコードが何をしているか確認し、テストを追加します</li>
+                                    <li>• 最終的には A/B/C/D すべての評価と、範囲外エラーのテストが必要です</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 動作確認カード -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-play text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認</h3>
+                            <p class="text-emerald-900 mb-4 break-words">
+                                以下のコマンドを実行し、カバレッジレポートが正しく出力されることを確認してください。
+                            </p>
+
+                            <div class="code-block-wrapper mb-4">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">ターミナル</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                            onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-bash">pytest --cov=myapp --cov-branch --cov-report=term-missing --cov-report=html</code></pre>
+                            </div>
+
+                            <h4 class="font-medium text-emerald-800 mb-2 break-words">
+                                <i class="fas fa-check-circle mr-2"></i>期待される結果
+                            </h4>
+                            <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                <pre class="text-emerald-900 text-sm whitespace-pre-wrap">---------- coverage: platform linux, python 3.11 -----------
+Name                Stmts   Miss Branch BrPart  Cover   Missing
+----------------------------------------------------------------
+myapp/grader.py        10      0      8      0   100%
+----------------------------------------------------------------
+TOTAL                  10      0      8      0   100%
+</pre>
+                            </div>
+                            <p class="text-sm text-emerald-800 mt-3">
+                                <i class="fas fa-folder-open mr-1"></i>
+                                HTMLレポートは <code class="bg-emerald-100 px-1 rounded">htmlcov/index.html</code> に生成されます。ブラウザで開いて行ごとのカバレッジ状況を確認してみましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章まとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-primary-50 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-flag-checkered text-primary-500"></i>
+                        第12章のまとめ
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-700 mb-2">学んだこと</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>テストカバレッジはコードのどの割合がテストで実行されたかを示す指標</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>pytest-covで <code class="bg-slate-100 px-1 rounded">--cov</code> オプションを使いカバレッジを計測できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>ブランチカバレッジはステートメントカバレッジより厳密で、分岐の全経路を確認できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span><code class="bg-slate-100 px-1 rounded">--cov-fail-under</code> でカバレッジの最低ラインを設定できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-sm text-slate-600">
+                                    <i class="fas fa-check-circle text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                    <span>カバレッジは「未テスト領域の発見ツール」であり、品質の保証ではない</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-700 mb-2">次章の予告</h3>
+                            <div class="bg-white border border-primary-200 rounded-lg p-4">
+                                <p class="text-sm text-slate-600 leading-relaxed">
+                                    第13章では、<code class="bg-primary-100 text-primary-700 px-1 rounded">pytest.ini</code>や<code class="bg-primary-100 text-primary-700 px-1 rounded">pyproject.toml</code>を使ったpytestの設定方法を学びます。テストディレクトリの指定、デフォルトオプション、マーカーの登録など、プロジェクトに合わせたカスタマイズを行います。
+                                </p>
+                                <p class="text-xs text-primary-600 mt-2">
+                                    <i class="fas fa-arrow-right mr-1"></i>第13章: 設定ファイルとカスタマイズ - pytest.iniとpyproject.toml
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-8 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-6">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. pytest-covでターミナルにカバレッジを表示し、テストされていない行番号も確認するコマンドはどれですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200 px-1 rounded">pytest --cov=myapp --cov-report=term-missing</code> です。<code class="bg-blue-200 px-1 rounded">term-missing</code>を指定することで、テストされていない行番号が "Missing" 列に表示されます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ステートメントカバレッジとブランチカバレッジの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>ステートメントカバレッジ</strong>は各行が少なくとも1回実行されたかを計測します。<strong>ブランチカバレッジ</strong>はif/elseなど分岐のすべての経路（True側・False側の両方）が実行されたかを計測します。ブランチカバレッジの方がより厳密で、片方の分岐しかテストしていないケースを検出できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. カバレッジが90%あれば十分な品質が保証されていると言えますか？理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>いいえ、品質の保証にはなりません。</strong>カバレッジはコードが「実行された」かを示すだけで、「正しく動くか」は別の問題です。アサーションのないテストや、意味のないアサーション（assert 1 == 1 など）でもカバレッジを上げることができます。カバレッジは未テスト領域を発見するためのツールであり、テスト内容の質は別途確認が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. カバレッジ計測から特定の行を除外するには何と書きますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            行末に <code class="bg-blue-200 px-1 rounded"># pragma: no cover</code> コメントを付けます。この行以降（ブロック全体）がカバレッジの計算から除外されます。<code class="bg-blue-200 px-1 rounded">if __name__ == "__main__":</code> のようなテストしにくいコードに使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="pytest-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">プラグインの活用</span>
+                        </div>
+                    </a>
+                    <a href="pytest-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">設定ファイルとカスタマイズ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz/tech_docs" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

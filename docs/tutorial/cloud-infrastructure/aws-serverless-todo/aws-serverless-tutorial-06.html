@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS サーバーレス Todoアプリチュートリアル ステップ6 - Lambda関数でCRUD操作を実装</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // チュートリアル推奨カラー: Emerald（緑系）
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS サーバーレス実践チュートリアル</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS サーバーレス</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ6</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">6</span>
+                            ステップ6
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">Lambda関数でCRUD操作を実装</h1>
+                    <p class="text-slate-600">DynamoDBと連携して、タスクの作成・読取・更新・削除（CRUD）を行うLambda関数を実装します。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>boto3を使ったDynamoDBへのデータ追加（put_item）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>タスク一覧取得（scan）とタスク詳細取得（get_item）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>タスク更新（update_item）と削除（delete_item）の実装</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>エラーハンドリングとバリデーション処理</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>DynamoDBテーブル（todos）が作成されている（Step 3）</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Lambda関数の基礎を理解している（Step 4）</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>API Gatewayの設定が完了している（Step 5）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: CRUD操作とは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.1 CRUD操作とは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        CRUD（クラッド）とは、データベースに対する4つの基本操作の頭文字を取ったものです。Webアプリケーションの多くは、このCRUD操作でデータを管理しています。
+                    </p>
+
+                    <!-- CRUD操作の説明 -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium">CRUD操作とは</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4">
+                                    <li>• <strong>C</strong>reate（作成）: 新しいデータを追加する</li>
+                                    <li>• <strong>R</strong>ead（読取）: データを取得して表示する</li>
+                                    <li>• <strong>U</strong>pdate（更新）: 既存のデータを変更する</li>
+                                    <li>• <strong>D</strong>elete（削除）: データを削除する</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CRUD操作のフロー図 -->
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    subgraph API["API Gateway"]
+        GET["GET /todos"]
+        POST["POST /todos"]
+        PUT["PUT /todos/{id}"]
+        DEL["DELETE /todos/{id}"]
+    end
+    subgraph Lambda["Lambda関数"]
+        L1["getTodos<br/>タスク一覧取得"]
+        L2["createTodo<br/>タスク作成"]
+        L3["updateTodo<br/>タスク更新"]
+        L4["deleteTodo<br/>タスク削除"]
+    end
+    subgraph DB["DynamoDB"]
+        D[("todosテーブル")]
+    end
+    GET --> L1
+    POST --> L2
+    PUT --> L3
+    DEL --> L4
+    L1 --> D
+    L2 --> D
+    L3 --> D
+    L4 --> D
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">CRUD操作の全体像</p>
+                    </div>
+
+                    <!-- Todoアプリでの具体例 -->
+                    <div class="bg-purple-100 rounded-lg p-4 border border-purple-200">
+                        <h3 class="font-semibold text-purple-800 mb-3">Todoアプリでの具体例</h3>
+                        <ul class="text-purple-900 text-sm space-y-2">
+                            <li><strong>Create:</strong> 「牛乳を買う」という新しいタスクを追加</li>
+                            <li><strong>Read:</strong> 保存されているタスク一覧を画面に表示</li>
+                            <li><strong>Update:</strong> 「牛乳を買う」を「牛乳とパンを買う」に変更</li>
+                            <li><strong>Delete:</strong> 完了したタスクを削除</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション2: boto3とは -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.2 boto3（AWS SDK for Python）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        boto3は、PythonからAWSサービスを操作するための公式ライブラリです。Lambda関数からDynamoDBを操作するために使用します。
+                    </p>
+
+                    <!-- boto3の主な機能 -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6">
+                        <p class="text-blue-900 font-medium mb-2">
+                            <i class="fas fa-lightbulb mr-1"></i>
+                            boto3でできること
+                        </p>
+                        <ul class="text-blue-800 text-sm space-y-1 ml-4">
+                            <li>• DynamoDBにデータを追加・取得・更新・削除</li>
+                            <li>• S3にファイルをアップロード・ダウンロード</li>
+                            <li>• SNSでメール通知を送信</li>
+                            <li>• その他、200以上のAWSサービスを操作可能</li>
+                        </ul>
+                    </div>
+
+                    <!-- boto3の基本的な使い方 -->
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">
+                                <i class="fab fa-python"></i>
+                                boto3の基本的な使い方
+                            </span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-python"># boto3のインポート
+import boto3
+
+# DynamoDBのリソースを取得
+dynamodb = boto3.resource('dynamodb')
+
+# テーブルを指定
+table = dynamodb.Table('todos')
+
+# これで、tableを使ってデータ操作ができます
+</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション3: タスク一覧取得（Read） -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.3 タスク一覧取得（Read）の実装
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 6-1: getTodos関数の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">DynamoDBからすべてのタスクを取得する関数を作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Lambda関数を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Lambdaコンソールで「関数の作成」をクリックし、以下を設定します。
+                                        </p>
+                                        <ul class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>• 関数名: <code class="bg-purple-100 px-1 rounded">getTodos</code></li>
+                                            <li>• ランタイム: <code class="bg-purple-100 px-1 rounded">Python 3.12</code></li>
+                                            <li>• 実行ロール: 既存のロール（Step 4で作成したロール）を使用</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数コードを実装</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコードをコードエディタに貼り付けます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fab fa-python"></i>
+                                                    getTodos.py
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-python">import json
+import boto3
+from decimal import Decimal
+
+# DynamoDBリソースの取得
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('todos')
+
+# Decimalを通常のfloat/intに変換するヘルパー関数
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    raise TypeError
+
+def lambda_handler(event, context):
+    try:
+        # DynamoDBからすべてのタスクを取得
+        response = table.scan()
+        items = response['Items']
+
+        # createdAtで降順ソート（新しいタスクが上に）
+        items.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
+
+        # レスポンスを返す
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps(items, default=decimal_default, ensure_ascii=False)
+        }
+
+    except Exception as e:
+        print(f"エラー: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': 'タスクの取得に失敗しました'
+            }, ensure_ascii=False)
+        }
+</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">「Deploy」をクリック</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            コードエディタの上部にある「Deploy」ボタンをクリックして変更を保存します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順4 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">4</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API Gatewayと統合</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            Step 5で作成したAPI Gatewayの「GET /todos」メソッドと、この関数を統合します。
+                                        </p>
+                                        <ol class="text-purple-900 text-sm space-y-1 ml-4">
+                                            <li>1. API Gatewayコンソールで「GET /todos」を選択</li>
+                                            <li>2. 「統合リクエスト」をクリック</li>
+                                            <li>3. Lambda関数に「getTodos」を選択</li>
+                                            <li>4. APIをデプロイ</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-purple-100 rounded-lg p-4 border border-purple-200 mb-6">
+                        <h3 class="font-semibold text-purple-800 mb-3">コード解説</h3>
+                        <ul class="text-purple-900 text-sm space-y-2">
+                            <li><strong>table.scan():</strong> テーブル内のすべてのデータを取得します（小規模なアプリ向け）</li>
+                            <li><strong>decimal_default:</strong> DynamoDBのDecimal型をJSONに変換可能な型に変換します</li>
+                            <li><strong>sort():</strong> createdAt（作成日時）で降順ソートし、最新のタスクが先頭に来るようにします</li>
+                            <li><strong>Access-Control-Allow-Origin:</strong> CORSヘッダーを設定し、ブラウザからのアクセスを許可します</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション4: タスク作成（Create） -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.4 タスク作成（Create）の実装
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 6-2: createTodo関数の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">新しいタスクをDynamoDBに追加する関数を作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Lambda関数を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            関数名を <code class="bg-purple-100 px-1 rounded">createTodo</code> として新しい関数を作成します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数コードを実装</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコードをコードエディタに貼り付けます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fab fa-python"></i>
+                                                    createTodo.py
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-python">import json
+import boto3
+import uuid
+from datetime import datetime
+
+# DynamoDBリソースの取得
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('todos')
+
+def lambda_handler(event, context):
+    try:
+        # リクエストボディを解析
+        body = json.loads(event['body'])
+        title = body.get('title', '').strip()
+
+        # バリデーション: タイトルが空でないか確認
+        if not title:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'error': 'タイトルは必須です'
+                }, ensure_ascii=False)
+            }
+
+        # バリデーション: タイトルの長さを確認（1〜200文字）
+        if len(title) > 200:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'error': 'タイトルは200文字以内で入力してください'
+                }, ensure_ascii=False)
+            }
+
+        # 新しいタスクの作成
+        todo = {
+            'id': str(uuid.uuid4()),  # 一意のIDを生成
+            'title': title,
+            'completed': False,
+            'createdAt': datetime.now().isoformat(),
+            'updatedAt': datetime.now().isoformat()
+        }
+
+        # DynamoDBに保存
+        table.put_item(Item=todo)
+
+        # 成功レスポンスを返す
+        return {
+            'statusCode': 201,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps(todo, ensure_ascii=False)
+        }
+
+    except Exception as e:
+        print(f"エラー: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': 'タスクの作成に失敗しました'
+            }, ensure_ascii=False)
+        }
+</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API Gatewayと統合</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「POST /todos」メソッドとこの関数を統合し、APIをデプロイします。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-purple-100 rounded-lg p-4 border border-purple-200 mb-6">
+                        <h3 class="font-semibold text-purple-800 mb-3">コード解説</h3>
+                        <ul class="text-purple-900 text-sm space-y-2">
+                            <li><strong>uuid.uuid4():</strong> 一意のID（UUID）を生成します。例: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"</li>
+                            <li><strong>datetime.now().isoformat():</strong> 現在日時をISO 8601形式で取得します。例: "2025-01-24T10:30:00"</li>
+                            <li><strong>table.put_item():</strong> DynamoDBにデータを追加します</li>
+                            <li><strong>バリデーション:</strong> タイトルの存在チェックと文字数制限をチェックしています</li>
+                            <li><strong>statusCode: 201:</strong> 新規作成成功を示すHTTPステータスコード</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション5: タスク更新（Update） -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.5 タスク更新（Update）の実装
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 6-3: updateTodo関数の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">既存のタスクのタイトルや完了状態を更新する関数を作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Lambda関数を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            関数名を <code class="bg-purple-100 px-1 rounded">updateTodo</code> として新しい関数を作成します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数コードを実装</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコードをコードエディタに貼り付けます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fab fa-python"></i>
+                                                    updateTodo.py
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-python">import json
+import boto3
+from datetime import datetime
+from decimal import Decimal
+
+# DynamoDBリソースの取得
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('todos')
+
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    raise TypeError
+
+def lambda_handler(event, context):
+    try:
+        # パスパラメータからIDを取得
+        todo_id = event['pathParameters']['id']
+
+        # リクエストボディを解析
+        body = json.loads(event['body'])
+
+        # 更新する属性を動的に構築
+        update_expression = "SET updatedAt = :updatedAt"
+        expression_values = {
+            ':updatedAt': datetime.now().isoformat()
+        }
+
+        # タイトルが送られてきた場合
+        if 'title' in body:
+            title = body['title'].strip()
+            if not title:
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'error': 'タイトルは必須です'
+                    }, ensure_ascii=False)
+                }
+            if len(title) > 200:
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'error': 'タイトルは200文字以内で入力してください'
+                    }, ensure_ascii=False)
+                }
+            update_expression += ", title = :title"
+            expression_values[':title'] = title
+
+        # 完了状態が送られてきた場合
+        if 'completed' in body:
+            update_expression += ", completed = :completed"
+            expression_values[':completed'] = bool(body['completed'])
+
+        # DynamoDBを更新
+        response = table.update_item(
+            Key={'id': todo_id},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_values,
+            ReturnValues='ALL_NEW'
+        )
+
+        # 更新後のアイテムを返す
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps(response['Attributes'], default=decimal_default, ensure_ascii=False)
+        }
+
+    except Exception as e:
+        print(f"エラー: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': 'タスクの更新に失敗しました'
+            }, ensure_ascii=False)
+        }
+</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API Gatewayと統合</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「PUT /todos/{id}」メソッドとこの関数を統合し、APIをデプロイします。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-purple-100 rounded-lg p-4 border border-purple-200 mb-6">
+                        <h3 class="font-semibold text-purple-800 mb-3">コード解説</h3>
+                        <ul class="text-purple-900 text-sm space-y-2">
+                            <li><strong>pathParameters['id']:</strong> URLから対象タスクのIDを取得します（例: /todos/abc-123）</li>
+                            <li><strong>UpdateExpression:</strong> 更新する属性を指定するSQL風の構文</li>
+                            <li><strong>ExpressionAttributeValues:</strong> UpdateExpressionで使う値を定義</li>
+                            <li><strong>動的な更新:</strong> titleまたはcompletedのどちらか、または両方を更新できます</li>
+                            <li><strong>ReturnValues='ALL_NEW':</strong> 更新後の完全なアイテムを返します</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション6: タスク削除（Delete） -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.6 タスク削除（Delete）の実装
+                    </h2>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 6-4: deleteTodo関数の作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">指定されたタスクをDynamoDBから削除する関数を作成します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">Lambda関数を作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            関数名を <code class="bg-purple-100 px-1 rounded">deleteTodo</code> として新しい関数を作成します。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">関数コードを実装</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            以下のコードをコードエディタに貼り付けます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fab fa-python"></i>
+                                                    deleteTodo.py
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-python">import json
+import boto3
+
+# DynamoDBリソースの取得
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('todos')
+
+def lambda_handler(event, context):
+    try:
+        # パスパラメータからIDを取得
+        todo_id = event['pathParameters']['id']
+
+        # DynamoDBから削除
+        table.delete_item(
+            Key={'id': todo_id}
+        )
+
+        # 成功レスポンスを返す
+        return {
+            'statusCode': 204,  # No Content（削除成功）
+            'headers': {
+                'Access-Control-Allow-Origin': '*'
+            }
+        }
+
+    except Exception as e:
+        print(f"エラー: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': 'タスクの削除に失敗しました'
+            }, ensure_ascii=False)
+        }
+</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">API Gatewayと統合</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            「DELETE /todos/{id}」メソッドとこの関数を統合し、APIをデプロイします。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード解説 -->
+                    <div class="bg-purple-100 rounded-lg p-4 border border-purple-200 mb-6">
+                        <h3 class="font-semibold text-purple-800 mb-3">コード解説</h3>
+                        <ul class="text-purple-900 text-sm space-y-2">
+                            <li><strong>table.delete_item():</strong> 指定されたキーのアイテムを削除します</li>
+                            <li><strong>Key={'id': todo_id}:</strong> 削除対象のタスクをIDで指定</li>
+                            <li><strong>statusCode: 204:</strong> 削除成功を示すHTTPステータスコード（No Content）</li>
+                            <li><strong>注意:</strong> 存在しないIDを指定してもエラーにはならず、204が返ります</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション7: 実装のまとめ -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.7 実装のまとめ
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        これで、4つのLambda関数（getTodos、createTodo、updateTodo、deleteTodo）とAPI Gatewayが連携し、完全なバックエンドAPIが完成しました。
+                    </p>
+
+                    <!-- CRUD操作一覧表 -->
+                    <div class="overflow-x-auto mb-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-slate-700">操作</th>
+                                    <th class="px-4 py-2 text-left text-slate-700">HTTPメソッド</th>
+                                    <th class="px-4 py-2 text-left text-slate-700">パス</th>
+                                    <th class="px-4 py-2 text-left text-slate-700">Lambda関数</th>
+                                    <th class="px-4 py-2 text-left text-slate-700">DynamoDBメソッド</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600 text-sm">
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-2">一覧取得</td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">GET</code></td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">/todos</code></td>
+                                    <td class="px-4 py-2">getTodos</td>
+                                    <td class="px-4 py-2">scan()</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-2">作成</td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">POST</code></td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">/todos</code></td>
+                                    <td class="px-4 py-2">createTodo</td>
+                                    <td class="px-4 py-2">put_item()</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-2">更新</td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">PUT</code></td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">/todos/{'{id}'}</code></td>
+                                    <td class="px-4 py-2">updateTodo</td>
+                                    <td class="px-4 py-2">update_item()</td>
+                                </tr>
+                                <tr class="border-t border-slate-200">
+                                    <td class="px-4 py-2">削除</td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">DELETE</code></td>
+                                    <td class="px-4 py-2"><code class="bg-slate-100 px-1 rounded">/todos/{'{id}'}</code></td>
+                                    <td class="px-4 py-2">deleteTodo</td>
+                                    <td class="px-4 py-2">delete_item()</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 動作確認 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        6.8 動作確認
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">curlコマンドでAPI動作確認</h3>
+                                <p class="text-emerald-900 mb-4">ターミナルまたはコマンドプロンプトから、以下のコマンドでAPIをテストします。</p>
+
+                                <div class="space-y-4">
+                                    <!-- タスク作成 -->
+                                    <div>
+                                        <h4 class="font-medium text-emerald-800 mb-2">1. タスク作成（POST）</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fas fa-terminal"></i>
+                                                    タスク作成
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash">curl -X POST https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/prod/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "牛乳を買う"}'
+</code></pre>
+                                        </div>
+                                        <p class="text-emerald-800 text-sm mt-2">
+                                            <strong>期待される結果:</strong> 新しいタスクのJSON（id、title、completed、createdAt、updatedAtを含む）が返されます。
+                                        </p>
+                                    </div>
+
+                                    <!-- タスク一覧取得 -->
+                                    <div>
+                                        <h4 class="font-medium text-emerald-800 mb-2">2. タスク一覧取得（GET）</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fas fa-terminal"></i>
+                                                    タスク一覧取得
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash">curl https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/prod/todos
+</code></pre>
+                                        </div>
+                                        <p class="text-emerald-800 text-sm mt-2">
+                                            <strong>期待される結果:</strong> すべてのタスクの配列が返されます（先ほど作成したタスクを含む）。
+                                        </p>
+                                    </div>
+
+                                    <!-- タスク更新 -->
+                                    <div>
+                                        <h4 class="font-medium text-emerald-800 mb-2">3. タスク更新（PUT）</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fas fa-terminal"></i>
+                                                    タスク更新
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash">curl -X PUT https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/prod/todos/タスクID \
+  -H "Content-Type: application/json" \
+  -d '{"completed": true}'
+</code></pre>
+                                        </div>
+                                        <p class="text-emerald-800 text-sm mt-2">
+                                            <strong>期待される結果:</strong> 更新後のタスクのJSONが返されます（completedがtrueになっている）。
+                                        </p>
+                                    </div>
+
+                                    <!-- タスク削除 -->
+                                    <div>
+                                        <h4 class="font-medium text-emerald-800 mb-2">4. タスク削除（DELETE）</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span class="code-block-title">
+                                                    <i class="fas fa-terminal"></i>
+                                                    タスク削除
+                                                </span>
+                                                <button class="code-copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash">curl -X DELETE https://YOUR_API_ID.execute-api.ap-northeast-1.amazonaws.com/prod/todos/タスクID
+</code></pre>
+                                        </div>
+                                        <p class="text-emerald-800 text-sm mt-2">
+                                            <strong>期待される結果:</strong> ステータスコード204（No Content）が返されます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mt-6">
+                                    <p class="text-blue-800 text-sm">
+                                        <i class="fas fa-lightbulb mr-1"></i>
+                                        <strong>ヒント:</strong> 「YOUR_API_ID」は、API GatewayのステージURLから確認できます。「タスクID」は、タスク一覧取得で表示されるidフィールドの値を使用してください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">Lambda関数実行時に「AccessDeniedException」が発生</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> Lambda関数のIAMロールにDynamoDBへのアクセス権限がない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• IAMコンソールでLambda関数のロールを開く</li>
+                                        <li>• 「ポリシーをアタッチ」をクリック</li>
+                                        <li>• 「AmazonDynamoDBFullAccess」ポリシーを検索して追加</li>
+                                        <li>• Lambda関数を再実行</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">「ResourceNotFoundException」が発生</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> テーブル名が間違っている、またはテーブルが存在しない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• DynamoDBコンソールで「todos」テーブルが存在するか確認</li>
+                                        <li>• Lambda関数のコード内のテーブル名が「todos」であることを確認</li>
+                                        <li>• リージョンが一致しているか確認（東京リージョン: ap-northeast-1）</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">API呼び出しで「Internal Server Error」が返ってくる</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> Lambda関数内でエラーが発生している</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• CloudWatch Logsで該当Lambda関数のログを確認</li>
+                                        <li>• エラーメッセージから原因を特定</li>
+                                        <li>• 「KeyError」の場合: 必要なキーが存在しないため、条件分岐を追加</li>
+                                        <li>• 「JSONDecodeError」の場合: リクエストボディのJSON形式が不正</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー4 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">curlで「CORS policy」エラーが出る</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> CORSヘッダーが正しく設定されていない</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• Lambda関数のレスポンスに「Access-Control-Allow-Origin」ヘッダーが含まれているか確認</li>
+                                        <li>• API GatewayでCORSが有効になっているか確認</li>
+                                        <li>• APIを再デプロイ</li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください：</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            getTodos関数でタスク一覧を取得できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            createTodo関数で新しいタスクを作成できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            updateTodo関数でタスクを更新できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            deleteTodo関数でタスクを削除できる
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            curlコマンドですべてのAPI操作を確認できた
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check6"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check6" class="text-blue-900 cursor-pointer">
+                                            CloudWatch Logsでログが正常に出力されている
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 次のステップ -->
+                <section class="mb-10">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">次のステップ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ステップ7では、Next.jsを使ってユーザーが操作する画面（UI）を作成します。モダンなフロントエンド開発の基礎を学びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="aws-serverless-tutorial-05.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">API Gatewayの設定</span>
+                        </div>
+                    </a>
+                    <a href="aws-serverless-tutorial-07.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">Next.jsフロントエンドの作成</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

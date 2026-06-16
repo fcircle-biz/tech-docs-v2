@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI学習教材 第9章 - テストとドキュメント</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #2e7d32; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #2e7d32; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #2e7d32; padding-bottom: 0.5rem; }
+        .section-title { color: #4caf50; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #2e7d32; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #2e7d32 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid"><a class="navbar-brand"><strong>FastAPI学習教材</strong></a></div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-01.html">第1章: FastAPI入門と環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-02.html">第2章: ルーティングとリクエスト処理</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-03.html">第3章: Pydanticモデルとデータ検証</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-04.html">第4章: レスポンス処理と例外ハンドリング</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-05.html">第5章: 依存性注入とミドルウェア</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-06.html">第6章: データベース連携とORM</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-07.html">第7章: 認証とセキュリティ</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-08.html">第8章: 非同期処理とパフォーマンス最適化</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="fastapi-learning-material-09.html">第9章: テストとドキュメント</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-10.html">第10章: デプロイメントと本番環境</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-border">
+                    <h1 class="h2">第9章: テストとドキュメント</h1>
+                </div>
+
+                <div id="chapter9">
+                    <h2 class="chapter-title">品質保証：テスト自動化とAPIドキュメント作成</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>pytestを使用したAPIテストの実装</li>
+                            <li>TestClientによる統合テスト</li>
+                            <li>自動生成APIドキュメントのカスタマイズ</li>
+                            <li>OpenAPI仕様の活用方法</li>
+                            <li>CI/CDパイプラインでのテスト自動化</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">9.1 pytestによるAPIテスト</h3>
+                    <p>高品質なAPIを構築するには、包括的なテストスイートが不可欠です。FastAPIはTestClientを提供し、実際のHTTPサーバーを起動せずにAPIをテストできます。</p>
+
+                    <div class="mermaid">
+                        graph TB
+                            subgraph "テスト戦略"
+                                A["単体テスト<br/>（Unit Tests）"] --> B["統合テスト<br/>（Integration Tests）"]
+                                B --> C["E2Eテスト<br/>（End-to-End Tests）"]
+                            end
+                            
+                            subgraph "FastAPIテスト"
+                                D["TestClient"] --> E["APIエンドポイント"]
+                                E --> F["レスポンス検証"]
+                                F --> G["データベーステスト"]
+                            end
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-1: 包括的APIテストの実装</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python"># test_main.py
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from main import app, get_db
+from database import Base
+import models
+
+# テスト用データベース設定
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# テスト用データベース依存性
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+app.dependency_overrides[get_db] = override_get_db
+
+@pytest.fixture(scope="module")
+def test_client():
+    """テストクライアント作成"""
+    Base.metadata.create_all(bind=engine)
+    
+    with TestClient(app) as client:
+        yield client
+    
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture(scope="function") 
+def test_db():
+    """テスト用データベースセッション"""
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
+# テストデータ作成用ヘルパー
+@pytest.fixture
+def sample_user_data():
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "full_name": "Test User"
+    }
+
+@pytest.fixture
+def sample_post_data():
+    return {
+        "title": "テスト投稿",
+        "content": "これはテスト投稿です。",
+        "is_published": True
+    }
+
+class TestUserEndpoints:
+    """ユーザー関連エンドポイントテスト"""
+    
+    def test_create_user_success(self, test_client: TestClient, sample_user_data):
+        """ユーザー作成成功テスト"""
+        response = test_client.post("/users/", json=sample_user_data)
+        
+        assert response.status_code == 201
+        
+        data = response.json()
+        assert data["username"] == sample_user_data["username"]
+        assert data["email"] == sample_user_data["email"]
+        assert "id" in data
+        assert "created_at" in data
+    
+    def test_create_user_duplicate_email(self, test_client: TestClient, sample_user_data):
+        """重複メールアドレスでのユーザー作成失敗テスト"""
+        # 最初のユーザー作成
+        test_client.post("/users/", json=sample_user_data)
+        
+        # 同じメールアドレスで再度作成
+        response = test_client.post("/users/", json=sample_user_data)
+        
+        assert response.status_code == 400
+        assert "既に登録されています" in response.json()["detail"]
+    
+    def test_get_user_success(self, test_client: TestClient, sample_user_data):
+        """ユーザー取得成功テスト"""
+        # ユーザー作成
+        create_response = test_client.post("/users/", json=sample_user_data)
+        user_id = create_response.json()["id"]
+        
+        # ユーザー取得
+        response = test_client.get(f"/users/{user_id}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == user_id
+        assert data["username"] == sample_user_data["username"]
+    
+    def test_get_user_not_found(self, test_client: TestClient):
+        """存在しないユーザー取得テスト"""
+        response = test_client.get("/users/999")
+        
+        assert response.status_code == 404
+        assert "見つかりません" in response.json()["detail"]
+    
+    def test_get_users_list(self, test_client: TestClient):
+        """ユーザー一覧取得テスト"""
+        # 複数ユーザー作成
+        for i in range(3):
+            user_data = {
+                "username": f"testuser{i}",
+                "email": f"test{i}@example.com", 
+                "full_name": f"Test User {i}"
+            }
+            test_client.post("/users/", json=user_data)
+        
+        # ユーザー一覧取得
+        response = test_client.get("/users/")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        assert isinstance(data, list)
+    
+    def test_update_user_success(self, test_client: TestClient, sample_user_data):
+        """ユーザー更新成功テスト"""
+        # ユーザー作成
+        create_response = test_client.post("/users/", json=sample_user_data)
+        user_id = create_response.json()["id"]
+        
+        # ユーザー更新
+        update_data = {"full_name": "Updated Name"}
+        response = test_client.put(f"/users/{user_id}", json=update_data)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["full_name"] == "Updated Name"
+        assert data["username"] == sample_user_data["username"]  # 変更されていない
+    
+    def test_delete_user_success(self, test_client: TestClient, sample_user_data):
+        """ユーザー削除成功テスト"""
+        # ユーザー作成
+        create_response = test_client.post("/users/", json=sample_user_data)
+        user_id = create_response.json()["id"]
+        
+        # ユーザー削除
+        response = test_client.delete(f"/users/{user_id}")
+        
+        assert response.status_code == 204
+        
+        # 削除確認
+        get_response = test_client.get(f"/users/{user_id}")
+        assert get_response.status_code == 404
+
+class TestAuthenticationEndpoints:
+    """認証関連エンドポイントテスト"""
+    
+    def test_login_success(self, test_client: TestClient):
+        """ログイン成功テスト"""
+        # テスト用ユーザー作成
+        user_data = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "full_name": "Test User"
+        }
+        test_client.post("/users/", json=user_data)
+        
+        # ログイン
+        login_data = {
+            "username": "testuser",
+            "password": "testpass"
+        }
+        response = test_client.post("/token", data=login_data)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+    
+    def test_login_invalid_credentials(self, test_client: TestClient):
+        """ログイン失敗テスト"""
+        login_data = {
+            "username": "invalid",
+            "password": "invalid"
+        }
+        response = test_client.post("/token", data=login_data)
+        
+        assert response.status_code == 401
+        assert "正しくありません" in response.json()["detail"]
+    
+    def test_protected_endpoint_without_token(self, test_client: TestClient):
+        """トークンなしで保護されたエンドポイントアクセス"""
+        response = test_client.get("/users/me")
+        
+        assert response.status_code == 401
+    
+    def test_protected_endpoint_with_token(self, test_client: TestClient):
+        """トークンありで保護されたエンドポイントアクセス"""
+        # ユーザー作成とログイン
+        user_data = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "full_name": "Test User"
+        }
+        test_client.post("/users/", json=user_data)
+        
+        login_response = test_client.post("/token", data={
+            "username": "testuser",
+            "password": "testpass"
+        })
+        token = login_response.json()["access_token"]
+        
+        # 認証ヘッダー付きでアクセス
+        headers = {"Authorization": f"Bearer {token}"}
+        response = test_client.get("/users/me", headers=headers)
+        
+        assert response.status_code == 200
+        assert response.json()["username"] == "testuser"
+
+class TestValidationErrors:
+    """バリデーションエラーテスト"""
+    
+    def test_invalid_email_format(self, test_client: TestClient):
+        """無効なメールフォーマット"""
+        invalid_data = {
+            "username": "testuser",
+            "email": "invalid-email",
+            "full_name": "Test User"
+        }
+        response = test_client.post("/users/", json=invalid_data)
+        
+        assert response.status_code == 422
+        
+    def test_missing_required_fields(self, test_client: TestClient):
+        """必須フィールド不足"""
+        incomplete_data = {"username": "testuser"}
+        response = test_client.post("/users/", json=incomplete_data)
+        
+        assert response.status_code == 422
+        
+        errors = response.json()["detail"]
+        assert any(error["loc"][-1] == "email" for error in errors)
+        assert any(error["loc"][-1] == "full_name" for error in errors)
+    
+    def test_field_length_validation(self, test_client: TestClient):
+        """フィールド長さバリデーション"""
+        invalid_data = {
+            "username": "a",  # 短すぎる
+            "email": "test@example.com",
+            "full_name": "x" * 101  # 長すぎる
+        }
+        response = test_client.post("/users/", json=invalid_data)
+        
+        assert response.status_code == 422</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.2 テストカバレッジと品質計測</h3>
+                    <p>テストの網羅性を測定し、品質を継続的に向上させるためのツールと手法を学びます。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-2: テストカバレッジと品質管理</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python"># conftest.py（pytest設定ファイル）
+import pytest
+import asyncio
+from typing import Generator
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from main import app
+from database import get_db, Base
+from auth import get_current_user
+
+# テスト用データベース設定
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def override_get_db():
+    """テスト用データベース依存性"""
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+def override_get_current_user():
+    """テスト用認証依存性"""
+    return {
+        "id": 1,
+        "username": "testuser",
+        "email": "test@example.com",
+        "full_name": "Test User",
+        "roles": ["user"]
+    }
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """イベントループフィクスチャ（非同期テスト用）"""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture(autouse=True)
+def setup_test_db():
+    """各テスト前にDBをセットアップ"""
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def client():
+    """テストクライアント"""
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    
+    with TestClient(app) as c:
+        yield c
+    
+    app.dependency_overrides.clear()
+
+# test_performance.py
+import time
+import statistics
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+class TestPerformance:
+    """パフォーマンステスト"""
+    
+    def test_response_time_single_request(self, client: TestClient):
+        """単一リクエストレスポンス時間"""
+        start_time = time.time()
+        response = client.get("/users/")
+        end_time = time.time()
+        
+        response_time = end_time - start_time
+        
+        assert response.status_code == 200
+        assert response_time < 1.0  # 1秒以内
+        print(f"Response time: {response_time:.3f}s")
+    
+    def test_concurrent_requests(self, client: TestClient):
+        """並行リクエスト処理性能"""
+        def make_request():
+            start = time.time()
+            response = client.get("/users/")
+            end = time.time()
+            return response.status_code, end - start
+        
+        # 10個の並行リクエスト
+        num_requests = 10
+        response_times = []
+        
+        with ThreadPoolExecutor(max_workers=num_requests) as executor:
+            futures = [executor.submit(make_request) for _ in range(num_requests)]
+            
+            for future in as_completed(futures):
+                status_code, response_time = future.result()
+                assert status_code == 200
+                response_times.append(response_time)
+        
+        # 統計情報
+        avg_time = statistics.mean(response_times)
+        max_time = max(response_times)
+        min_time = min(response_times)
+        
+        print(f"平均レスポンス時間: {avg_time:.3f}s")
+        print(f"最大レスポンス時間: {max_time:.3f}s")
+        print(f"最小レスポンス時間: {min_time:.3f}s")
+        
+        # パフォーマンス基準
+        assert avg_time < 0.5  # 平均0.5秒以内
+        assert max_time < 1.0  # 最大1秒以内
+    
+    def test_database_query_performance(self, client: TestClient):
+        """データベースクエリ性能"""
+        # テストデータ作成
+        for i in range(100):
+            user_data = {
+                "username": f"perftest{i}",
+                "email": f"perftest{i}@example.com",
+                "full_name": f"Performance Test User {i}"
+            }
+            client.post("/users/", json=user_data)
+        
+        # クエリ実行時間測定
+        start_time = time.time()
+        response = client.get("/users/?limit=100")
+        end_time = time.time()
+        
+        query_time = end_time - start_time
+        
+        assert response.status_code == 200
+        assert len(response.json()) == 100
+        assert query_time < 0.1  # 100ms以内
+        print(f"Query time for 100 users: {query_time:.3f}s")
+
+# test_edge_cases.py
+class TestEdgeCases:
+    """エッジケーステスト"""
+    
+    def test_very_long_input(self, client: TestClient):
+        """非常に長い入力値"""
+        long_string = "x" * 10000
+        
+        user_data = {
+            "username": "testuser",
+            "email": "test@example.com", 
+            "full_name": long_string
+        }
+        
+        response = client.post("/users/", json=user_data)
+        
+        # バリデーションエラーまたは413エラー
+        assert response.status_code in [413, 422]
+    
+    def test_special_characters_input(self, client: TestClient):
+        """特殊文字入力"""
+        special_chars_data = {
+            "username": "test&lt;&gt;user",
+            "email": "test@example.com",
+            "full_name": "Test &amp; User &lt;script&gt;alert('xss')&lt;/script&gt;"
+        }
+        
+        response = client.post("/users/", json=special_chars_data)
+        
+        # バリデーションルールに応じて適切に処理される
+        if response.status_code == 201:
+            # 特殊文字が適切にエスケープされているか確認
+            data = response.json()
+            assert "&lt;script&gt;" not in data["full_name"]
+        else:
+            # または適切にバリデーションエラーが返される
+            assert response.status_code == 422
+    
+    def test_unicode_input(self, client: TestClient):
+        """Unicode文字入力"""
+        unicode_data = {
+            "username": "テストユーザー",
+            "email": "テスト@example.com",
+            "full_name": "テスト 太郎 🚀"
+        }
+        
+        response = client.post("/users/", json=unicode_data)
+        
+        if response.status_code == 201:
+            data = response.json()
+            assert data["full_name"] == unicode_data["full_name"]
+    
+    def test_null_and_empty_values(self, client: TestClient):
+        """null値と空文字値"""
+        test_cases = [
+            {"username": "", "email": "test@example.com", "full_name": "Test"},
+            {"username": None, "email": "test@example.com", "full_name": "Test"},
+            {"username": "test", "email": "", "full_name": "Test"},
+            {"username": "test", "email": "test@example.com", "full_name": ""},
+        ]
+        
+        for case in test_cases:
+            response = client.post("/users/", json=case)
+            assert response.status_code == 422  # バリデーションエラー
+
+# pytest.ini（プロジェクトルートに配置）
+[pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = 
+    --verbose
+    --cov=main
+    --cov=database
+    --cov=auth
+    --cov-report=html:htmlcov
+    --cov-report=term
+    --cov-fail-under=80
+    --tb=short
+asyncio_mode = auto
+
+# requirements-test.txt
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-asyncio==0.21.0
+httpx==0.24.1</code></pre>
+                    </div>
+
+                    <h3 class="section-title">9.3 APIドキュメントのカスタマイズ</h3>
+                    <p>FastAPIの自動生成ドキュメントを組織に合わせてカスタマイズし、より使いやすくします。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 9-3: カスタムAPIドキュメント</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python"># docs_config.py
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+
+def custom_openapi(app: FastAPI):
+    """カスタムOpenAPI仕様生成"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="会社名 API システム",
+        version="2.1.0",
+        description="""
+        ## 概要
+        このAPIは、会社の基幹システムを支える統合APIプラットフォームです。
+        
+        ## 主な機能
+        - **ユーザー管理**: ユーザーの登録、認証、プロファイル管理
+        - **コンテンツ管理**: 投稿の作成、編集、公開管理
+        - **認証・認可**: JWT認証とロールベースアクセス制御
+        
+        ## 認証方法
+        このAPIは **Bearer Token認証** を使用します。
+        
+        1. `/token`エンドポイントでログイン
+        2. 取得したアクセストークンを`Authorization: Bearer <token>`ヘッダーに設定
+        3. 保護されたエンドポイントにアクセス
+        
+        ## レート制限
+        - 認証なし: 100リクエスト/時間
+        - 認証済み: 1000リクエスト/時間
+        
+        ## サポート
+        - **開発チーム**: dev-team@company.com
+        - **ドキュメント**: https://docs.company.com/api
+        - **ステータスページ**: https://status.company.com
+        """,
+        routes=app.routes,
+        contact={
+            "name": "開発チーム",
+            "url": "https://company.com/dev-team",
+            "email": "dev-team@company.com",
+        },
+        license_info={
+            "name": "Apache 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+        },
+        servers=[
+            {
+                "url": "https://api.company.com",
+                "description": "本番環境"
+            },
+            {
+                "url": "https://staging-api.company.com",
+                "description": "ステージング環境"
+            },
+            {
+                "url": "http://localhost:8000",
+                "description": "開発環境"
+            }
+        ]
+    )
+    
+    # セキュリティスキーマの追加
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    
+    # タグの説明を追加
+    openapi_schema["tags"] = [
+        {
+            "name": "users",
+            "description": "ユーザー管理操作。登録、認証、プロファイル管理を含みます。"
+        },
+        {
+            "name": "posts",
+            "description": "コンテンツ管理操作。投稿の作成、編集、公開を含みます。"
+        },
+        {
+            "name": "auth",
+            "description": "認証関連操作。ログイン、トークン更新、パスワード変更を含みます。"
+        }
+    ]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+# カスタムドキュメントページ
+def setup_custom_docs(app: FastAPI):
+    """カスタムドキュメントページ設定"""
+    
+    # 静的ファイル配信
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        """カスタムSwagger UI"""
+        return get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} - Swagger UI",
+            swagger_js_url="/static/swagger-ui/swagger-ui-bundle.js",
+            swagger_css_url="/static/swagger-ui/swagger-ui.css",
+            swagger_favicon_url="/static/favicon.ico",
+        )
+    
+    @app.get("/redoc", include_in_schema=False) 
+    async def custom_redoc_html():
+        """カスタムReDoc"""
+        return get_redoc_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} - ReDoc",
+            redoc_js_url="/static/redoc/redoc.standalone.js",
+            redoc_favicon_url="/static/favicon.ico",
+        )
+    
+    @app.get("/api-docs", include_in_schema=False)
+    async def api_documentation():
+        """カスタムAPIドキュメントページ"""
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>API ドキュメント</title>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; }
+                .header { border-bottom: 2px solid #007bff; padding-bottom: 20px; }
+                .section { margin: 30px 0; }
+                .endpoint { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+                .method { font-weight: bold; color: #007bff; }
+                pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 5px; overflow-x: auto; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🚀 Company API ドキュメント</h1>
+                <p>開発者向けAPIリファレンス</p>
+            </div>
+            
+            <div class="section">
+                <h2>📖 ドキュメント形式</h2>
+                <ul>
+                    <li><a href="/docs">Swagger UI</a> - 対話式APIテスト</li>
+                    <li><a href="/redoc">ReDoc</a> - 読みやすいドキュメント</li>
+                    <li><a href="/openapi.json">OpenAPI JSON</a> - 機械読み取り形式</li>
+                </ul>
+            </div>
+            
+            <div class="section">
+                <h2>🔑 認証方法</h2>
+                <div class="endpoint">
+                    <div class="method">POST /token</div>
+                    <p>ユーザー名とパスワードでアクセストークンを取得</p>
+                    <pre>curl -X POST "http://localhost:8000/token" \\
+     -H "Content-Type: application/x-www-form-urlencoded" \\
+     -d "username=your_username&password=your_password"</pre>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📊 使用例</h2>
+                <div class="endpoint">
+                    <div class="method">GET /users/me</div>
+                    <p>認証済みユーザー情報取得</p>
+                    <pre>curl -X GET "http://localhost:8000/users/me" \\
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"</pre>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>❓ サポート</h2>
+                <p>質問や問題がある場合は、<a href="mailto:dev-team@company.com">開発チーム</a>までお問い合わせください。</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+
+# エンドポイントに詳細な説明を追加
+@app.post(
+    "/users/",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["users"],
+    summary="新規ユーザー作成",
+    description="""
+    新しいユーザーアカウントを作成します。
+    
+    - **username**: 一意のユーザー名（3-20文字の英数字）
+    - **email**: 有効なメールアドレス
+    - **full_name**: ユーザーの氏名
+    
+    作成されたユーザーには自動的にウェルカムメールが送信されます。
+    """,
+    response_description="作成されたユーザー情報",
+    responses={
+        201: {
+            "description": "ユーザー作成成功",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "username": "johndoe",
+                        "email": "john@example.com",
+                        "full_name": "John Doe",
+                        "is_active": True,
+                        "created_at": "2025-01-01T12:00:00Z",
+                        "updated_at": "2025-01-01T12:00:00Z"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "バリデーションエラーまたは重複",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "このメールアドレスは既に登録されています"
+                    }
+                }
+            }
+        }
+    }
+)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """新規ユーザー作成エンドポイント"""
+    return user_crud.create_user(db=db, user=user)</code></pre>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>
+                                <strong>FastAPIでAPIテストを行うために使用するクライアントクラスは？</strong>
+                                <details><summary>解答</summary><p>TestClient（fastapi.testclient.TestClientから）</p></details>
+                            </li>
+                            <li>
+                                <strong>テストカバレッジを測定するためのpytestプラグインは？</strong>
+                                <details><summary>解答</summary><p>pytest-cov</p></details>
+                            </li>
+                            <li>
+                                <strong>OpenAPI仕様をカスタマイズするために使用するFastAPI関数は？</strong>
+                                <details><summary>解答</summary><p>get_openapi()</p></details>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 class="section-title">9.4 まとめ</h3>
+                    <div class="highlight">
+                        <h6>この章で習得したスキル</h6>
+                        <ul>
+                            <li>pytestとTestClientによる包括的APIテスト</li>
+                            <li>パフォーマンステストとエッジケース対応</li>
+                            <li>テストカバレッジ測定と品質管理</li>
+                            <li>OpenAPI仕様のカスタマイズ</li>
+                            <li>開発者向けドキュメントの整備</li>
+                            <li>CI/CD統合のためのテスト設計</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="fastapi-learning-material-08.html" class="btn btn-secondary">← 前の章: 非同期処理とパフォーマンス最適化</a>
+                        <a href="fastapi-learning-material-10.html" class="btn btn-primary">次の章: デプロイメントと本番環境 →</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <footer class="bg-dark text-white mt-5">
+        <div class="container-fluid py-3">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="mb-0">© 2025 F-Circle. All rights reserved.<br>
+本資料はAIツールを活用し、人間による編集・監修のもと作成されています。無断転載・再配布を禁じます。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>

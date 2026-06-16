@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>MySQL入門 第11章 - ユーザーと権限管理 - セキュリティの基礎</title>
+
+    <!-- ダークモード早期適用(フラッシュ防止) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">MySQL入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-database text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">MySQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ユーザーと権限管理 - セキュリティの基礎</h1>
+                    <p class="text-slate-600">MySQLのユーザー管理、GRANT/REVOKEによる権限設定を学習します。本番環境で必要となるセキュリティ設定の基本、接続制限、パスワードポリシーについて理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>MySQLのユーザー管理の基本</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>GRANT/REVOKEによる権限設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>本番環境でのセキュリティ設定</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>接続制限とパスワードポリシー</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: MySQLのユーザー管理 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 MySQLのユーザー管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQLでは、セキュリティ上の理由から各ユーザーに適切な権限のみを付与する「最小権限の原則」に従うことが重要です。開発環境と本番環境で異なるユーザーを作成し、それぞれ必要な権限のみを付与することで、データの漏洩や改ざんのリスクを減らします。
+                    </p>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">MySQLのユーザー管理の基本概念</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>ユーザー識別</strong> - MySQLのユーザーは「ユーザー名@ホスト名」の形式で識別される</li>
+                                    <li><strong>権限レベル</strong> - グローバル、データベース、テーブル、カラムの4段階がある</li>
+                                    <li><strong>認証プラグイン</strong> - MySQL 8.0からは「caching_sha2_password」がデフォルト</li>
+                                    <li><strong>mysql.user テーブル</strong> - ユーザー情報はこのシステムテーブルに格納される</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ユーザーの作成</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        新しいユーザーを作成するには CREATE USER 文を使用します。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>ユーザー作成の基本構文</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ローカルホストからのみ接続可能なユーザー
+CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'SecurePassword123!';
+
+-- 任意のホストから接続可能なユーザー（注意: セキュリティリスク高）
+CREATE USER 'remote_user'@'%' IDENTIFIED BY 'AnotherSecure456!';
+
+-- 特定のIPアドレスからのみ接続可能なユーザー
+CREATE USER 'admin_user'@'192.168.1.100' IDENTIFIED BY 'AdminPass789!';
+
+-- パスワード有効期限を設定（180日）
+CREATE USER 'temp_user'@'localhost'
+IDENTIFIED BY 'TempPass321!'
+PASSWORD EXPIRE INTERVAL 180 DAY;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">セキュリティ上の注意</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    本番環境では '@%'（全ホストからの接続許可）は使用しないでください。必ず接続元のIPアドレスを限定しましょう。また、パスワードは大文字・小文字・数字・記号を含む強固なものを設定し、定期的に変更してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ユーザー情報の確認</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>ユーザー一覧の確認</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- すべてのユーザーを確認
+SELECT user, host FROM mysql.user;
+
+-- 現在のユーザーを確認
+SELECT USER(), CURRENT_USER();
+
+-- 特定ユーザーの詳細情報
+SHOW CREATE USER 'app_user'@'localhost';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ユーザーの変更・削除</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>ユーザー管理操作</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- パスワードの変更
+ALTER USER 'app_user'@'localhost' IDENTIFIED BY 'NewPassword999!';
+
+-- ユーザー名の変更
+RENAME USER 'old_name'@'localhost' TO 'new_name'@'localhost';
+
+-- ユーザーの削除
+DROP USER 'temp_user'@'localhost';
+
+-- アカウントのロック（ログイン不可）
+ALTER USER 'app_user'@'localhost' ACCOUNT LOCK;
+
+-- アカウントのアンロック
+ALTER USER 'app_user'@'localhost' ACCOUNT UNLOCK;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション2: 権限の種類と設定 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 権限の種類と設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQLでは、SELECT、INSERT、UPDATE、DELETE などの基本的なデータ操作権限から、CREATE、DROP などのスキーマ変更権限まで、細かく権限を設定できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">主な権限の種類</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">権限名</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">説明</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">用途例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">SELECT</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">データの読み取り</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">閲覧専用ユーザー</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">INSERT</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">データの追加</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">アプリケーション</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">UPDATE</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">データの更新</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">アプリケーション</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">DELETE</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">データの削除</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">管理者のみ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">CREATE</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">テーブル・DBの作成</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">開発者・管理者</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">DROP</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">テーブル・DBの削除</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">管理者のみ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">ALTER</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">テーブル構造の変更</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">開発者・管理者</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">INDEX</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">インデックスの作成・削除</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">管理者</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">EXECUTE</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">ストアドプロシージャ実行</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">アプリケーション</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 text-slate-700 font-medium">ALL PRIVILEGES</td>
+                                    <td class="px-4 py-3 text-slate-600">すべての権限（GRANT除く）</td>
+                                    <td class="px-4 py-3 text-slate-600">管理者のみ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">権限の付与（GRANT文）</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>基本的な権限付与</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 特定のデータベースに読み取り権限のみ付与
+GRANT SELECT ON company_db.* TO 'readonly_user'@'localhost';
+
+-- データベース全体に基本的な操作権限を付与
+GRANT SELECT, INSERT, UPDATE, DELETE ON app_db.*
+TO 'app_user'@'localhost';
+
+-- 特定のテーブルにのみ権限を付与
+GRANT SELECT, UPDATE (name, email) ON app_db.users
+TO 'support_user'@'localhost';
+
+-- すべての権限を付与（管理者用）
+GRANT ALL PRIVILEGES ON *.* TO 'admin_user'@'localhost';
+
+-- 権限を他のユーザーに付与する権限（WITH GRANT OPTION）
+GRANT SELECT, INSERT ON app_db.* TO 'manager'@'localhost'
+WITH GRANT OPTION;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">権限の確認</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>権限の確認方法</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 現在のユーザーの権限を確認
+SHOW GRANTS;
+
+-- 特定ユーザーの権限を確認
+SHOW GRANTS FOR 'app_user'@'localhost';
+
+-- データベースごとの権限を確認
+SELECT * FROM mysql.db WHERE User = 'app_user';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">権限の取り消し（REVOKE文）</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>権限の取り消し</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 特定の権限を取り消す
+REVOKE DELETE ON app_db.* FROM 'app_user'@'localhost';
+
+-- すべての権限を取り消す
+REVOKE ALL PRIVILEGES ON *.* FROM 'temp_user'@'localhost';
+
+-- 権限付与の権限を取り消す
+REVOKE GRANT OPTION ON app_db.* FROM 'manager'@'localhost';
+
+-- 権限変更を即座に反映（通常は自動だが明示的に実行することも可能）
+FLUSH PRIVILEGES;</code></pre>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart TD
+    A[ユーザー作成] --> B[権限付与<br/>GRANT]
+    B --> C{権限レベル}
+    C -->|グローバル| D["*.*"]
+    C -->|データベース| E["db_name.*"]
+    C -->|テーブル| F["db.table"]
+    C -->|カラム| G["db.table（column）"]
+    D --> H[権限確認<br/>SHOW GRANTS]
+    E --> H
+    F --> H
+    G --> H
+    H --> I{変更必要?}
+    I -->|必要| J[権限取り消し<br/>REVOKE]
+    I -->|不要| K[継続使用]
+    J --> B
+                    </div>
+                </section>
+
+                <!-- セクション3: 実用的な権限設定パターン -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 実用的な権限設定パターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の開発・運用現場では、役割に応じて複数のユーザーを作成し、それぞれに適切な権限を設定します。以下は代表的なパターンです。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-laptop-code text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-purple-800 mb-2">開発者用ユーザー</h3>
+                                    <p class="text-purple-900 text-sm mb-2">開発環境での作業用。テーブル作成・変更が可能だが本番DBへはアクセス不可。</p>
+                                    <div class="bg-purple-100 rounded p-2 text-xs text-purple-900 font-mono">
+                                        GRANT ALL ON dev_db.*
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-desktop text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-blue-800 mb-2">アプリケーション用</h3>
+                                    <p class="text-blue-900 text-sm mb-2">本番環境で動作するアプリケーション用。基本操作のみ許可。</p>
+                                    <div class="bg-blue-100 rounded p-2 text-xs text-blue-900 font-mono">
+                                        SELECT, INSERT,<br/>UPDATE, DELETE
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-eye text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-emerald-800 mb-2">閲覧専用ユーザー</h3>
+                                    <p class="text-emerald-900 text-sm mb-2">データ分析・レポート作成用。読み取り専用で安全。</p>
+                                    <div class="bg-emerald-100 rounded p-2 text-xs text-emerald-900 font-mono">
+                                        SELECT のみ
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-user-shield text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-orange-800 mb-2">管理者用ユーザー</h3>
+                                    <p class="text-orange-900 text-sm mb-2">すべての操作が可能。バックアップ・メンテナンス用。</p>
+                                    <div class="bg-orange-100 rounded p-2 text-xs text-orange-900 font-mono">
+                                        ALL PRIVILEGES
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-pencil-alt text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習: 役割別ユーザーの作成</h3>
+                                <p class="text-purple-900 mb-4 break-words">実際に3種類のユーザーを作成して権限を設定してみましょう。</p>
+
+                                <div class="code-block-wrapper">
+                                    <div class="code-block-header">
+                                        <span>役割別ユーザー作成スクリプト</span>
+                                        <button class="copy-button" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre><code class="language-sql">-- 1. 開発者用ユーザー（開発DBへの完全アクセス）
+CREATE USER 'dev_user'@'localhost' IDENTIFIED BY 'DevPass123!';
+GRANT ALL PRIVILEGES ON dev_db.* TO 'dev_user'@'localhost';
+
+-- 2. アプリケーション用ユーザー（基本操作のみ）
+CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'AppPass456!';
+GRANT SELECT, INSERT, UPDATE, DELETE ON prod_db.*
+TO 'app_user'@'localhost';
+
+-- 3. 閲覧専用ユーザー（読み取りのみ）
+CREATE USER 'analyst'@'localhost' IDENTIFIED BY 'ReadOnly789!';
+GRANT SELECT ON prod_db.* TO 'analyst'@'localhost';
+
+-- 権限確認
+SHOW GRANTS FOR 'dev_user'@'localhost';
+SHOW GRANTS FOR 'app_user'@'localhost';
+SHOW GRANTS FOR 'analyst'@'localhost';</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: セキュリティ設定のベストプラクティス -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 セキュリティ設定のベストプラクティス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番環境でMySQLを安全に運用するために、以下のセキュリティ対策を実施しましょう。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">セキュリティチェックリスト</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 list-disc pl-5">
+                                    <li>rootユーザーは必ずパスワードを設定し、リモートアクセスを禁止する</li>
+                                    <li>本番環境では'@%'（全ホスト許可）を使わず接続元を限定する</li>
+                                    <li>パスワードは最低12文字以上で、複雑な組み合わせを使用する</li>
+                                    <li>不要なユーザーや匿名ユーザーは削除する</li>
+                                    <li>SSL/TLS接続を有効にして通信を暗号化する</li>
+                                    <li>定期的にユーザーと権限の見直しを行う</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">パスワードポリシーの設定</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MySQL 8.0では、パスワードの強度をチェックする「validate_password コンポーネント」が利用できます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>パスワードポリシーの設定</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- パスワード検証プラグインのインストール
+INSTALL COMPONENT 'file://component_validate_password';
+
+-- パスワードポリシーの確認
+SHOW VARIABLES LIKE 'validate_password%';
+
+-- パスワードポリシーの変更（LOW、MEDIUM、STRONG）
+SET GLOBAL validate_password.policy = MEDIUM;
+SET GLOBAL validate_password.length = 12;
+
+-- パスワード有効期限のデフォルト設定（全ユーザー対象）
+SET GLOBAL default_password_lifetime = 180;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">接続失敗時のアカウントロック</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>アカウントロック設定</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 3回失敗したら1日ロックする設定
+CREATE USER 'secure_user'@'localhost'
+IDENTIFIED BY 'SecurePass123!'
+FAILED_LOGIN_ATTEMPTS 3
+PASSWORD_LOCK_TIME 1;
+
+-- 既存ユーザーに設定
+ALTER USER 'app_user'@'localhost'
+FAILED_LOGIN_ATTEMPTS 5
+PASSWORD_LOCK_TIME 2;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">SSL/TLS接続の有効化</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リモート接続を行う場合、通信を暗号化することでパスワードやデータの盗聴を防ぎます。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>SSL接続の強制</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- SSL接続を必須にする
+CREATE USER 'remote_user'@'%'
+IDENTIFIED BY 'RemotePass123!'
+REQUIRE SSL;
+
+-- 既存ユーザーにSSL接続を強制
+ALTER USER 'app_user'@'%' REQUIRE SSL;
+
+-- SSL設定の確認
+SHOW VARIABLES LIKE '%ssl%';</code></pre>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-tools text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-orange-800 mb-3 break-words">トラブルシューティング</h3>
+
+                                <div class="space-y-4 text-orange-900">
+                                    <div class="bg-orange-100 rounded-lg p-3">
+                                        <p class="font-medium mb-1 break-words">問題: 権限を付与したのにアクセスできない</p>
+                                        <p class="text-sm break-words">
+                                            <strong>原因:</strong> ホスト名が一致していない可能性があります。<br>
+                                            <strong>解決策:</strong> ユーザー作成時の'@ホスト名'と実際の接続元が一致しているか確認してください。'localhost'と'127.0.0.1'は別物として扱われます。
+                                        </p>
+                                    </div>
+
+                                    <div class="bg-orange-100 rounded-lg p-3">
+                                        <p class="font-medium mb-1 break-words">問題: 「Access denied」エラーが出る</p>
+                                        <p class="text-sm break-words">
+                                            <strong>原因:</strong> パスワードが間違っているか、権限が不足しています。<br>
+                                            <strong>解決策:</strong> SHOW GRANTS コマンドで権限を確認し、必要に応じて再付与してください。
+                                        </p>
+                                    </div>
+
+                                    <div class="bg-orange-100 rounded-lg p-3">
+                                        <p class="font-medium mb-1 break-words">問題: rootパスワードを忘れた</p>
+                                        <p class="text-sm break-words">
+                                            <strong>解決策:</strong> MySQLを--skip-grant-tablesオプション付きで起動し、パスワードをリセットできます（ただしセキュリティリスクがあるため慎重に）。
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: 監査ログとセキュリティ監視 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 監査ログとセキュリティ監視
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番環境では、誰がいつどのような操作を行ったかを記録しておくことが重要です。MySQLでは一般クエリログやバイナリログを使って操作を追跡できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">一般クエリログの有効化</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>クエリログ設定</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 一般クエリログを有効化（すべてのクエリを記録）
+SET GLOBAL general_log = 'ON';
+SET GLOBAL general_log_file = '/var/log/mysql/general.log';
+
+-- 現在の設定確認
+SHOW VARIABLES LIKE 'general_log%';
+
+-- ログサイズが大きくなるため、本番環境では注意して使用</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">パフォーマンスへの影響</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    一般クエリログはすべてのクエリを記録するため、大量のディスクI/Oが発生しパフォーマンスに影響します。通常は無効にしておき、トラブルシューティング時のみ一時的に有効化するのが推奨されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ログイン履歴の確認</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span>接続履歴の確認</span>
+                            <button class="copy-button" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 現在の接続を確認
+SHOW PROCESSLIST;
+
+-- より詳細な情報
+SELECT * FROM information_schema.PROCESSLIST;</code></pre>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart LR
+    A[クライアント接続] --> B{認証成功?}
+    B -->|失敗| C[失敗カウント増加]
+    C --> D{ロック閾値?}
+    D -->|達した| E[アカウントロック]
+    D -->|未達| A
+    B -->|成功| F[クエリ実行]
+    F --> G{ログ有効?}
+    G -->|有効| H[ログファイルに記録]
+    G -->|無効| I[記録なし]
+    H --> J[定期監視]
+    I --> J
+    J --> K[異常検知]
+                    </mermaid>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ユーザー 'app_user'@'localhost' に company_db データベースの SELECT と INSERT 権限のみを付与するSQL文を書いてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <div class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <pre class="text-xs"><code>GRANT SELECT, INSERT ON company_db.* TO 'app_user'@'localhost';</code></pre>
+                                        </div>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 本番環境でユーザーを作成する際に避けるべきホスト指定は何ですか？また、その理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            '@%'（全ホストからの接続許可）は避けるべきです。理由は、世界中のどこからでも接続を試みることができてしまい、セキュリティリスクが非常に高くなるためです。本番環境では必ず接続元のIPアドレスやホスト名を限定してください。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 「最小権限の原則」とは何ですか？具体例を挙げて説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            最小権限の原則とは、各ユーザーに必要最低限の権限のみを付与するセキュリティの考え方です。例えば、データ分析専用のユーザーには SELECT 権限のみを付与し、DELETE や DROP などのデータを削除する権限は与えません。これにより、誤操作や不正アクセスによるデータ損失のリスクを最小化できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>MySQLのユーザーは「ユーザー名@ホスト名」で識別され、CREATE USER で作成する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>GRANT文で権限を付与し、REVOKE文で権限を取り消す。権限は役割に応じて適切に設定する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>本番環境では '@%' を使わず接続元を限定し、強固なパスワードを設定する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>パスワードポリシー、アカウントロック、SSL接続などのセキュリティ機能を活用する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>クエリログやプロセスリストで接続履歴と操作を監視し、セキュリティを維持する</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="mysql-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">バックアップとリストア</span>
+                        </div>
+                    </a>
+                    <a href="mysql-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">実践！MySQLでWebアプリのDBを設計</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

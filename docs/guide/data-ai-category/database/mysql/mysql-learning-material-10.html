@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>MySQL入門 第10章 - バックアップとリストア - データを安全に守る</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">MySQL入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-database text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">MySQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">バックアップとリストア - データを安全に守る</h1>
+                    <p class="text-slate-600">mysqldump、mysqlコマンドを使ったバックアップとリストアの方法を学習します。論理バックアップと物理バックアップの違い、定期バックアップの自動化、ポイントインタイムリカバリの基礎について理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>mysqldumpコマンドを使った論理バックアップの方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>mysqlコマンドを使ったリストア（復元）の方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>論理バックアップと物理バックアップの違いと使い分け</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>定期バックアップの自動化とバイナリログを使ったポイントインタイムリカバリ</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: バックアップの重要性と種類 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 バックアップの重要性と種類
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベースは企業や組織の重要な資産を格納しています。ハードウェア障害、ソフトウェアのバグ、人的ミス、災害など様々な理由でデータが失われる可能性があります。定期的なバックアップを取得し、確実にリストアできることを確認することは、データベース管理の基本中の基本です。
+                    </p>
+
+                    <div class="mermaid my-6">
+flowchart TD
+    A[データ損失のリスク] --> B[ハードウェア障害]
+    A --> C[ソフトウェアバグ]
+    A --> D[人的ミス]
+    A --> E[セキュリティ侵害]
+    A --> F[自然災害]
+
+    G[対策: バックアップ] --> H[定期バックアップ]
+    G --> I[テスト済みリストア手順]
+    G --> J[複数世代保持]
+    G --> K[オフサイト保存]
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">バックアップの種類</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>論理バックアップ</strong> - SQLのCREATE/INSERT文として出力。mysqldumpコマンドで取得。可読性が高く、異なるバージョン間で移行可能。</li>
+                                    <li><strong>物理バックアップ</strong> - データファイルをそのままコピー。MySQL Enterprise BackupやPercona XtraBackupで取得。高速で大規模DB向き。</li>
+                                    <li><strong>フルバックアップ</strong> - すべてのデータを取得。復元が簡単だが、時間とストレージを消費。</li>
+                                    <li><strong>増分バックアップ</strong> - 前回バックアップ以降の変更のみ取得。効率的だが、復元が複雑。</li>
+                                    <li><strong>バイナリログ</strong> - すべてのデータ変更を記録。ポイントインタイムリカバリに利用。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">バックアップ種類</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">メリット</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">デメリット</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">適用場面</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">論理バックアップ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">可読性が高い、テーブル単位で取得可能、バージョン間移行可能</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">遅い、サーバー負荷が高い</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">小〜中規模DB、定期バックアップ</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-medium">物理バックアップ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">高速、一貫性が高い</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">専用ツールが必要、可読性がない</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">大規模DB、高速復旧が必要</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-700 font-medium">バイナリログ</td>
+                                    <td class="px-4 py-3 text-slate-600">ポイントインタイムリカバリ可能</td>
+                                    <td class="px-4 py-3 text-slate-600">単独では使えない（フルバックアップと併用）</td>
+                                    <td class="px-4 py-3 text-slate-600">特定時点への復元が必要な場合</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション2: mysqldumpによる論理バックアップ -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 mysqldumpによる論理バックアップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        mysqldumpはMySQLに標準で付属する論理バックアップツールです。データベースやテーブルの内容をSQL文として出力し、テキストファイルに保存します。可読性が高く、編集も可能なため、初心者にも扱いやすいバックアップ方法です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">基本的な使い方</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">データベース全体をバックアップ</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 単一データベースをバックアップ
+mysqldump -u root -p sample_db > backup_sample_db.sql
+
+# 複数データベースをバックアップ
+mysqldump -u root -p --databases db1 db2 db3 > backup_multiple.sql
+
+# すべてのデータベースをバックアップ
+mysqldump -u root -p --all-databases > backup_all.sql</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">特定テーブルのみバックアップ</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 特定のテーブルだけバックアップ
+mysqldump -u root -p sample_db users orders > backup_tables.sql
+
+# テーブル構造のみバックアップ（データは含まない）
+mysqldump -u root -p --no-data sample_db > backup_schema_only.sql</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">重要なオプション</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">オプション</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">説明</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">用途</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-mono">--single-transaction</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">トランザクション内でバックアップを実行（InnoDB推奨）</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">本番稼働中のバックアップ</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-mono">--routines</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">ストアドプロシージャと関数もバックアップ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">完全なバックアップ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 border-b text-slate-700 font-mono">--triggers</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">トリガーもバックアップ</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">完全なバックアップ</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 border-b text-slate-700 font-mono">--master-data=2</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">バイナリログ位置を記録</td>
+                                    <td class="px-4 py-3 border-b text-slate-600">レプリケーション、PITR</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-700 font-mono">--compress</td>
+                                    <td class="px-4 py-3 text-slate-600">通信データを圧縮</td>
+                                    <td class="px-4 py-3 text-slate-600">リモートバックアップ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">本番運用に適したバックアップコマンド</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># InnoDB環境で推奨される設定
+mysqldump -u root -p \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --events \
+  --master-data=2 \
+  sample_db > backup_$(date +%Y%m%d_%H%M%S).sql</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ファイル名に日時を含める</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    バックアップファイル名に日時を含めることで、複数世代を保持しやすくなります。<code class="bg-emerald-100 px-1 rounded">$(date +%Y%m%d_%H%M%S)</code>でタイムスタンプを追加できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: リストア（復元） -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 リストア（復元）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        mysqldumpで作成したバックアップファイルは、mysqlコマンドを使って復元できます。バックアップファイルにはSQL文が記述されているため、それをそのまま実行することでデータベースが復元されます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">基本的なリストアコマンド</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># データベースをリストア
+mysql -u root -p sample_db < backup_sample_db.sql
+
+# 全データベースをリストア
+mysql -u root -p < backup_all.sql</code></pre>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart LR
+    A[バックアップファイル<br/>backup.sql] --> B[mysqlコマンド実行]
+    B --> C[SQL文を順次実行]
+    C --> D[CREATE TABLE]
+    C --> E[INSERT INTO]
+    C --> F[CREATE PROCEDURE]
+    D --> G[MySQLデータベース<br/>復元完了]
+    E --> G
+    F --> G
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">リストア前の注意点</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">
+                                    リストアを実行すると、既存のデータは上書きされます。本番環境でリストアする前に、必ずテスト環境でリストアが正常に完了することを確認してください。また、リストア前に現在のデータのバックアップを取ることも推奨されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">リストア手順の例</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">安全なリストア手順</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 1. 現在のデータベースをバックアップ
+mysqldump -u root -p sample_db > backup_before_restore.sql
+
+# 2. データベースを削除（既存データをクリア）
+mysql -u root -p -e "DROP DATABASE IF EXISTS sample_db;"
+
+# 3. データベースを再作成
+mysql -u root -p -e "CREATE DATABASE sample_db;"
+
+# 4. バックアップからリストア
+mysql -u root -p sample_db < backup_sample_db.sql
+
+# 5. リストア後の確認
+mysql -u root -p sample_db -e "SHOW TABLES;"</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4: 定期バックアップの自動化 -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 定期バックアップの自動化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        手動でバックアップを取得していると、忘れてしまったり、タイミングが遅れたりするリスクがあります。cronやタスクスケジューラを使って定期バックアップを自動化することで、確実にバックアップを取得できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">バックアップスクリプトの作成</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">backup.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# MySQLバックアップスクリプト
+
+# 設定
+DB_USER="root"
+DB_PASS="パスワード"  # 本番環境では.my.cnfを使用
+DB_NAME="sample_db"
+BACKUP_DIR="/backups/mysql"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.sql"
+
+# バックアップディレクトリ作成
+mkdir -p ${BACKUP_DIR}
+
+# バックアップ実行
+mysqldump -u ${DB_USER} -p${DB_PASS} \
+  --single-transaction \
+  --routines \
+  --triggers \
+  ${DB_NAME} > ${BACKUP_FILE}
+
+# 圧縮
+gzip ${BACKUP_FILE}
+
+# 古いバックアップを削除（30日以前）
+find ${BACKUP_DIR} -name "*.sql.gz" -mtime +30 -delete
+
+echo "Backup completed: ${BACKUP_FILE}.gz"</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-orange-900 font-medium break-words">パスワードの安全な管理</p>
+                                <p class="text-orange-800 text-sm mt-1 break-words">
+                                    スクリプト内に直接パスワードを書くのはセキュリティリスクがあります。<code class="bg-orange-100 px-1 rounded">~/.my.cnf</code>ファイルに認証情報を記述し、パーミッションを600に設定することで、安全に認証できます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">cronで定期実行</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">crontabの設定</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># crontab編集
+crontab -e
+
+# 毎日午前2時にバックアップを実行
+0 2 * * * /path/to/backup.sh >> /var/log/mysql_backup.log 2>&1
+
+# 毎週日曜日午前3時にフルバックアップ
+0 3 * * 0 /path/to/backup_full.sh >> /var/log/mysql_backup.log 2>&1</code></pre>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart TD
+    A[cronスケジューラ] --> B{指定時刻?}
+    B -- Yes --> C[backup.shを実行]
+    B -- No --> A
+    C --> D[mysqldumpでバックアップ]
+    D --> E[ファイルを圧縮 gzip]
+    E --> F[古いバックアップを削除]
+    F --> G[ログに記録]
+    G --> A
+                    </div>
+                </section>
+
+                <!-- セクション5: ポイントインタイムリカバリ -->
+                <section class="prose prose-slate max-w-none mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 ポイントインタイムリカバリ（PITR）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ポイントインタイムリカバリ（PITR）は、特定の時点までデータベースを復元する技術です。例えば、午前10時にバックアップを取得し、午後2時に誤ってテーブルを削除してしまった場合、午後1時59分の状態に戻すことができます。これにはバイナリログが必要です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">バイナリログの有効化</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">my.cnfまたはmy.ini</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">[mysqld]
+# バイナリログを有効化
+log-bin=mysql-bin
+server-id=1
+
+# バイナリログの保存期間（日数）
+expire_logs_days=7
+
+# バイナリログのフォーマット（ROWが推奨）
+binlog_format=ROW</code></pre>
+                    </div>
+
+                    <div class="mermaid my-6">
+flowchart LR
+    A[フルバックアップ<br/>10:00 AM] --> B[バイナリログ記録開始]
+    B --> C[通常運用<br/>INSERT/UPDATE/DELETE]
+    C --> D[誤操作発生<br/>2:00 PM]
+    D --> E[フルバックアップから復元]
+    E --> F[バイナリログを<br/>10:00〜1:59まで適用]
+    F --> G[1:59 PMの状態に復元完了]
+                    </mermaid>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">PITRの手順</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ポイントインタイムリカバリの実行</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 1. フルバックアップから復元
+mysql -u root -p sample_db < backup_20250115_1000.sql
+
+# 2. バイナリログの位置を確認
+mysqlbinlog mysql-bin.000001 | less
+
+# 3. 特定時刻までのバイナリログを適用
+mysqlbinlog --stop-datetime="2025-01-15 13:59:00" \
+  mysql-bin.000001 mysql-bin.000002 | mysql -u root -p sample_db
+
+# または、特定の位置まで適用
+mysqlbinlog --stop-position=12345 \
+  mysql-bin.000001 | mysql -u root -p sample_db</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">mysqlbinlogコマンドの主なオプション</h3>
+                                <ul class="text-blue-900 text-sm space-y-2">
+                                    <li><strong>--start-datetime</strong> - 指定した日時以降のログを出力</li>
+                                    <li><strong>--stop-datetime</strong> - 指定した日時までのログを出力</li>
+                                    <li><strong>--start-position</strong> - 指定した位置以降のログを出力</li>
+                                    <li><strong>--stop-position</strong> - 指定した位置までのログを出力</li>
+                                    <li><strong>--database</strong> - 特定のデータベースのみ出力</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">PITRは上級者向け</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    ポイントインタイムリカバリは強力な機能ですが、正確な時刻や位置の指定が必要で、操作ミスのリスクもあります。初心者のうちは定期的なフルバックアップを確実に取得することに集中し、PITRは慣れてから導入しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 10-1: バックアップとリストアを体験しよう</h3>
+                            <p class="text-purple-900 mb-4 break-words">データベースのバックアップを取得し、それをリストアしてデータが復元されることを確認します。</p>
+                            <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">テスト用データベースを作成し、サンプルデータを追加</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">mysqldumpコマンドでバックアップを取得</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">データベースを削除して、バックアップからリストアして復元できることを確認</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">バックアップファイルをテキストエディタで開いて中身を確認</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 論理バックアップと物理バックアップの違いは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            論理バックアップはデータベースの内容をSQL文（CREATE TABLE、INSERT文など）として出力します。可読性が高く、異なるバージョン間での移行も可能ですが、速度は遅めです。物理バックアップはデータファイルを直接コピーします。高速で一貫性が高いですが、専用ツールが必要で、可読性はありません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. mysqldumpの--single-transactionオプションは何のために使いますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            --single-transactionオプションは、バックアップをトランザクション内で実行し、一貫性のあるスナップショットを取得するために使います。これによりInnoDBテーブルをロックせずにバックアップできるため、本番稼働中のデータベースでも安全にバックアップが可能です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ポイントインタイムリカバリ（PITR）に必要なものは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            ポイントインタイムリカバリには、フルバックアップとバイナリログが必要です。フルバックアップで基準となる時点に戻し、バイナリログを適用することで、特定の時点までの変更を再現します。バイナリログはmy.cnfで「log-bin」を有効にすることで記録されます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>mysqldumpコマンドで論理バックアップを取得し、mysqlコマンドでリストアできる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>論理バックアップは可読性が高く初心者向き、物理バックアップは高速で大規模向き</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>cronやタスクスケジューラで定期バックアップを自動化できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-slate-400 mt-1 flex-shrink-0"></i>
+                            <span>バイナリログを使えばポイントインタイムリカバリで特定時点への復元が可能</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="mysql-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">MySQLの文字コードと照合順序</span>
+                        </div>
+                    </a>
+                    <a href="mysql-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">ユーザーと権限管理</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

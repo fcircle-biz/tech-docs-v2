@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第12章 - 実践！PostgreSQLでWebアプリのDBを設計しよう</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">実践！PostgreSQLでWebアプリのDBを設計しよう</h1>
+                    <p class="text-slate-600">これまで学んだ知識を活用して、実際のWebアプリケーション（ECサイトやブログシステム）を想定したデータベースを設計・構築します。テーブル設計、インデックス設計、JSON活用、ビュー作成までを通して実践します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>実際のWebアプリケーションを想定したデータベース設計の流れを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>テーブル設計、制約設定、インデックス配置を実践する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSON型や配列型など、PostgreSQL独自機能を活用する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューとマテリアライズドビューで運用を効率化する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 課題の概要 - ECサイトのデータベースを設計しよう
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        この章では、シンプルなECサイト（オンラインショップ）のデータベースを設計・構築します。
+                        基本的な機能に絞ることで、実務でよく使われるパターンを理解しやすくします。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">設計する機能</p>
+                                <ul class="text-blue-800 text-sm mt-2 space-y-1 list-disc list-inside">
+                                    <li>ユーザー管理（会員登録・ログイン）</li>
+                                    <li>商品管理（商品カタログ、在庫管理）</li>
+                                    <li>カート機能（買い物かご）</li>
+                                    <li>注文管理（注文履歴、注文詳細）</li>
+                                    <li>レビュー機能（商品レビュー・評価）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">必要なテーブル構成</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        ECサイトを実現するために、以下のテーブルを設計します。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+erDiagram
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ REVIEWS : writes
+    USERS ||--o{ CART_ITEMS : has
+    PRODUCTS ||--o{ CART_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ REVIEWS : receives
+    ORDERS ||--|{ ORDER_ITEMS : includes
+    CATEGORIES ||--o{ PRODUCTS : categorizes
+
+    USERS {
+        uuid user_id PK
+        varchar email UK
+        varchar password_hash
+        varchar name
+        jsonb address
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CATEGORIES {
+        int category_id PK
+        varchar category_name UK
+        text description
+    }
+
+    PRODUCTS {
+        int product_id PK
+        int category_id FK
+        varchar product_name
+        text description
+        decimal price
+        int stock_quantity
+        jsonb specifications
+        timestamp created_at
+    }
+
+    CART_ITEMS {
+        int cart_item_id PK
+        uuid user_id FK
+        int product_id FK
+        int quantity
+        timestamp added_at
+    }
+
+    ORDERS {
+        int order_id PK
+        uuid user_id FK
+        decimal total_amount
+        varchar status
+        jsonb shipping_address
+        timestamp ordered_at
+    }
+
+    ORDER_ITEMS {
+        int order_item_id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        decimal unit_price
+    }
+
+    REVIEWS {
+        int review_id PK
+        int product_id FK
+        uuid user_id FK
+        int rating
+        text comment
+        timestamp created_at
+    }
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 データベースとテーブルの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        実際にデータベースを作成し、テーブルを構築していきましょう。
+                        制約やインデックスも適切に設定します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 1: データベースの作成</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        まず、ECサイト用のデータベースを作成します。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- データベース作成
+CREATE DATABASE ec_shop
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'ja_JP.UTF-8'
+    LC_CTYPE = 'ja_JP.UTF-8'
+    TEMPLATE = template0;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 2: ユーザーテーブルの作成</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        会員情報を管理するテーブルを作成します。UUID型を主キーとして使用します。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- ユーザーテーブル
+CREATE TABLE users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    address JSONB, -- 住所情報をJSON形式で格納
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- メールアドレスでの検索を高速化
+CREATE INDEX idx_users_email ON users(email);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">設計のポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    UUID型を使用することで、セキュリティとスケーラビリティが向上します。
+                                    住所情報はJSONB型で格納することで、柔軟にデータを管理できます（複数配送先など）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 3: カテゴリテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- カテゴリテーブル
+CREATE TABLE categories (
+    category_id SERIAL PRIMARY KEY,
+    category_name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT
+);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 4: 商品テーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 商品テーブル
+CREATE TABLE products (
+    product_id SERIAL PRIMARY KEY,
+    category_id INT REFERENCES categories(category_id),
+    product_name VARCHAR(200) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    stock_quantity INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+    specifications JSONB, -- 商品仕様（サイズ、色など）
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- カテゴリIDでの検索用インデックス
+CREATE INDEX idx_products_category ON products(category_id);
+-- 商品名の部分一致検索用（GINインデックス）
+CREATE INDEX idx_products_name ON products USING gin(to_tsvector('japanese', product_name));</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 5: カートアイテムテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- カートアイテムテーブル
+CREATE TABLE cart_items (
+    cart_item_id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+    product_id INT REFERENCES products(product_id) ON DELETE CASCADE,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- 同一ユーザー・同一商品は1件のみ
+    UNIQUE(user_id, product_id)
+);
+
+-- ユーザーごとのカート検索用
+CREATE INDEX idx_cart_user ON cart_items(user_id);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 6: 注文テーブルと注文明細テーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 注文テーブル
+CREATE TABLE orders (
+    order_id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(user_id),
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
+    shipping_address JSONB NOT NULL,
+    ordered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 注文明細テーブル
+CREATE TABLE order_items (
+    order_item_id SERIAL PRIMARY KEY,
+    order_id INT REFERENCES orders(order_id) ON DELETE CASCADE,
+    product_id INT REFERENCES products(product_id),
+    quantity INT NOT NULL CHECK (quantity > 0),
+    unit_price DECIMAL(10, 2) NOT NULL
+);
+
+-- インデックス作成
+CREATE INDEX idx_orders_user ON orders(user_id);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_order_items_order ON order_items(order_id);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Step 7: レビューテーブルの作成</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- レビューテーブル
+CREATE TABLE reviews (
+    review_id SERIAL PRIMARY KEY,
+    product_id INT REFERENCES products(product_id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- 1ユーザーが同じ商品に複数レビュー投稿不可
+    UNIQUE(product_id, user_id)
+);
+
+-- レビュー検索用インデックス
+CREATE INDEX idx_reviews_product ON reviews(product_id);
+CREATE INDEX idx_reviews_user ON reviews(user_id);</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 サンプルデータの投入
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        動作確認のためにサンプルデータを投入します。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- カテゴリデータ
+INSERT INTO categories (category_name, description) VALUES
+('電子機器', 'スマートフォン、タブレット、パソコンなど'),
+('ファッション', '衣類、靴、アクセサリーなど'),
+('書籍', '本、雑誌、電子書籍など');
+
+-- ユーザーデータ
+INSERT INTO users (email, password_hash, name, address) VALUES
+('user1@example.com', 'hash123', '山田太郎',
+ '{"postal_code": "100-0001", "prefecture": "東京都", "city": "千代田区", "address1": "千代田1-1-1"}'::jsonb),
+('user2@example.com', 'hash456', '佐藤花子',
+ '{"postal_code": "530-0001", "prefecture": "大阪府", "city": "大阪市北区", "address1": "梅田1-1-1"}'::jsonb);
+
+-- 商品データ
+INSERT INTO products (category_id, product_name, description, price, stock_quantity, specifications) VALUES
+(1, 'スマートフォン X10', '最新モデルのスマートフォン', 89800, 50,
+ '{"color": ["black", "white", "blue"], "storage": ["128GB", "256GB"]}'::jsonb),
+(1, 'ワイヤレスイヤホン Pro', '高音質ノイズキャンセリング搭載', 29800, 100,
+ '{"battery_life": "8時間", "color": ["white", "black"]}'::jsonb),
+(2, 'カジュアルシャツ', '綿100%の着心地良いシャツ', 4980, 200,
+ '{"size": ["S", "M", "L", "XL"], "color": ["white", "blue", "gray"]}'::jsonb),
+(3, 'プログラミング入門書', 'Python初心者向けの解説書', 2980, 150, NULL);</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 便利なビューの作成
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        頻繁に使用するクエリをビューとして作成し、運用を効率化します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">商品一覧ビュー（カテゴリ名付き）</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 商品一覧ビュー
+CREATE VIEW product_catalog AS
+SELECT
+    p.product_id,
+    p.product_name,
+    c.category_name,
+    p.price,
+    p.stock_quantity,
+    COALESCE(AVG(r.rating), 0) AS avg_rating,
+    COUNT(r.review_id) AS review_count
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+LEFT JOIN reviews r ON p.product_id = r.product_id
+GROUP BY p.product_id, p.product_name, c.category_name, p.price, p.stock_quantity;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ユーザー注文履歴ビュー</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- ユーザー注文履歴ビュー
+CREATE VIEW user_order_history AS
+SELECT
+    o.order_id,
+    o.user_id,
+    u.name AS user_name,
+    o.total_amount,
+    o.status,
+    o.ordered_at,
+    COUNT(oi.order_item_id) AS item_count
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+JOIN order_items oi ON o.order_id = oi.order_id
+GROUP BY o.order_id, o.user_id, u.name, o.total_amount, o.status, o.ordered_at;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">売上集計マテリアライズドビュー</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        集計が重い売上データはマテリアライズドビューで事前計算します。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 売上集計マテリアライズドビュー
+CREATE MATERIALIZED VIEW sales_summary AS
+SELECT
+    p.product_id,
+    p.product_name,
+    c.category_name,
+    SUM(oi.quantity) AS total_sold,
+    SUM(oi.quantity * oi.unit_price) AS total_revenue
+FROM order_items oi
+JOIN products p ON oi.product_id = p.product_id
+JOIN categories c ON p.category_id = c.category_id
+JOIN orders o ON oi.order_id = o.order_id
+WHERE o.status IN ('shipped', 'delivered')
+GROUP BY p.product_id, p.product_name, c.category_name
+ORDER BY total_revenue DESC;
+
+-- マテリアライズドビューのリフレッシュ
+-- REFRESH MATERIALIZED VIEW sales_summary;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 実践的なクエリ例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        実際のアプリケーションで使用する典型的なクエリを見ていきましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">JSONデータを活用した商品検索</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 特定の色の商品を検索
+SELECT product_name, price, specifications
+FROM products
+WHERE specifications @> '{"color": ["black"]}';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ユーザーの配送先住所を取得</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- ユーザーの住所情報を取得
+SELECT
+    name,
+    address->>'prefecture' AS prefecture,
+    address->>'city' AS city,
+    address->>'address1' AS address1
+FROM users
+WHERE email = 'user1@example.com';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">注文処理（トランザクション使用）</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 注文処理のトランザクション例
+BEGIN;
+
+-- 在庫を確認して減算
+UPDATE products
+SET stock_quantity = stock_quantity - 2
+WHERE product_id = 1 AND stock_quantity >= 2;
+
+-- 注文レコード作成
+INSERT INTO orders (user_id, total_amount, status, shipping_address)
+VALUES (
+    (SELECT user_id FROM users WHERE email = 'user1@example.com'),
+    179600,
+    'pending',
+    (SELECT address FROM users WHERE email = 'user1@example.com')
+) RETURNING order_id;
+
+-- 注文明細作成
+INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+VALUES (currval('orders_order_id_seq'), 1, 2, 89800);
+
+COMMIT;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">人気商品ランキング（ウィンドウ関数）</h3>
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- 売上上位商品をカテゴリ別にランキング
+SELECT
+    category_name,
+    product_name,
+    total_revenue,
+    RANK() OVER (PARTITION BY category_name ORDER BY total_revenue DESC) AS rank
+FROM sales_summary;</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pencil-alt text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-4 break-words">実習課題</h3>
+                            <div class="space-y-4">
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">課題1: 拡張機能の追加</p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        お気に入り機能（wishlistテーブル）を追加してください。ユーザーが商品をお気に入りに登録できるようにします。
+                                    </p>
+                                </div>
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">課題2: クーポン機能</p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        クーポンテーブルを追加し、割引率や有効期限を管理できるようにしてください。注文時にクーポンコードを適用できるようにします。
+                                    </p>
+                                </div>
+                                <div class="bg-purple-100 rounded-lg p-4">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">課題3: 売上レポートビュー</p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        月別売上レポートのビューを作成してください。DATE_TRUNC関数を使って月単位で集計します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 パフォーマンス最適化のポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        設計したデータベースを本番運用する際の最適化ポイントを確認しましょう。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-tachometer-alt text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-blue-800 mb-2">インデックスの活用</h3>
+                                    <p class="text-blue-900 text-sm">
+                                        WHERE句やJOIN条件で頻繁に使用されるカラムにはインデックスを作成します。
+                                        ただし、書き込みパフォーマンスが低下するため、必要最低限に留めることが重要です。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-chart-bar text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-emerald-800 mb-2">EXPLAIN ANALYZEの活用</h3>
+                                    <p class="text-emerald-900 text-sm">
+                                        遅いクエリを見つけたら、EXPLAIN ANALYZEで実行計画を確認します。
+                                        シーケンシャルスキャンが発生している場合は、インデックス追加を検討しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-purple-800 mb-2">マテリアライズドビューの活用</h3>
+                                    <p class="text-purple-900 text-sm">
+                                        集計処理が重い場合は、マテリアライズドビューで事前計算します。
+                                        定期的にREFRESHすることで、データを最新に保ちます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-5 overflow-hidden">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-undo text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-amber-800 mb-2">VACUUMとANALYZE</h3>
+                                    <p class="text-amber-900 text-sm">
+                                        定期的にVACUUM（不要領域の回収）とANALYZE（統計情報の更新）を実行します。
+                                        通常は自動実行されますが、大量データ投入後は手動実行を検討しましょう。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <button class="copy-btn" onclick="copyToClipboard(this)"><i class="fas fa-copy"></i></button>
+                        <pre><code class="language-sql">-- クエリの実行計画を確認
+EXPLAIN ANALYZE
+SELECT * FROM product_catalog WHERE avg_rating >= 4.0;
+
+-- VACUUM実行
+VACUUM ANALYZE products;</code></pre>
+                    </div>
+                </section>
+
+                <!-- 動作確認カード -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-check-circle text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-4 break-words">動作確認チェックリスト</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>データベース「ec_shop」が作成できたか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>7つのテーブルすべてが正しく作成できたか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>サンプルデータが投入できたか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>ビューから正しくデータが取得できたか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>JSON検索クエリが動作したか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <input type="checkbox" class="mt-1">
+                                    <span>注文処理のトランザクションが成功したか</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ユーザーIDにUUID型を使うメリットを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            1. セキュリティ向上 - 連番と異なり、IDから総ユーザー数などが推測できない<br>
+                                            2. スケーラビリティ - 分散システムで一意なIDを生成できる（複数サーバーで同時生成しても重複しない）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 住所や商品仕様をJSONB型で保存するメリットは何ですか?</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            柔軟なデータ構造を持てる点です。住所なら複数配送先、商品仕様なら色やサイズのバリエーションなど、
+                                            アプリケーションの要件変更に応じてテーブル構造を変えずに対応できます。
+                                            また、JSONB型は効率的に検索・インデックス化が可能です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. マテリアライズドビューと通常のビューの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong><br>
+                                            通常のビューはクエリの定義を保存するだけで、参照時に毎回実行されます。
+                                            マテリアライズドビューは実行結果をディスクに保存するため、参照が高速です。
+                                            ただし、データが古くなるため、定期的にREFRESHする必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第12章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ECサイトを例に、実践的なデータベース設計の流れを体験しました</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>UUID型、JSONB型、配列型など、PostgreSQL独自機能を活用しました</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>適切な制約とインデックスで、データ整合性とパフォーマンスを確保しました</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ビューとマテリアライズドビューで、運用効率を向上させました</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>トランザクション、EXPLAIN、VACUUMなど、実務で重要な技術を習得しました</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- コース全体のまとめ -->
+                <div class="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-primary-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-graduation-cap text-primary-500"></i>
+                        PostgreSQL学習コース全体のまとめ
+                    </h2>
+                    <p class="text-primary-900 mb-4">
+                        お疲れさまでした！全12章を通して、PostgreSQLの基礎から実践までを学びました。
+                    </p>
+                    <div class="space-y-2 text-primary-800">
+                        <p class="font-medium">習得した主なスキル：</p>
+                        <ul class="space-y-1 ml-4">
+                            <li>• PostgreSQLの特徴と他のRDBMSとの違いの理解</li>
+                            <li>• pgAdminを使ったデータベース操作</li>
+                            <li>• 豊富なデータ型（JSON、UUID、配列など）の活用</li>
+                            <li>• テーブル設計と制約・インデックスの適用</li>
+                            <li>• トランザクションによるデータ整合性の確保</li>
+                            <li>• ビューとマテリアライズドビューでの運用効率化</li>
+                            <li>• バックアップ・リストア、ユーザー権限管理</li>
+                            <li>• 実践的なWebアプリDBの設計・構築</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 次のステップ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-emerald-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-rocket text-emerald-500"></i>
+                        次のステップ
+                    </h2>
+                    <p class="text-emerald-900 mb-4">
+                        この学習を終えたら、次のステップに進みましょう！
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-emerald-100 rounded-lg p-4">
+                            <h3 class="text-emerald-900 font-semibold mb-2">プログラミング言語との連携</h3>
+                            <p class="text-emerald-800 text-sm">
+                                Python、JavaScriptなどからPostgreSQLを操作する方法を学びましょう。
+                                ORMライブラリ（SQLAlchemy、Prismaなど）の使い方も習得できます。
+                            </p>
+                        </div>
+                        <div class="bg-emerald-100 rounded-lg p-4">
+                            <h3 class="text-emerald-900 font-semibold mb-2">Webフレームワークでの活用</h3>
+                            <p class="text-emerald-800 text-sm">
+                                Django、FastAPI、Next.jsなどのWebフレームワークとPostgreSQLを組み合わせて、実際のWebアプリケーションを開発しましょう。
+                            </p>
+                        </div>
+                        <div class="bg-emerald-100 rounded-lg p-4">
+                            <h3 class="text-emerald-900 font-semibold mb-2">高度な機能の習得</h3>
+                            <p class="text-emerald-800 text-sm">
+                                レプリケーション、パーティショニング、パフォーマンスチューニングなど、より高度な運用技術を学びましょう。
+                            </p>
+                        </div>
+                        <div class="bg-emerald-100 rounded-lg p-4">
+                            <h3 class="text-emerald-900 font-semibold mb-2">拡張機能の活用</h3>
+                            <p class="text-emerald-800 text-sm">
+                                PostGIS（地理情報）、TimescaleDB（時系列）、pg_stat_statements（パフォーマンス監視）などの拡張機能を試してみましょう。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">ユーザーと権限管理</span>
+                        </div>
+                    </a>
+                    <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-100 opacity-50">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-500 block">次の章</span>
+                            <span class="text-slate-400 font-medium">なし（完了）</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                    </div>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

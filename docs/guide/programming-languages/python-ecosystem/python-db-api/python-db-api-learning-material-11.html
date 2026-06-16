@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Python DB-API学習教材 第11章 - 接続プール</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Python系 - Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-python text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Python DB-API学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>プログラミング言語</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約13時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Python DB-API</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">接続プール - 効率的なコネクション管理</h1>
+                    <p class="text-slate-600">psycopg2.poolを使った接続プールの作成と活用方法を学習します。なぜ接続プールが必要なのか、SimpleConnectionPool・ThreadedConnectionPoolの使い分け、Webアプリケーションでの活用について理解しましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>接続プールとは何か、なぜ必要なのか</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SimpleConnectionPoolとThreadedConnectionPoolの違いと使い分け</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Webアプリケーションでの接続プール活用方法</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション 11.1 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 接続プールとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>接続プール（Connection Pool）</strong>とは、データベース接続を<strong>事前に作成して再利用する仕組み</strong>です。毎回新しい接続を作成・破棄するのではなく、プールから接続を借りて使い終わったら返却します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベース接続の確立には、ネットワーク通信や認証処理などのコストがかかります。特にWebアプリケーションのように頻繁にデータベースアクセスが発生する場合、毎回接続を作り直すのは非効率です。
+                    </p>
+
+                    <!-- 図: 通常接続 vs 接続プール -->
+                    <div class="my-6 p-4 bg-blue-50 rounded-lg">
+                        <h3 class="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-project-diagram"></i>
+                            通常接続 vs 接続プール
+                        </h3>
+                        <div class="mermaid">
+sequenceDiagram
+    participant App as アプリケーション
+    participant Pool as 接続プール
+    participant DB as PostgreSQL
+
+    Note over App,DB: 通常接続（毎回作成）
+    App->>DB: 接続作成（遅い）
+    App->>DB: SQL実行
+    App->>DB: 接続を閉じる
+    App->>DB: また接続作成（遅い）
+    App->>DB: SQL実行
+    App->>DB: 接続を閉じる
+
+    Note over App,DB: 接続プール（再利用）
+    App->>Pool: プールから接続を取得（速い）
+    App->>DB: SQL実行
+    App->>Pool: プールに返却
+    App->>Pool: プールから接続を取得（速い）
+    App->>DB: SQL実行
+    App->>Pool: プールに返却
+                        </div>
+                        <p class="text-sm text-blue-700 mt-2">
+                            接続プールを使うと、接続の再利用により大幅な高速化が実現できます。
+                        </p>
+                    </div>
+
+                    <!-- メリット/デメリット比較 -->
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-4">
+                            <h3 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i>
+                                接続プールのメリット
+                            </h3>
+                            <ul class="space-y-2 text-sm text-emerald-900">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>パフォーマンス向上（接続作成コストを削減）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>接続数の上限を制御可能（リソース管理）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>スレッドセーフな接続管理</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
+                            <h3 class="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-info-circle"></i>
+                                注意すべき点
+                            </h3>
+                            <ul class="space-y-2 text-sm text-blue-900">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>接続を借りたら必ず返却する必要がある</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>プールサイズの調整が必要（多すぎ・少なすぎに注意）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>長時間接続を保持すると他の処理がブロックされる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション 11.2 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 SimpleConnectionPoolの使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>SimpleConnectionPool</strong>は、psycopg2.poolモジュールが提供する<strong>基本的な接続プール</strong>です。シングルスレッドアプリケーションや、スレッドセーフ性が不要な場面で使用します。
+                    </p>
+
+                    <!-- コードブロック: SimpleConnectionPool基本例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">simple_pool_basic.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+from psycopg2 import pool
+
+# 接続プールを作成（最小1、最大5接続）
+connection_pool = pool.SimpleConnectionPool(
+    minconn=1,  # 最小接続数
+    maxconn=5,  # 最大接続数
+    host="localhost",
+    database="mydb",
+    user="postgres",
+    password="password"
+)
+
+# プールから接続を取得
+conn = connection_pool.getconn()
+
+# 接続を使って処理を実行
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM users;")
+users = cursor.fetchall()
+print(users)
+cursor.close()
+
+# 使い終わったらプールに返却
+connection_pool.putconn(conn)
+
+# プールを閉じる（アプリケーション終了時）
+connection_pool.closeall()</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 my-6">
+                        <h3 class="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-info-circle"></i>
+                            SimpleConnectionPoolの主なメソッド
+                        </h3>
+                        <ul class="space-y-2 text-sm text-blue-900">
+                            <li><code class="bg-blue-100 px-2 py-1 rounded text-blue-900">getconn()</code> - プールから接続を取得</li>
+                            <li><code class="bg-blue-100 px-2 py-1 rounded text-blue-900">putconn(conn)</code> - 接続をプールに返却</li>
+                            <li><code class="bg-blue-100 px-2 py-1 rounded text-blue-900">closeall()</code> - プール内の全接続を閉じる</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション 11.3 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 ThreadedConnectionPoolの使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ThreadedConnectionPool</strong>は、<strong>マルチスレッド環境</strong>で使用する接続プールです。複数のスレッドが同時にプールから接続を取得しても安全に動作します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Webアプリケーション（Flask、FastAPIなど）では、リクエストごとに異なるスレッドが処理を行うため、ThreadedConnectionPoolを使用するのが一般的です。
+                    </p>
+
+                    <!-- コードブロック: ThreadedConnectionPool例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">threaded_pool.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import psycopg2
+from psycopg2 import pool
+import threading
+
+# スレッドセーフな接続プールを作成
+connection_pool = pool.ThreadedConnectionPool(
+    minconn=2,  # 最小接続数
+    maxconn=10,  # 最大接続数
+    host="localhost",
+    database="mydb",
+    user="postgres",
+    password="password"
+)
+
+def fetch_users(thread_id):
+    """スレッドごとに実行される処理"""
+    conn = connection_pool.getconn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users;")
+        users = cursor.fetchall()
+        print(f"Thread {thread_id}: {len(users)} users")
+        cursor.close()
+    finally:
+        connection_pool.putconn(conn)  # 必ず返却
+
+# 5つのスレッドを起動
+threads = []
+for i in range(5):
+    t = threading.Thread(target=fetch_users, args=(i,))
+    threads.append(t)
+    t.start()
+
+# 全スレッドの終了を待つ
+for t in threads:
+    t.join()
+
+connection_pool.closeall()</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-4 my-6">
+                        <h3 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-lightbulb"></i>
+                            重要ポイント
+                        </h3>
+                        <p class="text-sm text-emerald-900">
+                            <strong>try-finally</strong>ブロックを使って、例外が発生しても必ず<code class="bg-emerald-100 px-2 py-1 rounded">putconn()</code>が実行されるようにしましょう。接続を返却し忘れると、プールが枯渇して他の処理がブロックされてしまいます。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- セクション 11.4 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 接続プールのプールサイズ設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>minconn（最小接続数）</strong>と<strong>maxconn（最大接続数）</strong>の設定は、アプリケーションの特性に応じて調整する必要があります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-300 rounded-lg overflow-hidden">
+                            <thead class="bg-primary-500 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">パラメータ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                    <th class="px-4 py-3 text-left font-semibold">推奨値の例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">minconn</td>
+                                    <td class="px-4 py-3">起動時に作成される接続数。常に確保される最低限の接続数。</td>
+                                    <td class="px-4 py-3">1〜5（小規模アプリ）</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm">maxconn</td>
+                                    <td class="px-4 py-3">プールが保持できる最大接続数。この数を超えると待機が発生する。</td>
+                                    <td class="px-4 py-3">10〜50（中規模Webアプリ）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 my-6">
+                        <h3 class="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            プールサイズ設定の注意点
+                        </h3>
+                        <ul class="space-y-2 text-sm text-red-900">
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-times text-red-600 mt-1 flex-shrink-0"></i>
+                                <span><strong>多すぎる接続数</strong>: データベースサーバーに負荷がかかり、メモリを圧迫</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-times text-red-600 mt-1 flex-shrink-0"></i>
+                                <span><strong>少なすぎる接続数</strong>: 接続待ちが頻発し、アプリケーションが遅くなる</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i class="fas fa-times text-red-600 mt-1 flex-shrink-0"></i>
+                                <span><strong>PostgreSQL側の設定も確認</strong>: postgresql.confの<code class="bg-red-100 px-2 py-1 rounded">max_connections</code>より大きくしない</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション 11.5 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 Webアプリケーションでの接続プール活用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Flask、FastAPIなどのWebフレームワークでは、<strong>アプリケーション起動時に接続プールを作成</strong>し、各リクエスト処理で接続を取得・返却するパターンが一般的です。
+                    </p>
+
+                    <!-- コードブロック: Flask + 接続プール -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">flask_with_pool.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from flask import Flask, jsonify
+import psycopg2
+from psycopg2 import pool
+
+app = Flask(__name__)
+
+# アプリ起動時に接続プールを作成
+connection_pool = pool.ThreadedConnectionPool(
+    minconn=2,
+    maxconn=10,
+    host="localhost",
+    database="mydb",
+    user="postgres",
+    password="password"
+)
+
+@app.route('/users')
+def get_users():
+    conn = connection_pool.getconn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM users;")
+        users = cursor.fetchall()
+        cursor.close()
+        return jsonify(users)
+    finally:
+        connection_pool.putconn(conn)
+
+if __name__ == '__main__':
+    app.run(debug=True)</code></pre>
+                    </div>
+
+                    <p class="text-sm text-slate-500 italic">
+                        リクエストごとに接続を取得し、処理が終わったら即座に返却することで、効率的にデータベース接続を管理できます。
+                    </p>
+                </section>
+
+                <!-- セクション 11.6 -->
+                <section class="prose prose-slate max-w-none mb-6">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 コンテキストマネージャーと接続プールの併用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        接続プールをより安全に使うため、<strong>カスタムコンテキストマネージャー</strong>を実装すると便利です。
+                    </p>
+
+                    <!-- コードブロック: コンテキストマネージャー -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">pool_context_manager.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from contextlib import contextmanager
+import psycopg2
+from psycopg2 import pool
+
+connection_pool = pool.ThreadedConnectionPool(
+    minconn=2, maxconn=10,
+    host="localhost", database="mydb",
+    user="postgres", password="password"
+)
+
+@contextmanager
+def get_db_connection():
+    """接続を取得・返却するコンテキストマネージャー"""
+    conn = connection_pool.getconn()
+    try:
+        yield conn  # 接続を提供
+    finally:
+        connection_pool.putconn(conn)  # 確実に返却
+
+# 使用例
+with get_db_connection() as conn:
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users;")
+    users = cursor.fetchall()
+    cursor.close()
+# withブロックを抜けると自動で返却される</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-4 my-6">
+                        <h3 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-lightbulb"></i>
+                            コンテキストマネージャーのメリット
+                        </h3>
+                        <p class="text-sm text-emerald-900 mb-2">
+                            <code class="bg-emerald-100 px-2 py-1 rounded">with</code>ステートメントを使うことで、例外が発生しても確実に接続が返却されます。コードも簡潔になり、返却忘れのリスクがなくなります。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: 接続プールを使ったデータ取得</h3>
+                            <p class="text-purple-900 mb-4 break-words">
+                                ThreadedConnectionPoolを作成し、複数のクエリで接続を再利用してみましょう。
+                            </p>
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <h4 class="text-sm font-semibold text-purple-800 mb-2">課題:</h4>
+                                <ol class="space-y-2 text-sm text-purple-900 list-decimal list-inside">
+                                    <li>ThreadedConnectionPoolを作成する（minconn=1, maxconn=3）</li>
+                                    <li>接続を取得してusersテーブルから全件取得</li>
+                                    <li>同じ接続を使ってproductsテーブルから全件取得</li>
+                                    <li>接続をプールに返却し、もう一度取得して別のクエリを実行</li>
+                                    <li>最後にプールを閉じる</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <section class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800 mb-4">
+                        <i class="fas fa-bookmark text-primary-500"></i>
+                        第11章のまとめ
+                    </h2>
+                    <ul class="space-y-3 text-slate-700">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>接続プール</strong>は、データベース接続を再利用することでパフォーマンスを向上させる仕組み</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span><strong>SimpleConnectionPool</strong>はシングルスレッド用、<strong>ThreadedConnectionPool</strong>はマルチスレッド用</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>プールサイズ（minconn/maxconn）は、アプリケーションの特性に応じて適切に設定する</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>接続を取得したら<strong>必ず返却</strong>すること（try-finallyやコンテキストマネージャーを活用）</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-primary-500 mt-1"></i>
+                            <span>WebアプリケーションではThreadedConnectionPoolを使い、リクエストごとに接続を取得・返却する</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 接続プールを使うことで得られる主なメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>パフォーマンスの向上</strong>です。データベース接続の作成・破棄には時間がかかるため、接続を再利用することで大幅な高速化が実現できます。また、接続数の上限を制御することで、リソースの管理もしやすくなります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. SimpleConnectionPoolとThreadedConnectionPoolの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>SimpleConnectionPool</strong>はシングルスレッド環境用で、スレッドセーフ性を保証しません。<strong>ThreadedConnectionPool</strong>はマルチスレッド環境でも安全に使えるスレッドセーフなプールです。Webアプリケーションでは通常ThreadedConnectionPoolを使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 接続をプールから取得した後、必ず行うべき処理は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-white/50 rounded-lg p-3 break-words">
+                                            <strong>putconn()で接続をプールに返却する</strong>ことが必須です。返却しないと、プールの接続が枯渇して他の処理がブロックされてしまいます。try-finallyブロックやコンテキストマネージャーを使って、例外が発生しても確実に返却されるようにしましょう。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="python-db-api-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第10章: 実践的なデータ操作</span>
+                        </div>
+                    </a>
+                    <a href="python-db-api-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: 総合演習</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

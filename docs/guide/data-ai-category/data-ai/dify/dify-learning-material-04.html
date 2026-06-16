@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Dify入門 第4章 - プロンプトオーケストレーション - AIの振る舞いを設計する</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Dify用カラー: fuchsia (生成AI/LLM)
+                        primary: {
+                            50: '#fdf4ff',
+                            100: '#fae8ff',
+                            200: '#f5d0fe',
+                            300: '#f0abfc',
+                            400: '#e879f9',
+                            500: '#d946ef',
+                            600: '#c026d3',
+                            700: '#a21caf',
+                            800: '#86198f',
+                            900: '#701a75',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-robot text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Dify入門</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級〜中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-brain text-[9px]"></i>
+                                <span>データ・AI</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約24.5時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="https://fcircle-biz.github.io/tech_docs/" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="https://fcircle-biz.github.io/tech_docs/guide/data-ai-category/data-ai/dify/" class="hover:text-primary-600 transition-colors">Dify入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">プロンプトオーケストレーション - AIの振る舞いを設計する</h1>
+                    <p class="text-slate-600">システムプロンプト、変数、コンテキストの設定方法を学び、AIアプリの品質を決定するプロンプト設計のベストプラクティスを実践します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プロンプトオーケストレーションとは何か、なぜ重要なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>システムプロンプトの役割と効果的な書き方</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>変数を使った動的なプロンプト設計の方法</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンテキスト（履歴）管理とメモリ機能の活用</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プロンプトエンジニアリングのベストプラクティス</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 プロンプトオーケストレーションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>プロンプトオーケストレーション</strong>とは、AIアプリケーションにおけるプロンプト（指示文）を構造化し、
+                        変数やコンテキストを組み合わせて動的に生成する技術です。
+                        「オーケストレーション（orchestration）」は「統制」「調和」を意味し、複数の要素を適切に組み合わせて管理することを指します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        単純なチャットボットでは、固定されたプロンプトをLLMに渡すだけですが、実用的なAIアプリでは以下のような要素を動的に組み合わせる必要があります：
+                    </p>
+
+                    <ul class="list-disc list-inside text-slate-600 space-y-2 mb-4 ml-4">
+                        <li><strong>システムプロンプト</strong>: AIの役割や振る舞いを定義する固定的な指示</li>
+                        <li><strong>変数</strong>: ユーザー入力やデータベースから取得した動的な情報</li>
+                        <li><strong>コンテキスト（履歴）</strong>: 過去の会話やセッション情報</li>
+                        <li><strong>参照データ</strong>: ナレッジベースから取得した関連ドキュメント（RAG）</li>
+                    </ul>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Difyでは、これらの要素をビジュアルエディタで管理し、プロンプトテンプレートとして設計できます。
+                        プロンプトオーケストレーションを適切に行うことで、AIの回答品質が大幅に向上します。
+                    </p>
+
+                    <!-- 重要ポイント -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">なぜプロンプトオーケストレーションが重要か？</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    LLMは同じ質問でもプロンプトの書き方次第で回答品質が大きく変わります。
+                                    構造化されたプロンプト設計により、一貫性のある高品質な回答を安定して得られるようになります。
+                                    特に、業務アプリケーションでは、AIの振る舞いを制御し、予測可能にすることが不可欠です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 システムプロンプトの設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>システムプロンプト</strong>は、AIの役割、振る舞い、制約条件を定義する固定的な指示文です。
+                        ユーザーからは見えませんが、全てのやり取りの基盤となる重要な要素です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">システムプロンプトの構成要素</h3>
+
+                    <!-- 構成要素カード -->
+                    <div class="space-y-4 mb-6">
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-user-tie text-purple-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">1. 役割（Role）定義</p>
+                                    <p class="text-sm text-slate-600 mb-2">AIが担う役割を明確に定義します。</p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-sm text-slate-700">
+                                        例: 「あなたは親切で専門的なカスタマーサポート担当者です。顧客の問題を理解し、丁寧に解決策を提案してください。」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-tasks text-blue-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">2. タスク（Task）明示</p>
+                                    <p class="text-sm text-slate-600 mb-2">AIが実行すべき具体的なタスクを説明します。</p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-sm text-slate-700">
+                                        例: 「ユーザーの質問内容を分析し、該当するFAQカテゴリを特定した上で、最も関連性の高い回答を提供してください。」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-ban text-orange-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">3. 制約条件（Constraints）</p>
+                                    <p class="text-sm text-slate-600 mb-2">AIが守るべきルールや禁止事項を指定します。</p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-sm text-slate-700">
+                                        例: 「必ず敬語を使用してください。個人情報や機密情報を要求しないでください。わからないことは推測せず、正直に『わかりません』と答えてください。」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-file-alt text-emerald-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">4. 出力フォーマット（Format）</p>
+                                    <p class="text-sm text-slate-600 mb-2">回答の構造や形式を指定します。</p>
+                                    <div class="bg-slate-100 rounded-lg p-3 text-sm text-slate-700">
+                                        例: 「回答は以下の形式で提供してください。<br>
+                                        【結論】<br>
+                                        【詳細説明】<br>
+                                        【次のステップ】」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">システムプロンプトの例</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">システムプロンプト例: カスタマーサポートAI</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">## 役割
+あなたは「TechSupport AI」という名前の、親切で専門的なカスタマーサポートAIです。
+製品マニュアルとFAQに基づいて、顧客の技術的な問題を解決することがあなたの役割です。
+
+## タスク
+1. 顧客の質問内容を正確に理解する
+2. 関連するドキュメントから最適な情報を検索する
+3. わかりやすく段階的な解決策を提案する
+4. 必要に応じて追加の質問をして問題を深掘りする
+
+## 制約条件
+- 必ず敬語を使用してください
+- 確実な情報のみを提供し、推測は避けてください
+- わからない場合は「サポート担当者にお繋ぎします」と案内してください
+- 個人情報や機密情報を要求しないでください
+- 製品マニュアルに記載されていない内容は回答しないでください
+
+## 出力形式
+回答は以下の形式で提供してください：
+
+【問題の確認】
+（顧客の問題を要約）
+
+【解決策】
+（段階的な手順を番号付きリストで提示）
+
+【補足情報】
+（関連する注意事項やヒント）</code></pre>
+                    </div>
+
+                    <!-- ヒント -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">システムプロンプト作成のコツ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    最初から完璧なプロンプトを作ろうとせず、シンプルなものから始めて、実際の回答を見ながら徐々に改善していくアプローチが効果的です。
+                                    Difyでは、プロンプトを編集したらすぐにテスト実行できるので、何度も試行錯誤しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 変数を使った動的プロンプト設計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>変数（Variables）</strong>を使うことで、ユーザー入力やシステムから取得した情報をプロンプトに動的に埋め込むことができます。
+                        これにより、同じプロンプトテンプレートで多様な状況に対応できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">Difyでの変数の種類</h3>
+
+                    <div class="overflow-x-auto mb-6">
+                        <table class="min-w-full border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">変数タイプ</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">説明</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200">使用例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">ユーザー入力変数</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">ユーザーが入力したテキスト</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">{{query}}, {{user_name}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">システム変数</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">システムから自動取得される情報</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">{{current_date}}, {{session_id}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200 font-medium">外部データ変数</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">APIやデータベースから取得したデータ</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">{{customer_info}}, {{order_status}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-slate-600 font-medium">ナレッジ変数</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">RAGで検索された関連ドキュメント</td>
+                                    <td class="px-4 py-3 text-sm text-slate-600">{{context}}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">変数を使ったプロンプトテンプレート例</h3>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">変数を使ったプロンプトテンプレート</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">## システムプロンプト
+あなたは{{company_name}}のカスタマーサポートAIです。
+今日は{{current_date}}です。
+
+## 顧客情報
+顧客名: {{customer_name}}
+会員ランク: {{customer_tier}}
+過去の問い合わせ回数: {{inquiry_count}}
+
+## 質問内容
+{{user_query}}
+
+## 関連ドキュメント
+{{context}}
+
+上記の情報をもとに、{{customer_name}}様に最適な回答を提供してください。
+会員ランクが「プレミアム」の場合は、より丁寧な対応を心がけてください。</code></pre>
+                    </div>
+
+                    <!-- Mermaid図: 変数の流れ -->
+                    <div class="my-6 bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-700 mb-3">変数がプロンプトに統合される流れ</h3>
+                        <div class="mermaid">
+flowchart LR
+    A[ユーザー入力<br/>user_query] --> E[プロンプト<br/>テンプレート]
+    B[システム変数<br/>current_date] --> E
+    C[外部API<br/>customer_info] --> E
+    D[ナレッジベース<br/>context] --> E
+    E --> F[最終プロンプト<br/>生成]
+    F --> G[LLMに送信]
+                        </div>
+                    </div>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5 mb-5 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習 4-1: 変数を使ったパーソナライズ挨拶アプリ</h3>
+                                <p class="text-purple-900 mb-4 break-words">ユーザーの名前と好きなトピックを受け取り、パーソナライズされた挨拶メッセージを生成するアプリを作成します。</p>
+                                <h4 class="font-medium text-purple-800 mb-2 break-words">手順</h4>
+                                <ol class="space-y-3 mb-4">
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0 break-words">Difyで新しい「チャットアプリ」を作成</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0 break-words">「入力変数」で`user_name`（テキスト）と`favorite_topic`（テキスト）を追加</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0 break-words">システムプロンプトに「{{user_name}}様、こんにちは！{{favorite_topic}}に興味をお持ちとのこと、素晴らしいですね。」を含める</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-purple-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                        <span class="flex-1 min-w-0 break-words">プレビュー画面で変数に値を入力してテスト実行</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 コンテキスト管理とメモリ機能
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>コンテキスト（Context）</strong>とは、AIが過去のやり取りを記憶し、会話の流れを理解するための情報です。
+                        Difyでは、会話履歴を自動的に管理し、LLMに送信するコンテキストを制御できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">コンテキスト管理の重要性</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        例えば、以下のような会話を考えてみましょう：
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-5 mb-4">
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-sm font-medium text-slate-600 mb-1">ユーザー:</p>
+                                <p class="text-slate-800">「Pythonのインストール方法を教えて」</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-slate-600 mb-1">AI:</p>
+                                <p class="text-slate-800">「Pythonの公式サイトからインストーラーをダウンロードし...（説明）」</p>
+                            </div>
+                            <div class="pt-3 border-t border-slate-300">
+                                <p class="text-sm font-medium text-slate-600 mb-1">ユーザー:</p>
+                                <p class="text-slate-800">「Macの場合はどうすればいいですか？」</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このとき、AIは「Macの場合」が「Pythonのインストール」を指していることを理解する必要があります。
+                        これが<strong>コンテキスト管理</strong>です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">Difyのコンテキスト設定</h3>
+
+                    <div class="space-y-4 mb-6">
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-history text-blue-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">履歴保持数（Context Window）</p>
+                                    <p class="text-sm text-slate-600">
+                                        過去何ターンの会話をLLMに送信するかを設定できます。
+                                        デフォルトは10ターンですが、長い文脈が必要な場合は増やすことができます。
+                                        ただし、トークン数が増えるとコストも増加します。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-memory text-emerald-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">メモリ機能（Memory）</p>
+                                    <p class="text-sm text-slate-600">
+                                        会話全体から重要な情報を抽出し、長期的に記憶する機能です。
+                                        例えば、ユーザーが「私はエンジニアです」と言った場合、セッションをまたいでもその情報を記憶できます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-compress-alt text-purple-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-1">要約機能（Summarization）</p>
+                                    <p class="text-sm text-slate-600">
+                                        長い会話履歴を要約して、トークン数を削減しつつ文脈を維持する機能です。
+                                        100ターン以上の長い会話でも、重要な情報を損なわずにコスト削減できます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">トークン数とコストのトレードオフ</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    コンテキストを多く送るほどAIの理解精度は上がりますが、LLM APIの利用料金も増加します。
+                                    必要最小限のコンテキストで最大の効果を得られるよう、プロンプト設計を工夫しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 プロンプトエンジニアリングのベストプラクティス
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        効果的なプロンプト設計のためのベストプラクティスを紹介します。
+                        これらは「生成AI入門ガイド」で学んだプロンプトエンジニアリングの原則を、Difyでの実装に応用したものです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-3 mt-6">ベストプラクティス一覧</h3>
+
+                    <div class="space-y-4 mb-6">
+                        <!-- BP1 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    1
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">具体的な指示を与える</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div class="bg-red-50 rounded p-3">
+                                            <p class="text-xs font-semibold text-red-700 mb-1">❌ 悪い例</p>
+                                            <p class="text-sm text-red-900">「質問に答えて」</p>
+                                        </div>
+                                        <div class="bg-emerald-50 rounded p-3">
+                                            <p class="text-xs font-semibold text-emerald-700 mb-1">✅ 良い例</p>
+                                            <p class="text-sm text-emerald-900">「質問に対して、根拠を示しながら3つのステップで説明してください」</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BP2 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    2
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">フォーマットを明示する</p>
+                                    <div class="bg-slate-100 rounded p-3 text-sm text-slate-700">
+                                        「回答は以下の形式で提供してください：<br>
+                                        ## 要約<br>
+                                        （1文で要約）<br>
+                                        ## 詳細<br>
+                                        （段階的に説明）<br>
+                                        ## 関連情報<br>
+                                        （参考リンクや補足）」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BP3 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    3
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">Few-shot例を提供する</p>
+                                    <p class="text-sm text-slate-600 mb-2">期待する出力の例を示すことで、AIの回答品質が向上します。</p>
+                                    <div class="bg-slate-100 rounded p-3 text-sm text-slate-700">
+                                        「以下の例のように、質問を分類してください。<br><br>
+                                        例1:<br>
+                                        質問: 「パスワードをリセットしたい」<br>
+                                        分類: アカウント管理<br><br>
+                                        例2:<br>
+                                        質問: 「注文が届かない」<br>
+                                        分類: 配送・物流」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BP4 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    4
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">思考プロセスを促す（Chain of Thought）</p>
+                                    <div class="bg-slate-100 rounded p-3 text-sm text-slate-700">
+                                        「回答する前に、以下のステップで考えてください：<br>
+                                        1. 問題の核心は何か？<br>
+                                        2. どのような情報が必要か？<br>
+                                        3. 最適な解決策は何か？」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BP5 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    5
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">制約を明確にする</p>
+                                    <div class="bg-slate-100 rounded p-3 text-sm text-slate-700">
+                                        「以下の制約を守ってください：<br>
+                                        - 回答は300文字以内<br>
+                                        - 専門用語は使わず、小学生でもわかる言葉で説明<br>
+                                        - 必ず具体例を1つ含める」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BP6 -->
+                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    6
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-slate-800 mb-2">不確実性への対応を指示する</p>
+                                    <div class="bg-slate-100 rounded p-3 text-sm text-slate-700">
+                                        「もし情報が不足している場合は、推測せずに『情報が不足しているため、確実な回答ができません』と答えてください。」
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ヒント -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">反復改善のサイクル</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    プロンプトは一度で完璧にはなりません。Difyのログ機能を使って実際の回答を確認し、
+                                    「期待と異なる回答が出た場合はプロンプトを修正」を繰り返すことで、徐々に精度が向上します。
+                                    このサイクルを「プロンプトチューニング」と呼びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. プロンプトオーケストレーションとは何ですか？なぜ重要ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            プロンプトを構造化し、変数やコンテキストを組み合わせて動的に生成する技術です。
+                                            システムプロンプト、変数、履歴、参照データを適切に組み合わせることで、AIの回答品質が大幅に向上し、
+                                            一貫性のある高品質な回答を安定して得られるようになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. システムプロンプトに含めるべき4つの構成要素は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            1. 役割（Role）定義：AIが担う役割<br>
+                                            2. タスク（Task）明示：実行すべき具体的なタスク<br>
+                                            3. 制約条件（Constraints）：守るべきルールや禁止事項<br>
+                                            4. 出力フォーマット（Format）：回答の構造や形式
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 変数を使う利点は何ですか？具体例を挙げて説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            同じプロンプトテンプレートで多様な状況に対応できることが最大の利点です。
+                                            例えば、カスタマーサポートAIで{{customer_name}}や{{order_id}}などの変数を使えば、
+                                            個別の顧客情報を動的に埋め込んでパーソナライズされた対応が可能になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. コンテキスト管理で、履歴保持数を増やすメリットとデメリットは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            メリット：長い会話の文脈を保持でき、AIの理解精度が向上する。<br>
+                                            デメリット：トークン数が増加し、LLM APIの利用料金が増える。
+                                            必要最小限のコンテキストで最大の効果を得られるよう設計することが重要です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-primary-500"></i>
+                        第4章のまとめ
+                    </h3>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>プロンプトオーケストレーションは、システムプロンプト、変数、コンテキストを組み合わせてAIの振る舞いを制御する技術</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>システムプロンプトには、役割、タスク、制約条件、出力フォーマットの4要素を含めることが重要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>変数を活用することで、同じテンプレートで多様な状況に対応できるパーソナライズされたAIアプリが構築可能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>コンテキスト管理により会話の流れを維持でき、メモリ機能で長期的な情報記憶も実現できる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>プロンプトエンジニアリングのベストプラクティスを適用し、反復改善サイクルで精度を向上させることが重要</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="dify-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第3章: はじめてのアプリ作成</span>
+                        </div>
+                    </a>
+                    <a href="dify-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: モデルプロバイダーの設定</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/fcircle-biz" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

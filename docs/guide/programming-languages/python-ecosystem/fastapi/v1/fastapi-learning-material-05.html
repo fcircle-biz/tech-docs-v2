@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI学習教材 第5章 - 依存性注入とミドルウェア</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts - Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #2e7d32; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #2e7d32; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #2e7d32; padding-bottom: 0.5rem; }
+        .section-title { color: #4caf50; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .quiz-container { background-color: #e8f5e8; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #2e7d32; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; border-left: 4px solid #9c27b0; }
+        .highlight { background-color: #ffecb3; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #ffc107; }
+        .warning { background-color: #ffebee; border-radius: 8px; padding: 1rem; margin: 1rem 0; border-left: 4px solid #f44336; }
+        .code-block { background-color: #1e1e1e; border-radius: 5px; padding: 1rem; margin: 1rem 0; }
+        .nav-link.active { background-color: #2e7d32 !important; color: white !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand"><strong>FastAPI学習教材</strong></a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-01.html">第1章: FastAPI入門と環境構築</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-02.html">第2章: ルーティングとリクエスト処理</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-03.html">第3章: Pydanticモデルとデータ検証</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-04.html">第4章: レスポンス処理と例外ハンドリング</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="fastapi-learning-material-05.html">第5章: 依存性注入とミドルウェア</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-06.html">第6章: データベース連携とORM</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-07.html">第7章: 認証とセキュリティ</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-08.html">第8章: 非同期処理とパフォーマンス最適化</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-09.html">第9章: テストとドキュメント</a></li>
+                        <li class="nav-item"><a class="nav-link" href="fastapi-learning-material-10.html">第10章: デプロイメントと本番環境</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第5章: 依存性注入とミドルウェア</h1>
+                </div>
+
+                <div id="chapter5">
+                    <h2 class="chapter-title">アーキテクチャの基盤：依存性注入とミドルウェア</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>依存性注入（Dependency Injection）の概念と利点</li>
+                            <li>Dependsを使った効率的なコードの共通化</li>
+                            <li>ミドルウェアによるリクエスト・レスポンス処理</li>
+                            <li>CORSの設定とセキュリティ対策</li>
+                            <li>ログ出力とリクエスト追跡の実装</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">5.1 依存性注入の基本概念</h3>
+                    <p>依存性注入は、オブジェクト間の依存関係を外部から注入する設計パターンです。FastAPIのDependsを使用することで、コードの再利用性と保守性が大幅に向上します。</p>
+
+                    <div class="mermaid">
+                        graph LR
+                            A["HTTPリクエスト"] --> B["FastAPIルーター"]
+                            B --> C["依存性解決"]
+                            C --> D["共通パラメータ1"]
+                            C --> E["共通パラメータ2"]
+                            C --> F["認証情報"]
+                            D --> G["エンドポイント関数"]
+                            E --> G
+                            F --> G
+                            G --> H["レスポンス"]
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 5-1: 基本的な依存性注入</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">from fastapi import FastAPI, Depends, Query, HTTPException
+from typing import Optional, Dict, Any
+from datetime import datetime
+
+app = FastAPI()
+
+# 共通のクエリパラメータを依存性として定義
+def common_query_params(
+    page: int = Query(1, ge=1, description="ページ番号"),
+    limit: int = Query(10, ge=1, le=100, description="取得件数"),
+    sort_by: str = Query("created_at", description="ソートフィールド"),
+    order: str = Query("desc", regex="^(asc|desc)$", description="ソート順")
+) -> Dict[str, Any]:
+    """共通クエリパラメータの依存性"""
+    return {
+        "page": page,
+        "limit": limit,
+        "sort_by": sort_by,
+        "order": order,
+        "offset": (page - 1) * limit
+    }
+
+# APIキー認証のための依存性
+def get_api_key(api_key: str = Query(..., description="APIキー")) -> str:
+    """APIキー認証"""
+    valid_keys = ["secret_key_123", "test_key_456"]
+    
+    if api_key not in valid_keys:
+        raise HTTPException(
+            status_code=401,
+            detail="無効なAPIキーです"
+        )
+    
+    return api_key
+
+# データベース接続をシミュレートする依存性
+def get_database() -> Dict[str, Any]:
+    """データベース接続（シミュレート）"""
+    return {
+        "connection": "database_connection_mock",
+        "connected_at": datetime.now()
+    }
+
+# 認証済みユーザー情報取得の依存性
+def get_current_user(api_key: str = Depends(get_api_key)) -> Dict[str, Any]:
+    """現在のユーザー情報取得"""
+    # 実際のシステムではAPIキーからユーザー情報を取得
+    user_map = {
+        "secret_key_123": {"id": 1, "name": "管理者", "role": "admin"},
+        "test_key_456": {"id": 2, "name": "テストユーザー", "role": "user"}
+    }
+    
+    return user_map.get(api_key, {"id": 0, "name": "ゲスト", "role": "guest"})
+
+# 依存性を使用したエンドポイント
+@app.get("/users")
+def get_users(
+    commons: Dict[str, Any] = Depends(common_query_params),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """ユーザー一覧取得（依存性注入使用）"""
+    
+    # 模擬ユーザーデータ
+    all_users = [
+        {"id": i, "name": f"ユーザー{i}", "created_at": "2025-01-01"}
+        for i in range(1, 51)
+    ]
+    
+    # ページネーション適用
+    start = commons["offset"]
+    end = start + commons["limit"]
+    paginated_users = all_users[start:end]
+    
+    return {
+        "users": paginated_users,
+        "pagination": {
+            "page": commons["page"],
+            "limit": commons["limit"],
+            "total": len(all_users),
+            "pages": (len(all_users) + commons["limit"] - 1) // commons["limit"]
+        },
+        "requester": current_user,
+        "db_info": f"Connected at {db['connected_at']}"
+    }
+
+@app.get("/protected-data")
+def get_protected_data(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """保護されたデータ（認証必須）"""
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="管理者権限が必要です"
+        )
+    
+    return {
+        "message": "機密データにアクセスしました",
+        "admin_user": current_user["name"],
+        "data": ["重要な情報1", "重要な情報2"]
+    }</code></pre>
+                    </div>
+
+                    <h3 class="section-title">5.2 ミドルウェアの実装</h3>
+                    <p>ミドルウェアは、すべてのリクエストとレスポンスに対して共通の処理を実行する仕組みです。ログ出力、CORS設定、パフォーマンス測定などに活用されます。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 5-2: カスタムミドルウェアの実装</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+import time
+import uuid
+import json
+from datetime import datetime
+
+app = FastAPI()
+
+# CORS設定
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://mydomain.com"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+
+# 信頼できるホストのみ許可
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["localhost", "127.0.0.1", "mydomain.com"]
+)
+
+# カスタムログ出力ミドルウェア
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """リクエスト・レスポンスログミドルウェア"""
+    
+    # リクエストID生成
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    # リクエスト情報のログ出力
+    request_log = {
+        "request_id": request_id,
+        "timestamp": datetime.now().isoformat(),
+        "method": request.method,
+        "url": str(request.url),
+        "client_ip": request.client.host,
+        "user_agent": request.headers.get("User-Agent", ""),
+    }
+    
+    print(f"REQUEST: {json.dumps(request_log, ensure_ascii=False)}")
+    
+    # リクエストヘッダーにIDを追加
+    request.state.request_id = request_id
+    
+    # 次の処理を実行
+    response = await call_next(request)
+    
+    # 処理時間計算
+    process_time = time.time() - start_time
+    
+    # レスポンス情報のログ出力
+    response_log = {
+        "request_id": request_id,
+        "status_code": response.status_code,
+        "process_time": f"{process_time:.4f}s",
+        "response_size": response.headers.get("content-length", "unknown")
+    }
+    
+    print(f"RESPONSE: {json.dumps(response_log, ensure_ascii=False)}")
+    
+    # カスタムヘッダーを追加
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Process-Time"] = f"{process_time:.4f}s"
+    
+    return response
+
+# セキュリティヘッダー追加ミドルウェア
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """セキュリティヘッダー追加ミドルウェア"""
+    
+    response = await call_next(request)
+    
+    # セキュリティヘッダーの追加
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    return response
+
+# エラー処理ミドルウェア
+@app.middleware("http")
+async def error_handling_middleware(request: Request, call_next):
+    """エラー処理ミドルウェア"""
+    
+    try:
+        response = await call_next(request)
+        return response
+    
+    except Exception as exc:
+        # エラーログの出力
+        error_log = {
+            "request_id": getattr(request.state, "request_id", "unknown"),
+            "error": str(exc),
+            "path": request.url.path,
+            "method": request.method,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        print(f"ERROR: {json.dumps(error_log, ensure_ascii=False)}")
+        
+        # エラーレスポンスの返却
+        return Response(
+            content=json.dumps({
+                "error": "内部サーバーエラーが発生しました",
+                "request_id": getattr(request.state, "request_id", "unknown")
+            }),
+            status_code=500,
+            media_type="application/json"
+        )
+
+# テスト用エンドポイント
+@app.get("/test")
+def test_endpoint():
+    """ミドルウェア動作確認用"""
+    return {"message": "ミドルウェアが正常に動作しています"}
+
+@app.get("/slow")
+def slow_endpoint():
+    """処理時間測定用（遅いエンドポイント）"""
+    import time
+    time.sleep(2)  # 2秒待機
+    return {"message": "遅い処理が完了しました"}
+
+@app.get("/error")
+def error_endpoint():
+    """エラー処理確認用"""
+    raise Exception("テスト用エラー")</code></pre>
+                    </div>
+
+                    <h3 class="section-title">5.3 高度な依存性パターン</h3>
+                    <p>より複雑なアプリケーションでは、階層化された依存性や条件付き依存性が必要になります。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 5-3: 高度な依存性パターン</h5>
+                        <h6>実装例</h6>
+                        <pre class="code-block"><code class="language-python">from fastapi import FastAPI, Depends, HTTPException, Header
+from typing import Optional, Generator
+import contextlib
+from datetime import datetime, timedelta
+
+app = FastAPI()
+
+# 設定管理クラス
+class AppConfig:
+    def __init__(self):
+        self.debug_mode = True
+        self.max_connections = 100
+        self.cache_ttl = 300  # 5分
+
+# シングルトンの設定インスタンス
+app_config = AppConfig()
+
+def get_config() -> AppConfig:
+    """アプリケーション設定取得"""
+    return app_config
+
+# データベースコネクションプールのシミュレート
+class DatabasePool:
+    def __init__(self, max_connections: int = 10):
+        self.max_connections = max_connections
+        self.active_connections = 0
+    
+    @contextlib.contextmanager
+    def get_connection(self):
+        if self.active_connections >= self.max_connections:
+            raise HTTPException(
+                status_code=503,
+                detail="データベース接続数が上限に達しています"
+            )
+        
+        self.active_connections += 1
+        try:
+            yield f"connection_{self.active_connections}"
+        finally:
+            self.active_connections -= 1
+
+db_pool = DatabasePool()
+
+def get_db_connection() -> Generator:
+    """データベース接続取得"""
+    with db_pool.get_connection() as conn:
+        yield conn
+
+# キャッシュマネージャー
+class CacheManager:
+    def __init__(self):
+        self._cache = {}
+        self._timestamps = {}
+    
+    def get(self, key: str, ttl: int = 300):
+        if key not in self._cache:
+            return None
+        
+        if datetime.now() - self._timestamps[key] > timedelta(seconds=ttl):
+            del self._cache[key]
+            del self._timestamps[key]
+            return None
+        
+        return self._cache[key]
+    
+    def set(self, key: str, value):
+        self._cache[key] = value
+        self._timestamps[key] = datetime.now()
+
+cache_manager = CacheManager()
+
+def get_cache() -> CacheManager:
+    """キャッシュマネージャー取得"""
+    return cache_manager
+
+# 認証レベル別の依存性
+class AuthLevel:
+    NONE = 0
+    USER = 1
+    ADMIN = 2
+
+def require_auth_level(min_level: int):
+    """認証レベルチェック用ファクトリー関数"""
+    def check_auth_level(
+        authorization: Optional[str] = Header(None),
+        config: AppConfig = Depends(get_config)
+    ):
+        if config.debug_mode and authorization == "debug":
+            return {"level": AuthLevel.ADMIN, "user": "debug_user"}
+        
+        if not authorization:
+            if min_level > AuthLevel.NONE:
+                raise HTTPException(401, "認証が必要です")
+            return {"level": AuthLevel.NONE, "user": "anonymous"}
+        
+        # 簡単な認証シミュレート
+        if authorization == "user_token":
+            user_level = AuthLevel.USER
+        elif authorization == "admin_token":
+            user_level = AuthLevel.ADMIN
+        else:
+            raise HTTPException(401, "無効な認証トークンです")
+        
+        if user_level < min_level:
+            raise HTTPException(403, "権限が不足しています")
+        
+        return {"level": user_level, "user": f"user_level_{user_level}"}
+    
+    return check_auth_level
+
+# 複数の依存性を組み合わせた高度なエンドポイント
+@app.get("/admin/stats")
+def get_admin_stats(
+    auth_info = Depends(require_auth_level(AuthLevel.ADMIN)),
+    db_conn = Depends(get_db_connection),
+    cache: CacheManager = Depends(get_cache),
+    config: AppConfig = Depends(get_config)
+):
+    """管理者向け統計情報（複数依存性使用）"""
+    
+    # キャッシュから取得を試行
+    cache_key = "admin_stats"
+    cached_data = cache.get(cache_key, config.cache_ttl)
+    
+    if cached_data:
+        return {
+            "data": cached_data,
+            "source": "cache",
+            "admin_user": auth_info["user"],
+            "db_connection": db_conn
+        }
+    
+    # 新しいデータを生成
+    stats_data = {
+        "total_users": 1250,
+        "active_sessions": 45,
+        "server_uptime": "72 hours",
+        "generated_at": datetime.now().isoformat()
+    }
+    
+    # キャッシュに保存
+    cache.set(cache_key, stats_data)
+    
+    return {
+        "data": stats_data,
+        "source": "database",
+        "admin_user": auth_info["user"],
+        "db_connection": db_conn
+    }
+
+@app.get("/user/profile")
+def get_user_profile(
+    auth_info = Depends(require_auth_level(AuthLevel.USER)),
+    config: AppConfig = Depends(get_config)
+):
+    """ユーザープロファイル取得"""
+    return {
+        "user": auth_info["user"],
+        "level": auth_info["level"],
+        "debug_mode": config.debug_mode
+    }
+
+@app.get("/public/info")
+def get_public_info(
+    auth_info = Depends(require_auth_level(AuthLevel.NONE)),
+    config: AppConfig = Depends(get_config)
+):
+    """パブリック情報（認証不要）"""
+    return {
+        "message": "パブリック情報です",
+        "user_type": auth_info["user"],
+        "server_time": datetime.now().isoformat()
+    }</code></pre>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>理解度確認クイズ</h5>
+                        <ol>
+                            <li>
+                                <strong>FastAPIで依存性注入を使用するために使うキーワードは？</strong>
+                                <details><summary>解答</summary><p>Depends</p></details>
+                            </li>
+                            <li>
+                                <strong>CORSミドルウェアで許可するオリジンを設定するパラメータは？</strong>
+                                <details><summary>解答</summary><p>allow_origins</p></details>
+                            </li>
+                            <li>
+                                <strong>カスタムHTTPミドルウェアを追加するデコレータは？</strong>
+                                <details><summary>解答</summary><p>@app.middleware("http")</p></details>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <h3 class="section-title">5.4 まとめ</h3>
+                    <div class="highlight">
+                        <h6>この章で習得したスキル</h6>
+                        <ul>
+                            <li>依存性注入による効率的なコード共通化</li>
+                            <li>ミドルウェアを使った横断的な処理実装</li>
+                            <li>CORS設定とセキュリティヘッダーの追加</li>
+                            <li>ログ出力とリクエスト追跡機能</li>
+                            <li>階層化された依存性設計</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="fastapi-learning-material-04.html" class="btn btn-secondary">← 前の章: レスポンス処理と例外ハンドリング</a>
+                        <a href="fastapi-learning-material-06.html" class="btn btn-primary">次の章: データベース連携とORM →</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <footer class="bg-dark text-white mt-5">
+        <div class="container-fluid py-3">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="mb-0">© 2025 F-Circle. All rights reserved.<br>
+本資料はAIツールを活用し、人間による編集・監修のもと作成されています。無断転載・再配布を禁じます。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default'
+        });
+    </script>
+</body>
+</html>

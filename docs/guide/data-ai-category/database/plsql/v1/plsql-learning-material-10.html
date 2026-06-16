@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PL/SQL学習教材 第10章 - パフォーマンスとベストプラクティス</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; padding-top: 56px; }
+        .navbar { background-color: #1565c0; }
+        .sidebar { position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto; }
+        .chapter-title { color: #1565c0; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #1565c0; padding-bottom: 0.5rem; }
+        .section-title { color: #1976d2; margin-top: 1.2rem; margin-bottom: 0.8rem; }
+        .code-block {
+            background-color: #1e1e1e;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .quiz-container { background-color: #e3f2fd; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; }
+        .exercise-container { background-color: #f3e5f5; border-radius: 8px; padding: 1.5rem; margin: 2rem 0; }
+        .highlight { background-color: #fff3e0; padding: 1rem; border-left: 4px solid #ff9800; margin: 1rem 0; }
+        .best-practice { background-color: #e8f5e8; padding: 1rem; border-left: 4px solid #4caf50; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">PL/SQL学習ガイド</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="../../../README.md">ホーム</a></li>
+                    <li class="nav-item"><a class="nav-link" href="README.md">ガイド一覧</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <h6 class="sidebar-heading">学習内容</h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-01.html">第1章: PL/SQLの基本</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-02.html">第2章: 変数とデータ型</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-03.html">第3章: 制御構造</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-04.html">第4章: プロシージャとファンクション</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-05.html">第5章: 例外処理</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-06.html">第6章: カーソル</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-07.html">第7章: トリガー</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-08.html">第8章: パッケージ</a></li>
+                        <li class="nav-item"><a class="nav-link" href="plsql-learning-material-09.html">第9章: 動的SQL</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="#chapter10">第10章: パフォーマンスとベストプラクティス</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">第10章: パフォーマンスとベストプラクティス</h1>
+                </div>
+
+                <div id="chapter10">
+                    <h2 class="chapter-title">パフォーマンス最適化とベストプラクティス</h2>
+                    
+                    <div class="highlight">
+                        <h5>この章で学ぶこと</h5>
+                        <ul>
+                            <li>BULK COLLECTとFORALL文</li>
+                            <li>コンパイル最適化</li>
+                            <li>デバッグ技術</li>
+                            <li>コーディング規約</li>
+                            <li>パフォーマンス測定と改善</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="section-title">10.1 BULK COLLECT</h3>
+                    <p>BULK COLLECTは複数行を一度に配列に取得する機能で、行単位の処理よりも高速です。</p>
+
+                    <pre class="code-block"><code class="language-sql">DECLARE
+    TYPE emp_id_array IS TABLE OF employees.employee_id%TYPE;
+    TYPE emp_name_array IS TABLE OF employees.first_name%TYPE;
+    
+    v_emp_ids emp_id_array;
+    v_emp_names emp_name_array;
+BEGIN
+    SELECT employee_id, first_name
+    BULK COLLECT INTO v_emp_ids, v_emp_names
+    FROM employees
+    WHERE department_id = 10;
+    
+    FOR i IN 1..v_emp_ids.COUNT LOOP
+        DBMS_OUTPUT.PUT_LINE(v_emp_ids(i) || ': ' || v_emp_names(i));
+    END LOOP;
+END;
+/</code></pre>
+
+                    <h3 class="section-title">10.2 FORALL文</h3>
+                    <p>FORALL文は配列の要素に対してDML文を一括実行するため、ループよりも高速です。</p>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-1: BULK COLLECTとFORALLの組み合わせ</h5>
+                        <pre class="code-block"><code class="language-sql">DECLARE
+    TYPE emp_id_array IS TABLE OF employees.employee_id%TYPE;
+    v_emp_ids emp_id_array;
+    
+    -- 新しい給与を格納する配列
+    TYPE salary_array IS TABLE OF NUMBER;
+    v_new_salaries salary_array := salary_array();
+BEGIN
+    -- BULK COLLECTで一括取得
+    SELECT employee_id
+    BULK COLLECT INTO v_emp_ids
+    FROM employees
+    WHERE department_id = 10;
+    
+    -- 新しい給与を計算（10%アップ）
+    v_new_salaries.EXTEND(v_emp_ids.COUNT);
+    FOR i IN 1..v_emp_ids.COUNT LOOP
+        SELECT salary * 1.1 INTO v_new_salaries(i)
+        FROM employees
+        WHERE employee_id = v_emp_ids(i);
+    END LOOP;
+    
+    -- FORALLで一括更新
+    FORALL i IN 1..v_emp_ids.COUNT
+        UPDATE employees
+        SET salary = v_new_salaries(i)
+        WHERE employee_id = v_emp_ids(i);
+    
+    DBMS_OUTPUT.PUT_LINE('更新された行数: ' || SQL%ROWCOUNT);
+    COMMIT;
+END;
+/</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.3 コンパイル最適化</h3>
+                    <p>Oracle 10g以降では、PL/SQLコンパイラーの最適化レベルを設定できます。</p>
+
+                    <pre class="code-block"><code class="language-sql">-- 最適化レベルの設定（0-3）
+ALTER SESSION SET PLSQL_OPTIMIZE_LEVEL = 2;
+
+-- 条件付きコンパイルの使用
+$IF DBMS_DB_VERSION.VERSION >= 12 $THEN
+    -- Oracle 12c以降の機能を使用
+$ELSE
+    -- 古いバージョン向けのコード
+$END</code></pre>
+
+                    <h3 class="section-title">10.4 デバッグ技術</h3>
+                    
+                    <h4>DBMS_OUTPUTの効果的な使用</h4>
+                    <pre class="code-block"><code class="language-sql">-- デバッグ情報の出力
+PROCEDURE debug_message(p_message VARCHAR2) IS
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') || ': ' || p_message);
+END;</code></pre>
+
+                    <h4>例外処理でのエラー情報取得</h4>
+                    <pre class="code-block"><code class="language-sql">EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('エラーコード: ' || SQLCODE);
+        DBMS_OUTPUT.PUT_LINE('エラーメッセージ: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE('スタックトレース: ' || DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+        RAISE;</code></pre>
+
+                    <div class="best-practice">
+                        <h5>✅ ベストプラクティス</h5>
+                        <h6>1. 命名規約</h6>
+                        <ul>
+                            <li><strong>変数</strong>: v_変数名（例: v_employee_id）</li>
+                            <li><strong>パラメータ</strong>: p_パラメータ名（例: p_department_id）</li>
+                            <li><strong>定数</strong>: c_定数名（例: c_max_salary）</li>
+                            <li><strong>グローバル変数</strong>: g_変数名（例: g_total_count）</li>
+                            <li><strong>カーソル</strong>: cursor_名前（例: cursor_employees）</li>
+                        </ul>
+
+                        <h6>2. コード構造</h6>
+                        <ul>
+                            <li>適切なインデントと空行の使用</li>
+                            <li>コメントの効果的な配置</li>
+                            <li>複雑なロジックの分割</li>
+                            <li>再利用可能なコードのパッケージ化</li>
+                        </ul>
+
+                        <h6>3. エラーハンドリング</h6>
+                        <ul>
+                            <li>すべてのブロックに適切な例外処理</li>
+                            <li>意味のあるエラーメッセージ</li>
+                            <li>リソースの適切なクリーンアップ</li>
+                            <li>ログ記録の実装</li>
+                        </ul>
+                    </div>
+
+                    <div class="exercise-container">
+                        <h5>実習 10-2: パフォーマンス測定</h5>
+                        <pre class="code-block"><code class="language-sql">DECLARE
+    v_start_time NUMBER;
+    v_end_time NUMBER;
+    v_elapsed_time NUMBER;
+    
+    -- テスト用の配列
+    TYPE number_array IS TABLE OF NUMBER;
+    v_numbers number_array := number_array();
+BEGIN
+    -- 開始時間を記録
+    v_start_time := DBMS_UTILITY.GET_TIME;
+    
+    -- パフォーマンステスト（配列に10000個の要素を追加）
+    v_numbers.EXTEND(10000);
+    FOR i IN 1..10000 LOOP
+        v_numbers(i) := i * 2;
+    END LOOP;
+    
+    -- 終了時間を記録
+    v_end_time := DBMS_UTILITY.GET_TIME;
+    
+    -- 経過時間を計算（単位: 1/100秒）
+    v_elapsed_time := v_end_time - v_start_time;
+    
+    DBMS_OUTPUT.PUT_LINE('処理時間: ' || v_elapsed_time || '/100秒');
+    DBMS_OUTPUT.PUT_LINE('配列要素数: ' || v_numbers.COUNT);
+END;
+/</code></pre>
+                    </div>
+
+                    <h3 class="section-title">10.5 まとめ</h3>
+                    <div class="best-practice">
+                        <h5>PL/SQL開発のガイドライン</h5>
+                        <ol>
+                            <li><strong>設計</strong>: 要件を明確にし、適切なアーキテクチャを選択</li>
+                            <li><strong>実装</strong>: ベストプラクティスに従ってコーディング</li>
+                            <li><strong>テスト</strong>: 単体テストと統合テストの実施</li>
+                            <li><strong>最適化</strong>: パフォーマンス測定と改善</li>
+                            <li><strong>保守</strong>: ドキュメンテーションとコードレビュー</li>
+                        </ol>
+                    </div>
+
+                    <div class="quiz-container">
+                        <h5>最終確認クイズ</h5>
+                        <ol>
+                            <li>BULK COLLECTとFORALLの主な利点は何ですか？</li>
+                            <li>PL/SQLの最適化レベルはどの範囲で設定できますか？</li>
+                            <li>変数の命名規約で推奨されるプレフィックスは何ですか？</li>
+                            <li>パフォーマンス測定に使用できるパッケージは何ですか？</li>
+                        </ol>
+                        
+                        <h6 class="mt-3">🎉 おめでとうございます！</h6>
+                        <p>PL/SQL学習ガイドラインのすべての章を完了しました。これらの知識を実際のプロジェクトで活用し、継続的に学習を続けてください。</p>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="plsql-learning-material-09.html" class="btn btn-secondary">← 前の章</a>
+                        <a href="README.md" class="btn btn-success">ガイド一覧へ戻る</a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

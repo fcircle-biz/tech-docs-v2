@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>AWS サーバーレス Todoアプリチュートリアル ステップ8 - フロントエンドとAPIの連携</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // チュートリアル推奨カラー: Emerald（緑系）
+                        primary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            300: '#6ee7b7',
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-aws text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">AWS サーバーレス実践チュートリアル</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-hammer text-yellow-300 text-[8px]"></i>
+                                ハンズオン
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>クラウド・インフラ</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約17時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">AWS サーバーレス</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">ステップ8</span>
+                </nav>
+
+                <!-- ステップヘッダー -->
+                <header class="mb-8">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+                                     bg-primary-100 text-primary-700 text-sm font-semibold">
+                            <span class="w-6 h-6 flex items-center justify-center
+                                         bg-primary-500 text-white rounded-full text-xs">8</span>
+                            ステップ8
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">フロントエンドとAPIの連携</h1>
+                    <p class="text-slate-600">フロントエンドからAPI Gatewayを呼び出し、データの取得・操作を行います。</p>
+                </header>
+
+                <!-- このステップの目標 -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-6 mb-8">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">このステップで実装すること</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>環境変数の設定（APIエンドポイント）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>fetch APIを使ったHTTPリクエストの実装</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>useEffectでのデータ取得とローディング処理</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>CRUD操作（作成・読取・更新・削除）のフロント実装</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-caret-right text-amber-500 mt-1"></i>
+                                    <span>エラーハンドリングとユーザーへのフィードバック</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 前提条件 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-8">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-800 mb-2">前提条件</h3>
+                            <ul class="space-y-1 text-blue-900 text-sm">
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Step 7でNext.jsプロジェクトが作成されている</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>API GatewayのエンドポイントURLをメモしている</span>
+                                </li>
+                                <li class="flex items-center gap-2">
+                                    <i class="fas fa-check text-blue-500"></i>
+                                    <span>Lambda関数とDynamoDBが正常に動作している</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: フロント・バック連携の仕組み -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.1 フロント・バック連携の仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        フロントエンド（ブラウザで動くReactアプリ）とバックエンド（AWS上のAPI）を連携させることで、ユーザーの操作がデータベースに反映される仕組みを実現します。
+                    </p>
+
+                    <!-- システム構成図 -->
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant U as ユーザー
+    participant F as フロントエンド<br/>Next.js
+    participant A as API Gateway
+    participant L as Lambda関数
+    participant D as DynamoDB
+
+    U->>F: タスクを追加
+    F->>A: POST /todos
+    A->>L: createTodo実行
+    L->>D: データ保存
+    D-->>L: 保存完了
+    L-->>A: レスポンス
+    A-->>F: 作成されたタスク
+    F-->>U: 画面を更新
+                        </div>
+                        <p class="text-sm text-slate-500 text-center mt-2">フロント・バック連携の流れ</p>
+                    </div>
+
+                    <!-- HTTPリクエストの種類 -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium">HTTPメソッドとCRUD操作の対応</p>
+                                <ul class="text-emerald-800 text-sm mt-2 space-y-1 ml-4">
+                                    <li>• <strong>GET</strong> → 読取（Read）- タスク一覧を取得</li>
+                                    <li>• <strong>POST</strong> → 作成（Create）- 新しいタスクを追加</li>
+                                    <li>• <strong>PUT</strong> → 更新（Update）- タスクの内容を変更</li>
+                                    <li>• <strong>DELETE</strong> → 削除（Delete）- タスクを削除</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: 環境変数の設定 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.2 環境変数の設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        APIエンドポイントURLをコード内にハードコーディングせず、環境変数として管理します。これにより開発環境と本番環境で異なるAPIを簡単に切り替えられます。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 8-1: 環境変数ファイルの作成
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">APIエンドポイントを環境変数として設定します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">.env.localファイルを作成</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            プロジェクトのルートディレクトリ（frontend/）に<code class="bg-purple-100 px-1 rounded">.env.local</code>ファイルを作成します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>ターミナル</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># frontend/ ディレクトリに移動
+cd frontend
+
+# .env.local ファイルを作成
+touch .env.local</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">APIエンドポイントを記述</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            .env.localファイルにAPI GatewayのエンドポイントURLを記述します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/.env.local</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># API GatewayのエンドポイントURL（Step 5で取得したURL）
+NEXT_PUBLIC_API_URL=https://xxxxx.execute-api.ap-northeast-1.amazonaws.com/prod</code></pre>
+                                        </div>
+                                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg mt-3">
+                                            <p class="text-blue-800 text-sm">
+                                                <i class="fas fa-lightbulb mr-1"></i>
+                                                <strong>NEXT_PUBLIC_</strong>プレフィックスを付けると、ブラウザ側のコードからも環境変数にアクセスできます。
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順3 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">開発サーバーを再起動</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            環境変数を反映させるため、開発サーバーを再起動します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>ターミナル</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-bash"># Ctrl+C で開発サーバーを停止
+# 再度起動
+npm run dev</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: タスク一覧取得の実装 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.3 タスク一覧取得の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        ページが読み込まれたタイミングで、DynamoDBからタスク一覧を取得して画面に表示します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 8-2: データ取得機能の追加
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">page.tsxにタスク一覧を取得する処理を追加します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">page.tsxに状態管理を追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            タスク一覧、ローディング状態、エラー状態を管理するためのstateを追加します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">'use client';
+
+import { useState, useEffect } from 'react';
+
+// Todoの型定義
+interface Todo {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export default function Home() {
+  // 状態管理
+  const [todos, setTodos] = useState&lt;Todo[]&gt;([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState&lt;string | null&gt;(null);
+
+  // APIエンドポイント
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  // ページ読み込み時にタスク一覧を取得
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  // タスク一覧取得関数
+  const fetchTodos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${API_URL}/todos`);
+
+      if (!response.ok) {
+        throw new Error('タスクの取得に失敗しました');
+      }
+
+      const data = await response.json();
+      setTodos(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '不明なエラー');
+      console.error('エラー:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    &lt;div className="min-h-screen bg-gray-50 py-8"&gt;
+      &lt;div className="max-w-4xl mx-auto px-4"&gt;
+        &lt;h1 className="text-3xl font-bold text-gray-900 mb-8"&gt;
+          Todoリスト
+        &lt;/h1&gt;
+
+        {/* ローディング表示 */}
+        {loading && (
+          &lt;div className="text-center py-8"&gt;
+            &lt;div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"&gt;&lt;/div&gt;
+            &lt;p className="mt-4 text-gray-600"&gt;読み込み中...&lt;/p&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* エラー表示 */}
+        {error && (
+          &lt;div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4"&gt;
+            &lt;p className="text-red-800"&gt;{error}&lt;/p&gt;
+          &lt;/div&gt;
+        )}
+
+        {/* タスク一覧表示 */}
+        {!loading && !error && (
+          &lt;div className="bg-white rounded-lg shadow"&gt;
+            {todos.length === 0 ? (
+              &lt;p className="p-8 text-center text-gray-500"&gt;
+                タスクがまだありません
+              &lt;/p&gt;
+            ) : (
+              &lt;ul className="divide-y divide-gray-200"&gt;
+                {todos.map((todo) =&gt; (
+                  &lt;li key={todo.id} className="p-4"&gt;
+                    &lt;p className="text-gray-900"&gt;{todo.title}&lt;/p&gt;
+                    &lt;p className="text-sm text-gray-500"&gt;
+                      {todo.completed ? '完了' : '未完了'}
+                    &lt;/p&gt;
+                  &lt;/li&gt;
+                ))}
+              &lt;/ul&gt;
+            )}
+          &lt;/div&gt;
+        )}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">コードの解説</h4>
+                                        <ul class="text-purple-900 text-sm space-y-2 ml-4">
+                                            <li>• <strong>useState</strong>: タスク一覧、ローディング、エラーの状態を管理</li>
+                                            <li>• <strong>useEffect</strong>: ページ読み込み時にfetchTodos()を実行</li>
+                                            <li>• <strong>fetchTodos</strong>: fetch APIでGETリクエストを送信</li>
+                                            <li>• <strong>try-catch</strong>: エラーハンドリングでユーザーにメッセージを表示</li>
+                                            <li>• <strong>finally</strong>: 成功・失敗問わずローディングを終了</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: タスク追加機能の実装 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.4 タスク追加機能の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        ユーザーが入力したタスクをPOSTリクエストでバックエンドに送信し、DynamoDBに保存します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 8-3: タスク追加関数の実装
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">page.tsxにタスク追加のための関数とフォームを追加します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">タスク追加関数を追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            page.tsxのfetchTodos関数の後に、以下の関数を追加します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（追加部分）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">  // タスク追加関数
+  const addTodo = async (title: string) => {
+    try {
+      setError(null);
+
+      const response = await fetch(`${API_URL}/todos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        throw new Error('タスクの追加に失敗しました');
+      }
+
+      // 一覧を再取得して画面を更新
+      await fetchTodos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '不明なエラー');
+      console.error('エラー:', err);
+    }
+  };
+
+  // フォーム送信ハンドラー
+  const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const title = formData.get('title') as string;
+
+    if (title.trim()) {
+      addTodo(title);
+      e.currentTarget.reset(); // フォームをクリア
+    }
+  };</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">入力フォームを追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            return文内のタイトルの下に、入力フォームを追加します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（return文内に追加）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">        {/* タスク追加フォーム */}
+        &lt;form onSubmit={handleSubmit} className="mb-6"&gt;
+          &lt;div className="flex gap-2"&gt;
+            &lt;input
+              type="text"
+              name="title"
+              placeholder="新しいタスクを入力..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg
+                         focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            /&gt;
+            &lt;button
+              type="submit"
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg
+                         hover:bg-blue-600 transition-colors"
+            &gt;
+              追加
+            &lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/form&gt;</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: タスク更新・削除機能の実装 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.5 タスク更新・削除機能の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        タスクの完了状態の切り替え（PUT）と削除（DELETE）の機能を実装します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 8-4: 更新・削除関数の実装
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">タスクの完了切り替えと削除の機能を追加します。</p>
+
+                            <!-- 手順リスト -->
+                            <div class="space-y-6">
+                                <!-- 手順1 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">更新・削除関数を追加</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            addTodo関数の後に、以下の関数を追加します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（追加部分）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">  // タスク完了状態の切り替え
+  const toggleTodo = async (id: string, completed: boolean) => {
+    try {
+      setError(null);
+
+      const response = await fetch(`${API_URL}/todos/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ completed: !completed }),
+      });
+
+      if (!response.ok) {
+        throw new Error('タスクの更新に失敗しました');
+      }
+
+      await fetchTodos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '不明なエラー');
+      console.error('エラー:', err);
+    }
+  };
+
+  // タスク削除
+  const deleteTodo = async (id: string) => {
+    if (!confirm('このタスクを削除しますか?')) {
+      return;
+    }
+
+    try {
+      setError(null);
+
+      const response = await fetch(`${API_URL}/todos/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('タスクの削除に失敗しました');
+      }
+
+      await fetchTodos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '不明なエラー');
+      console.error('エラー:', err);
+    }
+  };</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 手順2 -->
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">タスク表示部分を更新</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            タスク一覧表示部分に、チェックボックスと削除ボタンを追加します。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（タスク一覧部分を置き換え）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">              &lt;ul className="divide-y divide-gray-200"&gt;
+                {todos.map((todo) =&gt; (
+                  &lt;li key={todo.id} className="p-4 flex items-center gap-4"&gt;
+                    {/* 完了チェックボックス */}
+                    &lt;input
+                      type="checkbox"
+                      checked={todo.completed}
+                      onChange={() =&gt; toggleTodo(todo.id, todo.completed)}
+                      className="w-5 h-5 rounded border-gray-300 text-blue-500
+                                 focus:ring-blue-500 cursor-pointer"
+                    /&gt;
+
+                    {/* タスクタイトル */}
+                    &lt;p className={`flex-1 ${
+                      todo.completed ? 'line-through text-gray-400' : 'text-gray-900'
+                    }`}&gt;
+                      {todo.title}
+                    &lt;/p&gt;
+
+                    {/* 削除ボタン */}
+                    &lt;button
+                      onClick={() =&gt; deleteTodo(todo.id)}
+                      className="px-3 py-1 text-red-600 hover:bg-red-50 rounded
+                                 transition-colors"
+                    &gt;
+                      削除
+                    &lt;/button&gt;
+                  &lt;/li&gt;
+                ))}
+              &lt;/ul&gt;</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: フィルター機能の追加 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.6 フィルター機能の追加（オプション）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        「すべて」「未完了」「完了済み」でタスクをフィルタリングする機能を追加します。
+                    </p>
+
+                    <!-- 実装手順カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl overflow-hidden mb-8">
+                        <div class="bg-purple-100 px-6 py-3 border-b border-purple-200">
+                            <h3 class="font-semibold text-purple-800 flex items-center gap-2">
+                                <i class="fas fa-hammer"></i>
+                                実装 8-5: フィルター機能の実装
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-purple-900 mb-6">表示するタスクをフィルタリングする機能を追加します。</p>
+
+                            <!-- コード -->
+                            <div class="space-y-6">
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">1</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">フィルター用のstateを追加</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（state追加）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">  const [filter, setFilter] = useState&lt;'all' | 'active' | 'completed'&gt;('all');
+
+  // フィルタリングされたタスク一覧
+  const filteredTodos = todos.filter((todo) =&gt; {
+    if (filter === 'active') return !todo.completed;
+    if (filter === 'completed') return todo.completed;
+    return true; // 'all'
+  });</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">2</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">フィルターボタンを追加</h4>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（フォームの下に追加）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">        {/* フィルターボタン */}
+        &lt;div className="flex gap-2 mb-6"&gt;
+          &lt;button
+            onClick={() =&gt; setFilter('all')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              filter === 'all'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          &gt;
+            すべて
+          &lt;/button&gt;
+          &lt;button
+            onClick={() =&gt; setFilter('active')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              filter === 'active'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          &gt;
+            未完了
+          &lt;/button&gt;
+          &lt;button
+            onClick={() =&gt; setFilter('completed')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              filter === 'completed'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          &gt;
+            完了済み
+          &lt;/button&gt;
+        &lt;/div&gt;</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-4">
+                                    <div class="flex-shrink-0 w-8 h-8 bg-purple-500 rounded-full
+                                                flex items-center justify-center text-white font-bold text-sm">3</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-purple-800 mb-2">表示部分を変更</h4>
+                                        <p class="text-purple-900 text-sm mb-3">
+                                            <code class="bg-purple-100 px-1 rounded">todos</code>を<code class="bg-purple-100 px-1 rounded">filteredTodos</code>に置き換えます。
+                                        </p>
+                                        <div class="code-block-wrapper">
+                                            <div class="code-block-header">
+                                                <span>frontend/app/page.tsx（変更箇所）</span>
+                                                <button class="copy-btn" onclick="copyCode(this)">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <pre><code class="language-typescript">            {filteredTodos.length === 0 ? (
+              &lt;p className="p-8 text-center text-gray-500"&gt;
+                タスクがありません
+              &lt;/p&gt;
+            ) : (
+              &lt;ul className="divide-y divide-gray-200"&gt;
+                {filteredTodos.map((todo) =&gt; (
+                  // ... (以下同じ)
+                ))}
+              &lt;/ul&gt;
+            )}</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 動作確認 -->
+                <section class="mb-10">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-6">
+                        8.7 動作確認
+                    </h2>
+
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-6 mb-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">完成したTodoアプリのテスト</h3>
+                                <p class="text-emerald-900 mb-4">すべての機能が正常に動作することを確認します。</p>
+
+                                <ol class="space-y-3 text-emerald-900">
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">1.</span>
+                                        <span>ブラウザで<code class="bg-emerald-100 px-1 rounded">http://localhost:3000</code>を開きます。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">2.</span>
+                                        <span>入力欄に「テストタスク1」と入力し、「追加」ボタンをクリックします。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">3.</span>
+                                        <span>タスクが一覧に追加されることを確認します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">4.</span>
+                                        <span>チェックボックスをクリックし、タスクに取り消し線が表示されることを確認します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">5.</span>
+                                        <span>「削除」ボタンをクリックし、タスクが削除されることを確認します。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <span class="font-medium">6.</span>
+                                        <span>複数タスクを追加し、フィルターボタンで表示が切り替わることを確認します。</span>
+                                    </li>
+                                </ol>
+
+                                <h4 class="font-medium text-emerald-800 mb-2 mt-6">
+                                    <i class="fas fa-check-circle mr-2"></i>期待される結果
+                                </h4>
+                                <div class="bg-emerald-100 rounded-lg p-4 border border-emerald-200">
+                                    <ul class="text-emerald-900 text-sm space-y-1">
+                                        <li>✓ タスクの追加、完了切り替え、削除がすべて動作する</li>
+                                        <li>✓ ページをリロードしてもデータが保持される（DynamoDBに保存）</li>
+                                        <li>✓ フィルターボタンで表示が切り替わる</li>
+                                        <li>✓ エラー発生時にエラーメッセージが表示される</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ブラウザ開発者ツールでの確認 -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mt-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">開発者ツールでの確認</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ブラウザの開発者ツール（F12）→「ネットワーク」タブで、APIリクエストとレスポンスを確認できます。正常に通信できているか確認しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                                rounded-xl overflow-hidden">
+                        <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                            <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                                <i class="fas fa-tools"></i>
+                                トラブルシューティング
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- エラー1 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">CORSエラーが出る</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>エラーメッセージ:</strong> "Access to fetch has been blocked by CORS policy"</p>
+                                    <p class="mb-2"><strong>原因:</strong> API GatewayのCORS設定が不完全</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• API GatewayコンソールでCORSを有効化</li>
+                                        <li>• 各メソッド（GET, POST, PUT, DELETE）でCORSを有効化</li>
+                                        <li>• APIを再デプロイ</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー2 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">タスクが追加されない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> Lambda関数のエラー、または権限不足</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• CloudWatch Logsでエラーログを確認</li>
+                                        <li>• LambdaのIAMロールにDynamoDB書き込み権限があるか確認</li>
+                                        <li>• Lambda関数を直接テストして動作確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー3 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">環境変数が読み込まれない</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> 開発サーバーの再起動忘れ</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• .env.local作成後、必ず開発サーバーを再起動（Ctrl+C → npm run dev）</li>
+                                        <li>• NEXT_PUBLIC_プレフィックスが付いているか確認</li>
+                                        <li>• console.log(process.env.NEXT_PUBLIC_API_URL)でURLを確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- エラー4 -->
+                            <details class="group">
+                                <summary class="flex items-center gap-3 cursor-pointer list-none
+                                               p-3 rounded-lg bg-white border border-orange-200
+                                               hover:bg-orange-50 transition-colors">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                    <span class="font-medium text-orange-800">ページをリロードするとデータが消える</span>
+                                    <i class="fas fa-chevron-down ml-auto text-orange-400
+                                              transition-transform group-open:rotate-180"></i>
+                                </summary>
+                                <div class="mt-3 pl-10 text-orange-900">
+                                    <p class="mb-2"><strong>原因:</strong> データがDynamoDBに保存されていない可能性</p>
+                                    <p><strong>解決方法:</strong></p>
+                                    <ul class="ml-4 mt-2 space-y-1">
+                                        <li>• DynamoDBコンソールでデータが保存されているか確認</li>
+                                        <li>• Lambda関数のログでエラーがないか確認</li>
+                                        <li>• APIエンドポイントが正しいか確認</li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ完了チェック -->
+                <section class="mb-10">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200
+                                rounded-xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-clipboard-check text-white"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-blue-800 mb-4">ステップ完了チェック</h3>
+                                <p class="text-blue-900 mb-4">以下の項目が完了していることを確認してください：</p>
+
+                                <ul class="space-y-3">
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check1"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check1" class="text-blue-900 cursor-pointer">
+                                            環境変数ファイル(.env.local)が作成され、APIエンドポイントが設定されている
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check2"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check2" class="text-blue-900 cursor-pointer">
+                                            タスク一覧の取得（GET）が正常に動作する
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check3"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check3" class="text-blue-900 cursor-pointer">
+                                            タスクの追加（POST）が正常に動作する
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check4"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check4" class="text-blue-900 cursor-pointer">
+                                            タスクの完了切り替え（PUT）が正常に動作する
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check5"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check5" class="text-blue-900 cursor-pointer">
+                                            タスクの削除（DELETE）が正常に動作する
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check6"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check6" class="text-blue-900 cursor-pointer">
+                                            フィルター機能が正常に動作する
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check7"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check7" class="text-blue-900 cursor-pointer">
+                                            ページをリロードしてもデータが保持される
+                                        </label>
+                                    </li>
+                                    <li class="checkbox-item flex items-center gap-3">
+                                        <input type="checkbox" id="check8"
+                                               class="w-5 h-5 rounded border-blue-300 text-blue-500
+                                                      focus:ring-blue-500 cursor-pointer">
+                                        <label for="check8" class="text-blue-900 cursor-pointer">
+                                            エラー発生時に適切なエラーメッセージが表示される
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 次のステップ -->
+                <section class="mb-10">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium">次のステップ</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ステップ9では、完成したNext.jsアプリをGitHubにプッシュし、AWS Amplify Hostingを使ってインターネットに公開します。誰でもアクセスできる本格的なWebアプリとして公開しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ステップ間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-8 mt-8 border-t border-slate-200">
+                    <a href="aws-serverless-tutorial-07.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前のステップ</span>
+                            <span class="font-medium">Next.jsフロントエンド作成</span>
+                        </div>
+                    </a>
+                    <a href="aws-serverless-tutorial-09.html"
+                       class="group flex items-center gap-3 px-5 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors shadow-lg shadow-primary-500/30">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次のステップ</span>
+                            <span class="font-medium">AWS Amplifyでデプロイ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2026 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

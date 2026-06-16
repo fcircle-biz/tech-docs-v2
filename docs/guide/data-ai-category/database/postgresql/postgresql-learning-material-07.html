@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>PostgreSQL学習教材 第7章 - ビューとマテリアライズドビュー</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // PostgreSQL: Blue
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fas fa-database text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">PostgreSQL学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                初級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>データベース</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約14時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">PostgreSQL</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ビューとマテリアライズドビュー - 複雑なクエリを簡単に</h1>
+                    <p class="text-slate-600">ビューの作成と活用方法、マテリアライズドビューによるパフォーマンス改善を学習します。複雑なクエリを再利用可能な形で保存し、日常的なデータ分析業務を効率化する方法を習得します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューとは何か、なぜ便利なのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ビューの作成・更新・削除の方法を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>マテリアライズドビューとビューの違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>マテリアライズドビューでパフォーマンスを改善する方法を学ぶ</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 ビューとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        ビュー（View）は、1つまたは複数のテーブルから必要なデータだけを取り出したSELECT文を保存したものです。
+                        ビューを使うことで、複雑なクエリを「仮想的なテーブル」として扱えるようになります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        ビューは実際にデータを保存しているわけではなく、ビューにアクセスするたびに元のテーブルから最新データを取得します。
+                        これにより、元のテーブルが更新されれば、ビューの結果も自動的に更新されます。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    subgraph Tables["実際のテーブル"]
+        T1[(users)]
+        T2[(orders)]
+        T3[(products)]
+    end
+
+    subgraph View["ビュー（仮想テーブル）"]
+        V1["user_order_view<br/>全ユーザー、注文、商品を<br/>結合したSELECT文を保存"]
+    end
+
+    subgraph Query["アプリケーション"]
+        Q1["SELECT * FROM<br/>user_order_view"]
+    end
+
+    T1 --> V1
+    T2 --> V1
+    T3 --> V1
+    Q1 --> V1
+    V1 -.実行時に<br/>データ取得.-> Tables
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-emerald-900 font-medium break-words">ビューのメリット</p>
+                                <p class="text-emerald-800 text-sm mt-1 break-words">
+                                    複雑なJOINやSUBQUERYを毎回書く必要がなく、再利用できます。また、特定のカラムだけを見せることで、セキュリティ向上にも役立ちます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 ビューの作成と利用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビューを作成するには、CREATE VIEW文を使います。実際に例を見ながら学びましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">基本的なビューの作成</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        まず、社員テーブルと部署テーブルがあるとします。部署名と社員名を結合したビューを作成してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">employees.sql（サンプルテーブル作成）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 部署テーブル
+CREATE TABLE departments (
+    department_id SERIAL PRIMARY KEY,
+    department_name VARCHAR(100) NOT NULL
+);
+
+-- 社員テーブル
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    employee_name VARCHAR(100) NOT NULL,
+    department_id INTEGER REFERENCES departments(department_id),
+    salary INTEGER NOT NULL,
+    hire_date DATE NOT NULL
+);
+
+-- サンプルデータ挿入
+INSERT INTO departments VALUES
+(1, '営業部'),
+(2, '開発部'),
+(3, '人事部');
+
+INSERT INTO employees VALUES
+(1, '山田太郎', 1, 350000, '2020-04-01'),
+(2, '佐藤花子', 2, 420000, '2019-07-15'),
+(3, '鈴木一郎', 2, 480000, '2018-05-10'),
+(4, '田中美咲', 3, 380000, '2021-09-01');</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">employee_view.sql（ビュー作成）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 社員と部署を結合したビューを作成
+CREATE VIEW employee_department_view AS
+SELECT
+    e.employee_id,
+    e.employee_name,
+    d.department_name,
+    e.salary,
+    e.hire_date
+FROM employees e
+INNER JOIN departments d ON e.department_id = d.department_id;</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">query_view.sql（ビューの利用）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ビューを通常のテーブルと同じように利用
+SELECT * FROM employee_department_view;
+
+-- ビューに対してWHERE句やORDER BYも使える
+SELECT * FROM employee_department_view
+WHERE department_name = '開発部'
+ORDER BY salary DESC;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">集計を含むビューの作成</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        部署ごとの平均給与と人数を集計したビューを作成してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">department_summary_view.sql（集計ビュー）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- 部署ごとの統計情報ビュー
+CREATE VIEW department_summary_view AS
+SELECT
+    d.department_name,
+    COUNT(e.employee_id) AS employee_count,
+    AVG(e.salary)::INTEGER AS avg_salary,
+    MIN(e.salary) AS min_salary,
+    MAX(e.salary) AS max_salary
+FROM departments d
+LEFT JOIN employees e ON d.department_id = e.department_id
+GROUP BY d.department_name;
+
+-- ビューを利用して統計情報を取得
+SELECT * FROM department_summary_view
+ORDER BY avg_salary DESC;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 ビューの管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビューを削除したり、定義を変更したりする方法を学びましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- ビューの削除 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-trash text-red-500"></i>
+                                <h3 class="font-semibold text-slate-800">ビューの削除</h3>
+                            </div>
+                            <div class="code-block-wrapper">
+                                <pre><code class="language-sql">-- ビューを削除
+DROP VIEW employee_department_view;
+
+-- 存在しない場合エラーを防ぐ
+DROP VIEW IF EXISTS employee_department_view;</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- ビューの定義変更 -->
+                        <div class="bg-white border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-sync text-blue-500"></i>
+                                <h3 class="font-semibold text-slate-800">ビューの定義変更</h3>
+                            </div>
+                            <div class="code-block-wrapper">
+                                <pre><code class="language-sql">-- ビューを置き換え（OR REPLACE）
+CREATE OR REPLACE VIEW employee_department_view AS
+SELECT
+    e.employee_id,
+    e.employee_name,
+    d.department_name
+    -- salaryカラムを削除した定義に変更
+FROM employees e
+INNER JOIN departments d ON e.department_id = d.department_id;</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">view_info.sql（ビュー情報の確認）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- データベース内の全ビューを確認
+SELECT table_name
+FROM information_schema.views
+WHERE table_schema = 'public';
+
+-- ビューの定義を確認
+SELECT pg_get_viewdef('employee_department_view'::regclass, true);</code></pre>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: ビューを作成して活用してみよう</h3>
+                            <div class="space-y-3">
+                                <div class="bg-purple-100 rounded-lg p-3">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">
+                                        <i class="fas fa-check-circle text-purple-600"></i>
+                                        演習1: 給与が40万円以上の社員だけを表示するビュー
+                                    </p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        high_salary_employees_viewという名前で、給与40万円以上の社員の情報（社員名、部署名、給与）を表示するビューを作成してください。
+                                    </p>
+                                </div>
+                                <div class="bg-purple-100 rounded-lg p-3">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">
+                                        <i class="fas fa-check-circle text-purple-600"></i>
+                                        演習2: 2020年以降に入社した社員を表示するビュー
+                                    </p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        recent_employees_viewという名前で、2020年以降に入社した社員の情報（社員名、部署名、入社日）を表示するビューを作成し、入社日の新しい順に並べてください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 マテリアライズドビューとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed">
+                        マテリアライズドビュー（Materialized View）は、ビューと異なり、クエリ実行結果を実際にディスク上に保存します。
+                        通常のビューは毎回元のテーブルからデータを取得しますが、マテリアライズドビューは結果を「スナップショット」として保存するため、高速にデータを取得できます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed">
+                        ただし、元のテーブルが更新されても自動的には反映されないため、定期的に「REFRESH」する必要があります。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    subgraph Normal["通常のビュー"]
+        NV1["ビュー定義<br/>全SELECT文のみ保存全"]
+        NV2["クエリ実行<br/>↓<br/>毎回元テーブルから<br/>データ取得"]
+        NV3["結果返却<br/>全常に最新データ全"]
+        NV1 --> NV2 --> NV3
+    end
+
+    subgraph Materialized["マテリアライズドビュー"]
+        MV1["ビュー定義<br/>全SELECT文保存全"]
+        MV2["初回実行<br/>↓<br/>結果をディスクに保存"]
+        MV3["クエリ実行<br/>↓<br/>保存済みデータを<br/>即座に返却"]
+        MV4["REFRESH実行<br/>全手動で最新化全"]
+        MV1 --> MV2 --> MV3
+        MV4 -.更新.-> MV2
+    end
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full bg-white border border-slate-200 rounded-lg">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">項目</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">通常のビュー</th>
+                                    <th class="px-4 py-3 text-left text-slate-700 font-semibold border-b border-slate-200">マテリアライズドビュー</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-600">
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">データ保存</td>
+                                    <td class="px-4 py-3">保存しない（定義のみ）</td>
+                                    <td class="px-4 py-3 text-blue-600">保存する（ディスク）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">パフォーマンス</td>
+                                    <td class="px-4 py-3">元のクエリと同じ</td>
+                                    <td class="px-4 py-3 text-emerald-600">高速（保存済みデータを返す）</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">データ鮮度</td>
+                                    <td class="px-4 py-3 text-emerald-600">常に最新</td>
+                                    <td class="px-4 py-3 text-amber-600">REFRESHまで古い</td>
+                                </tr>
+                                <tr class="border-b border-slate-100">
+                                    <td class="px-4 py-3 font-medium">ディスク容量</td>
+                                    <td class="px-4 py-3 text-emerald-600">不要</td>
+                                    <td class="px-4 py-3 text-amber-600">必要</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">適した用途</td>
+                                    <td class="px-4 py-3">最新データが必要な場合</td>
+                                    <td class="px-4 py-3">集計処理、レポート、データ分析</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 マテリアライズドビューの作成と利用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        マテリアライズドビューを作成して、パフォーマンスを改善する方法を学びましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">基本的なマテリアライズドビューの作成</h3>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">materialized_view.sql（マテリアライズドビュー作成）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- マテリアライズドビューの作成
+CREATE MATERIALIZED VIEW department_stats_mv AS
+SELECT
+    d.department_name,
+    COUNT(e.employee_id) AS employee_count,
+    AVG(e.salary)::INTEGER AS avg_salary,
+    SUM(e.salary) AS total_salary
+FROM departments d
+LEFT JOIN employees e ON d.department_id = e.department_id
+GROUP BY d.department_name;
+
+-- 通常のSELECT文と同じように使える（高速）
+SELECT * FROM department_stats_mv;
+
+-- データを最新化（元のテーブルが更新された後に実行）
+REFRESH MATERIALIZED VIEW department_stats_mv;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">マテリアライズドビューのインデックス</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        マテリアライズドビューにはインデックスを作成できます。これにより、さらに高速なデータ取得が可能になります。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">mv_index.sql（インデックス作成）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- マテリアライズドビューにインデックスを作成
+CREATE INDEX idx_mv_dept_name
+ON department_stats_mv(department_name);
+
+-- 特定の部署を高速に検索できる
+SELECT * FROM department_stats_mv
+WHERE department_name = '開発部';</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-700 mt-6 mb-3">CONCURRENT REFRESHの利用</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        通常のREFRESHは、更新中にビューへのアクセスがブロックされます。REFRESH MATERIALIZED VIEW CONCURRENTLYを使うと、更新中もビューにアクセスできます（ユニークインデックスが必要）。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">concurrent_refresh.sql（CONCURRENT REFRESH）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- ユニークインデックスを作成（CONCURRENT REFRESHに必要）
+CREATE UNIQUE INDEX idx_mv_dept_name_unique
+ON department_stats_mv(department_name);
+
+-- 並行更新（アクセスをブロックしない）
+REFRESH MATERIALIZED VIEW CONCURRENTLY department_stats_mv;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-blue-900 font-medium break-words">CONCURRENT REFRESHの制約</p>
+                                <p class="text-blue-800 text-sm mt-1 break-words">
+                                    CONCURRENT REFRESHを使うには、マテリアライズドビューにユニークインデックスが必要です。また、通常のREFRESHよりも時間がかかる場合があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 マテリアライズドビューの管理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        マテリアライズドビューの削除や情報確認の方法を学びましょう。
+                    </p>
+
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span class="code-block-title">mv_management.sql（マテリアライズドビュー管理）</span>
+                            <button onclick="copyCode(this)" class="code-copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre><code class="language-sql">-- マテリアライズドビューの削除
+DROP MATERIALIZED VIEW department_stats_mv;
+
+-- 存在しない場合エラーを防ぐ
+DROP MATERIALIZED VIEW IF EXISTS department_stats_mv;
+
+-- 全マテリアライズドビューの一覧を取得
+SELECT schemaname, matviewname, matviewowner
+FROM pg_matviews
+WHERE schemaname = 'public';
+
+-- マテリアライズドビューのサイズを確認
+SELECT pg_size_pretty(pg_total_relation_size('department_stats_mv'));</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 ビューとマテリアライズドビューの使い分け
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビューとマテリアライズドビューをどのように使い分けるべきか、具体的な状況を見てみましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <!-- 通常のビューを使うケース -->
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-eye text-white text-sm"></i>
+                                </div>
+                                <h3 class="text-blue-900 font-semibold">通常のビューを使うケース</h3>
+                            </div>
+                            <ul class="space-y-2 text-blue-800 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>常に最新データが必要な場合（リアルタイム性重視）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>元のクエリが十分高速な場合</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>頻繁に更新されるデータの表示</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-blue-600 mt-1 flex-shrink-0"></i>
+                                    <span>ディスク容量を節約したい場合</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- マテリアライズドビューを使うケース -->
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="flex-shrink-0 w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-database text-white text-sm"></i>
+                                </div>
+                                <h3 class="text-emerald-900 font-semibold">マテリアライズドビューを使うケース</h3>
+                            </div>
+                            <ul class="space-y-2 text-emerald-800 text-sm">
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>複雑で時間がかかる集計処理（パフォーマンス重視）</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>日次・週次レポートなど、更新頻度が低いデータ</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>大量のJOINや集計を含むクエリ</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fas fa-check text-emerald-600 mt-1 flex-shrink-0"></i>
+                                    <span>データ分析・BIツール用のサマリーテーブル</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    Start{クエリのパフォーマンス}
+    Start -->|十分高速| Fast["通常のビュー<br/>全最新データ優先全"]
+    Start -->|遅い| Slow{データ鮮度}
+    Slow -->|リアルタイム必須| RT["通常のビュー<br/>全インデックス最適化検討全"]
+    Slow -->|多少古くてもOK| Old["マテリアライズドビュー<br/>全パフォーマンス優先全"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-laptop-code text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">実習: マテリアライズドビューを作成してみよう</h3>
+                            <div class="space-y-3">
+                                <div class="bg-purple-100 rounded-lg p-3">
+                                    <p class="text-purple-900 font-medium mb-2 break-words">
+                                        <i class="fas fa-check-circle text-purple-600"></i>
+                                        演習: 部署別給与ランキング
+                                    </p>
+                                    <p class="text-purple-800 text-sm break-words">
+                                        各部署で給与上位3名の社員情報（順位、社員名、部署名、給与）を表示するマテリアライズドビュー「top_earners_by_dept_mv」を作成してください。
+                                        <br><br>
+                                        ヒント: ROW_NUMBER()ウィンドウ関数とPARTITION BYを使います。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-orange-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-tools text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-4 break-words">トラブルシューティング</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="text-orange-900 font-medium break-words">
+                                        <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                                        エラー: ビューを削除できない
+                                    </p>
+                                    <p class="text-orange-800 text-sm mt-1 break-words">
+                                        他のビューやマテリアライズドビューがそのビューを参照している可能性があります。CASCADE オプションを使って依存するビューも一緒に削除するか、先に依存しているビューを削除してください。
+                                    </p>
+                                    <div class="bg-orange-100 rounded-lg p-3 mt-2">
+                                        <code class="text-orange-900 text-sm">DROP VIEW ビュー名 CASCADE;</code>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-orange-900 font-medium break-words">
+                                        <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                                        マテリアライズドビューが更新されない
+                                    </p>
+                                    <p class="text-orange-800 text-sm mt-1 break-words">
+                                        マテリアライズドビューは自動更新されません。元のテーブルを更新した後、必ず REFRESH MATERIALIZED VIEW を実行してください。定期的な更新が必要な場合は、cronやpg_cronを使ったスケジュール実行を検討しましょう。
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-orange-900 font-medium break-words">
+                                        <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                                        CONCURRENT REFRESHが使えない
+                                    </p>
+                                    <p class="text-orange-800 text-sm mt-1 break-words">
+                                        CONCURRENT REFRESHを使うには、マテリアライズドビューにユニークインデックスが必要です。CREATE UNIQUE INDEX でユニークインデックスを作成してから再度実行してください。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 通常のビューとマテリアライズドビューの最大の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え:</strong> 通常のビューはクエリ実行結果を保存せず、アクセスするたびに元のテーブルからデータを取得します。一方、マテリアライズドビューは実行結果をディスクに保存するため、高速にデータを取得できますが、元のテーブルが更新されても自動的には反映されません（REFRESH必要）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ビューを使うメリットを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え（例）:</strong><br>
+                                            1. 複雑なクエリを再利用できる - 長いJOINやSUBQUERYを毎回書く必要がない<br>
+                                            2. データの抽象化 - 特定のカラムだけを見せることでセキュリティ向上<br>
+                                            3. データの整合性 - 同じクエリロジックを複数の場所で再利用できる<br>
+                                            （他にも、可読性向上、メンテナンス性向上なども正解です）
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. マテリアライズドビューを使うべき状況はどのようなときですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>答え（例）:</strong><br>
+                                            1. 複雑で時間がかかる集計処理をする場合（パフォーマンス重視）<br>
+                                            2. 日次・週次レポートなど、リアルタイム性が求められない場合<br>
+                                            3. 大量のJOINや集計を含むクエリで、頻繁にアクセスされる場合<br>
+                                            4. データ分析・BIツール用のサマリーデータを用意する場合
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-book text-primary-500"></i>
+                        第7章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>ビューは複雑なクエリを「仮想テーブル」として保存し、再利用できる機能</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>マテリアライズドビューはクエリ結果をディスクに保存し、高速アクセスを実現</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>通常のビューは常に最新データ、マテリアライズドビューはREFRESHが必要</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>リアルタイム性が必要なら通常のビュー、パフォーマンスが必要ならマテリアライズドビューを選択</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>CONCURRENT REFRESHを使うには、ユニークインデックスが必要</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="postgresql-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">JSONデータの操作</span>
+                        </div>
+                    </a>
+                    <a href="postgresql-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">トランザクションとロック</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>

@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" id="viewport-meta">
+    <title>Next.js学習教材 第7章 - Server Actionsでフォーム処理</title>
+
+    <!-- ダークモード早期適用（フラッシュ防止） -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('darkMode');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (saved === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts - Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Mermaid.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- カスタムスタイル -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-slate-50 text-slate-800 antialiased">
+    <!-- ヘッダー/ナビゲーションバー -->
+    <header class="fixed top-0 left-0 right-0 z-50 text-white header-rich header-rich-shadow">
+        <nav class="w-full px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="flex items-center justify-between py-3">
+                <!-- 左側: ロゴとタイトルセクション -->
+                <div class="flex items-center gap-4">
+                    <!-- アイコン -->
+                    <div class="relative group">
+                        <div class="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-400/30 rounded-2xl blur-lg group-hover:blur-xl transition-all"></div>
+                        <div class="relative w-14 h-14 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <i class="fab fa-react text-3xl icon-rotate-hover drop-shadow-lg"></i>
+                        </div>
+                    </div>
+
+                    <!-- タイトルとメタ情報 -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-wide drop-shadow-md">Next.js学習教材</span>
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-md text-[10px] font-semibold uppercase tracking-wider">
+                                <i class="fas fa-star text-yellow-300 text-[8px]"></i>
+                                中級
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] text-white/90 font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fas fa-code text-[9px]"></i>
+                                <span>Webフレームワーク</span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-1">
+                                <i class="fas fa-clock text-[9px]"></i>
+                                <span>所要時間 約36時間</span>
+                            </div>
+                            <div class="hidden lg:flex items-center gap-1">
+                                <i class="fas fa-language text-[9px]"></i>
+                                <span>日本語</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: サイドバートグルボタン -->
+                <button id="sidebar-toggle-btn" class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all active:scale-95" title="サイドバーの表示/非表示">
+                    <i class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex min-h-screen pt-20">
+        <!-- サイドバーはsidebar-content.jsで動的に生成されます -->
+
+        <!-- メインコンテンツ -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Next.js</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Server Actionsでフォーム処理</h1>
+                    <p class="text-slate-600">Server Actionsを活用したフォーム送信・データ更新処理、バリデーション、楽観的更新、そしてuseFormStateとuseFormStatusによる状態管理について実践的に学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Server Actionsの基本概念とAPI Routesとの違い</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>フォーム送信の処理とバリデーションの実装</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>楽観的更新とプログレッシブエンハンスメントの実現</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>useFormStateとuseFormStatusによる状態管理とUI反映</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション1: Server Actionsとは -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 Server Actionsとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Server Actions</strong>は、Next.js 13以降で導入された機能で、サーバーサイドで実行される非同期関数をクライアントから直接呼び出すことができます。これにより、API Routesを作成せずにフォーム送信やデータ更新が可能になります。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart LR
+    subgraph Client["クライアント側"]
+        A[フォーム送信]
+        B[ボタンクリック]
+    end
+
+    subgraph Server["サーバー側"]
+        C[Server Action<br/>関数実行]
+        D[データベース<br/>更新]
+        E[revalidate<br/>キャッシュ更新]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    E --> F[自動的に<br/>UI更新]
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h3 class="font-semibold text-blue-800 mb-2">Server Actionsの特徴</h3>
+                                <ul class="text-blue-900 text-sm space-y-1">
+                                    <li><strong>API Routesが不要：</strong>別途エンドポイントを作成せずにサーバー処理を実行</li>
+                                    <li><strong>型安全性：</strong>TypeScriptで引数と戻り値の型が保証される</li>
+                                    <li><strong>プログレッシブエンハンスメント：</strong>JavaScriptなしでもフォームが動作</li>
+                                    <li><strong>自動シリアライゼーション：</strong>FormDataが自動的にサーバーに送信される</li>
+                                    <li><strong>組み込みセキュリティ：</strong>CSRF保護が自動的に適用される</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <!-- API Routes -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-route text-slate-500"></i>
+                                従来のAPI Routes
+                            </h3>
+                            <ul class="text-slate-600 text-sm space-y-2">
+                                <li><i class="fas fa-file-code text-slate-400 mr-2"></i>別ファイルでエンドポイント作成</li>
+                                <li><i class="fas fa-link text-slate-400 mr-2"></i>URLパスを指定してfetch</li>
+                                <li><i class="fas fa-wrench text-slate-400 mr-2"></i>手動でリクエスト/レスポンス処理</li>
+                                <li><i class="fas fa-shield-alt text-slate-400 mr-2"></i>CSRF対策を手動実装</li>
+                            </ul>
+                        </div>
+
+                        <!-- Server Actions -->
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                                <i class="fas fa-bolt text-emerald-500"></i>
+                                Server Actions（推奨）
+                            </h3>
+                            <ul class="text-emerald-900 text-sm space-y-2">
+                                <li><i class="fas fa-check text-emerald-400 mr-2"></i>同じファイルに関数定義</li>
+                                <li><i class="fas fa-check text-emerald-400 mr-2"></i>action属性で直接指定</li>
+                                <li><i class="fas fa-check text-emerald-400 mr-2"></i>FormDataが自動送信</li>
+                                <li><i class="fas fa-check text-emerald-400 mr-2"></i>CSRF保護が自動適用</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2: Server Actionsの基本実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 Server Actionsの基本実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Server Actionsを使用してシンプルなフォーム送信を実装してみましょう。<code class="bg-slate-100 px-1 rounded text-sm">'use server'</code>ディレクティブで関数をサーバー側で実行することを宣言します。
+                    </p>
+
+                    <!-- 実習カード -->
+                    <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                    実習 7-1: Server Actionでお問い合わせフォームを作成
+                                </h3>
+                                <p class="text-purple-900 mb-4 break-words">
+                                    Server Actionsを使って、お問い合わせフォームのデータをサーバー側で処理します。
+                                </p>
+
+                                <h4 class="font-medium text-purple-800 mb-2">実装例</h4>
+                                <div class="code-block-wrapper">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">app/contact/page.tsx</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-typescript">// Server Actionの定義
+async function submitContact(formData: FormData) {
+  'use server'
+
+  // FormDataから値を取得
+  const name = formData.get('name') as string
+  const email = formData.get('email') as string
+  const message = formData.get('message') as string
+
+  // サーバー側でデータ処理（例: DBに保存）
+  console.log({ name, email, message })
+
+  // 成功時は何もreturnしないか、リダイレクト
+}
+
+export default function ContactPage() {
+  return (
+    &lt;form action={submitContact}&gt;
+      &lt;input type="text" name="name" required /&gt;
+      &lt;input type="email" name="email" required /&gt;
+      &lt;textarea name="message" required&gt;&lt;/textarea&gt;
+      &lt;button type="submit"&gt;送信&lt;/button&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">Server Actionの定義方法</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    <code class="bg-blue-100 px-1 rounded">'use server'</code>はファイルの先頭に書くか、関数の内部に書きます。関数内部に書く場合、その関数のみがサーバー側で実行されます。ファイル先頭に書くと、そのファイルのすべての関数がServer Actionsになります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション3: バリデーションの実装 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 バリデーションの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Server Actionsでは、Zodなどのバリデーションライブラリを使ってサーバー側で入力値を検証できます。エラー時にはフィードバックをクライアントに返却します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app/actions/contact.ts</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-typescript">'use server'
+
+import { z } from 'zod'
+import { redirect } from 'next/navigation'
+
+// バリデーションスキーマ
+const contactSchema = z.object({
+  name: z.string().min(2, '名前は2文字以上'),
+  email: z.string().email('有効なメールアドレス'),
+  message: z.string().min(10, 'メッセージは10文字以上'),
+})
+
+// Server Action
+export async function submitContact(
+  prevState: any,
+  formData: FormData
+) {
+  // バリデーション
+  const result = contactSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    message: formData.get('message'),
+  })
+
+  if (!result.success) {
+    return { errors: result.error.flatten().fieldErrors }
+  }
+
+  // データベースに保存など
+  // await db.contacts.create({ data: result.data })
+
+  redirect('/contact/success')
+}</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    Server Actionsはサーバー側で実行されるため、クライアント側バリデーションをバイパスされる可能性があります。必ずサーバー側でバリデーションを実装してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4: useFormStateとuseFormStatus -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 useFormStateとuseFormStatus
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded text-sm">useFormState</code>はServer Actionの結果を状態管理し、<code class="bg-slate-100 px-1 rounded text-sm">useFormStatus</code>はフォームの送信状態を取得するReact Hooksです。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant F as Form
+    participant A as Server Action
+    participant S as useFormState
+
+    U->>F: フォーム送信
+    F->>A: データ送信
+    Note over F: useFormStatus: pending=true
+    A->>A: バリデーション
+    A->>A: データ処理
+    A-->>S: 結果を返却
+    Note over F: useFormStatus: pending=false
+    S-->>F: エラーまたは成功状態
+    F-->>U: UI更新
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app/contact/form.tsx</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-typescript">'use client'
+
+import { useFormState, useFormStatus } from 'react-dom'
+import { submitContact } from './actions/contact'
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    &lt;button type="submit" disabled={pending}&gt;
+      {pending ? '送信中...' : '送信'}
+    &lt;/button&gt;
+  )
+}
+
+export default function ContactForm() {
+  const [state, formAction] = useFormState(submitContact, null)
+
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;div&gt;
+        &lt;input type="text" name="name" /&gt;
+        {state?.errors?.name &amp;&amp; (
+          &lt;p className="error"&gt;{state.errors.name[0]}&lt;/p&gt;
+        )}
+      &lt;/div&gt;
+      &lt;SubmitButton /&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-table text-slate-500"></i>
+                            useFormStateとuseFormStatusの違い
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b-2 border-slate-300">
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">Hook</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">用途</th>
+                                        <th class="text-left py-2 px-3 font-semibold text-slate-700">返却値</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-600">
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">useFormState</td>
+                                        <td class="py-2 px-3">Server Actionの結果を管理</td>
+                                        <td class="py-2 px-3">[state, formAction]</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200">
+                                        <td class="py-2 px-3 font-medium">useFormStatus</td>
+                                        <td class="py-2 px-3">フォームの送信状態を取得</td>
+                                        <td class="py-2 px-3">{ pending, data, method, action }</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5: 楽観的更新 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 楽観的更新（Optimistic Update）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        楽観的更新は、サーバーの応答を待たずにUIを即座に更新する手法です。<code class="bg-slate-100 px-1 rounded text-sm">useOptimistic</code>フックを使用して実装できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app/todos/page.tsx</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-typescript">'use client'
+
+import { useOptimistic } from 'react'
+import { addTodo } from './actions'
+
+export default function TodoList({ todos }) {
+  const [optimisticTodos, addOptimisticTodo] = useOptimistic(
+    todos,
+    (state, newTodo) =&gt; [...state, newTodo]
+  )
+
+  async function handleSubmit(formData: FormData) {
+    const title = formData.get('title')
+
+    // 即座にUIを更新（楽観的更新）
+    addOptimisticTodo({ id: Date.now(), title, status: 'pending' })
+
+    // サーバー処理を実行
+    await addTodo(formData)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;form action={handleSubmit}&gt;
+        &lt;input type="text" name="title" /&gt;
+        &lt;button type="submit"&gt;追加&lt;/button&gt;
+      &lt;/form&gt;
+
+      &lt;ul&gt;
+        {optimisticTodos.map(todo =&gt; (
+          &lt;li key={todo.id}&gt;{todo.title}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1"></i>
+                            <div>
+                                <p class="text-blue-900 font-medium">楽観的更新のメリット</p>
+                                <p class="text-blue-800 text-sm mt-1">
+                                    ユーザーはサーバー応答を待たずに即座にフィードバックを得られるため、UXが向上します。ただし、エラー時のロールバック処理も考慮する必要があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6: revalidatePathとrevalidateTag -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 revalidatePathとrevalidateTag
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Server Actionsでデータを更新した後、Next.jsのキャッシュを無効化してUIを最新状態に更新する必要があります。<code class="bg-slate-100 px-1 rounded text-sm">revalidatePath</code>と<code class="bg-slate-100 px-1 rounded text-sm">revalidateTag</code>を使用します。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-purple-800 mb-3">revalidatePath</h3>
+                            <p class="text-purple-900 text-sm mb-3">特定のパス配下のキャッシュを無効化</p>
+                            <div class="code-block-wrapper">
+                                <pre class="!text-xs"><code class="language-typescript">import { revalidatePath } from 'next/cache'
+
+async function createPost(formData: FormData) {
+  'use server'
+  // データ作成処理
+  revalidatePath('/posts')
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-emerald-800 mb-3">revalidateTag</h3>
+                            <p class="text-emerald-900 text-sm mb-3">タグでマークされたキャッシュを無効化</p>
+                            <div class="code-block-wrapper">
+                                <pre class="!text-xs"><code class="language-typescript">import { revalidateTag } from 'next/cache'
+
+async function updatePost(formData: FormData) {
+  'use server'
+  // データ更新処理
+  revalidateTag('posts')
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="text-orange-900 font-medium">注意</p>
+                                <p class="text-orange-800 text-sm mt-1">
+                                    revalidateを呼び出さないと、データ更新後も古いキャッシュが表示され続けます。Server Actionsでデータを変更した場合は、必ず適切なrevalidateを実行してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7: ファイルアップロード -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 ファイルアップロードの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Server ActionsはFormDataを通じてファイルアップロードも処理できます。アップロードされたファイルはサーバー側で検証・保存します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app/upload/actions.ts</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-typescript">'use server'
+
+import { writeFile } from 'fs/promises'
+import { join } from 'path'
+
+export async function uploadFile(formData: FormData) {
+  const file = formData.get('file') as File
+
+  if (!file) {
+    return { error: 'ファイルが選択されていません' }
+  }
+
+  // ファイルサイズ制限（例: 5MB）
+  if (file.size &gt; 5 * 1024 * 1024) {
+    return { error: 'ファイルサイズは5MB以下にしてください' }
+  }
+
+  // ファイル形式チェック
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    return { error: '画像ファイルのみアップロード可能です' }
+  }
+
+  // ファイル保存
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
+  const path = join(process.cwd(), 'public/uploads', file.name)
+  await writeFile(path, buffer)
+
+  return { success: true, path: `/uploads/${file.name}` }
+}</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="text-red-900 font-medium">つまずきポイント</p>
+                                <p class="text-red-800 text-sm mt-1">
+                                    ファイルアップロードでは必ずサーバー側でファイルサイズ・形式・拡張子を検証してください。クライアント側の検証だけでは不正なファイルがアップロードされる可能性があります。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8: プログレッシブエンハンスメント -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.8 プログレッシブエンハンスメント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Server Actionsの大きな利点は、JavaScriptが無効でもフォームが動作する<strong>プログレッシブエンハンスメント</strong>を実現できることです。
+                    </p>
+
+                    <div class="my-6">
+                        <div class="mermaid">
+flowchart TD
+    A[ユーザーがフォーム送信] --> B{JavaScriptが有効?}
+
+    B -->|有効| C[非同期でServer Action実行]
+    C --> D[ページ遷移なしでUIを更新]
+
+    B -->|無効| E[通常のHTMLフォーム送信]
+    E --> F[サーバーでServer Action実行]
+    F --> G[結果ページにリダイレクト]
+
+    D --> H[どちらでも動作する]
+    G --> H
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-600 mt-1"></i>
+                            <div>
+                                <p class="text-emerald-900 font-medium">重要ポイント</p>
+                                <p class="text-emerald-800 text-sm mt-1">
+                                    Server Actionsは基本的なHTMLフォームとして機能するため、JavaScriptが無効な環境やブラウザでも動作します。これによりアクセシビリティとSEOが向上します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- トラブルシューティング -->
+                <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl overflow-hidden my-8">
+                    <div class="bg-orange-100 px-6 py-3 border-b border-orange-200">
+                        <h3 class="font-semibold text-orange-800 flex items-center gap-2">
+                            <i class="fas fa-tools"></i>
+                            トラブルシューティング
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">Server Actionが実行されない</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> <code class="bg-orange-100 px-1 rounded">'use server'</code>ディレクティブが欠けている、または関数がクライアントコンポーネントで定義されている。</p>
+                                <p><strong>解決方法:</strong> Server Actionの先頭に<code class="bg-orange-100 px-1 rounded">'use server'</code>を追加し、別ファイルに定義するか、サーバーコンポーネント内で定義してください。</p>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">データ更新後にUIが古いまま</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> <code class="bg-orange-100 px-1 rounded">revalidatePath</code>または<code class="bg-orange-100 px-1 rounded">revalidateTag</code>を呼び出していない。</p>
+                                <p><strong>解決方法:</strong> Server Action内で適切なrevalidate関数を呼び出してキャッシュを無効化してください。</p>
+                            </div>
+                        </details>
+
+                        <details class="group">
+                            <summary class="flex items-center gap-3 cursor-pointer list-none p-3 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                <span class="font-medium text-orange-800">useFormStateがundefinedエラー</span>
+                                <i class="fas fa-chevron-down ml-auto text-orange-400 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="mt-3 pl-10 text-orange-900">
+                                <p class="mb-2"><strong>原因:</strong> React 19またはNext.js 14以降が必要ですが、古いバージョンを使用している。</p>
+                                <p><strong>解決方法:</strong> <code class="bg-orange-100 px-1 rounded">npm install next@latest react@latest react-dom@latest</code>で最新版にアップデートしてください。</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Server ActionsとAPI Routesの主な違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Server Actionsは別途エンドポイントを作成せずにサーバー処理を実行でき、フォームのaction属性で直接指定できます。TypeScriptの型安全性が保証され、CSRF保護が自動適用されます。一方、API Routesは専用のエンドポイントファイルを作成し、URLを指定してfetchする必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. useFormStateとuseFormStatusの違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            useFormStateはServer Actionの結果（エラーメッセージや成功状態）を管理するHookで、useFormStatusはフォームの送信状態（pending、data、methodなど）を取得するHookです。useFormStateは結果の表示に、useFormStatusはローディング状態の表示に使用します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. データ更新後にUIが自動更新されない場合、どうすればよいですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-800 bg-blue-100 rounded-lg p-3 break-words">
+                                            Server Action内で<code class="bg-blue-200 px-1 rounded">revalidatePath('/path')</code>または<code class="bg-blue-200 px-1 rounded">revalidateTag('tag-name')</code>を呼び出してキャッシュを無効化する必要があります。これによりNext.jsのキャッシュが更新され、UIに最新データが反映されます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章のまとめ -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-6 my-8">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-check-circle text-slate-500"></i>
+                        この章のまとめ
+                    </h2>
+                    <ul class="space-y-2 text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Server Actionsは別途API Routesを作成せずにサーバー処理を実行でき、型安全性とセキュリティが保証される</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>Zodなどのバリデーションライブラリでサーバー側の入力検証を実装し、エラー時はuseFormStateで表示する</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>useOptimisticで楽観的更新を実装し、ユーザー体験を向上させることができる</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i>
+                            <span>データ更新後はrevalidatePathまたはrevalidateTagでキャッシュを無効化し、UIを最新状態に保つ</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="nextjs-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: 静的生成（SSG）と増分静的再生成（ISR）</span>
+                        </div>
+                    </a>
+                    <a href="nextjs-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: 画像とフォントの最適化</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
+            </div>
+        </main>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-slate-800 text-slate-300">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-center md:text-left">
+                    &copy; 2025 F-Circle. All rights reserved.<br>
+                    本資料はAIツールを活用し、人間による編集・監修のもと作成されています。
+                </p>
+                <div class="flex items-center gap-4">
+                    <a href="#" class="hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- スクロールトップボタン -->
+    <button id="scroll-top-btn"
+            class="fixed bottom-6 right-6 w-12 h-12 bg-primary-500 text-white rounded-full
+                   shadow-lg hover:bg-primary-600 transition-all duration-300
+                   opacity-0 invisible translate-y-4"
+            onclick="scrollToTop()">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- サイドバー生成 -->
+    <script src="sidebar-content.js"></script>
+
+    <!-- 共通JavaScript -->
+    <script src="main.js"></script>
+
+    <!-- 描画ツール -->
+    <script src="drawing-tool.js"></script>
+</body>
+</html>
