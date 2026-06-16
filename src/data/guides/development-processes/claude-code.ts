@@ -1,0 +1,43 @@
+import type { TechGuide } from '../types';
+
+// Claude Code 入門学習ガイド（全14章）。技術色 = パープル（AI/ML）。
+export const claudeCode: TechGuide = {
+  category: 'development-processes',
+  slug: 'claude-code',
+  techTitle: 'Claude Code学習教材',
+  icon: 'fa-robot',
+  level: '初級',
+  categoryLabel: '開発手法・プロセス',
+  totalTime: '約16時間',
+  splashStop0: '#a855f7',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#faf5ff',
+    100: '#f3e8ff',
+    200: '#e9d5ff',
+    300: '#d8b4fe',
+    400: '#c084fc',
+    500: '#a855f7',
+    600: '#9333ea',
+    700: '#7e22ce',
+    800: '#6b21a8',
+    900: '#581c87',
+  },
+  chapters: [
+    { number: 1, name: 'Claude Codeとは', file: 'claude-code-learning-material-01.html' },
+    { number: 2, name: 'AI支援開発の基礎知識', file: 'claude-code-learning-material-02.html' },
+    { number: 3, name: 'インストールと初期設定', file: 'claude-code-learning-material-03.html' },
+    { number: 4, name: '基本操作と最初のセッション', file: 'claude-code-learning-material-04.html' },
+    { number: 5, name: 'ファイルの読み書きとコード編集', file: 'claude-code-learning-material-05.html' },
+    { number: 6, name: 'コードベースの探索と理解', file: 'claude-code-learning-material-06.html' },
+    { number: 7, name: 'スラッシュコマンドと便利機能', file: 'claude-code-learning-material-07.html' },
+    { number: 8, name: 'CLAUDE.mdとメモリ・コンテキスト管理', file: 'claude-code-learning-material-08.html' },
+    { number: 9, name: 'Git・GitHub連携', file: 'claude-code-learning-material-09.html' },
+    { number: 10, name: '権限と設定', file: 'claude-code-learning-material-10.html' },
+    { number: 11, name: 'MCPによる外部ツール連携', file: 'claude-code-learning-material-11.html' },
+    { number: 12, name: 'サブエージェントと自動化', file: 'claude-code-learning-material-12.html' },
+    { number: 13, name: '実践ワークフローとベストプラクティス', file: 'claude-code-learning-material-13.html' },
+    { number: 14, name: 'トラブルシューティングと次のステップ', file: 'claude-code-learning-material-14.html' },
+  ],
+};
