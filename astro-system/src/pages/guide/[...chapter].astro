@@ -1,0 +1,49 @@
+---
+// 学習ガイド全章を生成する単一動的ルート。
+// src/chapters/<category>/<slug>/<file>.html（本文断片）を glob で集約し、
+// 1 ファイルで全技術・全章の HTML を出力する（章ごとの .astro は不要）。
+import GuideChapterLayout from '../../layouts/GuideChapterLayout.astro';
+import { guideRegistry, pageTitleOf } from '../../data/guides';
+
+export function getStaticPaths() {
+  // 本文断片を生文字列として一括読み込み（ビルド時に確定）
+  const fragments = import.meta.glob('../../chapters/**/*.html', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }) as Record<string, string>;
+
+  const paths = [];
+  for (const [path, body] of Object.entries(fragments)) {
+    // category は分類パス（例: development-processes / programming-languages/python-ecosystem）。
+    // エコシステム等で複数セグメントになり得るため先頭グループは `.+`（slash 可）で受ける。
+    // slug・base（ファイル名）は単一セグメント。2階層構成とも後方互換。
+    const m = path.match(/\/chapters\/(.+)\/([^/]+)\/([^/]+)\.html$/);
+    if (!m) throw new Error(`本文断片のパス形式が不正です: ${path}`);
+    const [, category, slug, base] = m;
+
+    const tech = guideRegistry[category]?.[slug];
+    if (!tech) throw new Error(`データ未登録のガイドです: ${category}/${slug}（src/data/guides/ に追加してください）`);
+
+    const file = `${base}.html`;
+    const chapter = tech.chapters.find((c) => c.file === file);
+    if (!chapter) throw new Error(`章定義が見つかりません: ${category}/${slug}/${file}`);
+
+    paths.push({
+      params: { chapter: `${category}/${slug}/${base}` },
+      props: {
+        tech,
+        body,
+        currentChapter: chapter.number,
+        pageTitle: pageTitleOf(tech, chapter.number),
+      },
+    });
+  }
+  return paths;
+}
+
+const { tech, body, currentChapter, pageTitle } = Astro.props;
+---
+<GuideChapterLayout tech={tech} pageTitle={pageTitle} currentChapter={currentChapter}>
+  <Fragment set:html={body} />
+</GuideChapterLayout>

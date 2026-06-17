@@ -101,11 +101,11 @@ description: ディスク上の実フォルダ構成を真実源にルートのR
 - 書き込み対象はルート `README.md` のみ。他の README.md は変更しない。
 - 共有データ(9分類体系・カラー・Tailwind・Mermaid・コンポーネント)は複製せず既存 repo ファイルを参照する。
   - 9分類体系: `tech-knowledge-map.md`
-  - カラー: `templates/v3/reference/color-themes.md`
-  - Tailwind: `templates/v3/reference/css-styles.md`
-  - Mermaid詳細: `templates/v3/reference/mermaid-patterns.md`
-  - カードコンポーネント: `templates/v3/snippets/components.html`
-- README.md 内に図(Mermaid)を含める場合は CLAUDE.md の Mermaid 記法に統一する(HTMLエンティティ `&#40;` 等を使わない / 半角括弧は全角化かノードをダブルクォートで囲む / `&` は全角 `＆` / `<br/>` 使用時はノードをダブルクォートで囲む / dark テーマ禁止)。詳細は `templates/v3/reference/mermaid-patterns.md` 参照。
+  - カラー: `astro-system/templates/v1/reference/color-themes.md`
+  - Tailwind: `astro-system/templates/v1/reference/css-styles.md`
+  - Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md`
+  - カードコンポーネント: `astro-system/templates/v1/snippets/components.html`
+- README.md 内に図(Mermaid)を含める場合は CLAUDE.md の Mermaid 記法に統一する(HTMLエンティティ `&#40;` 等を使わない / 半角括弧は全角化かノードをダブルクォートで囲む / `&` は全角 `＆` / `<br/>` 使用時はノードをダブルクォートで囲む / dark テーマ禁止)。詳細は `astro-system/templates/v1/reference/mermaid-patterns.md` 参照。
 
 ## references
 

@@ -1,6 +1,6 @@
 # レビュー手順（並列検証・集約・修正）
 
-docs-reviewer 本体（メイン会話ループ）が実行する詳細手順。検証観点そのものは references/checklist.md を参照。共通ルールの真実源は CLAUDE.md と `templates/v3/reference/`。
+docs-reviewer 本体（メイン会話ループ）が実行する詳細手順。検証観点そのものは references/checklist.md を参照。共通ルールの真実源は CLAUDE.md と `astro-system/templates/v1/reference/`。
 
 旧 workflow エージェントが Task で並列起動していた挙動を、本体が Agent ツール（`subagent_type: general-purpose`）で再現する。**列挙・集約・報告は本体が逐次実行**し、**検証・修正は並列ファンアウト**で行う。
 
@@ -27,8 +27,9 @@ docs-reviewer 本体（メイン会話ループ）が実行する詳細手順。
    - 例（ガイド・slide/cheatsheet以外）: `docs/.../[name]/*-NN.html`
    - cheatsheet / slide は `index.html` が対象（slide は `pdf/` の存在と `slide-content.js` も確認）。
 3. **基準ファイルの把握**:
-   - **第1単位HTML**（`*-01.html` 等）= 第2単位以降の構造継承の基準（checklist A-6）。
-   - 共通部品（`styles.css`・`sidebar-content.js`・`main.js`・`drawing-tool.js`）= プレースホルダー置換（A-2）・読込順（A-5）・sidebar整合（A-10）の検証対象。
+   - **第1単位HTML/断片**（`*-01.html` 等）= 第2単位以降の構造継承の基準（checklist A-6）。
+   - **Astro 学習ガイド**: 技術色・章定義は `src/data/guides/<分類>/<slug>.ts`（`TechGuide`）が検証対象（A-2 Astro 版・B 節・A-10 代替）。共通シェル（レイアウト・`_shared/`）は全ガイド共有のため検証対象外（A-5 は非該当）。
+   - **legacy 旧テンプレ方式のみ**: 共通部品（`styles.css`・`sidebar-content.js`・`main.js`・`drawing-tool.js`）= プレースホルダー置換（A-2 legacy）・読込順（A-5 legacy）・sidebar整合（A-10 legacy）の検証対象。
 4. 対象HTMLが0件なら、その旨（対象なし）を報告して終了する。
 
 ---
@@ -52,7 +53,7 @@ subagent_type: general-purpose
      対象HTML「{target_html_path}」を検証する。
   3. 第1単位HTML「{first_unit_html_path}」を構造継承（A-6）の基準として比較する。
      共通部品「{styles_css_path}」を A-2/A-5 の確認に使う。
-  4. 値の真実源は CLAUDE.md と templates/v3/reference/（カラー・Tailwind・
+  4. 値の真実源は CLAUDE.md と astro-system/templates/v1/reference/（カラー・Tailwind・
      Mermaid・コンポーネント）。判断に必要なら参照する。
   5. ファイルは一切変更しない（read-only 検証）。
   6. 所見を「所見スキーマ（JSON）」（下記）で1つだけ返す。違反が無ければ
@@ -114,11 +115,13 @@ subagent_type: general-purpose
   2. 対象ファイル「{file_path}」の以下の所見を修正する（JSON配列を渡す）。
      {該当ファイルの findings}
   3. 各 fix_hint と checklist の正しい書式に従い Edit で最小修正する。
-     - 値の真実源は CLAUDE.md と templates/v3/reference/。
-     - 構造（ヘッダー・スクリプト読込順・第1単位継承）を壊さない。
-  4. 共通部品（sidebar-content.js / styles.css / main.js / drawing-tool.js）は
-     安易に上書きしない。styles.css の {{PRIMARY_*}} 未置換など共通部品自体の
-     違反のみ、その共通部品ファイルを担当する1サブエージェントが修正する。
+     - 値の真実源は CLAUDE.md と astro-system/templates/v1/reference/。
+     - Astro 学習ガイドは断片構造（head/ヘッダー/フッター/スクリプト非混入）・第1章断片継承を壊さない。
+  4. **Astro 学習ガイド**: 共通シェル（`GuideChapterLayout.astro` / `_shared/` の styles.css・main.js・
+     drawing-tool.js）は全ガイド共有のため修正対象にしない。技術色の不備は `src/data/guides/<分類>/<slug>.ts`
+     の `primary` を、章定義の不備は `chapters[]` を修正する。
+     **legacy 旧テンプレ方式**: 共通部品（sidebar-content.js / styles.css / main.js / drawing-tool.js）は
+     安易に上書きせず、`{{PRIMARY_*}}` 未置換など共通部品自体の違反のみ、その共通部品を担当する1サブエージェントが修正する。
   5. 修正した箇所を所見IDごとに「修正済み/対応不要」で報告する。
 渡す可変情報: file_path / 該当ファイルの findings 配列
 ```
@@ -145,14 +148,15 @@ subagent_type: general-purpose
 **検証ファイル数**: 8（違反 2 / 合格 6）
 
 ### ファイル別所見
-- docker-learning-material-03.html
+- src/chapters/cloud-infrastructure/docker/docker-learning-material-03.html
   - [error][A-1] Mermaid図にHTMLエンティティ（&#40;）— 38行目付近
-- styles.css
-  - [error][A-2] {{PRIMARY_500}} が未置換
+  - [error][B] 断片に `<head>`/`tailwind.config` が混入（レイアウトと二重）
+- src/data/guides/cloud-infrastructure/docker.ts
+  - [error][A-2/B] `primary` パレット未設定（または index.ts 未登録）
 
 ### 修正（--fix 時）
-- docker-learning-material-03.html: [A-1] 修正済み（全角括弧に変更）
-- styles.css: [A-2] 修正済み（#2563eb 等へ置換）
+- docker-learning-material-03.html: [A-1] 修正済み（全角括弧に変更）／[B] head・tailwind.config を断片から除去
+- docker.ts: [A-2/B] `primary`(50-900) を color-themes.md の値で設定し index.ts に登録
 ```
 
 3. 必要に応じて GitHub Pages URL を添える（形式は checklist.md「I. 資料タイプ別 命名規則・URL形式」）。

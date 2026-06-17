@@ -36,7 +36,7 @@
 
 - [ ] Markdown 構文が正しい(見出しレベル・リンク記法・テーブル・字下げ)。
 - [ ] 文字化け・全角半角の不整合がない。
-- [ ] (Mermaid 図を含める場合)CLAUDE.md の Mermaid 記法に準拠している(HTMLエンティティ不使用 / 半角括弧は全角化かダブルクォート / `&` は全角 `＆` / dark テーマ不使用)。詳細は `templates/v3/reference/mermaid-patterns.md` 参照。
+- [ ] (Mermaid 図を含める場合)CLAUDE.md の Mermaid 記法に準拠している(HTMLエンティティ不使用 / 半角括弧は全角化かダブルクォート / `&` は全角 `＆` / dark テーマ不使用)。詳細は `astro-system/templates/v1/reference/mermaid-patterns.md` 参照。
 
 ## 対象限定
 

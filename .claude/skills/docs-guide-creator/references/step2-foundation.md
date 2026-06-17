@@ -1,144 +1,75 @@
-# step2: 土台作成（共通部品＋第1章HTML）
+# step2: 第1章の本文断片生成（構造テンプレ＝継承元）
 
-技術分野の初心者向けHTMLベース教育コンテンツ作成の専門家として、技術フォルダの「土台作り」を担当する。
+技術分野の初心者向けHTMLベース教育コンテンツ作成の専門家として、**第1章の本文断片**を生成する。この第1章断片が、第2章以降の構造テンプレ（継承元）になる。
 
-以下を1回の準備フェーズで実行する。
+> **旧フローからの変更**: 旧 step2 は「`astro-system/templates/v1/html/` から4ファイルをコピーし、`styles.css` の `{{PRIMARY_*}}` を置換し、`sidebar-content.js` を編集し、フル HTML を生成」していた。**これらはすべて廃止**。Astro では共通部品（CSS/JS/サイドバー/ヘッダー/フッター）はレイアウトと `_shared/` が供給するため、章は**本文断片のみ**を作る。技術色は step1 のデータ.ts `primary` で設定済み。
 
-1. 共通部品ファイル（JS/CSS）のコピーと設定
-2. `sidebar-content.js` に全章分の定義を設定
-3. 第1章のHTMLファイルを生成
+## 前提（step1 完了済み）
 
-この第1章HTMLが、第2章以降の構造テンプレ（継承元）になる。
+- `src/data/guides/<category>/<slug>.ts`（`TechGuide`、`primary`・`chapters[]` 設定済み）
+- `src/data/guides/index.ts` に登録済み
+- `public/guide/<category>/<slug>/README.md`（概要）
 
-## 1. README分析
+技術色・章定義は上記データに入っているため、第1章断片で色や章配列を書く必要はない。
 
-対象フォルダの README.md を読み込み、以下を抽出する。
+## 1. 本文断片とは（最重要）
 
-- 技術名
-- 全章のタイトル一覧
-- 第1章の詳細情報（学習目標、内容）
+生成するファイルは **`max-w-5xl mx-auto ...` ラッパーの内側に挿入される本文だけ**。`src/pages/guide/[...chapter].astro` が断片を読み込み、`GuideChapterLayout.astro` でラップして完全な HTML を出力する。
 
-## 2. 共通ファイルのコピーと設定
+**断片に含めるもの**:
+- パンくずリスト（`<nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">...`）
+- 章ヘッダー（章番号バッジ `bg-primary-100 text-primary-700`、`<h1>`、説明文）
+- 学習目標カード
+- 本文セクション（説明・コード例・図表・クイズ等）
+- 前章／次章ナビゲーション（相対リンク `<slug>-learning-material-NN.html`）
 
-`templates/v3/html/` から以下4ファイルを技術フォルダにコピーする。
+**断片に含めてはいけないもの（レイアウトが供給。書くと二重表示・破損）**:
+- `<!DOCTYPE>`・`<html>`・`<head>`・`<meta>`・`<title>`
+- `tailwind.config`・CDN の `<script>`／`<link>`（Tailwind・Highlight.js・Mermaid・Font Awesome・Google Fonts）
+- グローバルヘッダー（`<header class="fixed ... header-rich">`）・サイドバー（`<aside id="sidebar">`）・フッター（`<footer>`）
+- 共通スクリプト（`main.js`・`drawing-tool.js`）・`styles.css` の `<link>`
+- ダークモードボタン（`main.js` が動的生成）・スクロールトップボタン
 
-- `styles.css` — 共通カスタムスタイル（**コピー後に修正が必要**）
-- `main.js` — 共通機能
-- `drawing-tool.js` — 描画ツール機能
-- `sidebar-content.js` — サイドバー動的生成（後で編集）
+> 既存の断片例: `astro-system/src/chapters/development-processes/codex/codex-learning-material-01.html` を参照すると、断片の粒度・インデント・先頭（パンくず）から末尾（前後ナビ）までの構造が分かる。
 
-### styles.css のプレースホルダー置換（必須）
+## 2. README／カリキュラム分析
 
-⚠️ テンプレートの `styles.css` にはプレースホルダー `{{PRIMARY_XXX}}` が含まれている。**コピー後、必ず実際の値に置換すること。置換しないと CSS が壊れる。**
+step1 で設計したカリキュラム（または `public/guide/<category>/<slug>/README.md`）から、第1章の学習目標・内容を抽出する。
 
-```css
-/* テンプレートのプレースホルダー */
---primary-300: {{PRIMARY_300}};
---primary-400: {{PRIMARY_400}};
---primary-500: {{PRIMARY_500}};
---primary-600: {{PRIMARY_600}};
---primary-700: {{PRIMARY_700}};
---primary-rgb: {{PRIMARY_RGB}};
+## 3. 第1章断片の生成
 
-/* ↓ 例: SQL (sky) の場合に置換後 */
---primary-300: #7dd3fc;
---primary-400: #38bdf8;
---primary-500: #0ea5e9;
---primary-600: #0284c7;
---primary-700: #0369a1;
---primary-rgb: 14, 165, 233;
-```
+- ファイル: `src/chapters/<category>/<slug>/<slug>-learning-material-01.html`
+- 技術色は Tailwind の `primary` クラス（`text-primary-600`・`bg-primary-100`・`border-primary-500` 等）で参照する。レイアウトの `tailwind.config` とインライン注入された CSS 変数で解決される（生の hex を書かない）。
+- HTML生成の共通ルール（断片構造・ヘッダー非混入・Mermaid・コンポーネント・ダーク可読性・Highlight.js追加言語・コード方針）は **references/html-rules.md に集約**しているので必ず参照すること。
 
-技術別カラーは tailwind.config の primary パレット(50-900) と styles.css :root の {{PRIMARY_*}} の **2箇所**に同じ技術カラーを設定する（値は templates/v3/reference/color-themes.md 参照）。テンプレHTMLには JetBrains Mono とスプラッシュ template が含まれ、ヘッダーは全技術共通のグラファイトガラス（識別色は primary→cyan のレールで表現）になる。
+## 4. ダーク可読性（重要・標準クラスのみ）
 
-**技術別カラー設定一覧**（正典は `templates/v3/reference/color-themes.md`。以下は代表値の抜粋）:
+`_shared/styles.css` のダーク補正が、標準 Tailwind の淡色背景 `bg-*-50〜300` を暗色化、暗色文字 `text-*-600〜950` を明色化する（全 color family 対応）。**標準クラスを使う限りダークで文字が読めなくなる事故は起きない。** 以下は禁止（CSS 補正対象外でダーク事故源）:
 
-| 技術 | {{PRIMARY_300}} | {{PRIMARY_400}} | {{PRIMARY_500}} | {{PRIMARY_600}} | {{PRIMARY_700}} | {{PRIMARY_RGB}} |
-|------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-| Python/PostgreSQL (blue) | `#93c5fd` | `#60a5fa` | `#3b82f6` | `#2563eb` | `#1d4ed8` | `59, 130, 246` |
-| Java/AWS (orange) | `#fdba74` | `#fb923c` | `#f97316` | `#ea580c` | `#c2410c` | `249, 115, 22` |
-| SQL/Docker (sky) | `#7dd3fc` | `#38bdf8` | `#0ea5e9` | `#0284c7` | `#0369a1` | `14, 165, 233` |
-| Spring/Excel (emerald) | `#6ee7b7` | `#34d399` | `#10b981` | `#059669` | `#047857` | `16, 185, 129` |
-| .NET (violet) | `#c4b5fd` | `#a78bfa` | `#8b5cf6` | `#7c3aed` | `#6d28d9` | `139, 92, 246` |
-| React (cyan) | `#67e8f9` | `#22d3ee` | `#06b6d4` | `#0891b2` | `#0e7490` | `6, 182, 212` |
-| JavaScript (yellow) | `#fde047` | `#facc15` | `#eab308` | `#ca8a04` | `#a16207` | `234, 179, 8` |
-| PHP (indigo) | `#a5b4fc` | `#818cf8` | `#6366f1` | `#4f46e5` | `#4338ca` | `99, 102, 241` |
-| Oracle (red) | `#fca5a5` | `#f87171` | `#ef4444` | `#dc2626` | `#b91c1c` | `239, 68, 68` |
-| AI/ML (purple) | `#d8b4fe` | `#c084fc` | `#a855f7` | `#9333ea` | `#7e22ce` | `168, 85, 247` |
-| Git (slate) | `#cbd5e1` | `#94a3b8` | `#64748b` | `#475569` | `#334155` | `100, 116, 139` |
+- 生color指定: `text-[#333]`・`bg-[#f0f0f0]` 等の角括弧任意値
+- インライン `style="color: ..."`／`style="background: ..."`
+- 半透明背景: `bg-white/70`・`bg-white/60`・`bg-white/50` 等
 
-**注意**: この変数がアクセント（セクション見出しのレール・アイコンチップ・ボタン・サイドバー強調・ヘッダーのレール等）の色を決める（ヘッダー背景自体はグラファイトガラス固定）。プレースホルダーのまま放置すると CSS エラーになる。styles.css のプレースホルダーは **6個**（300/400/500/600/700/RGB）すべてを置換すること。
+内側ボックスは親と同系色の `-100` 背景＋`-900` テキストにする（例: 親 Blue → `bg-blue-100` ＋ `text-blue-900`）。
 
-## 3. sidebar-content.js の編集（重要）
-
-**テンプレートからコピーした `sidebar-content.js` の `chapters` 配列部分のみを編集する。**
-
-⚠️ **絶対に守ること**:
-- テンプレートファイルには `chapters` 配列の他に、`createSidebar()` 関数、`insertSidebar()` 関数、即時実行関数（IIFE）が含まれている。
-- **これらの関数部分は絶対に削除・変更しない。**
-- 編集するのは `chapters` 配列の中身だけ。
-
-```javascript
-// ========================================
-// TODO: 章の定義データをカスタマイズ
-// ========================================
-const chapters = [
-    { number: 1, title: '第1章: Dockerとは', file: 'docker-learning-material-01.html' },
-    { number: 2, title: '第2章: インストールと環境構築', file: 'docker-learning-material-02.html' },
-    // ... 全章分を定義（README.mdの章構成に合わせる）
-];
-
-// ↓↓↓ 以下の関数部分はテンプレートのまま維持すること ↓↓↓
-// - currentFile, currentChapter, progressPercentage の計算
-// - createSidebar() 関数
-// - insertSidebar() 関数
-// - DOMContentLoaded イベントリスナー
-```
-
-**正しい手順**:
-1. テンプレートの `sidebar-content.js` を技術フォルダにコピー。
-2. コピーしたファイルを開き、`chapters` 配列の中身だけを README.md の章構成に合わせて書き換える（全章分を定義）。
-3. 他の部分（約100行の関数コード）はそのまま維持。
-
-## 4. 第1章のHTML生成
-
-`templates/v3/html/learning-material-template.html` をベースに第1章を生成する。
-
-- ファイル名: `[技術名]-learning-material-01.html`
-- テンプレート内の `<!-- TODO: ... -->` コメントを検索し編集する。
-  - **技術名・タイトル**: プレースホルダーを実際の値に置換。
-  - **カラーテーマ**: `tailwind.config` 内の `primary` カラー（`templates/v3/reference/color-themes.md` 参照）。
-  - **アイコン**: 適切な Font Awesome アイコン。
-  - **コンテンツ**: 学習目標、説明文、コード例、クイズ。
-
-HTML生成の共通ルール（スクリプト読込順・ヘッダー禁止事項・Mermaid・コンポーネント・Highlight.js追加言語・コード方針）は **references/html-rules.md に集約**しているので必ず参照すること。
-
-## 5. 生成後のファイル構成例
+## 5. 生成後の構成例
 
 ```bash
-docs/guide/cloud-infrastructure/docker/
-├── sidebar-content.js      # 全章分の定義を含む
-├── styles.css              # テンプレートからコピー＋{{PRIMARY_*}}置換済み
-├── main.js                 # テンプレートからコピー
-├── drawing-tool.js         # テンプレートからコピー
-└── docker-learning-material-01.html  # 第1章（構造テンプレ）
+astro-system/
+├── src/data/guides/cloud-infrastructure/docker.ts      # step1（primary・chapters）
+├── src/data/guides/index.ts                            # step1（import 登録）
+├── src/chapters/cloud-infrastructure/docker/
+│   └── docker-learning-material-01.html                # step2（第1章＝構造テンプレ）
+└── public/guide/cloud-infrastructure/docker/README.md   # step1（概要）
 ```
 
 ## 6. 初心者向け重点事項
 
 - 理論・背景説明優先（コードより概念説明を重視）。
-- 用語解説充実。
-- 視覚的理解促進（図表多用）。
-- 段階的理解構築。
+- 用語解説充実。視覚的理解促進（図表多用）。段階的理解構築。
 
 ## 出力
 
-以下を生成し、ファイルパス一覧を報告する。
+第1章の本文断片 `<slug>-learning-material-01.html` を生成し、パスを報告する。
 
-1. `styles.css`（`{{PRIMARY_*}}` 置換済み）
-2. `main.js`
-3. `drawing-tool.js`
-4. `sidebar-content.js`（全章定義済み）
-5. `[技術名]-learning-material-01.html`（第1章）
-
-**第2章以降は、生成フェーズで Agent ツール（`general-purpose`）を1メッセージにまとめて並列起動し、references/step3-chapter.md に従って生成する。**
+**第2章以降は、生成フェーズで Agent ツール（`general-purpose`・`model: sonnet`）を1メッセージにまとめて並列起動し、references/step3-chapter.md に従って生成する。**

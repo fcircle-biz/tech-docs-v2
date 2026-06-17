@@ -1,0 +1,43 @@
+import type { TechGuide } from '../types';
+
+// Codex 入門学習ガイド（全14章）。技術色 = ティール（OpenAI ブランド寄り）。
+export const codex: TechGuide = {
+  category: 'development-processes',
+  slug: 'codex',
+  techTitle: 'Codex学習教材',
+  icon: 'fa-robot',
+  level: '初級',
+  categoryLabel: '開発手法・プロセス',
+  totalTime: '約16時間',
+  splashStop0: '#14b8a6',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#f0fdfa',
+    100: '#ccfbf1',
+    200: '#99f6e4',
+    300: '#5eead4',
+    400: '#2dd4bf',
+    500: '#14b8a6',
+    600: '#0d9488',
+    700: '#0f766e',
+    800: '#115e59',
+    900: '#134e4a',
+  },
+  chapters: [
+    { number: 1, name: 'Codexとは', file: 'codex-learning-material-01.html' },
+    { number: 2, name: 'AI支援開発の基礎知識', file: 'codex-learning-material-02.html' },
+    { number: 3, name: 'インストールと初期設定', file: 'codex-learning-material-03.html' },
+    { number: 4, name: '基本操作と最初のセッション', file: 'codex-learning-material-04.html' },
+    { number: 5, name: 'ファイルの読み書きとコード編集', file: 'codex-learning-material-05.html' },
+    { number: 6, name: 'コードベースの探索と理解', file: 'codex-learning-material-06.html' },
+    { number: 7, name: '承認モードとサンドボックス', file: 'codex-learning-material-07.html' },
+    { number: 8, name: 'AGENTS.mdとメモリ・コンテキスト管理', file: 'codex-learning-material-08.html' },
+    { number: 9, name: '設定ファイル（config.toml）とプロファイル', file: 'codex-learning-material-09.html' },
+    { number: 10, name: 'Git・GitHub連携', file: 'codex-learning-material-10.html' },
+    { number: 11, name: 'MCPによる外部ツール連携', file: 'codex-learning-material-11.html' },
+    { number: 12, name: '非対話実行と自動化（codex exec）', file: 'codex-learning-material-12.html' },
+    { number: 13, name: '実践ワークフローとベストプラクティス', file: 'codex-learning-material-13.html' },
+    { number: 14, name: 'トラブルシューティングと次のステップ', file: 'codex-learning-material-14.html' },
+  ],
+};

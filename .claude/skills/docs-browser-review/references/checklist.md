@@ -1,6 +1,6 @@
 # 描画QA 詳細チェックリスト
 
-docs-browser-review が実機確認する観点の詳細。CLAUDE.md と `templates/v3/` のテンプレート標準が真実源。
+docs-browser-review が実機確認する観点の詳細。CLAUDE.md と `astro-system/templates/v1/` のテンプレート標準が真実源。
 
 ## Chrome MCP 操作の要点
 

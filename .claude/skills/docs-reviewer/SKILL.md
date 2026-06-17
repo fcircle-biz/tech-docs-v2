@@ -5,7 +5,7 @@ description: 生成済み教材(guide/tutorial/practice/assignment/cheatsheet/sl
 
 # Docs Reviewer
 
-生成済み教材をテンプレート標準（CLAUDE.md・`templates/v3/`）に照らして複数サブエージェントで並列検証し、違反を報告（既定）または修正（`--fix`）する再利用部品スキル。
+生成済み教材をテンプレート標準（CLAUDE.md・`astro-system/templates/v1/`）に照らして複数サブエージェントで並列検証し、違反を報告（既定）または修正（`--fix`）する再利用部品スキル。
 
 ## 概要
 
@@ -38,7 +38,9 @@ description: 生成済み教材(guide/tutorial/practice/assignment/cheatsheet/sl
 ### 1. 列挙フェーズ（本体が逐次実行）
 
 1. 対象パスから資料タイプを判定する（`docs/guide/`→ガイド、`docs/tutorial/`→チュートリアル、`docs/practice/`→練習問題、`docs/assignment/`→実践課題、`docs/cheatsheet/`→チートシート、`docs/slide/`→スライド）。
-2. Glob で対象HTMLを列挙する。**旧バージョンフォルダ（`v1/`・`v2/` 等）は必ず除外**する。共通部品（`styles.css`・`sidebar-content.js`・`main.js`・`drawing-tool.js`）と第1単位HTML（`*-01.html` 等）のパスを把握する（第1単位は構造継承の基準になる）。
+2. Glob で対象HTMLを列挙する。**旧バージョンフォルダ（`v1/`・`v2/` 等）は必ず除外**する。
+   - **Astro 学習ガイド**: ソースは `astro-system/src/chapters/<分類>/<slug>/*.html`（本文断片）＋ `astro-system/src/data/guides/<分類>/<slug>.ts`（`TechGuide`）。共通シェルは `src/layouts/GuideChapterLayout.astro` と `public/guide/_shared/`（共有・技術色非依存）。第1章断片（`*-01.html`）が構造継承の基準。検証対象は断片とデータ.ts であり、共通シェル／`_shared/` は対象外（全ガイド共有のため安易に触らない）。
+   - **legacy 旧テンプレ方式の資料**（`docs_backup/` 等）: 共通部品（`styles.css`・`sidebar-content.js`・`main.js`・`drawing-tool.js`）と第1単位HTML（`*-01.html`）のパスを把握する。
 3. 詳細は references/review-procedure.md「1. 列挙フェーズ」を参照。
 
 ### 2. 検証フェーズ（並列ファンアウト）
@@ -73,11 +75,11 @@ Glob で対象を再確認し、検証結果サマリ（合否・違反件数・
 - **検査と修正の既定:** 引数に `--fix` が無ければ検査＋報告のみ。ファイルは変更しない。
 - **旧バージョン除外:** Glob 検索では `v1/`・`v2/` 等の旧バージョンフォルダを除外する（過去バックアップでありアクティブコンテンツではない）。
 - **絶対パスのハードコード禁止。** `/home/...`・`/Users/...` 等は使わずリポジトリルート相対で扱う。
-- **共通ルールの真実源は CLAUDE.md と `templates/v3/reference/`。** 検証観点の値（Mermaid詳細・カラー・Tailwind・コンポーネント）はこれらを参照する。チェックリスト本体は references/checklist.md。
+- **共通ルールの真実源は CLAUDE.md と `astro-system/templates/v1/reference/`。** 検証観点の値（Mermaid詳細・カラー・Tailwind・コンポーネント）はこれらを参照する。チェックリスト本体は references/checklist.md。
 
 ## 参照ファイル
 
 - references/checklist.md — 全検証観点を資料タイプ別に整理（共通観点＋guide/tutorial/practice/assignment/cheatsheet/slide 固有観点、ファイル命名・URL形式表）
 - references/review-procedure.md — 並列検証・集約・修正の手順、Agent 並列起動の出し方、所見スキーマ（JSON）例
 
-共有データは複製せず既存リポジトリファイルを参照する。9分類体系: `tech-knowledge-map.md` / カラー: `templates/v3/reference/color-themes.md` / Tailwind: `templates/v3/reference/css-styles.md` / Mermaid詳細: `templates/v3/reference/mermaid-patterns.md` / カードコンポーネント: `templates/v3/snippets/components.html`。
+共有データは複製せず既存リポジトリファイルを参照する。9分類体系: `tech-knowledge-map.md` / カラー: `astro-system/templates/v1/reference/color-themes.md` / Tailwind: `astro-system/templates/v1/reference/css-styles.md` / Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md` / カードコンポーネント: `astro-system/templates/v1/snippets/components.html`。

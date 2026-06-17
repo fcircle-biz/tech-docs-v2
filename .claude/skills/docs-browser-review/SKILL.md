@@ -35,7 +35,7 @@ description: 生成済みの学習教材HTMLをChrome（ブラウザ）で実際
 
 ## レビュー観点（描画・動的）
 
-`templates/v3/` と CLAUDE.md のテンプレート標準に沿って、ブラウザでの描画結果を確認する。詳細チェックリストは references/checklist.md を参照。
+`astro-system/templates/v1/` と CLAUDE.md のテンプレート標準に沿って、ブラウザでの描画結果を確認する。詳細チェックリストは references/checklist.md を参照。
 
 | 観点 | 確認ポイント |
 | --- | --- |
