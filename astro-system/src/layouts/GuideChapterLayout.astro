@@ -18,10 +18,30 @@ const { tech, pageTitle, currentChapter } = Astro.props;
 const total = tech.chapters.length;
 const progress = Math.round((currentChapter / total) * 100);
 
-// 全技術で同一の共通スクリプトは _shared/ に1部だけ置き、base 付き絶対URLで参照する。
+// 全技術で同一の共通スクリプト／スタイルは _shared/ に1部だけ置き、base 付き絶対URLで参照する。
 const base = import.meta.env.BASE_URL;
 const mainJsSrc = `${base}guide/_shared/main.js`;
 const drawingToolSrc = `${base}guide/_shared/drawing-tool.js`;
+const sharedStylesHref = `${base}guide/_shared/styles.css`;
+
+// 技術別の primary トークンは _shared/styles.css には持たせず（共通化のため）、
+// tech.primary パレット（src/data/guides/**）から導出してここでインライン注入する。
+// これが技術色 CSS 変数の唯一の供給源（tailwind.config と同一データ源 = drift しない）。
+const hexToRgb = (hex: string) => {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/./g, '$&$&') : h, 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+const p = tech.primary;
+const primaryStyle = `:root{
+  --primary-300:${p[300]};
+  --primary-400:${p[400]};
+  --primary-500:${p[500]};
+  --primary-600:${p[600]};
+  --primary-700:${p[700]};
+  --primary-rgb:${hexToRgb(p[500])};
+}
+html.dark{ --primary-500:${p[400]}; }`;
 
 // ダークモード早期適用（フラッシュ防止）— 旧 HTML と同一。
 const darkModeScript = `(function() {
@@ -89,8 +109,10 @@ const splashSvg = `<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-    <!-- カスタムスタイル -->
-    <link rel="stylesheet" href="styles.css" />
+    <!-- カスタムスタイル（共通部は _shared/ で全技術共有） -->
+    <link rel="stylesheet" href={sharedStylesHref} />
+    <!-- 技術別 primary トークン（tech.primary から導出してインライン注入） -->
+    <style is:inline set:html={primaryStyle}></style>
 
     <!-- スタンドアロン展開中のスプラッシュ -->
     <template id="__bundler_thumbnail" data-bg-color={tech.splashBg} set:html={splashSvg}></template>
