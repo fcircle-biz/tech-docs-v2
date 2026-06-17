@@ -2,7 +2,7 @@
 
 ソフトウェア開発およびIT関連トピックに関する学習ガイドをHTML形式で提供する技術文書集です。
 
-> **現状**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`feature/astro-support` ブランチ）。Astro プロジェクト一式は `astro-system/` に配置され、ビルド出力は GitHub Pages 公開用の `/docs/`（リポジトリ直下）に生成されます。
+> **現状**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`main` の正規構成）。Astro プロジェクト一式は `astro-system/` に配置され、ビルド出力は GitHub Pages 公開用の `/docs/`（リポジトリ直下）に生成されます。
 
 ## 📋 目次
 

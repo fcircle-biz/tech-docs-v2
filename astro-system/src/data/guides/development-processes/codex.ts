@@ -8,7 +8,7 @@ export const codex: TechGuide = {
   icon: 'fa-robot',
   level: '初級',
   categoryLabel: '開発手法・プロセス',
-  totalTime: '約16時間',
+  totalTime: '約16.5時間',
   splashStop0: '#14b8a6',
   splashStop1: '#06b6d4',
   splashBg: '#090b11',
