@@ -41,7 +41,7 @@ flowchart TD
 
 カラー値の正典は `templates/v3/reference/color-themes.md`。
 
-### A-3. テキスト視認性（半透明背景禁止）／深刻度: error
+### A-3. テキスト視認性 ＋ ダーク可読性ガードレール／深刻度: error
 
 - [ ] **半透明背景を使っていない**: `bg-white/70` `bg-white/60` `bg-white/50` 等の `/数字` 付き背景が無い。
 - [ ] **内側ボックスは不透明な同系色**: カード内に内側ボックスを置く場合、親と同系色の `-100` 背景＋`-900` テキストになっている。
@@ -52,6 +52,12 @@ flowchart TD
 | Blue | `bg-blue-100` | `text-blue-900` |
 | Green (Emerald) | `bg-emerald-100` | `text-emerald-900` |
 | Orange | `bg-orange-100` | `text-orange-900` |
+
+**ダーク可読性（重要）**: 共通 `_shared/styles.css` のダーク補正は、**標準 Tailwind の色クラス**を自動で読みやすく変換する（淡色背景 `bg-{color}-50〜300` を暗色化、暗色文字 `text-{color}-600〜950` を明色化。全 color family 対応）。したがって標準クラスを使う限りダークで文字が読めなくなる事故は起きない。**逆に CSS が補正できない「標準外の色指定」だけが事故源**なので、以下が無いことを確認する（旧版で多発した「ダークで文字が読めない」の再発防止）。
+
+- [ ] **任意値の生color指定が無い**: `text-[#333]` `bg-[#f0f0f0]` `text-[rgb(...)]` 等の角括弧任意値カラーが無い（ダーク補正の対象外になり暗背景で埋もれる）。
+- [ ] **インライン `style` で色を直書きしていない**: `style="color: ..."` `style="background: ..."`（`background-color` 含む）が無い。色は Tailwind クラスで指定する。
+- [ ] **色は標準 Tailwind パレットの範囲内**: 淡色背景は `-50〜-300`、濃色文字は `-600〜-950` の標準シェードを使う（`_shared/styles.css` のダーク補正が網羅する範囲）。新しい color family を使った場合は `_shared/styles.css` のダーク補正一覧（テキスト明色化・背景暗色化）にもその family が追加されているか確認する。
 
 ### A-4. ヘッダー構造／深刻度: error
 
