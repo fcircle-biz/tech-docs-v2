@@ -2,7 +2,7 @@
 
 このファイルは、このリポジトリのコードを扱う際の Claude Code (claude.ai/code) 向けガイダンスを提供します。
 
-> **注記（Astro 構成）**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`feature/astro-support` ブランチ）。
+> **注記（Astro 構成）**: 本リポジトリは静的 HTML 教材を **Astro ベース**で管理しています（`main` の正規構成）。
 > Astro プロジェクト一式は **`astro-system/`** 配下にあり（`astro.config.mjs`・`src/`・`public/` 等）、`astro-system/` で `npm run build` を実行すると GitHub Pages 公開用の **`/docs/`（リポジトリ直下）** へ出力されます。構成変更に合わせて本書も更新してください。
 
 ## コミュニケーションスタイル
@@ -24,7 +24,6 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 - `/docs/` - **Astro のビルド出力＝GitHub Pages 公開ディレクトリ**（`astro-system/` からのビルドで生成。直接編集しない）。`docs/guide/` に学習ガイドが出力される。**現状は `development-processes/` 配下の以下 2 件のみ**:
   - `development-processes/claude-code/` - Claude Code 入門学習ガイド（全14章）
   - `development-processes/codex/` - Codex 入門学習ガイド（全14章）
-- `/docs_backup/` - 移行前の静的 HTML 一式のバックアップ（参照用、配信対象外）。
 - `/astro-system/templates/v1/` - デザイン標準の真実源。`reference/`（カラー・Tailwind・Mermaid）と `snippets/`（カードコンポーネント）のみ。共通シェルの実体は Astro（`astro-system/src/layouts/`・`public/guide/_shared/`）に移行済み。
 - `/tech-knowledge-map.md` - 9分類体系（後述）の定義ドキュメント。
 - `/.claude/skills/` - コンテンツ自動生成・運用補助用の Claude スキル定義（スラッシュコマンドで呼び出し）。
