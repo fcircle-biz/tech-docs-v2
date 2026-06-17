@@ -25,7 +25,7 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
   - `development-processes/claude-code/` - Claude Code 入門学習ガイド（全14章）
   - `development-processes/codex/` - Codex 入門学習ガイド（全14章）
 - `/docs_backup/` - 移行前の静的 HTML 一式のバックアップ（参照用、配信対象外）。
-- `/templates/v3/` - HTML/CSS テンプレート標準（現行）。
+- `/astro-system/templates/v1/` - デザイン標準の真実源。`reference/`（カラー・Tailwind・Mermaid）と `snippets/`（カードコンポーネント）のみ。共通シェルの実体は Astro（`astro-system/src/layouts/`・`public/guide/_shared/`）に移行済み。
 - `/tech-knowledge-map.md` - 9分類体系（後述）の定義ドキュメント。
 - `/.claude/skills/` - コンテンツ自動生成・運用補助用の Claude スキル定義（スラッシュコマンドで呼び出し）。
 
@@ -71,7 +71,7 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 | オーケストレーター（メイン） | Opus | 全体統括・依存制御・ファンアウト指揮・集約・最終報告（メイン会話ループ） |
 | 推論・分析サブ | Opus | 設計判断・カリキュラム/構成設計・分類決定・レビュー判定・複雑な分析 |
 | コーディング・資料作成サブ | Sonnet | HTML/教材の生成、コード記述、文書作成 |
-| 単純作業サブ | Haiku | ファイルコピー、プレースホルダー置換、定型チェック、ファイル名照合などの機械的作業 |
+| 単純作業サブ | Haiku | 定型チェック、ファイル名照合、データ登録の機械的確認などの単純作業 |
 
 判断に迷う場合は「**設計・判断=Opus / 生成・記述=Sonnet / 機械的作業=Haiku**」を基準とする。
 
@@ -79,9 +79,9 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 
 | スキル | 目的 | 呼び出し |
 |-------|---------|------------|
-| `docs-guide-creator` | 学習ガイド一式（README ＋ 共通ファイル ＋ 全章HTML）を生成 | `/docs-guide-creator [tech-name]` |
+| `docs-guide-creator` | 学習ガイド一式（`TechGuide` データ定義 ＋ 全章の本文断片 ＋ 概要README）を Astro 構成へ生成 | `/docs-guide-creator [tech-name]` |
 
-`docs-guide-creator` はまず**準備フェーズを逐次実行**し（README → 共通 JS/CSS ＋ 章 `01` のHTML）、その後**残りの章（`02..N`）を並列にファンアウト**する（1メッセージ内で複数の `Agent` ツール呼び出しを発行。`subagent_type: general-purpose`・`model: sonnet`（資料作成）とし、スキルの `references/` を読むよう指示する）。最後に `docs-reviewer` で検証して報告する。検証フェーズの判定は `model: opus`（分析）、共通部品コピー等の単純作業は `model: haiku` を割り当てる。
+`docs-guide-creator` はまず**準備フェーズを逐次実行**し（配置決定・カリキュラム設計 → `src/data/guides/` の `TechGuide` 定義＋`index.ts` 登録＋概要README → 章 `01` の本文断片）、その後**残りの章（`02..N`）を並列にファンアウト**する（1メッセージ内で複数の `Agent` ツール呼び出しを発行。`subagent_type: general-purpose`・`model: sonnet`（資料作成）とし、スキルの `references/` を読むよう指示する）。各章は**本文断片**として生成し、共通シェル（レイアウト・`_shared/`）には触れない。最後に `astro-system/` で `npm run build` してから `docs-reviewer` で検証・報告する。検証フェーズの判定は `model: opus`（分析）、定型チェックは `model: haiku` を割り当てる。
 
 ### マルチエージェント・オーケストレーション／検証スキル
 
@@ -116,28 +116,31 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 
 **禁止例:**
 - 「時間がかかりますが、どの方法がよいですか？」→ 禁止
-- 「手早くプレースホルダー版を生成することを提案します」→ 禁止
+- 「手早く簡易版（数章のみ）を生成することを提案します」→ 禁止
 - 処理中の確認ダイアログ → 禁止
 
 ## テンプレート標準
 
-HTMLコンテンツは `/templates/v3/` の標準に従うこと:
+学習ガイドのデザイン標準は `/astro-system/templates/v1/reference/`（カラー・Tailwind・Mermaid）と `/astro-system/templates/v1/snippets/`（カードコンポーネント）を**真実源**とする。共通シェル（head／ヘッダー／サイドバー／フッター／スクリプト／CSS）の**実体は Astro 構成**が持つ:
 
-### v3 デザイン: "Graphite × Iris" クールデザイン
+- 共通レイアウト: `astro-system/src/layouts/GuideChapterLayout.astro`
+- 共有 CSS/JS: `astro-system/public/guide/_shared/`（`styles.css`・`main.js`・`drawing-tool.js`）
+- 技術メタ・章定義・技術色: `astro-system/src/data/guides/<分類>/<slug>.ts`（`TechGuide`）
+
+> **旧テンプレート（`astro-system/templates/v1/html/` ＝ `learning-material-template.html`・`styles.css`・`main.js`・`drawing-tool.js`・`sidebar-content.js`）と他バリアント（`html_tutorial/`・`html_practice/`・`html_assignment/`・`html_cheatsheet/`・`slide/`）は Astro 移行により撤去済み**。共通シェルはレイアウトと `_shared/` に集約された。残置するのは `astro-system/templates/v1/reference/`（デザイン標準の真実源）と `astro-system/templates/v1/snippets/`（断片で使うカードコンポーネント）のみ。
+
+### v1 デザイン: "Graphite × Iris" クールデザイン
 - グラファイト（墨）の落ち着いたニュートラル面に、**技術別 primary** とシアン（`--cyan`）の差し色。パステルの塗りは廃し「ニュートラル面＋色ヘアライン＋グラデーションのアイコンチップ」で色を差す。
-- ヘッダーは**全バリアント共通のグラファイトガラス**（暗いすりガラス）＋ primary→cyan のレールで技術識別色を表現（ライト/ダーク両対応）。
-- コードは **JetBrains Mono** ＋ macOS 風ウィンドウ表示。`<head>` にスプラッシュ `<template id="__bundler_thumbnail">` を含む。
-- **技術別カラーは2箇所に同値を設定**する: ① HTML の `tailwind.config` の `primary`（50-900）、② `styles.css` の `:root` の `{{PRIMARY_300/400/500/600/700}}` ＋ `{{PRIMARY_RGB}}`（skill が置換。値は `templates/v3/reference/color-themes.md`）。未置換は CSS 破損。
-- **例外**: assignment は実践課題識別のオレンジを `:root` にハードコード（プレースホルダ無し）、cheatsheet はヘッダー色モディファイア方式（`.header-emerald` 等）で primary を切替。
+- ヘッダーは**グラファイトガラス**（暗いすりガラス）＋ primary→cyan のレールで技術識別色を表現（ライト/ダーク両対応）。
+- コードは **JetBrains Mono** ＋ macOS 風ウィンドウ表示。`<head>` のスプラッシュ `<template id="__bundler_thumbnail">` はレイアウトが生成する。
+- **技術別カラーはデータ1箇所に集約**する: `astro-system/src/data/guides/<分類>/<slug>.ts` の `primary`（50-900）。レイアウトがこれから `tailwind.config` の `primary` と `:root` の CSS 変数（`--primary-300/400/500/600/700`・`--primary-rgb`、ダークの `--primary-500`）を導出してインライン注入する。**旧 `styles.css` の `{{PRIMARY_*}}` プレースホルダー置換・per-tech styles.css は廃止**（共有 `_shared/styles.css` は技術色を持たない）。色値の正典は `astro-system/templates/v1/reference/color-themes.md`。
 
-> `templates/v3/` には学習ガイド用（`html/`）のほか `html_tutorial/`・`html_practice/`・`html_assignment/`・`html_cheatsheet/`・`slide/` の各テンプレート一式が用意されているが、**本リポジトリで現在オーサリングされているのは学習ガイドのみ**。他バリアントのテンプレートは将来利用に備えて残置されている。
-
-### テンプレートファイル (`html/`) - 学習ガイド用
-- **learning-material-template.html** - 学習教材テンプレート
-- **sidebar-content.js** - サイドバー生成（ガイド用）
-- **styles.css** - 共通カスタムスタイル
-- **main.js** - 共通機能
-- **drawing-tool.js** - 描画ツール機能
+### 共通シェル（Astro）- 学習ガイド用
+- **`src/layouts/GuideChapterLayout.astro`** - 共通シェル（head・ヘッダー・サイドバー・フッター・スクリプト読込・技術色インライン注入）
+- **`src/pages/guide/[...chapter].astro`** - 本文断片を glob して全章ページを動的生成
+- **`public/guide/_shared/styles.css`** - 全技術共有の共通カスタムスタイル（技術色非依存）
+- **`public/guide/_shared/main.js`** - 共通機能（ダークモード・コピー・Mermaid テーマ連動等）
+- **`public/guide/_shared/drawing-tool.js`** - 描画ツール機能
 
 ### 参照ドキュメント (`reference/`)
 - **css-styles.md** - Tailwind CSS スタイルガイド
@@ -177,12 +180,17 @@ flowchart TD
     B -->|Windows| C[Windows Environment<br/>Setup]
 ```
 
-### テキスト視認性ルール（重要）
+### テキスト視認性・ダーク可読性ルール（重要）
 
-カード内のテキストが読みやすい状態を保つため、以下のルールに従う:
+カード内のテキストが（ライト/ダーク両モードで）読みやすい状態を保つため、以下に従う:
 
-1. **半透明背景の禁止**: `bg-white/70`、`bg-white/60`、`bg-white/50` などを使わない
-2. **不透明な同系色背景を使う**: カード内に内側ボックスを置く場合は、同じ色系統の `-100` シェードを使う
+**ダーク自動補正の仕組み**: 共有 `_shared/styles.css` のダーク補正が、標準 Tailwind の淡色背景 `bg-*-50〜300` を暗色化し、暗色文字 `text-*-600〜950` を明色化する（全 color family 対応）。**標準クラスを使う限り、ダークモードで文字が読めなくなる事故は構造的に起きない。**
+
+1. **標準外の色指定を使わない**（CSS 補正対象外＝ダーク事故源）:
+   - 生color指定: `text-[#333]`・`bg-[#f0f0f0]` 等の角括弧任意値
+   - インライン `style="color: ..."`／`style="background: ..."`
+   - 半透明背景: `bg-white/70`・`bg-white/60`・`bg-white/50` 等
+2. **不透明な同系色背景を使う**: カード内に内側ボックスを置く場合は、同じ色系統の `-100` シェード背景＋`-900` テキストを使う
 
 | 親カードの色 | 内側ボックスの背景 | テキスト色 |
 |------------------|---------------------|------------|
@@ -191,11 +199,13 @@ flowchart TD
 | 緑 (Green) | `bg-emerald-100` | `text-emerald-900` |
 | 橙 (Orange) | `bg-orange-100` | `text-orange-900` |
 
-### 使い方
-1. テンプレートを対象フォルダにコピーする
-2. JS/CSSファイル（`sidebar-content.js`、`styles.css`、`main.js`、`drawing-tool.js`）を同じフォルダにコピーする
-3. `sidebar-content.js` を編集して章定義を設定する
-4. `tailwind.config` のカラーテーマを更新する
+### 使い方（学習ガイドの追加 — Astro フロー）
+1. `astro-system/src/data/guides/<分類>/<slug>.ts` に `TechGuide` を定義し（`primary`・`chapters[]`）、`src/data/guides/index.ts` に import 登録する
+2. `astro-system/src/chapters/<分類>/<slug>/<slug>-learning-material-NN.html` に各章の**本文断片**を置く（共通シェルはレイアウトが供給。テンプレートのコピー・プレースホルダー置換は不要）
+3. （任意）`astro-system/public/guide/<分類>/<slug>/README.md` に概要を置く
+4. `astro-system/` で `npm run build` を実行し `docs/` へ出力する
+
+> 詳細は `/docs-guide-creator` スキル（`.claude/skills/docs-guide-creator/`）が自動化する。
 
 ## バージョン管理
 
@@ -207,6 +217,6 @@ flowchart TD
 
 ## GitHub Pages URL
 
-形式: `https://fcircle-biz.github.io/tech-docs-v2/guide/[category-path]/[filename].html`（base path は `/tech-docs-v2/`）
+形式: `https://fcircle-biz.github.io/tech-docs-v2/guide/[category-path]/[slug]/[filename].html`（base path は `/tech-docs-v2/`）
 
 例: `https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/claude-code/claude-code-learning-material-01.html`

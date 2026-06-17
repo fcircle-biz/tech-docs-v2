@@ -1,8 +1,15 @@
 # 9分類のディレクトリパス代表例
 
-配置先の分類は **必ずリポジトリルートの `tech-knowledge-map.md`（正典）と `docs/guide/README.md` を参照** して決定すること。本ファイルはその抜粋・代表例であり、丸写し用ではない。
+配置先の分類は **必ずリポジトリルートの `tech-knowledge-map.md`（正典）** を参照して決定すること。本ファイルはその抜粋・代表例であり、丸写し用ではない。
 
-ディレクトリは `docs/guide/[分類パス]/[技術]/`、GitHub Pages URL は `https://fcircle-biz.github.io/tech_docs/guide/[分類パス]/[技術]/[ファイル名].html`。
+> **Astro 構成のパス対応**: 下表・下記の `docs/guide/[分類パス]/[技術]/` は**ビルド出力先**。実際に編集する**ソース**は `astro-system/` 配下:
+> - データ: `astro-system/src/data/guides/[分類パス]/[slug].ts`（＋ `index.ts` 登録）
+> - 本文断片: `astro-system/src/chapters/[分類パス]/[slug]/[slug]-learning-material-NN.html`
+> - 概要 README: `astro-system/public/guide/[分類パス]/[slug]/README.md`
+>
+> 分類パス（[分類パス]）は複数セグメント可（例: `programming-languages/python-ecosystem`）。`npm run build` で `docs/guide/[分類パス]/[slug]/` に出力される。
+
+GitHub Pages URL は `https://fcircle-biz.github.io/tech-docs-v2/guide/[分類パス]/[技術]/[ファイル名].html`。
 
 ## 9つの主要分類とパス規則
 
