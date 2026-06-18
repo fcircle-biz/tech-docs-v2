@@ -12,8 +12,9 @@
 import type { TechGuide } from './types';
 import { claudeCode } from './development-processes/claude-code';
 import { codex } from './development-processes/codex';
+import { java } from './programming-languages/java-ecosystem/java';
 
-const all: TechGuide[] = [claudeCode, codex];
+const all: TechGuide[] = [claudeCode, codex, java];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
 export const guideRegistry: Record<string, Record<string, TechGuide>> = {};

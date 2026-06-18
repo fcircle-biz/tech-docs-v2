@@ -1,0 +1,43 @@
+import type { TechGuide } from '../../types';
+
+// Java 入門学習ガイド（全14章）。技術色 = オレンジ（Java ブランド寄り）。
+export const java: TechGuide = {
+  category: 'programming-languages/java-ecosystem',
+  slug: 'java',
+  techTitle: 'Java学習教材',
+  icon: 'fa-mug-hot',
+  level: '初級',
+  categoryLabel: 'プログラミング言語',
+  totalTime: '約21時間',
+  splashStop0: '#f97316',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#fff7ed',
+    100: '#ffedd5',
+    200: '#fed7aa',
+    300: '#fdba74',
+    400: '#fb923c',
+    500: '#f97316',
+    600: '#ea580c',
+    700: '#c2410c',
+    800: '#9a3412',
+    900: '#7c2d12',
+  },
+  chapters: [
+    { number: 1, name: 'Javaプログラミングの世界へようこそ', file: 'java-learning-material-01.html' },
+    { number: 2, name: 'データを扱う - 変数と型', file: 'java-learning-material-02.html' },
+    { number: 3, name: 'プログラムに判断させる - 条件分岐', file: 'java-learning-material-03.html' },
+    { number: 4, name: '繰り返し処理 - ループ', file: 'java-learning-material-04.html' },
+    { number: 5, name: 'データをまとめて管理する - 配列', file: 'java-learning-material-05.html' },
+    { number: 6, name: '処理をまとめる - メソッド', file: 'java-learning-material-06.html' },
+    { number: 7, name: '設計図からモノを作る - クラスとオブジェクトの基本', file: 'java-learning-material-07.html' },
+    { number: 8, name: 'オブジェクトの中身を理解する - フィールドとメソッド', file: 'java-learning-material-08.html' },
+    { number: 9, name: 'データを守る - カプセル化とアクセス制御', file: 'java-learning-material-09.html' },
+    { number: 10, name: 'クラスの親子関係 - 継承', file: 'java-learning-material-10.html' },
+    { number: 11, name: '同じ名前で違う動き - ポリモーフィズム', file: 'java-learning-material-11.html' },
+    { number: 12, name: 'エラーに対処する - 例外処理', file: 'java-learning-material-12.html' },
+    { number: 13, name: '便利な道具を使いこなす - Java標準ライブラリ', file: 'java-learning-material-13.html' },
+    { number: 14, name: 'データをまとめて操作する - コレクション入門', file: 'java-learning-material-14.html' },
+  ],
+};
