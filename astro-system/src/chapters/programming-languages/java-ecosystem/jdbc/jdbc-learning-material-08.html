@@ -1,0 +1,556 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JDBC</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約50分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ベストプラクティスとトラブルシューティング</h1>
+                    <p class="text-slate-600">JDBC を「正しく・安全に・速く」使い続けるための知恵を学ぶ最終章です。try-with-resources でリソース解放を確実にし、コネクションプーリングで接続コストを削減する仕組みを理解します。よくあるエラーの読み方・対処法とパフォーマンス向上のヒントも合わせて整理し、これまでの学習を総まとめします。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>try-with-resources 文でリソースを確実に閉じる方法を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コネクションプーリングの仕組みと HikariCP の基本を知る</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>よくある SQLException やエラーの読み方・対処法を押さえる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SELECT・PreparedStatement・バッチ処理のパフォーマンスヒントを活かせる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション8.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 try-with-resources で確実に閉じる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6章では <code class="bg-slate-100 px-1 rounded">try-catch-finally</code> を使って、<code class="bg-slate-100 px-1 rounded">Connection</code> や <code class="bg-slate-100 px-1 rounded">PreparedStatement</code> を確実に閉じる方法を学びました。Java 7 以降では、<strong>try-with-resources 文</strong>を使うとこれをもっとシンプルに書けます。<code class="bg-slate-100 px-1 rounded">AutoCloseable</code> インターフェースを実装したオブジェクト（Connection・Statement・ResultSet はすべて対象）は、<strong>try の丸括弧の中で宣言するだけで、ブロックを抜けるときに自動で <code class="bg-slate-100 px-1 rounded">close()</code> が呼ばれます</strong>。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        finally ブロックで手動 close を書く必要がなくなるため、「閉じ忘れ」や「例外が起きたときに close が実行されない」というバグを構造的に防げます。
+                    </p>
+
+                    <!-- finally 版との比較 -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">finally 版（第6章）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">try-with-resources 版</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">コード量</td>
+                                    <td class="px-4 py-3 text-slate-600">close を finally に手で書く（行が増える）</td>
+                                    <td class="px-4 py-3 text-slate-600">宣言だけで自動 close（行が減る）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">閉じ忘れリスク</td>
+                                    <td class="px-4 py-3 text-slate-600">書き忘れの可能性がある</td>
+                                    <td class="px-4 py-3 text-slate-600">構造的にゼロ</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">複数リソース</td>
+                                    <td class="px-4 py-3 text-slate-600">null チェックが必要で煩雑</td>
+                                    <td class="px-4 py-3 text-slate-600">セミコロン区切りで並べるだけ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- コード例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">TryWithResourcesExample.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// try の丸括弧内でリソースを宣言 → 自動 close される
+try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+     PreparedStatement ps = conn.prepareStatement(
+             "SELECT id, name FROM users WHERE id = ?")) {
+
+    ps.setInt(1, 1); // パラメータをセット
+    try (ResultSet rs = ps.executeQuery()) { // ResultSet も宣言
+        if (rs.next()) {
+            System.out.println(rs.getString("name")); // 結果を表示
+        }
+    } // ← rs.close() が自動実行される
+} // ← ps.close() → conn.close() の順に自動実行される</code></pre>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: try-with-resources を常に使おう</p>
+                                <p class="text-emerald-900 text-sm">try の丸括弧内に宣言したリソースは、<strong>正常終了でも例外が起きても必ず close</strong> されます。複数リソースはセミコロン区切りで書き、宣言した逆順（後→前）に close されます。今後 JDBC コードを書くときは、<strong>常に try-with-resources を第一選択</strong>にしましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 コネクションプーリング
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">DriverManager.getConnection()</code> は、その呼び出しのたびに<strong>データベースへの新しい接続を作成</strong>します。接続の作成はネットワーク通信や認証処理を伴うため、比較的コストの高い処理です。リクエストのたびに接続を作って閉じていると、性能上のボトルネックになりやすい問題があります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この問題を解決するのが<strong>コネクションプーリング</strong>です。あらかじめ一定数の接続を作っておき、アプリからの要求があれば「プール」から既存の接続を貸し出し、使い終わったら閉じずにプールへ返却します。接続の作成コストを大幅に削減できます。
+                    </p>
+
+                    <!-- Mermaid 図 -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["Javaアプリ<br/>（リクエスト）"] -->|"接続を要求"| B["コネクションプール<br/>（接続を管理）"]
+    B -->|"接続を貸し出し"| A
+    A -->|"使い終わったら返却"| B
+    B -->|"接続を維持・再利用"| C[("データベース")]
+    C -.->|"通信"| B
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Java でよく使われるコネクションプーリングの実装として <strong>HikariCP</strong>（ヒカリシーピー）と <strong>Apache DBCP</strong> があります。これらは <code class="bg-slate-100 px-1 rounded">javax.sql.DataSource</code> インターフェースを実装しており、<code class="bg-slate-100 px-1 rounded">DataSource#getConnection()</code> を呼ぶことでプールから接続を取得できます。アプリ側のコードは <code class="bg-slate-100 px-1 rounded">DriverManager</code> を <code class="bg-slate-100 px-1 rounded">DataSource</code> に置き換えるだけで、接続の「実体」は内部で使い回されます。
+                    </p>
+
+                    <!-- HikariCP コード例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">HikariCP 設定の例（概要）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// HikariCP を使ったプール設定のイメージ
+HikariConfig config = new HikariConfig();
+config.setJdbcUrl("jdbc:h2:mem:testdb"); // 接続先 URL
+config.setUsername("sa");               // ユーザー名
+config.setMaximumPoolSize(10);          // プール内の最大接続数
+
+// DataSource からプール経由の接続を取得する
+HikariDataSource ds = new HikariDataSource(config);
+try (Connection conn = ds.getConnection()) { // プールから貸し出し
+    // SQL 操作 …
+} // ← ここで接続はプールへ返却される（実際には close されない）</code></pre>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: DataSource と DriverManager の違い</p>
+                                <p class="text-blue-900 text-sm"><strong>DriverManager</strong> は毎回新しい接続を作る「単純な窓口」。<strong>DataSource</strong> は接続プールを管理する「高機能な窓口」です。Spring Boot などの実用フレームワークでは、HikariCP が自動で DataSource として設定されます。本ガイドでは学習のため DriverManager を使ってきましたが、実務では DataSource を使うのが標準です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 よくあるエラーと対処
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JDBC のコードを書き始めると、必ずと言っていいほど遭遇するエラーがあります。エラーメッセージを読み解けると、修正に要する時間が大幅に短くなります。代表的なものを以下に整理します。
+                    </p>
+
+                    <!-- エラー一覧テーブル -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">エラー・例外</th>
+                                    <th class="px-4 py-3 text-left font-semibold">よくある原因</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対処法</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">ClassNotFoundException</td>
+                                    <td class="px-4 py-3 text-slate-600">ドライバの JAR がクラスパスにない</td>
+                                    <td class="px-4 py-3 text-slate-600">pom.xml / build.gradle にドライバ依存を追加する</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">No suitable driver found</td>
+                                    <td class="px-4 py-3 text-slate-600">接続 URL の書き式が誤っている、またはドライバが未ロード</td>
+                                    <td class="px-4 py-3 text-slate-600">URL の先頭（<code class="bg-slate-100 px-1 rounded">jdbc:h2:</code> 等）を確認。ドライバ依存を再確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">Connection refused</td>
+                                    <td class="px-4 py-3 text-slate-600">DB サーバーが起動していない、またはホスト・ポートが誤り</td>
+                                    <td class="px-4 py-3 text-slate-600">DB の起動確認。接続 URL のホスト・ポートを見直す</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">Access denied / Login failed</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー名・パスワードが誤っている</td>
+                                    <td class="px-4 py-3 text-slate-600">認証情報を確認。DB 側でユーザー権限を確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">ResultSet is closed</td>
+                                    <td class="px-4 py-3 text-slate-600">Statement や Connection を閉じた後に ResultSet を参照している</td>
+                                    <td class="px-4 py-3 text-slate-600">ResultSet の操作を Statement/Connection の close より前に完了させる</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-800">ORA-00942 / Table not found</td>
+                                    <td class="px-4 py-3 text-slate-600">テーブル名のスペルミス、または接続先 DB が違う</td>
+                                    <td class="px-4 py-3 text-slate-600">テーブル名と接続 URL を再確認する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>SQLException の読み方</strong>: <code class="bg-slate-100 px-1 rounded">catch (SQLException e)</code> でキャッチした例外は、<code class="bg-slate-100 px-1 rounded">e.getMessage()</code>（エラー内容）と <code class="bg-slate-100 px-1 rounded">e.getSQLState()</code>（エラーの種類を示す5桁コード）を確認します。<code class="bg-slate-100 px-1 rounded">e.printStackTrace()</code> でスタックトレースを表示すると、どのコードで起きたかも把握できます。
+                    </p>
+
+                    <!-- コード例 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SQLException の詳細を確認する</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">try (Connection conn = DriverManager.getConnection(URL, USER, PASS)) {
+    // … SQL 操作 …
+} catch (SQLException e) {
+    // エラー内容・SQLState を確認してデバッグに役立てる
+    System.err.println("エラーメッセージ: " + e.getMessage());
+    System.err.println("SQLState: " + e.getSQLState());
+    e.printStackTrace(); // スタックトレースを出力
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション8.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 パフォーマンス向上のヒント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JDBC のパフォーマンスは、少し気をつけるだけで大きく改善できます。代表的なヒントをまとめます。
+                    </p>
+
+                    <!-- ヒント一覧カード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-table-columns text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">必要な列だけ SELECT する</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-blue-100 px-1 rounded">SELECT *</code> は全列を転送するため無駄が多い。<code class="bg-blue-100 px-1 rounded">SELECT id, name</code> のように必要な列だけを指定する。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-recycle text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">PreparedStatement を使い回す</h3>
+                            <p class="text-sm text-slate-600">SQL 解析はコストがかかる。同じ SQL を繰り返す場合、PreparedStatement を一度作って使い回すとオーバーヘッドを減らせる。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-layer-group text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">バッチ処理で大量 INSERT を高速化</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-emerald-100 px-1 rounded">addBatch()</code> で SQL をまとめ、<code class="bg-emerald-100 px-1 rounded">executeBatch()</code> で一括送信。1件ずつ実行するより DB とのやり取りが激減する。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-hourglass-half text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">接続を必要最小限の時間だけ保持する</h3>
+                            <p class="text-sm text-slate-600">接続を長時間開きっぱなしにするとプールが枯渇する。SQL を実行する直前に取得し、すぐ close（返却）する習慣をつける。</p>
+                        </div>
+                    </div>
+
+                    <!-- バッチ処理のコード例 -->
+                    <p class="text-slate-600 leading-relaxed mb-2">バッチ処理の最小コード例を見てみましょう。</p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">バッチ INSERT の例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">String sql = "INSERT INTO users (name, email) VALUES (?, ?)";
+try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+     PreparedStatement ps = conn.prepareStatement(sql)) {
+
+    conn.setAutoCommit(false); // バッチはトランザクションと組み合わせる
+    for (String[] row : dataList) { // 登録したいデータを順に処理
+        ps.setString(1, row[0]);    // name をセット
+        ps.setString(2, row[1]);    // email をセット
+        ps.addBatch();              // SQL をバッチに追加
+    }
+    ps.executeBatch(); // まとめて送信（1件ずつより高速）
+    conn.commit();     // 全件成功したらコミット
+}</code></pre>
+                    </div>
+
+                    <!-- DB インデックスのヒント -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">DB 側のチューニング: インデックスを活用する</p>
+                                <p class="text-blue-900 text-sm">WHERE 句で頻繁に絞り込む列には、DB 側でインデックスを張ると検索速度が劇的に上がります。JDBC プログラムの改善だけでなく、テーブル設計・インデックス設計も性能に大きく影響します。SQL や DB 設計の深掘りは「次のステップ」（8.5）で紹介するリソースで学べます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.5 まとめ -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 まとめと次のステップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        全8章を通して、JDBC の基礎から実践まで一通り学びました。各章で身につけたことをまとめます。
+                    </p>
+
+                    <!-- 全章振り返りリスト -->
+                    <div class="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-5 my-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-slate-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-book-open text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-3">全8章で学んだこと</h3>
+                                <ul class="space-y-2">
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第1章</strong>: JDBC の役割・ドライバの仕組み・DB 接続の全体像</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第2章</strong>: ドライバのセットアップ・DriverManager・Connection・接続 URL</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第3章</strong>: SELECT 文・Statement・ResultSet での結果取得</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第4章</strong>: INSERT / UPDATE / DELETE・executeUpdate() の戻り値</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第5章</strong>: PreparedStatement・プレースホルダ・SQL インジェクション対策</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第6章</strong>: トランザクション（commit / rollback）・例外処理・finally での close</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第7章</strong>: DAO パターン・DB 処理とビジネスロジックの分離・再利用可能な設計</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-slate-700">
+                                        <i class="fas fa-check-circle text-slate-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>第8章</strong>: try-with-resources・コネクションプーリング・エラー対処・バッチ処理</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 次のステップカード（エメラルド） -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-arrow-right text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2">次の学習ステップ</h3>
+                                <p class="text-emerald-900 mb-3">JDBC の基礎をマスターしたら、以下のトピックに進んで実務レベルへステップアップしましょう。</p>
+                                <ul class="space-y-2">
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>Spring JdbcTemplate / Spring Data</strong> — JDBC をさらに抽象化したフレームワーク。定型コードが大幅に減る</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>JPA / Hibernate・MyBatis</strong> — O/R マッパー。オブジェクトと DB テーブルを自動でマッピングする</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>SQL の深掘り</strong> — JOIN・集計・サブクエリ・ウィンドウ関数など、より高度な SQL を習得する</span>
+                                    </li>
+                                    <li class="flex items-start gap-2 text-emerald-900">
+                                        <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                        <span><strong>DB 設計（ER 図・正規化）</strong> — 実務で通用するテーブル設計の基礎を固める</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-1: コードを try-with-resources に書き換える
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">これまでに書いた JDBC コードを振り返り、<code class="bg-purple-100 px-1 rounded">finally</code> ブロックで手動 close していた部分を try-with-resources に書き換えてみましょう。リソース解放をより安全・簡潔にする練習です。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">第3〜7章で作成したサンプルコードを1つ選ぶ。<code class="bg-purple-100 px-1 rounded">finally</code> ブロックで <code class="bg-purple-100 px-1 rounded">close()</code> を呼んでいるコードが対象。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">try (Connection conn = ...; PreparedStatement ps = ...) { ... }</code> の形式に書き換える。<code class="bg-purple-100 px-1 rounded">finally</code> ブロックと手動 close を削除する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">書き換え前後でプログラムの動作が変わらないことを確認する。ResultSet も try-with-resources にネストして書けるか試してみよう。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">（発展）8.4 のバッチ処理コードを参考に、<code class="bg-purple-100 px-1 rounded">addBatch() / executeBatch()</code> を使って複数件の INSERT をまとめて実行してみよう。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. try-with-resources を使うと、finally ブロックで手動 close するコードと比べてどんな利点がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            try の丸括弧内で宣言したリソースが<strong>正常終了でも例外が発生しても必ず自動 close</strong> されます。「閉じ忘れ」や「例外時に close が実行されない」バグを構造的に防げるため、コードが短くなり安全性が高まります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. コネクションプーリングを使う主な理由は何ですか？また、Java での代表的な実装を1つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            データベース接続の作成はコストが高いため、あらかじめ複数の接続を作っておき<strong>使い回す（貸し出し・返却）</strong>ことで、接続コストを削減しパフォーマンスを向上させます。代表的な実装は <strong>HikariCP</strong>（または Apache DBCP）です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 「No suitable driver found」というエラーが発生しました。考えられる原因と対処法を述べてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            主な原因は、<strong>① JDBC ドライバの JAR がクラスパスに存在しない</strong>、または<strong>② 接続 URL の書式（<code class="bg-blue-100 px-1 rounded">jdbc:h2:</code> 等のプレフィックス）が誤っている</strong>、のいずれかです。pom.xml / build.gradle のドライバ依存設定と接続 URL を再確認することで対処できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jdbc-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第7章: 実践的なDAOパターン</span>
+                        </div>
+                    </a>
+                    <span class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                                 bg-slate-100 opacity-60 cursor-not-allowed">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-500 block">最終章です</span>
+                            <span class="text-slate-700 font-medium">お疲れさまでした！</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                    </span>
+                </nav>
