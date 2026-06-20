@@ -262,7 +262,7 @@ try {
                             <i class="fas fa-key text-emerald-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
-                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 px-1 rounded">rollback()</code> は <code class="bg-emerald-100 px-1 rounded">catch</code> ブロック内で呼びます。commit 前に例外が発生した場合、rollback を呼ばないと「確定していない変更がいつまでも宙に浮いた状態」になりえます。必ず catch で rollback するクセをつけましょう。</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 px-1 rounded">rollback()</code> は <code class="bg-emerald-100 px-1 rounded">catch</code> ブロック内で呼びます。commit 前に例外が発生したのに rollback を呼ばないと、<strong>トランザクションが未完了のまま残ります</strong>。その間は変更しようとした行に<strong>ロックがかかったまま</strong>になり、ほかの処理が待たされたり、その接続を占有し続けたりします。さらに、接続が閉じられるとき DB 側が<strong>暗黙的に rollback</strong> して、意図しないタイミングで変更が取り消されることもあります。必ず catch で明示的に rollback するクセをつけましょう。</p>
                             </div>
                         </div>
                     </div>
@@ -376,6 +376,37 @@ try {
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100 px-1 rounded">finally</code> ブロックは、<code class="bg-slate-100 px-1 rounded">try</code> が正常終了しても例外で終了しても<strong>必ず実行</strong>されます。そのため、リソースの解放処理を書く場所として適しています。
                     </p>
+
+                    <!-- rollback/close も例外を投げる 注意カード -->
+                    <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-amber-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-amber-800 mb-1">注意: rollback() や close() 自体も SQLException を投げる</p>
+                                <p class="text-amber-900 text-sm mb-2"><code class="bg-amber-100 px-1 rounded">conn.rollback()</code> や <code class="bg-amber-100 px-1 rounded">conn.close()</code> もチェック例外 <code class="bg-amber-100 px-1 rounded">SQLException</code> を投げます。上のコードは <code class="bg-amber-100 px-1 rounded">catch</code>／<code class="bg-amber-100 px-1 rounded">finally</code> の中でこれらを呼んでいるため、<strong>その例外を外側で受け止める必要があります</strong>。このまま <code class="bg-amber-100 px-1 rounded">main</code> に書くと、メソッドに <code class="bg-amber-100 px-1 rounded">throws SQLException</code> が無い場合はコンパイルエラーになります。</p>
+                                <p class="text-amber-900 text-sm">対処は2つです。① メソッド宣言に <code class="bg-amber-100 px-1 rounded">throws SQLException</code> を付ける、② <code class="bg-amber-100 px-1 rounded">close()</code> などをさらに <code class="bg-amber-100 px-1 rounded">try-catch</code> で囲む（下の例）。次章で学ぶ <strong>try-with-resources</strong> を使えば、この煩雑さの大半を避けられます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">close() の例外を finally 内で処理する例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">} finally {
+    if (conn != null) {
+        try {
+            conn.close();            // close() も SQLException を投げる
+        } catch (SQLException ex) {
+            ex.printStackTrace();    // finally 内でさらに try-catch して処理する
+        }
+    }
+}</code></pre>
+                    </div>
 
                     <!-- 重要ポイントカード（エメラルド）: 閉じ忘れ＝接続リーク -->
                     <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">

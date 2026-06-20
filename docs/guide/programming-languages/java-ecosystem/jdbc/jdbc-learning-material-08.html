@@ -232,6 +232,37 @@ try (Connection conn = ds.getConnection()) { // プールから貸し出し
 } // ← ここで接続はプールへ返却される（実際には close されない）</code></pre>
                     </div>
 
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HikariCP は Java 標準ライブラリではなく<strong>外部ライブラリ</strong>です。H2 ドライバと同じように、依存関係に追加する必要があります（Maven の例）。
+                    </p>
+
+                    <div class="code-block-wrapper my-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">pom.xml（HikariCP の依存・抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;dependency&gt;
+    &lt;groupId&gt;com.zaxxer&lt;/groupId&gt;
+    &lt;artifactId&gt;HikariCP&lt;/artifactId&gt;
+    &lt;version&gt;5.1.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+                    </div>
+
+                    <!-- close/返却 の違いカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">2種類の「close」を区別する</p>
+                                <p class="text-emerald-900 text-sm mb-2"><strong>接続の <code class="bg-emerald-100 px-1 rounded">conn.close()</code></strong>: プールから借りた接続を<strong>返却</strong>するだけで、実際には切断されません。だからこそ、借りた接続は使い終わったら必ず <code class="bg-emerald-100 px-1 rounded">close()</code>（返却）してください。返し忘れるとプールが枯渇します。try-with-resources で借りれば自動で返却されます。</p>
+                                <p class="text-emerald-900 text-sm"><strong>プール本体の <code class="bg-emerald-100 px-1 rounded">ds.close()</code></strong>: <code class="bg-emerald-100 px-1 rounded">HikariDataSource</code> 自体もリソースです。こちらはアプリ終了時に一度だけ閉じ、保持している全接続を破棄します。プールは通常アプリ全体で1つだけ作り、使い回します。</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ヒントカード -->
                     <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
                         <div class="flex items-start gap-3">
@@ -366,10 +397,10 @@ try (Connection conn = ds.getConnection()) { // プールから貸し出し
                     </div>
 
                     <!-- バッチ処理のコード例 -->
-                    <p class="text-slate-600 leading-relaxed mb-2">バッチ処理の最小コード例を見てみましょう。</p>
+                    <p class="text-slate-600 leading-relaxed mb-2">バッチ処理のコード例を見てみましょう。第6章で学んだトランザクションと組み合わせ、<strong>失敗時は <code class="bg-slate-100 px-1 rounded">rollback()</code> で全件取り消す</strong>のが完成形です。</p>
                     <div class="code-block-wrapper my-6">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
-                            <span class="text-slate-400 text-sm">バッチ INSERT の例</span>
+                            <span class="text-slate-400 text-sm">バッチ INSERT の例（rollback 付き）</span>
                             <button class="copy-btn text-slate-400 hover:text-white transition-colors"
                                     onclick="copyCode(this)">
                                 <i class="fas fa-copy"></i>
@@ -380,14 +411,30 @@ try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
      PreparedStatement ps = conn.prepareStatement(sql)) {
 
     conn.setAutoCommit(false); // バッチはトランザクションと組み合わせる
-    for (String[] row : dataList) { // 登録したいデータを順に処理
-        ps.setString(1, row[0]);    // name をセット
-        ps.setString(2, row[1]);    // email をセット
-        ps.addBatch();              // SQL をバッチに追加
+    try {
+        for (String[] row : dataList) { // 登録したいデータを順に処理
+            ps.setString(1, row[0]);    // name をセット
+            ps.setString(2, row[1]);    // email をセット
+            ps.addBatch();              // SQL をバッチに追加
+        }
+        ps.executeBatch(); // まとめて送信（1件ずつより高速）
+        conn.commit();     // 全件成功したらコミット
+    } catch (SQLException e) {
+        conn.rollback();   // 1件でも失敗したら全件取り消し
+        throw e;           // 例外は握りつぶさず呼び出し元へ伝える
     }
-    ps.executeBatch(); // まとめて送信（1件ずつより高速）
-    conn.commit();     // 全件成功したらコミット
 }</code></pre>
+                    </div>
+
+                    <!-- バッチ＋rollback 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: バッチも「全部成功か全部取り消し」</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 px-1 rounded">setAutoCommit(false)</code> でまとめたバッチは、<code class="bg-emerald-100 px-1 rounded">executeBatch()</code> の途中で1件でも失敗すると例外になります。その際 <code class="bg-emerald-100 px-1 rounded">rollback()</code> を呼ばないと、それまでに送った分が中途半端に残るおそれがあります。<code class="bg-emerald-100 px-1 rounded">try-catch</code> で <code class="bg-emerald-100 px-1 rounded">rollback()</code> し、例外を握りつぶさず呼び出し元へ伝えましょう。</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- DB インデックスのヒント -->
