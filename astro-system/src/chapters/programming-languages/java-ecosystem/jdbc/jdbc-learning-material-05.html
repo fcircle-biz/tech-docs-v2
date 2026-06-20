@@ -1,0 +1,524 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JDBC</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第5章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第5章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">プリペアドステートメント（PreparedStatement）の活用</h1>
+                    <p class="text-slate-600">SQL インジェクション対策と処理速度向上のための PreparedStatement の使い方を詳しく学びます。プレースホルダ（?）の使い方、パラメータのバインド方法、Statement との違いを理解して、より安全で効率的なデータベースプログラミングを身につけましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Statement で文字列連結をする危険な書き方と、その問題点を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SQL インジェクション攻撃の仕組みと与える被害を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PreparedStatement のプレースホルダ（?）とパラメータバインドの基本を習得する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>PreparedStatement が SQL インジェクションを防ぐ仕組みを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Statement と PreparedStatement の違いを整理し、使い分けの基準を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション5.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.1 Statement の問題点 — 文字列連結の危険な書き方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第3章・第4章で学んだ <code class="bg-slate-100 px-1 rounded">Statement</code> を使った書き方では、ユーザーが入力した値を SQL 文に「文字列として貼り付ける」ことがよくあります。たとえば、名前で会員を検索するプログラムを次のように書いたとします。
+                    </p>
+
+                    <!-- 危険な例のコードブロック -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">危険な書き方（文字列連結）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ユーザーが入力した名前を受け取る
+String input = getInputFromUser(); // 例: "佐藤 太郎"
+
+// ★危険: ユーザー入力をそのまま SQL 文字列に連結している
+String sql = "SELECT * FROM users WHERE name = '" + input + "'";
+
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery(sql); // 危険な SQL を実行してしまう</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        入力が正しい名前であれば問題なく動作します。しかし、<strong>ユーザーが意図的に悪意ある文字列を入力したら、どうなるでしょうか？</strong> SQL の文字列連結は、入力内容をそのまま SQL 文の「命令の一部」として解釈してしまいます。これが、次節で学ぶ「SQL インジェクション」の根本的な原因です。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: 文字列連結</p>
+                                <p class="text-blue-900 text-sm">Java の <code class="bg-blue-100 px-1 rounded">+</code> 演算子などで複数の文字列をつなぎ合わせることを「文字列連結」といいます。<code class="bg-blue-100 px-1 rounded">"... WHERE name = '" + input + "'"</code> のように、変数の値を SQL 文字列の途中に埋め込む書き方です。直感的に書けますが、<strong>セキュリティ上の大きなリスク</strong>があります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.2 SQL インジェクションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>SQL インジェクション（SQL Injection）</strong>とは、<strong>悪意ある入力を SQL 文の「命令の一部」として紛れ込ませる攻撃</strong>です。「インジェクション（injection）」は「注入」という意味で、文字列連結を利用して、本来は「データ」として扱われるべき入力を、SQL の「命令」として注入します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば、先ほどの危険な書き方で、ユーザーが名前として <code class="bg-slate-100 px-1 rounded">' OR '1'='1</code> という文字列を入力したとします。連結後の SQL はどうなるでしょうか？
+                    </p>
+
+                    <!-- 攻撃のイメージコードブロック -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SQL インジェクションの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 入力: ' OR '1'='1 を連結すると…
+-- SELECT * FROM users WHERE name = '' OR '1'='1'
+--
+-- '1'='1' は常に真（TRUE）なので、
+-- WHERE 句全体が常に TRUE になり全件取得されてしまう！</code></pre>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">危険: SQL インジェクションで起こりうる被害</p>
+                                <ul class="text-red-900 text-sm space-y-1 mt-2">
+                                    <li class="flex items-start gap-2"><i class="fas fa-circle text-red-400 text-xs mt-1.5 flex-shrink-0"></i><span><strong>全件データ漏洩</strong> — 認証をすり抜けてすべてのユーザー情報を取得される</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-circle text-red-400 text-xs mt-1.5 flex-shrink-0"></i><span><strong>データ改ざん・削除</strong> — UPDATE や DELETE を注入してデータを書き換えられる</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-circle text-red-400 text-xs mt-1.5 flex-shrink-0"></i><span><strong>ログインバイパス</strong> — パスワードを知らずに管理者としてログインされる</span></li>
+                                </ul>
+                                <p class="text-red-900 text-sm mt-3">SQL インジェクションはウェブアプリの攻撃手法の中でも<strong>特に危険度が高い</strong>ものです。必ず PreparedStatement で対策しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 攻撃フローの図解 -->
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL インジェクションの仕組みを図で確認しましょう。「入力値」が「データ」ではなく「SQL の命令」として解釈される流れがポイントです。
+                    </p>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["ユーザー入力<br/>' OR '1'='1"] --> B["文字列連結<br/>WHERE name = '' OR '1'='1'"]
+    B --> C{"SQL として解釈される"}
+    C -->|"条件が常に TRUE"| D["全件取得される<br/>（データ漏洩）"]
+    C -->|"DROP TABLE など"| E["データ破壊<br/>（最悪のケース）"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.3 PreparedStatement の基本 — プレースホルダ（?）の使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>PreparedStatement</strong> を使うと、SQL 文の「値を埋め込む場所」を <code class="bg-slate-100 px-1 rounded">?</code>（プレースホルダ）として先に確定させ、あとから値だけを「データ」として安全にバインド（結びつける）できます。ユーザーの入力が SQL の「命令」として解釈されることはありません。
+                    </p>
+
+                    <!-- PreparedStatement の基本コード -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">PreparedStatement の基本的な使い方</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ユーザー入力（悪意ある文字列が来ても安全）
+String input = getInputFromUser();
+
+// 1. SQL は ? でプレースホルダを使って先に確定させる
+String sql = "SELECT * FROM users WHERE name = ?";
+PreparedStatement pstmt = conn.prepareStatement(sql);
+
+// 2. ? に値をバインドする（第1引数: ? のインデックス、第2引数: 値）
+pstmt.setString(1, input); // 1番目の ? に input を「データ」として渡す
+
+// 3. 実行する（executeQuery に SQL 文字列を渡さない点に注目）
+ResultSet rs = pstmt.executeQuery();</code></pre>
+                    </div>
+
+                    <!-- ヒントカード: インデックスについて -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">? のインデックスは 1 始まり</p>
+                                <p class="text-blue-900 text-sm">Java の配列は 0 始まりですが、PreparedStatement の <code class="bg-blue-100 px-1 rounded">setXxx()</code> メソッドで指定する <code class="bg-blue-100 px-1 rounded">?</code> の番号（インデックス）は <strong>1 始まり</strong>です。SQL 文の左から何番目の <code class="bg-blue-100 px-1 rounded">?</code> かを数えて指定します。<code class="bg-blue-100 px-1 rounded">?</code> が複数ある場合は <code class="bg-blue-100 px-1 rounded">setString(1, ...)</code>・<code class="bg-blue-100 px-1 rounded">setInt(2, ...)</code> のように順に指定します。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        主なバインドメソッドは次のとおりです。Java の型に合わせて使い分けます。
+                    </p>
+
+                    <!-- バインドメソッド一覧テーブル -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">メソッド</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Java の型</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対応する SQL 型の例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setString(1, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">String</td>
+                                    <td class="px-4 py-3 text-slate-600">VARCHAR, TEXT など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setInt(1, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">int</td>
+                                    <td class="px-4 py-3 text-slate-600">INT, INTEGER など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setLong(1, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">long</td>
+                                    <td class="px-4 py-3 text-slate-600">BIGINT など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setDouble(1, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">double</td>
+                                    <td class="px-4 py-3 text-slate-600">DOUBLE, FLOAT など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setBoolean(1, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">boolean</td>
+                                    <td class="px-4 py-3 text-slate-600">BOOLEAN など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code class="bg-slate-100 px-1 rounded">setNull(1, Types.VARCHAR)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">null 値</td>
+                                    <td class="px-4 py-3 text-slate-600">NULL を明示的にセット</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 複数の ? を使う例 -->
+                    <p class="text-slate-600 leading-relaxed mb-2">INSERT など、複数のパラメータが必要な場合も同様に <code class="bg-slate-100 px-1 rounded">?</code> を複数使えます。</p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">複数のプレースホルダの例（INSERT）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 複数の ? には左から順にインデックス 1, 2, 3 ... を割り当てる
+String sql = "INSERT INTO users (name, email, age) VALUES (?, ?, ?)";
+PreparedStatement pstmt = conn.prepareStatement(sql);
+
+pstmt.setString(1, "田中 次郎");      // 1番目 ? = name
+pstmt.setString(2, "jiro@example.com"); // 2番目 ? = email
+pstmt.setInt(3, 25);                   // 3番目 ? = age
+
+int count = pstmt.executeUpdate(); // 挿入された行数が返る</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.4 なぜ安全なのか — 入力は常に「データ」として扱われる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PreparedStatement が安全な理由は、<strong>SQL 文の「構造」と「値」を完全に分離する</strong>仕組みにあります。SQL 文は <code class="bg-slate-100 px-1 rounded">prepareStatement()</code> の時点でデータベースにあらかじめ送られ、解析・コンパイルされます。あとから <code class="bg-slate-100 px-1 rounded">setString()</code> などで渡す値は、<strong>「データ（文字列そのもの）」として扱われるだけで、SQL 命令として解釈されることは絶対にありません。</strong>
+                    </p>
+
+                    <!-- 安全な仕組みのフロー図 -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["prepareStatement()<br/>SQL の構造を先に確定"] --> B["データベースが<br/>SQL をコンパイル・解析"]
+    B --> C["setString（1, input）<br/>値を「データ」として渡す"]
+    C --> D{"input が<br/>' OR '1'='1 でも…"}
+    D --> E["「name = ' OR '1'='1'」という<br/>文字列データとして検索される"]
+    E --> F["SQL 命令としては<br/>解釈されない<br/>→ 攻撃が成立しない"]
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード（エメラルド） -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: なぜ PreparedStatement は安全か</p>
+                                <ul class="text-emerald-900 text-sm space-y-2 mt-2">
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                        <span><strong>SQL の構造はコンパイル時に確定</strong> — <code class="bg-emerald-100 px-1 rounded">prepareStatement()</code> の段階でデータベースが SQL を解析します。この後から変えられるのは「値（データ）」だけです。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                        <span><strong>値は純粋な「データ」として扱われる</strong> — <code class="bg-emerald-100 px-1 rounded">setString()</code> で渡した文字列に <code class="bg-emerald-100 px-1 rounded">'</code> や SQL キーワードが含まれていても、SQL 命令としては絶対に解釈されません。</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i class="fas fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>
+                                        <span><strong>エスケープ処理を自動で行う</strong> — JDBC ドライバが値を適切にエスケープするため、プログラマが手動でエスケープする必要がありません。</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.5 速度面の利点と Statement との使い分け
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PreparedStatement はセキュリティ面だけでなく、<strong>処理速度の面でも有利</strong>です。同じ SQL 文を繰り返し実行する場合、PreparedStatement は最初の <code class="bg-slate-100 px-1 rounded">prepareStatement()</code> 呼び出し時に SQL を「プリコンパイル（事前解析）」し、<strong>実行計画をデータベース側でキャッシュ</strong>します。2回目以降は SQL のコンパイルをスキップするため、高速に実行できます。
+                    </p>
+
+                    <!-- 処理フロー比較の図 -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph S["Statement（毎回コンパイル）"]
+        direction TB
+        S1["SQL文字列を連結"] --> S2["SQLを送信"]
+        S2 --> S3["DB がコンパイル"]
+        S3 --> S4["実行"]
+    end
+    subgraph P["PreparedStatement（プリコンパイル）"]
+        direction TB
+        P1["prepareStatement()<br/>でコンパイル済み"] --> P2["値をバインドして送信"]
+        P2 --> P3["DB はキャッシュを使う"]
+        P3 --> P4["高速実行"]
+    end
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        特に、ループの中で同じ INSERT を何百回も繰り返す処理などでは、PreparedStatement の速度優位が顕著に現れます。Statement と PreparedStatement の違いをまとめると次のとおりです。
+                    </p>
+
+                    <!-- 比較テーブル -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Statement</th>
+                                    <th class="px-4 py-3 text-left font-semibold">PreparedStatement</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SQL の指定方法</td>
+                                    <td class="px-4 py-3 text-slate-600">実行時に SQL 文字列を渡す</td>
+                                    <td class="px-4 py-3 text-slate-600">事前に SQL を確定し、? で値をバインド</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">セキュリティ</td>
+                                    <td class="px-4 py-3 text-slate-600">文字列連結で SQL インジェクションの危険あり</td>
+                                    <td class="px-4 py-3 text-slate-600 font-medium text-emerald-700">SQL インジェクションを防げる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">速度（繰り返し実行）</td>
+                                    <td class="px-4 py-3 text-slate-600">毎回 SQL をコンパイルするため遅い</td>
+                                    <td class="px-4 py-3 text-slate-600 font-medium text-emerald-700">プリコンパイルで高速（実行計画を再利用）</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">使い分けの結論</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー入力を扱わない・使い捨ての場合のみ</td>
+                                    <td class="px-4 py-3 text-slate-600 font-semibold">基本は常にこちらを使う</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">結論: 基本は常に PreparedStatement を使う</p>
+                                <p class="text-emerald-900 text-sm">Statement が有効なのは、<strong>ユーザー入力を一切含まない固定の SQL を一度だけ実行する</strong>場合に限られます。ユーザー入力・外部から来る値・動的に変わる値が絡む場合は、<strong>迷わず PreparedStatement を使いましょう。</strong> セキュリティと速度の両方でメリットがあります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 5-1: 危険な書き方と安全な書き方を比べる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">文字列連結の危険な版と PreparedStatement の安全な版を実際に書き比べ、悪意ある入力を与えたときの挙動の違いを体感しましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">H2 データベースに <code class="bg-purple-100 px-1 rounded">users</code> テーブル（id, name, email 列）を作成し、数件のテストデータを INSERT しておく。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">【危険な版】<code class="bg-purple-100 px-1 rounded">Statement</code> と文字列連結で名前検索するプログラムを書く。入力として <code class="bg-purple-100 px-1 rounded">' OR '1'='1</code> を与えて実行し、何件取得されるか確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">【安全な版】同じ検索を <code class="bg-purple-100 px-1 rounded">PreparedStatement</code> と <code class="bg-purple-100 px-1 rounded">setString()</code> で書き直す。同じ入力 <code class="bg-purple-100 px-1 rounded">' OR '1'='1</code> を与えて実行し、0件（または一致する件数のみ）になることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">なぜ PreparedStatement では攻撃が成立しないのか、自分の言葉で一言まとめてみる。</span>
+                                </li>
+                            </ol>
+
+                            <!-- ヒント -->
+                            <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                <p class="text-purple-900 text-sm font-medium mb-1"><i class="fas fa-lightbulb text-purple-500 mr-1"></i>ヒント</p>
+                                <p class="text-purple-900 text-sm break-words">危険な版で全件取得されてしまった場合、そのまま次のステップへ進みましょう（本番サービスでは絶対に使わないこと）。安全な版で 0 件になれば、PreparedStatement が正しく機能している証拠です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. PreparedStatement で使う <code class="bg-blue-100 px-1 rounded">?</code>（プレースホルダ）の役割を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            SQL 文の中で「あとから値を入れる場所（プレースホルダ）」を表す記号です。SQL の構造をあらかじめ確定させておくことで、後から渡す値が SQL 命令として解釈されるのを防ぎます。<code class="bg-blue-100">setString()</code> などのメソッドでバインドした値は、純粋な「データ」として扱われます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100 px-1 rounded">pstmt.setString(2, "test@example.com")</code> の第1引数「2」は何を意味しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            SQL 文の左から数えて「2番目の <code class="bg-blue-100">?</code>」を指定するインデックスです。PreparedStatement のインデックスは <strong>1 始まり</strong>であることに注意してください。この場合、2番目の <code class="bg-blue-100">?</code> に文字列 <code class="bg-blue-100">"test@example.com"</code> をデータとしてバインドします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. PreparedStatement を使うと SQL インジェクションを防げるのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            SQL の「構造（命令の形）」は <code class="bg-blue-100">prepareStatement()</code> の時点でデータベースにプリコンパイルされ、確定しているためです。あとから <code class="bg-blue-100">setString()</code> などで渡す値は「データ（文字列そのもの）」としてのみ扱われ、どんな文字列が渡されても SQL 命令として解釈されることはありません。そのため、<code class="bg-blue-100">' OR '1'='1</code> のような悪意ある文字列が入力されても、それは「名前データ」として検索されるだけで攻撃は成立しません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jdbc-learning-material-04.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第4章: データの登録・更新・削除</span>
+                        </div>
+                    </a>
+                    <a href="jdbc-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第6章: トランザクション処理と例外処理</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
