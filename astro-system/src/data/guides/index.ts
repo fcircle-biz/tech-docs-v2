@@ -14,9 +14,10 @@ import { claudeCode } from './development-processes/claude-code';
 import { codex } from './development-processes/codex';
 import { java } from './programming-languages/java-ecosystem/java';
 import { jdbc } from './programming-languages/java-ecosystem/jdbc';
+import { springDataJdbc } from './programming-languages/java-ecosystem/spring-data-jdbc';
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, javascript];
+const all: TechGuide[] = [claudeCode, codex, java, jdbc, springDataJdbc, javascript];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
 export const guideRegistry: Record<string, Record<string, TechGuide>> = {};
