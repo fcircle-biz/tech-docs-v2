@@ -1,0 +1,41 @@
+import type { TechGuide } from '../../types';
+
+// JUnit 入門学習ガイド（全12章）。技術色 = エメラルド（テスト/QA ＝ JUnit5 ブランド寄り）。
+export const junit: TechGuide = {
+  category: 'programming-languages/java-ecosystem',
+  slug: 'junit',
+  techTitle: 'JUnit学習教材',
+  icon: 'fa-vial',
+  level: '初級',
+  categoryLabel: 'プログラミング言語',
+  totalTime: '約10時間',
+  splashStop0: '#10b981',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#ecfdf5',
+    100: '#d1fae5',
+    200: '#a7f3d0',
+    300: '#6ee7b7',
+    400: '#34d399',
+    500: '#10b981',
+    600: '#059669',
+    700: '#047857',
+    800: '#065f46',
+    900: '#064e3b',
+  },
+  chapters: [
+    { number: 1, name: 'テストって何だろう？ ソフトウェアテスト入門', file: 'junit-learning-material-01.html' },
+    { number: 2, name: 'はじめてのJUnitテスト（環境構築）', file: 'junit-learning-material-02.html' },
+    { number: 3, name: '期待通りか確かめよう アサーションの基本', file: 'junit-learning-material-03.html' },
+    { number: 4, name: 'テストを整理整頓 テストクラスの構成', file: 'junit-learning-material-04.html' },
+    { number: 5, name: 'テストの準備と後片付け ライフサイクル', file: 'junit-learning-material-05.html' },
+    { number: 6, name: '様々な状況を確かめる パラメータ化テスト', file: 'junit-learning-material-06.html' },
+    { number: 7, name: 'エラーもテストしよう 例外テスト', file: 'junit-learning-material-07.html' },
+    { number: 8, name: '読みやすく DisplayNameとネストクラス', file: 'junit-learning-material-08.html' },
+    { number: 9, name: '実践！電卓アプリのテスト（前編）', file: 'junit-learning-material-09.html' },
+    { number: 10, name: '実践！電卓アプリのテスト（後編）とカバレッジ', file: 'junit-learning-material-10.html' },
+    { number: 11, name: 'テスト駆動開発（TDD）入門', file: 'junit-learning-material-11.html' },
+    { number: 12, name: '良いテストを書くコツ ベストプラクティス', file: 'junit-learning-material-12.html' },
+  ],
+};
