@@ -36,6 +36,7 @@
 
 - [**Java入門学習ガイド**](docs/guide/programming-languages/java-ecosystem/java/README.md) - プログラミング未経験者・初心者向けJava入門14章構成カリキュラム。開発環境構築とHello World、変数と型、条件分岐、ループ、配列、メソッドの基礎から、オブジェクト指向の核心（クラスとオブジェクト、フィールドとメソッド、カプセル化、継承、ポリモーフィズム）、さらに例外処理、標準ライブラリ、コレクション（ArrayList / HashMap / HashSet）まで身近なたとえと豊富なコード例で段階的に学習（全14章・約21時間）
 - [**JDBC学習ガイド**](docs/guide/programming-languages/java-ecosystem/jdbc/README.md) - 入門者向けJDBC（Java Database Connectivity）入門8章構成カリキュラム。データベース接続の基本と開発環境準備から、SELECT文によるデータ検索、INSERT/UPDATE/DELETEによる更新、PreparedStatementの活用とSQLインジェクション対策、トランザクション処理と例外処理、DAO（Data Access Object）パターン、コネクションプーリングやtry-with-resourcesなどのベストプラクティスまで段階的に学習（全8章・約7.5時間）
+- [**JSP/Servlet学習ガイド**](docs/guide/programming-languages/java-ecosystem/jsp/README.md) - 入門者向けのJava Webアプリケーション開発（Servlet/JSP）入門11章構成カリキュラム。Webの仕組みとHTTPの基礎・Tomcatのセットアップから、Servletによるリクエスト処理、JSPによる画面生成、フォーム処理とバリデーション、HttpSessionによるセッション管理とログイン機能、フォワード／リダイレクトとMVCパターン、JavaBeansと4つのスコープ、EL式とJSTL、JDBC・DAOパターンによるデータベース連携（CRUD）まで段階的に学習（全11章・約11時間）
 
 #### JavaScript/Node.js
 

@@ -14,6 +14,10 @@ import { claudeCode } from './development-processes/claude-code';
 import { codex } from './development-processes/codex';
 import { java } from './programming-languages/java-ecosystem/java';
 import { jdbc } from './programming-languages/java-ecosystem/jdbc';
+import { jsp } from './programming-languages/java-ecosystem/jsp';
+import { javascript } from './programming-languages/javascript-ecosystem/javascript';
+
+const all: TechGuide[] = [claudeCode, codex, java, jdbc, jsp, javascript];
 import { springBasic } from './programming-languages/java-ecosystem/spring-basic';
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
