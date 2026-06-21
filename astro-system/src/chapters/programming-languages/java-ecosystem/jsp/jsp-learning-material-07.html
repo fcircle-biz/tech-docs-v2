@@ -1,0 +1,763 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JSP/Servlet</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約70分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">セッション管理 - ユーザー状態の保持</h1>
+                    <p class="text-slate-600">この章では、HTTP の「ステートレス」という性質を理解し、<strong>HttpSession</strong> と <strong>Cookie</strong> を使ってユーザーの状態を保持する方法を学びます。ログイン・ログアウト機能の実装を通して、実際のWebアプリでなくてはならないセッション管理をマスターします。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTP のステートレス性とセッションが必要な理由を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HttpSession を使ってユーザーデータを管理できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Cookie の仕組みを理解し、作成・送信・読み取りができる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ログイン・ログアウト機能を実装できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 セッションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ネットショッピングでは、商品ページから移動してカートに進んでも「さっきカートに入れた商品」がちゃんと残っていますよね。でも、HTTP という通信の仕組みは、本来は<strong>前のやり取りを一切覚えていない</strong>設計になっています。この節では、その仕組みと対策を理解しましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">HTTPのステートレス性</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTP は <strong>ステートレス</strong>（stateless）なプロトコルです。「ステートレス」とは「<strong>状態を持たない</strong>」という意味です。ブラウザがページを1回リクエストするごとに、サーバーはそのやり取りが終わると<strong>誰からのリクエストだったかを完全に忘れてしまいます</strong>。次のリクエストが来ても、「あなたさっきも来ましたよね？」とはわかりません。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-medium text-slate-600 mb-3">ステートレスなHTTPの問題: 各リクエストは独立しており、サーバーはユーザーを覚えていない</p>
+                        <div class="mermaid">
+flowchart LR
+    U["ユーザー<br/>（ブラウザ）"]
+    U -->|"① ログインリクエスト"| S["サーバー"]
+    S -->|"② ログイン成功レスポンス"| U
+    U -->|"③ 次のページリクエスト"| S
+    S -->|"④ 誰？知らない人だ..."| U
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これでは「ログイン済みか否か」を判定したり、カートの中身を維持したりすることができません。そこで登場するのが <strong>セッション</strong>という仕組みです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">セッションの仕組み（セッションID + Cookie）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セッションとは、「<strong>同じユーザーの一連のやり取りをひとまとまりとして扱う</strong>」仕組みです。具体的には次の流れで機能します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">手順</th>
+                                    <th class="px-4 py-3 text-left font-semibold">サーバーの動作</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ブラウザの動作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">①初回アクセス</td>
+                                    <td class="px-4 py-3 text-slate-600">ユニークな<strong>セッションID</strong>を発行してサーバー側に保存</td>
+                                    <td class="px-4 py-3 text-slate-600">セッションIDをCookieに保存</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">②2回目以降</td>
+                                    <td class="px-4 py-3 text-slate-600">CookieのセッションIDを見て「あの人だ」と識別</td>
+                                    <td class="px-4 py-3 text-slate-600">自動でCookieをサーバーへ送信</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">③終了</td>
+                                    <td class="px-4 py-3 text-slate-600">セッションを無効化してデータを削除</td>
+                                    <td class="px-4 py-3 text-slate-600">CookieのセッションIDが無効になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Jakarta Servlet では、このセッションIDは <strong>JSESSIONID</strong> という名前の Cookie として扱われます。ブラウザが次のリクエストを送る際に自動的に Cookie を添付するため、サーバーは「これはさっきの人だ」と判断できます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-medium text-slate-600 mb-3">セッションによる状態管理: JSESSIONIDでユーザーを追跡する</p>
+                        <div class="mermaid">
+flowchart LR
+    B["ブラウザ"]
+    S["サーバー<br/>（セッション記憶）"]
+    B -->|"① リクエスト<br/>（初回）"| S
+    S -->|"② JSESSIONID=abc123<br/>をCookieで返す"| B
+    B -->|"③ 次のリクエスト<br/>+ Cookie:JSESSIONID=abc123"| S
+    S -->|"④ abc123のユーザー<br/>と識別して応答"| B
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">セッションが必要な場面</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        現実のWebアプリでセッションが使われる代表的な場面をまとめました。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-right-to-bracket text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">ログイン状態の維持</h3>
+                            <p class="text-sm text-slate-600">「ログイン済みか否か」を複数ページにわたって判定する。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-cart-shopping text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">ショッピングカート</h3>
+                            <p class="text-sm text-slate-600">商品を選んでいる間、ページを移動しても選択内容を保持する。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-list-check text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">入力ウィザード</h3>
+                            <p class="text-sm text-slate-600">複数ステップの入力フォームで途中のデータを一時保存する。</p>
+                        </div>
+                    </div>
+
+                    <!-- セキュリティの注意 -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">セキュリティ考慮: セッションハイジャックとID再生成</p>
+                                <p class="text-red-900 text-sm">セッションIDが第三者に盗まれると、なりすましログインが可能になります（<strong>セッションハイジャック</strong>）。これを防ぐため、<strong>ログイン成功後は必ずセッションIDを再生成</strong>します。Servletでは <code class="bg-red-100 px-1 rounded">session.invalidate()</code> で古いセッションを破棄し、新しいセッションを取得することが推奨されます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 HttpSessionの使い方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Jakarta Servlet では <strong>jakarta.servlet.http.HttpSession</strong> インタフェースを使ってセッションを操作します。<code class="bg-slate-100 px-1 rounded">HttpServletRequest</code> からセッションを取得し、属性（データ）を読み書きするのが基本パターンです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">セッションの取得</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">request.getSession()</code> を呼ぶと、既存のセッションがあればそれを返し、なければ新しく作って返します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LoginServlet.java — セッションの取得</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 既存セッションを取得、なければ新規作成
+HttpSession session = request.getSession();
+
+// false を渡すと「既存があれば返す・なければ null」になる
+HttpSession session = request.getSession(false);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">主要メソッド一覧</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HttpSession が提供するメソッドを把握しておきましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">メソッド</th>
+                                    <th class="px-4 py-3 text-left font-semibold">役割</th>
+                                    <th class="px-4 py-3 text-left font-semibold">例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium"><code>setAttribute(name, value)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">属性を保存する</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.setAttribute("user", userObj)</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>getAttribute(name)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">属性を取得する（Object型）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.getAttribute("user")</code></td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium"><code>removeAttribute(name)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">属性を削除する</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.removeAttribute("user")</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>invalidate()</code></td>
+                                    <td class="px-4 py-3 text-slate-600">セッションを無効化（ログアウト）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.invalidate()</code></td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium"><code>setMaxInactiveInterval(秒)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">タイムアウト秒数を設定</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.setMaxInactiveInterval(1800)</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>getId()</code></td>
+                                    <td class="px-4 py-3 text-slate-600">セッションIDを取得</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>session.getId()</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">属性の設定と取得のコード例</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SessionDemoServlet.java — 属性の操作</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">HttpSession session = request.getSession();
+
+// セッションにユーザー名を保存
+session.setAttribute("loginUser", "山田太郎");
+
+// セッションのタイムアウトを30分に設定
+session.setMaxInactiveInterval(30 * 60); // 秒で指定
+
+// 別のServlet/JSPで取得する（Object型を適切にキャスト）
+String loginUser = (String) session.getAttribute("loginUser");
+
+// null チェックは必ず行う
+if (loginUser != null) {
+    response.getWriter().println("ようこそ、" + loginUser);
+}</code></pre>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">タイムアウト設定の単位に注意</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100 px-1 rounded">setMaxInactiveInterval()</code> の引数は<strong>秒</strong>です。分ではありません。30分にしたいなら <code class="bg-blue-100 px-1 rounded">30 * 60 = 1800</code> と指定します。デフォルトは Tomcat では30分（1800秒）が多いですが、<code class="bg-blue-100 px-1 rounded">web.xml</code> の <code class="bg-blue-100 px-1 rounded">&lt;session-timeout&gt;</code> で分単位で変更できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 Cookieの基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Cookie</strong>（クッキー）は、サーバーがブラウザに「<strong>小さなデータを覚えておいて</strong>」と頼む仕組みです。ブラウザはそのデータを保存し、次のリクエスト時に自動でサーバーへ送り返します。セッションIDの保存にも使われていますが、独自データを直接保存する用途にも利用できます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">CookieとHttpSessionの違い</h3>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">比較項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Cookie</th>
+                                    <th class="px-4 py-3 text-left font-semibold">HttpSession</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">データの保存場所</td>
+                                    <td class="px-4 py-3 text-slate-600">ブラウザ（クライアント側）</td>
+                                    <td class="px-4 py-3 text-slate-600">サーバー側</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">有効期限</td>
+                                    <td class="px-4 py-3 text-slate-600">setMaxAge() で任意設定可能</td>
+                                    <td class="px-4 py-3 text-slate-600">タイムアウトまたはinvalidate()まで</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">適している用途</td>
+                                    <td class="px-4 py-3 text-slate-600">「次回からチェックを入れる」など長期的な設定</td>
+                                    <td class="px-4 py-3 text-slate-600">ログイン状態など機密性の高いデータ</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">ユーザーが操作可能か</td>
+                                    <td class="px-4 py-3 text-slate-600">削除・無効化できる</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーは直接操作できない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Cookieの作成と送信</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">jakarta.servlet.http.Cookie</code> クラスでCookieオブジェクトを作り、<code class="bg-slate-100 px-1 rounded">response.addCookie()</code> でブラウザへ送ります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">CookieDemoServlet.java — Cookieの作成と送信</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 新しいCookieを作成（名前と値）
+Cookie cookie = new Cookie("username", "yamada");
+
+// 有効期限: 7日間（秒で指定）
+cookie.setMaxAge(7 * 24 * 60 * 60);
+
+// 有効なパス（"/" はサイト全体）
+cookie.setPath("/");
+
+// Cookieをレスポンスに追加してブラウザへ送信
+response.addCookie(cookie);</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Cookieの読み取り</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次のリクエストでは <code class="bg-slate-100 px-1 rounded">request.getCookies()</code> で全Cookieを配列として取得し、目的の名前のものを探します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">CookieDemoServlet.java — Cookieの読み取り</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">Cookie[] cookies = request.getCookies();
+String username = null;
+
+// null チェック: Cookieが全くない場合は null
+if (cookies != null) {
+    for (Cookie c : cookies) {
+        if ("username".equals(c.getName())) {
+            username = c.getValue(); // 値を取得
+            break;
+        }
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">セッションCookieと永続Cookie</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-clock-rotate-left text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">セッションCookie</h3>
+                            <p class="text-sm text-slate-600 mb-2"><code class="bg-slate-200 px-1 rounded">setMaxAge()</code> を呼ばないか、または <code class="bg-slate-200 px-1 rounded">-1</code> を指定。</p>
+                            <p class="text-sm text-slate-600">ブラウザを<strong>閉じると消える</strong>。JSESSIONIDはデフォルトでこちら。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-hard-drive text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">永続Cookie</h3>
+                            <p class="text-sm text-slate-600 mb-2"><code class="bg-emerald-100 px-1 rounded">setMaxAge(秒)</code> で正の値を指定。</p>
+                            <p class="text-sm text-slate-600">ブラウザを閉じても<strong>指定期間は残る</strong>。「次回から自動入力」などに利用。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 ログイン機能の実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セッションを使ったログイン機能の実装パターンを見ていきます。ここでは理解のため、認証は固定のユーザー情報を使った簡易版で説明します。実際のアプリではデータベースと組み合わせます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ログイン〜ログアウトの全体フロー</h3>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["ログインフォームを表示<br/>（login.jsp）"] --> B["ID/パスワードを入力して送信<br/>POST /LoginServlet"]
+    B --> C{"認証チェック<br/>（LoginServlet）"}
+    C -->|"一致しない"| D["エラーメッセージ表示<br/>ログインフォームへ戻る"]
+    C -->|"一致する"| E["セッション再生成<br/>session.invalidate＋getSession"]
+    E --> F["session.setAttribute<br/>でユーザー情報を保存"]
+    F --> G["ログイン後ページへ<br/>リダイレクト"]
+    G --> H["ログアウトボタン押下"]
+    H --> I["session.invalidate<br/>（LogoutServlet）"]
+    I --> J["ログインページへ<br/>リダイレクト"]
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ログインフォーム（login.jsp）</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">login.jsp — ログインフォーム</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-html">&lt;!-- エラーメッセージ表示 --&gt;
+&lt;% String error = (String) request.getAttribute("error"); %&gt;
+&lt;% if (error != null) { %&gt;
+    &lt;p style="color:red;"&gt;&lt;%= error %&gt;&lt;/p&gt;
+&lt;% } %&gt;
+
+&lt;form method="post" action="LoginServlet"&gt;
+    &lt;label&gt;ユーザーID: &lt;input type="text" name="userId"&gt;&lt;/label&gt;
+    &lt;label&gt;パスワード: &lt;input type="password" name="password"&gt;&lt;/label&gt;
+    &lt;button type="submit"&gt;ログイン&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">LoginServlet（認証とセッション保存）</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LoginServlet.java — 認証処理</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">protected void doPost(HttpServletRequest request,
+        HttpServletResponse response) throws IOException, ServletException {
+    String userId = request.getParameter("userId");
+    String password = request.getParameter("password");
+
+    // 簡易認証（実際はDBで照合）
+    if ("admin".equals(userId) && "pass1234".equals(password)) {
+        // セッションIDを再生成（セキュリティ対策）
+        HttpSession oldSession = request.getSession(false);
+        if (oldSession != null) oldSession.invalidate();
+        HttpSession session = request.getSession(true);
+        session.setAttribute("loginUser", userId); // ユーザー情報を保存
+        response.sendRedirect("home.jsp");          // ログイン後ページへ
+    } else {
+        request.setAttribute("error", "IDまたはパスワードが違います");
+        request.getRequestDispatcher("login.jsp").forward(request, response);
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ログインチェック（未ログイン時のリダイレクト）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログインが必要なページでは、セッションにユーザー情報があるか確認し、なければログインページへリダイレクトします。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">home.jsp — ログインチェック</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// JSP の先頭でログインチェック
+HttpSession session = request.getSession(false);
+String loginUser = (session != null)
+        ? (String) session.getAttribute("loginUser")
+        : null;
+
+// 未ログインならログインページへ強制転送
+if (loginUser == null) {
+    response.sendRedirect("login.jsp");
+    return; // 以降の処理をしない
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">LogoutServlet（セッション無効化）</h3>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">LogoutServlet.java — ログアウト処理</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">protected void doGet(HttpServletRequest request,
+        HttpServletResponse response) throws IOException {
+    // セッションを取得（なければ null）
+    HttpSession session = request.getSession(false);
+    if (session != null) {
+        session.invalidate(); // セッションを無効化してデータを消去
+    }
+    response.sendRedirect("login.jsp"); // ログインページへ転送
+}</code></pre>
+                    </div>
+
+                    <!-- 重要ポイント -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">ログイン実装の重要ポイント</p>
+                                <ul class="space-y-1 text-emerald-900 text-sm">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-0.5"></i><span>ログイン成功後はセッションIDを再生成する（セッションハイジャック対策）</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-0.5"></i><span>ログインチェックは保護したい全ページの先頭に記述する</span></li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-0.5"></i><span>ログアウトは <code class="bg-emerald-100 px-1 rounded">invalidate()</code> でセッション全体を無効化する</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- つまずきやすいポイント -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 つまずきやすいポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セッション管理でよく発生するトラブルと対処法をまとめました。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-red-800 mb-1">セッションが維持されない</p>
+                                    <p class="text-red-900 text-sm mb-2">ブラウザのCookieが無効になっていると、JSESSIONIDが送受信されずセッションが維持されません。</p>
+                                    <div class="bg-red-100 rounded-lg p-3">
+                                        <p class="text-red-900 text-sm font-medium mb-1">対処法</p>
+                                        <ul class="space-y-1 text-red-900 text-sm">
+                                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span>ブラウザのCookie設定を確認する</span></li>
+                                            <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span>Cookieが使えない環境向けには、URLにセッションIDを埋め込む <code class="bg-red-200 px-1 rounded">response.encodeURL(url)</code> を使う（<strong>URLリライティング</strong>）</span></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-orange-800 mb-1">getAttribute() で ClassCastException が起きる</p>
+                                    <p class="text-orange-900 text-sm mb-2"><code class="bg-orange-100 px-1 rounded">getAttribute()</code> の戻り値は <code class="bg-orange-100 px-1 rounded">Object</code> 型です。保存したオブジェクトと異なる型にキャストすると例外が発生します。</p>
+                                    <div class="bg-orange-100 rounded-lg p-3">
+                                        <p class="text-orange-900 text-sm font-medium mb-1">対処法</p>
+                                        <p class="text-orange-900 text-sm"><strong>保存時と取得時で同じ型</strong>を使うこと。取得時はキャスト前に <code class="bg-orange-200 px-1 rounded">instanceof</code> チェックや、<code class="bg-orange-200 px-1 rounded">null</code> チェックを忘れずに行う。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-orange-800 mb-1">セッションタイムアウト後の操作でエラーになる</p>
+                                    <p class="text-orange-900 text-sm mb-2">しばらく操作しないとセッションが失効し、再度アクセスしたときに <code class="bg-orange-100 px-1 rounded">getAttribute()</code> が <code class="bg-orange-100 px-1 rounded">null</code> を返します。そのまま処理を続けると NullPointerException になります。</p>
+                                    <div class="bg-orange-100 rounded-lg p-3">
+                                        <p class="text-orange-900 text-sm font-medium mb-1">対処法</p>
+                                        <p class="text-orange-900 text-sm">ログインチェックで <code class="bg-orange-200 px-1 rounded">getSession(false)</code> を使い、セッションが <code class="bg-orange-200 px-1 rounded">null</code> だった場合は「セッションが切れました。再ログインしてください」などのメッセージとともにログインページへリダイレクトする。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-1: 簡易ログイン・ログアウト機能の実装
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">本章のコード例をもとに、ログイン・ログアウト機能を動かしてみましょう。</p>
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-6">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">login.jsp</code>（フォーム）・<code class="bg-purple-100 px-1 rounded">LoginServlet</code>（認証）・<code class="bg-purple-100 px-1 rounded">home.jsp</code>（ログイン後）・<code class="bg-purple-100 px-1 rounded">LogoutServlet</code>（ログアウト）を作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">正しいID・パスワードでログインし、<code class="bg-purple-100 px-1 rounded">home.jsp</code> が表示されることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ログインせずに <code class="bg-purple-100 px-1 rounded">home.jsp</code> へ直接アクセスすると <code class="bg-purple-100 px-1 rounded">login.jsp</code> にリダイレクトされることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">ログアウトボタンを押すとセッションが消え、再度 <code class="bg-purple-100 px-1 rounded">home.jsp</code> にアクセスするとログインページへ戻ることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-2: ショッピングカートの実装
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">セッションに商品リストを保持するショッピングカートを作ってみましょう。</p>
+                            <ol class="space-y-3 mb-6">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">商品一覧ページ（<code class="bg-purple-100 px-1 rounded">items.jsp</code>）に「カートに追加」ボタンをつける。クリックすると <code class="bg-purple-100 px-1 rounded">AddCartServlet</code> へ商品名を POST する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">AddCartServlet</code> では <code class="bg-purple-100 px-1 rounded">session.getAttribute("cart")</code> で <code class="bg-purple-100 px-1 rounded">List&lt;String&gt;</code> を取得し、なければ新規作成して商品を追加後 <code class="bg-purple-100 px-1 rounded">setAttribute("cart", list)</code> で保存する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">カートページ（<code class="bg-purple-100 px-1 rounded">cart.jsp</code>）でセッションの商品リストを表示し、ページをまたいで商品が保持されることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-3: ウィザード形式の入力フォーム
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">複数ページにわたる入力内容をセッションで保持するウィザードを実装しましょう。</p>
+                            <ol class="space-y-3">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">ステップ1（氏名入力）・ステップ2（住所入力）・ステップ3（確認画面）の3ページを作る。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">各ステップで「次へ」を押したとき、入力内容をセッションに <code class="bg-purple-100 px-1 rounded">setAttribute</code> して保存し次のページへ進む。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">確認画面でセッションから全ステップの入力内容を取り出し、一覧表示する。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. HTTPがステートレスとはどういう意味ですか？セッションが必要な理由と合わせて説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            HTTPはリクエストとレスポンスが完結するたびに状態を忘れる「ステートレス」なプロトコルです。そのため「前回のリクエストでログインした」という情報をHTTP自体は保持できません。セッションはサーバー側でユーザーごとのデータを保持し、JSESSIONIDというCookieでユーザーを識別することで、この制限を補う仕組みです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code>session.getAttribute("user")</code> を使う際に注意すべきことを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ① 戻り値はObject型なので、保存時と同じ型への<strong>キャスト</strong>が必要です。型が一致しない場合はClassCastExceptionが発生します。② セッションが存在しないか属性が未設定の場合は<strong>nullが返る</strong>ため、NullPointerExceptionを避けるためnullチェックが必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ログアウト処理で <code>session.invalidate()</code> を呼ぶ理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code>invalidate()</code> を呼ぶとセッション全体が無効化され、サーバー側に保存されていたユーザー情報などのデータもすべて消去されます。これにより、ログアウト後に同じセッションIDを持つリクエストが来ても認証済みとして扱われなくなり、セキュリティを確保できます。単に属性を削除するだけでは不十分で、セッション自体を無効にすることが重要です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jsp-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: フォーム処理とデータの受け渡し</span>
+                        </div>
+                    </a>
+                    <a href="jsp-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: ServletとJSPの連携</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

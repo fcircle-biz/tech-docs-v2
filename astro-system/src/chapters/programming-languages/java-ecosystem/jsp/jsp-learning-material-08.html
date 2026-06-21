@@ -1,0 +1,639 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JSP/Servlet</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ServletとJSPの連携 - MVCパターン入門</h1>
+                    <p class="text-slate-600">この章では、Servlet と JSP が<strong>どのように協力して1つの画面を作るか</strong>を学びます。「フォワード」と「リダイレクト」という2つの転送方式を理解し、役割分担の設計思想である <strong>MVC パターン</strong>を習得することで、保守しやすく拡張しやすいアプリの作り方が身につきます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>フォワード（サーバー内転送）とリダイレクト（クライアント再リクエスト）を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>MVC パターン（Model／View／Controller）の概念と役割分担を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Servlet（Controller）と JSP（View）を連携させた実装ができる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>RequestDispatcher の forward() と include() を使いこなせる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション8.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 フォワードとリダイレクト
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Servlet がリクエストを処理した後、次の画面へ移動するには2つの方法があります。<strong>フォワード</strong>と<strong>リダイレクト</strong>です。どちらも「次のページへ移る」操作ですが、仕組みがまったく異なります。この違いを正確に理解することが、本章の第一歩です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フォワードの仕組み</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>フォワード</strong>は「<strong>サーバーの中だけで処理を引き渡す</strong>」方式です。ブラウザはリクエストを1回送るだけで、サーバーが内部でServletからJSPへ処理を渡し、最終的な画面をブラウザへ返します。ブラウザは途中でServletが動いたことを知りません。そのため<strong>URLはServletのURL（転送前のURL）のままです</strong>。また、リクエスト属性（<code class="bg-slate-100 px-1 rounded">setAttribute</code>で設定した値）をJSPへ引き継ぐことができます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700 mb-3 text-center">【フォワード】ブラウザから見るとリクエストは1往復</p>
+                        <div class="mermaid">
+sequenceDiagram
+    participant B as ブラウザ
+    participant S as Servlet
+    participant J as JSP
+    B->>S: ① リクエスト
+    Note over S: リクエスト属性をsetAttribute
+    S->>J: ② forward（サーバー内転送）
+    J-->>B: ③ レスポンス（HTML）
+    Note over B: URLはServletのまま変わらない
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">リダイレクトの仕組み</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>リダイレクト</strong>は「<strong>ブラウザに別のURLへアクセスし直すよう指示する</strong>」方式です。サーバーはまず「302 Found」というレスポンスを返し、<code class="bg-slate-100 px-1 rounded">Location</code> ヘッダーに移動先URLを教えます。ブラウザはそのURLへ自動的に再度リクエストを送ります。このため<strong>URLが新しいURL（リダイレクト先）に変わります</strong>。また、最初のリクエストの属性は引き継げません（ブラウザが別のリクエストとして送るため）。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700 mb-3 text-center">【リダイレクト】ブラウザとサーバーが2往復する</p>
+                        <div class="mermaid">
+sequenceDiagram
+    participant B as ブラウザ
+    participant S as Servlet
+    participant T as 遷移先ページ
+    B->>S: ① リクエスト
+    S-->>B: ② 302 Found（Location: /next）
+    B->>T: ③ 新しいURLへ再リクエスト
+    T-->>B: ④ レスポンス（HTML）
+    Note over B: URLが遷移先のURLに変わる
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">フォワードとリダイレクトの比較</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">比較項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">フォワード</th>
+                                    <th class="px-4 py-3 text-left font-semibold">リダイレクト</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">URLの変化</td>
+                                    <td class="px-4 py-3 text-slate-600">変わらない（転送前のURL）</td>
+                                    <td class="px-4 py-3 text-slate-600 bg-primary-50">変わる（新しいURL）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">リクエスト属性</td>
+                                    <td class="px-4 py-3 text-slate-600">JSPへ引き継げる</td>
+                                    <td class="px-4 py-3 text-slate-600 bg-primary-50">引き継げない（別リクエスト）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">通信回数</td>
+                                    <td class="px-4 py-3 text-slate-600">1往復（サーバー内で完結）</td>
+                                    <td class="px-4 py-3 text-slate-600 bg-primary-50">2往復（ブラウザが再リクエスト）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">主な用途</td>
+                                    <td class="px-4 py-3 text-slate-600">結果を表示するJSPへの転送</td>
+                                    <td class="px-4 py-3 text-slate-600 bg-primary-50">POST後の画面遷移（PRGパターン）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">PRGパターン（Post-Redirect-Get）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フォームのPOST送信後にそのままフォワードすると、ブラウザの「更新ボタン」を押したとき同じPOSTが再送されてしまい、<strong>二重送信</strong>が起きることがあります。これを防ぐ定番パターンが <strong>PRG（Post-Redirect-Get）パターン</strong>です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        POST処理が終わったら、リダイレクトで結果表示ページ（GETリクエスト）へ誘導します。こうすると更新ボタンを押してもGETリクエストが再送されるだけなので、二重送信が起きません。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">使い分けの基準</p>
+                                <p class="text-blue-900 text-sm">「<strong>データを渡してJSPで表示させたいだけ</strong>」→ フォワード。「<strong>POSTの後で画面遷移させたい・URLを変えたい・ブックマークさせたい</strong>」→ リダイレクト。迷ったらこの基準で判断してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 RequestDispatcher
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フォワードを実現するのが <strong>RequestDispatcher</strong>（リクエストディスパッチャー）です。Servlet の中で JSP や他の Servlet へ処理を引き渡す役割を担います。<code class="bg-slate-100 px-1 rounded">request.getRequestDispatcher("パス")</code> で取得し、<code class="bg-slate-100 px-1 rounded">forward()</code> または <code class="bg-slate-100 px-1 rounded">include()</code> を呼び出します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">forward() メソッド</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>forward()</strong> は「処理を完全に JSP へ引き渡す」メソッドです。呼び出した後は Servlet では何も出力してはいけません。forward 後に <code class="bg-slate-100 px-1 rounded">response.getWriter().println()</code> などを呼ぶと、後述の <code class="bg-slate-100 px-1 rounded">IllegalStateException</code> が発生します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SearchServlet.java — forward の基本</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 1. リクエスト属性にデータをセット
+request.setAttribute("resultList", list);
+
+// 2. RequestDispatcherを取得してforwardする
+RequestDispatcher dispatcher =
+    request.getRequestDispatcher("/WEB-INF/views/result.jsp");
+dispatcher.forward(request, response); // JSPへ処理を引き渡す
+
+// ※ forward()の後には何も書かない！</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">include() メソッド</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>include()</strong> は「他のリソースの出力を現在のレスポンスに取り込む」メソッドです。ヘッダーやフッターなど、複数ページで共通する部品をJSPに埋め込むときに使います。forward と違い、include の後も Servlet（または呼び出し元のJSP）で処理を続けられます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">page.jsp — include の例（共通ヘッダー埋め込み）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ヘッダー部品を取り込む（include後も処理は続く）
+RequestDispatcher header =
+    request.getRequestDispatcher("/WEB-INF/parts/header.jsp");
+header.include(request, response);
+
+// この後も出力できる
+out.println("&lt;main&gt;メインコンテンツ&lt;/main&gt;");</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">パスの指定方法</h3>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">パスの種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">書き方</th>
+                                    <th class="px-4 py-3 text-left font-semibold">基点</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">絶対パス（推奨）</td>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-700"><code>/WEB-INF/views/result.jsp</code></td>
+                                    <td class="px-4 py-3 text-slate-600">コンテキストルート（アプリのルート）から</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">相対パス</td>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-700"><code>result.jsp</code></td>
+                                    <td class="px-4 py-3 text-slate-600">現在のServletのURLを基点とする（混乱しやすい）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">JSPは WEB-INF/views/ に置こう</p>
+                                <p class="text-blue-900 text-sm">JSP ファイルを <code class="bg-blue-100 px-1 rounded">WEB-INF/views/</code> の下に置くと、ブラウザから直接アクセスできなくなります。<strong>必ず Servlet（Controller）を経由させる</strong>設計を強制できるため、MVCパターンを徹底できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 MVCパターンの基礎
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Web アプリが複雑になると、「ロジック」「データ」「画面」が入り混じったコードは読みにくく、修正が怖くなります。そこで登場するのが <strong>MVC パターン</strong>です。MVC は <strong>Model</strong>（モデル）・<strong>View</strong>（ビュー）・<strong>Controller</strong>（コントローラー）の3つの役割に処理を分ける設計思想です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">3つの役割</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-database text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Model（モデル）</h3>
+                            <p class="text-sm text-slate-600">ビジネスロジック・データ処理を担当。データベースアクセスや計算処理など、アプリの「頭脳」部分。</p>
+                            <div class="mt-3 bg-orange-100 text-orange-900 rounded px-2 py-1 text-xs font-medium">例: 検索ロジック、DBアクセス</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-desktop text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">View（ビュー）</h3>
+                            <p class="text-sm text-slate-600">ユーザーへの表示を担当。HTML を生成してブラウザへ返す「顔」の部分。ロジックは書かない。</p>
+                            <div class="mt-3 bg-blue-100 text-blue-900 rounded px-2 py-1 text-xs font-medium">例: JSPファイル</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-shuffle text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Controller（コントローラー）</h3>
+                            <p class="text-sm text-slate-600">リクエストを受け取り、Model に処理を指示し、View へ転送する「指揮者」部分。</p>
+                            <div class="mt-3 bg-emerald-100 text-emerald-900 rounded px-2 py-1 text-xs font-medium">例: Servletクラス</div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">MVCの処理フロー</h3>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700 mb-3 text-center">リクエストからレスポンスまでの処理の流れ</p>
+                        <div class="mermaid">
+flowchart LR
+    B["ブラウザ<br/>（ユーザー）"] -->|"① リクエスト"| C["Controller<br/>（Servlet）"]
+    C -->|"② 処理依頼"| M["Model<br/>（ビジネスロジック）"]
+    M -->|"③ データ返却"| C
+    C -->|"④ setAttribute<br/>＋ forward"| V["View<br/>（JSP）"]
+    V -->|"⑤ HTML レスポンス"| B
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">なぜMVCが重要なのか</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        MVC パターンを守ることで、次のようなメリットが得られます。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">メリット</th>
+                                    <th class="px-4 py-3 text-left font-semibold">理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">保守性の向上</td>
+                                    <td class="px-4 py-3 text-slate-600">「画面だけ直したい」「ロジックだけ変えたい」が独立してできる</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">テストのしやすさ</td>
+                                    <td class="px-4 py-3 text-slate-600">Model のロジックを画面なしで単体テストできる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">役割分担の明確化</td>
+                                    <td class="px-4 py-3 text-slate-600">「どこに何を書くか」が決まり、複数人での開発もしやすい</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション8.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 Servlet→JSPの連携実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際に Servlet（Controller）と JSP（View）を連携させる実装を見ていきましょう。典型的なパターンは「リクエスト受信 → Controller が Model を呼ぶ → 結果を属性にセット → JSP へフォワード → JSP が属性を取り出して表示」という流れです。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">① Controller（Servlet）の実装</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Servlet ではビジネスロジック（ここでは簡単な検索処理）を行い、結果を <code class="bg-slate-100 px-1 rounded">request.setAttribute()</code> でリクエスト属性にセットしてから JSP へフォワードします。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SearchController.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">@WebServlet("/search")
+public class SearchController extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest request,
+                         HttpServletResponse response)
+            throws ServletException, IOException {
+        // ① パラメータ取得
+        String keyword = request.getParameter("keyword");
+        // ② Modelに処理を委譲（例: 商品リストを取得）
+        List&lt;String&gt; results = ItemModel.search(keyword);
+        // ③ 結果をリクエスト属性にセット
+        request.setAttribute("results", results);
+        request.setAttribute("keyword", keyword);
+        // ④ ViewのJSPへフォワード
+        request.getRequestDispatcher(
+            "/WEB-INF/views/searchResult.jsp")
+            .forward(request, response);
+    }
+}</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">② View（JSP）の実装</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSP では <code class="bg-slate-100 px-1 rounded">request.getAttribute()</code> でリクエスト属性を取り出して表示します。JSP に複雑なロジックを書かないのが MVC の鉄則です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">WEB-INF/views/searchResult.jsp（抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-jsp">&lt;%-- リクエスト属性を取り出す --%&gt;
+&lt;%
+    String keyword = (String) request.getAttribute("keyword");
+    List&lt;String&gt; results =
+        (List&lt;String&gt;) request.getAttribute("results");
+%&gt;
+&lt;h1&gt;&lt;%= keyword %&gt; の検索結果&lt;/h1&gt;
+&lt;ul&gt;
+&lt;% for (String item : results) { %&gt;
+    &lt;li&gt;&lt;%= item %&gt;&lt;/li&gt;
+&lt;% } %&gt;
+&lt;/ul&gt;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">処理の全体フロー（まとめ）</h3>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["① ブラウザが /search?keyword=Java にリクエスト"] --> B
+    B["② SearchController.doGet が実行される"] --> C
+    C["③ ItemModel.search で検索処理"] --> D
+    D["④ request.setAttribute で結果をセット"] --> E
+    E["⑤ RequestDispatcher.forward で searchResult.jsp へ転送"] --> F
+    F["⑥ JSP が request.getAttribute で結果を取り出して HTML 生成"] --> G
+    G["⑦ ブラウザへ HTML レスポンス（URLは /search のまま）"]
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">setAttribute と getAttribute の対応</p>
+                                <p class="text-emerald-900 text-sm">Servlet で <code class="bg-emerald-100 px-1 rounded">request.setAttribute("results", list)</code> と書いたら、JSP では同じキー名 <code class="bg-emerald-100 px-1 rounded">request.getAttribute("results")</code> で取り出します。<strong>キー名のスペルミス</strong>が最初のつまずきポイントです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- つまずきやすいポイント -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 つまずきやすいポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Servlet と JSP を連携させるとき、初学者がよく遭遇するエラーと対処法をまとめました。
+                    </p>
+
+                    <div class="space-y-4 my-6">
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-red-800 mb-1">JSPでデータが表示されない（null になる）</p>
+                                    <p class="text-red-900 text-sm">原因は <strong>Servlet 側の <code class="bg-red-100 px-1 rounded">request.setAttribute()</code> の呼び出し漏れ</strong>、またはキー名のスペルミスです。</p>
+                                    <ul class="mt-2 space-y-1 text-red-900 text-sm">
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span>Servlet に <code class="bg-red-100 px-1 rounded">setAttribute</code> を書いたか確認する</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span>JSP の getAttribute のキー名が Servlet 側と完全に一致しているか確認する</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-red-800 mb-1">IllegalStateException が発生する</p>
+                                    <p class="text-red-900 text-sm">原因は <strong><code class="bg-red-100 px-1 rounded">forward()</code> または <code class="bg-red-100 px-1 rounded">sendRedirect()</code> の後にレスポンスへ書き込もうとした</strong>ことです。一度レスポンスが確定した後に再度出力することは許可されていません。</p>
+                                    <ul class="mt-2 space-y-1 text-red-900 text-sm">
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span><code class="bg-red-100 px-1 rounded">forward()</code> の後にコードを書かない（<code class="bg-red-100 px-1 rounded">return</code> で終了させる）</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-red-500 mt-1"></i><span>条件分岐内で forward と別の出力が競合していないか確認する</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-orange-800 mb-1">URLが変わらない / 変わって困る</p>
+                                    <p class="text-orange-900 text-sm">フォワードとリダイレクトの混同です。</p>
+                                    <ul class="mt-2 space-y-1 text-orange-900 text-sm">
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-orange-500 mt-1"></i><span>「URLを変えたくない・属性を引き継ぎたい」→ <strong>フォワード</strong>を使う</span></li>
+                                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-orange-500 mt-1"></i><span>「URLを変えたい・POST後に安全に画面遷移したい」→ <strong>リダイレクト</strong>を使う</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-1: 検索処理をMVCパターンで実装する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">キーワードを受け取って結果を表示する検索処理を、MVC パターンで実装します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-6">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">SearchController</code> Servlet を作成し、<code class="bg-purple-100 px-1 rounded">@WebServlet("/search")</code> を付ける。<code class="bg-purple-100 px-1 rounded">doGet</code> でキーワードを受け取り、リスト（仮のデータで可）を <code class="bg-purple-100 px-1 rounded">setAttribute</code> でセットする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">WEB-INF/views/searchResult.jsp</code> を作成し、<code class="bg-purple-100 px-1 rounded">getAttribute</code> でリストを取り出して <code class="bg-purple-100 px-1 rounded">&lt;ul&gt;</code> で一覧表示する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ブラウザで <code class="bg-purple-100 px-1 rounded">http://localhost:8080/アプリ名/search?keyword=Java</code> にアクセスし、結果が表示されることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-2: ログイン処理のMVC化
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">第7章で実装したログイン処理を、MVC パターンへリファクタリングします。</p>
+
+                            <ol class="space-y-3 mb-6">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">ログインのバリデーションロジックを <code class="bg-purple-100 px-1 rounded">UserModel</code> クラスに分離し、Servlet から呼び出す構造にする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ログイン成功時はリダイレクト（PRGパターン）でトップページへ遷移し、失敗時はエラーメッセージを <code class="bg-purple-100 px-1 rounded">setAttribute</code> でセットしてフォワードする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ログインフォームの JSP はエラーメッセージ属性を取り出し、メッセージがあれば赤字で表示する。</span>
+                                </li>
+                            </ol>
+
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-3: 一覧→詳細画面の遷移をMVCで実装する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">商品一覧から商品IDを受け取り、詳細画面を表示する遷移をMVC構造で実装します。</p>
+
+                            <ol class="space-y-3">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">一覧JSPに各商品へのリンク（<code class="bg-purple-100 px-1 rounded">/detail?id=1</code> など）を設ける。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">DetailController</code> Servlet で ID を受け取り、Model から詳細データを取得して <code class="bg-purple-100 px-1 rounded">setAttribute</code> でセット後、詳細JSPへフォワードする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">詳細JSPで商品の名前・価格・説明を表示する。一覧画面へ戻るリンクも設ける。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. フォワードとリダイレクトの違いを、「URLの変化」「リクエスト属性の引き継ぎ」の2点から説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            フォワードはサーバー内で処理を転送するためURLは変わらず、同じリクエストオブジェクトが引き継がれるためリクエスト属性（setAttribute の値）もJSPへ渡せます。リダイレクトはブラウザへ別URLへの再アクセスを指示するためURLが変わり、新しいリクエストとなるため属性は引き継げません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. MVCパターンにおけるModel・View・Controllerの役割を、Servlet/JSP開発の文脈で説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Model はビジネスロジックやデータアクセスを担うJavaクラス（DBへの検索など）、View は画面を生成するJSPファイル（HTMLの出力）、Controller はリクエストを受け取りModelに処理を指示してViewへフォワードするServletクラス、がそれぞれの役割です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. フォーム送信（POST）後にリダイレクトを使う「PRGパターン」は、なぜ必要ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            POST後にそのままフォワードすると、ブラウザの更新ボタンを押したとき同じPOSTリクエストが再送され、二重送信が起きることがあります。POST後にリダイレクトでGETリクエストの結果表示ページへ誘導することで、更新しても安全なGETリクエストが再送されるだけになり、二重送信を防止できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jsp-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第7章: セッション管理</span>
+                        </div>
+                    </a>
+                    <a href="jsp-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第9章: JavaBeansとスコープ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
