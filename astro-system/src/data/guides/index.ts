@@ -18,6 +18,14 @@ import { junit } from './programming-languages/java-ecosystem/junit';
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
 const all: TechGuide[] = [claudeCode, codex, java, jdbc, junit, javascript];
+import { jsp } from './programming-languages/java-ecosystem/jsp';
+import { javascript } from './programming-languages/javascript-ecosystem/javascript';
+
+const all: TechGuide[] = [claudeCode, codex, java, jdbc, jsp, javascript];
+import { springBasic } from './programming-languages/java-ecosystem/spring-basic';
+import { javascript } from './programming-languages/javascript-ecosystem/javascript';
+
+const all: TechGuide[] = [claudeCode, codex, java, jdbc, springBasic, javascript];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
 export const guideRegistry: Record<string, Record<string, TechGuide>> = {};
