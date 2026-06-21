@@ -10,30 +10,40 @@
 //   4. src/pages/guide/[...chapter].astro が断片を glob して全章ページを自動生成する（個別ファイル不要）。
 //   <category> は分類パス（development-processes / programming-languages/python-ecosystem 等、複数セグメント可）。
 import type { TechGuide } from './types';
+
+// 開発手法・プロセス
 import { claudeCode } from './development-processes/claude-code';
 import { codex } from './development-processes/codex';
+
+// プログラミング言語 — Java エコシステム
 import { java } from './programming-languages/java-ecosystem/java';
 import { jdbc } from './programming-languages/java-ecosystem/jdbc';
-import { springMvc } from './programming-languages/java-ecosystem/spring-mvc';
-import { javascript } from './programming-languages/javascript-ecosystem/javascript';
-
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, springMvc, javascript];
-import { springDataJdbc } from './programming-languages/java-ecosystem/spring-data-jdbc';
-import { javascript } from './programming-languages/javascript-ecosystem/javascript';
-
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, springDataJdbc, javascript];
-import { junit } from './programming-languages/java-ecosystem/junit';
-import { javascript } from './programming-languages/javascript-ecosystem/javascript';
-
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, junit, javascript];
 import { jsp } from './programming-languages/java-ecosystem/jsp';
-import { javascript } from './programming-languages/javascript-ecosystem/javascript';
-
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, jsp, javascript];
 import { springBasic } from './programming-languages/java-ecosystem/spring-basic';
+import { springDataJdbc } from './programming-languages/java-ecosystem/spring-data-jdbc';
+import { springMvc } from './programming-languages/java-ecosystem/spring-mvc';
+import { junit } from './programming-languages/java-ecosystem/junit';
+
+// プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
-const all: TechGuide[] = [claudeCode, codex, java, jdbc, springBasic, javascript];
+// 一覧の並び順 ＝ ランディングページ（src/pages/index.astro）のカード表示順。
+// 分類は初出順、分類内はこの配列順で並ぶ。
+const all: TechGuide[] = [
+  // プログラミング言語 — Java エコシステム
+  java,
+  jdbc,
+  jsp,
+  springBasic,
+  springDataJdbc,
+  springMvc,
+  junit,
+  // プログラミング言語 — JavaScript エコシステム
+  javascript,
+  // 開発手法・プロセス
+  claudeCode,
+  codex,
+];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
 export const guideRegistry: Record<string, Record<string, TechGuide>> = {};
