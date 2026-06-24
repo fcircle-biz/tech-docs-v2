@@ -14,6 +14,7 @@ import type { TechGuide } from './types';
 // 開発手法・プロセス
 import { claudeCode } from './development-processes/claude-code';
 import { codex } from './development-processes/codex';
+import { gitGithub } from './development-processes/git-github';
 
 // プログラミング言語 — Java エコシステム
 import { java } from './programming-languages/java-ecosystem/java';
@@ -48,6 +49,7 @@ const all: TechGuide[] = [
   codex,
   // クラウド・インフラ
   docker,
+  gitGithub,
 ];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
