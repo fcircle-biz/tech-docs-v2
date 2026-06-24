@@ -384,4 +384,107 @@
     // DOM読み込み後にサイドバートグルを初期化（sidebar-content.jsの後に実行されるよう遅延）
     setTimeout(initSidebarToggle, 100);
 
+    // 画像ズーム（ライトボックス）＋ ブラウザのビジュアル検索ボタン抑止
+    // 本文中の <img> をトリガーで包み、クリック/Enter/Space で拡大表示する。
+    function setupImageZoom() {
+        const images = document.querySelectorAll('main img');
+        if (!images.length) return;
+
+        // ライトボックス要素を1つだけ生成
+        const lightbox = document.createElement('div');
+        lightbox.id = 'image-lightbox';
+        lightbox.setAttribute('role', 'dialog');
+        lightbox.setAttribute('aria-modal', 'true');
+        lightbox.setAttribute('aria-label', '拡大画像');
+        lightbox.innerHTML =
+            '<button type="button" class="lightbox-close" aria-label="閉じる"><i class="fas fa-times"></i></button>' +
+            '<img alt="" />' +
+            '<figcaption></figcaption>';
+        document.body.appendChild(lightbox);
+
+        const lbImg = lightbox.querySelector('img');
+        const lbCaption = lightbox.querySelector('figcaption');
+        const lbClose = lightbox.querySelector('.lightbox-close');
+
+        let lastTrigger = null;
+
+        function openLightbox(src, alt, caption, trigger) {
+            lastTrigger = trigger || null;
+            lbImg.src = src;
+            lbImg.alt = alt || '';
+            lbCaption.textContent = caption || '';
+            lbCaption.style.display = caption ? '' : 'none';
+            lightbox.classList.add('is-open');
+            document.body.classList.add('lightbox-open');
+            lbClose.focus();
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('is-open');
+            document.body.classList.remove('lightbox-open');
+            if (lastTrigger) { lastTrigger.focus(); lastTrigger = null; }
+        }
+
+        // 背景（画像本体以外）のクリック・閉じるボタン・Escで閉じる
+        lightbox.addEventListener('click', function(e) {
+            if (e.target !== lbImg) closeLightbox();
+        });
+        lbClose.addEventListener('click', closeLightbox);
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && lightbox.classList.contains('is-open')) {
+                closeLightbox();
+            }
+        });
+
+        // 各画像をトリガーで包み、ハンドラを設定
+        images.forEach(function(img) {
+            if (img.closest('.img-zoom-trigger')) return;
+
+            const trigger = document.createElement('span');
+            trigger.className = 'img-zoom-trigger';
+            trigger.setAttribute('role', 'button');
+            trigger.setAttribute('tabindex', '0');
+            trigger.setAttribute('aria-label', '画像を拡大表示');
+
+            // 配置/最大幅クラスは画像からトリガーへ移し、サイズと中央寄せを一致させる
+            Array.from(img.classList).forEach(function(c) {
+                if (c === 'mx-auto' || c === 'ml-auto' || c === 'mr-auto' || c.indexOf('max-w-') === 0) {
+                    img.classList.remove(c);
+                    trigger.classList.add(c);
+                }
+            });
+
+            img.parentNode.insertBefore(trigger, img);
+            trigger.appendChild(img);
+
+            // 拡大ヒントアイコン
+            const hint = document.createElement('span');
+            hint.className = 'img-zoom-hint';
+            hint.setAttribute('aria-hidden', 'true');
+            hint.innerHTML = '<i class="fas fa-magnifying-glass-plus"></i>';
+            trigger.appendChild(hint);
+
+            // キャプションは figure 内の figcaption を流用
+            const fig = trigger.closest('figure');
+            const cap = fig ? fig.querySelector('figcaption') : null;
+
+            const open = function() {
+                openLightbox(img.currentSrc || img.src, img.alt, cap ? cap.textContent.trim() : '', trigger);
+            };
+            trigger.addEventListener('click', open);
+            trigger.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    open();
+                }
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupImageZoom);
+    } else {
+        setupImageZoom();
+    }
+
 })();
