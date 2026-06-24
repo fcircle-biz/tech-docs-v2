@@ -95,6 +95,7 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 |-------|---------|------------|
 | `docs-readme-updater` | ディスク上の実構成からルート `README.md` を再生成 | `/docs-readme-updater` |
 | `re-estimate-learning-time` | 既存資料の README.md を読み、推奨所要時間を再見積もりして更新 | `/re-estimate-learning-time [dir]` |
+| `docs-image-inserter` | `work/<名称>/` の画像群＋差し込み指示Markdownを基に、学習ガイドの該当章HTMLへ画像を `<figure>` 差し込み・配置・ビルド | `/docs-image-inserter [名称]` |
 
 ### Git / GitHub 運用スキル
 
