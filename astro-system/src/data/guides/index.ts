@@ -27,6 +27,9 @@ import { junit } from './programming-languages/java-ecosystem/junit';
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
+// クラウド・インフラ
+import { docker } from './cloud-infrastructure/docker';
+
 // 一覧の並び順 ＝ ランディングページ（src/pages/index.astro）のカード表示順。
 // 分類は初出順、分類内はこの配列順で並ぶ。
 const all: TechGuide[] = [
@@ -43,6 +46,8 @@ const all: TechGuide[] = [
   // 開発手法・プロセス
   claudeCode,
   codex,
+  // クラウド・インフラ
+  docker,
 ];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */

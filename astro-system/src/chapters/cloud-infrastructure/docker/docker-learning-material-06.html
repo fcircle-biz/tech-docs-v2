@@ -1,0 +1,529 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Docker</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ファイルをコンテナに渡す：バインドマウントとボリューム</h1>
+                    <p class="text-slate-600">コンテナは使い捨ての「箱」です。コンテナを削除すると、中で変更したファイルも消えてしまいます。この章では、大事なファイルをホスト（自分のPC）側に置いたまま、コンテナへ渡す方法を2つ学びます。開発作業でとくに役立つ<strong>バインドマウント</strong>と、データ保存に使う<strong>ボリューム</strong>を理解しましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンテナ内の変更はコンテナ削除で消えることを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>バインドマウントでホストのファイルをコンテナに渡せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ボリュームの考え方を知る</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>開発中はバインドマウント・永続データはボリュームという使い分けを理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 コンテナの中の変更は消える
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまでの章でコンテナを起動・停止してきました。ここで、重要な性質を確認しておきましょう。<strong>コンテナを削除すると、その中で変更したファイルも一緒に消えます</strong>。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば、Nginxコンテナを起動して中にファイルを置いたとします。その後、<code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">docker rm</code> でコンテナを削除すると、追加したファイルはなくなります。次に同じイメージからコンテナを作り直しても、ファイルは元通りには残っていません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これはコンテナが「使い捨ての箱」として設計されているからです。毎回きれいな状態から始められる、という利点でもあります。ただし、<strong>消えてほしくないファイルはコンテナの外に置かなければなりません</strong>。その方法がこの章のテーマです。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">コンテナ削除でファイルも消える</p>
+                                <p class="text-orange-900 text-sm">コンテナ内でファイルを作ったり書き換えたりしても、<code class="bg-orange-100 px-1 rounded font-mono">docker rm</code> するとすべて消えます。大事なデータはホスト側に置いてコンテナに渡す習慣をつけましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 ファイルを渡す2つの方法
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ホスト（自分のPC）とコンテナの間でファイルをやり取りする方法は、主に2つあります。<strong>バインドマウント</strong>と<strong>ボリューム</strong>です。まずはざっくりとした違いを押さえましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-sky-50 border border-sky-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-sky-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-link"></i> バインドマウント
+                            </h3>
+                            <p class="text-sky-900 text-sm leading-relaxed">
+                                ホスト（PC）上の<strong>特定のフォルダ</strong>を、コンテナ内の特定フォルダに「つなげて見せる」方法です。PCのフォルダを編集するだけで、コンテナ内にも即座に反映されます。<strong>開発作業</strong>でとくに便利です。
+                            </p>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-database"></i> ボリューム
+                            </h3>
+                            <p class="text-emerald-900 text-sm leading-relaxed">
+                                <strong>Dockerが管理する保管領域</strong>にデータを保存する方法です。コンテナを削除してもデータが残ります。データベースなど<strong>消えてほしくないデータ</strong>の保存に向いています。
+                            </p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この章では、まずバインドマウントを実際に試します。ボリュームは概念と基本コマンドを紹介します。使い分けについては6.5節でまとめます。
+                    </p>
+                </section>
+
+                <!-- セクション6.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 バインドマウントを試す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バインドマウントは、ホスト側のフォルダをコンテナの中から「そのまま見える」ようにする仕組みです。実際に手を動かして体験してみましょう。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">ファイル構成を作る</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まず、ホスト側（自分のPC）に次の構成でフォルダとファイルを作ります。作業ディレクトリの任意の場所に <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">mount-sample</code> フォルダを作り、その中に <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">html</code> フォルダ、さらにその中に <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">index.html</code> を置きます。
+                    </p>
+
+                    <!-- ファイル構成 -->
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 mb-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            作業フォルダ構成
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code class="language-plaintext">mount-sample/
+└── html/
+    └── index.html    ← 自分で作るHTMLファイル</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">index.html</code> の内容は、第5章で作ったものと同様のシンプルなHTMLで構いません。以下はサンプルです。
+                    </p>
+
+                    <!-- index.html サンプル -->
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">mount-sample/html/index.html</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;!DOCTYPE html&gt;
+&lt;html lang="ja"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;マイページ&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;バインドマウントで表示中&lt;/h1&gt;
+  &lt;p&gt;このファイルはホスト側にあります。&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">バインドマウントでコンテナを起動する</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">mount-sample</code> フォルダの中（<code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">html</code> フォルダの親）に移動してから、次のコマンドを実行します。<strong>-v オプション</strong>がバインドマウントの指定です。
+                    </p>
+
+                    <!-- docker run コマンド -->
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># PCのhtmlフォルダをコンテナのNginx配信フォルダにつないで起動する
+docker run --name mounted-nginx -p 8080:80 -v ./html:/usr/share/nginx/html nginx</code></pre>
+                    </div>
+
+                    <!-- オプション解説テーブル -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">オプション</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900"><code class="bg-slate-100 px-1.5 py-0.5 rounded">--name mounted-nginx</code></td>
+                                    <td class="px-4 py-3 text-slate-600 text-sm">コンテナに <code class="bg-slate-100 px-1 rounded font-mono">mounted-nginx</code> という名前をつける</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900"><code class="bg-slate-100 px-1.5 py-0.5 rounded">-p 8080:80</code></td>
+                                    <td class="px-4 py-3 text-slate-600 text-sm">PCの8080番ポートをコンテナの80番ポートに転送する</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900"><code class="bg-slate-100 px-1.5 py-0.5 rounded">-v ./html:/usr/share/nginx/html</code></td>
+                                    <td class="px-4 py-3 text-slate-600 text-sm font-medium"><strong>PCの <code class="bg-slate-100 px-1 rounded font-mono">./html</code> フォルダ</strong>を、コンテナ内の <code class="bg-slate-100 px-1 rounded font-mono">/usr/share/nginx/html</code>（Nginxの配信フォルダ）につなぐ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900"><code class="bg-slate-100 px-1.5 py-0.5 rounded">nginx</code></td>
+                                    <td class="px-4 py-3 text-slate-600 text-sm">使用するイメージ名</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>-v の書き方は「ホスト側のパス：コンテナ側のパス」</strong>と覚えてください。コロン（<code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">:</code>）で区切って、左がPC側、右がコンテナ側です。
+                    </p>
+
+                    <!-- Mermaid図: バインドマウントの仕組み -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図1: バインドマウント — PC側のhtmlフォルダがコンテナ内に見えている</p>
+                        <div class="mermaid">
+flowchart LR
+    A["PC側: ./html<br/>（index.html を格納）"] -->|"-v でマウント"| B["コンテナ内:<br/>/usr/share/nginx/html"]
+    B --> C["Nginx がファイルを配信"]
+    C --> D["ブラウザで確認<br/>http://localhost:8080"]
+                        </div>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-circle-check text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3">動作確認</h3>
+                                <ol class="space-y-3">
+                                    <li class="flex items-start gap-3 text-emerald-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-emerald-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">1</span>
+                                        <span class="flex-1 min-w-0">ブラウザで <strong>http://localhost:8080</strong> を開き、<code class="bg-emerald-100 px-1 rounded font-mono">index.html</code> の内容が表示されることを確認する</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-emerald-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-emerald-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">2</span>
+                                        <span class="flex-1 min-w-0">PC側の <code class="bg-emerald-100 px-1 rounded font-mono">html/index.html</code> をテキストエディタで書き換えて保存する（例: <code class="bg-emerald-100 px-1 rounded font-mono">h1</code> タグの文字を変える）</span>
+                                    </li>
+                                    <li class="flex items-start gap-3 text-emerald-900">
+                                        <span class="flex-shrink-0 w-6 h-6 bg-emerald-200 rounded-full
+                                                     flex items-center justify-center text-sm font-medium">3</span>
+                                        <span class="flex-1 min-w-0">ブラウザを再読み込みする。<strong>コンテナを作り直さなくても表示が変わる</strong>ことを確認する</span>
+                                    </li>
+                                </ol>
+                                <div class="mt-4 bg-emerald-100 rounded-lg p-3">
+                                    <p class="text-emerald-900 text-sm"><i class="fas fa-lightbulb text-emerald-600 mr-1"></i>これが開発中にバインドマウントが便利な理由です。ファイルを書き換えるたびにコンテナを作り直す必要がなく、すぐに結果を確認できます。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- スクリーンショット指示 -->
+                    <p class="text-slate-500 text-sm italic mb-4">【スクリーンショット：ブラウザで http://localhost:8080 を開いた画面。自作の index.html の内容が表示されている様子】</p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">コンテナを停止・削除する</h3>
+                    <p class="text-slate-600 leading-relaxed mb-3">
+                        確認が終わったら、コンテナを停止して削除します。コンテナを削除しても、PC側の <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">html</code> フォルダとファイルはそのまま残ります。
+                    </p>
+
+                    <!-- 停止・削除コマンド -->
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># コンテナを停止する
+docker stop mounted-nginx
+
+# コンテナを削除する
+docker rm mounted-nginx</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション6.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 ボリュームの紹介
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ボリューム（volume）</strong>は、Dockerが管理する専用の保管領域です。バインドマウントがホスト側の特定フォルダを直接つなぐのに対し、ボリュームはDocker自身が場所を管理します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コンテナを削除してもボリューム内のデータは残り続けます。このため、データベースのデータなど<strong>消えては困るデータ</strong>の保存によく使われます。この章では実際のデータベース構築は行いませんが、基本的なコマンドを確認しておきましょう。
+                    </p>
+
+                    <!-- ボリューム操作コマンド -->
+                    <div class="code-block-wrapper mb-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル（補足コマンド）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># ボリュームの一覧を表示する
+docker volume ls
+
+# my-volume という名前のボリュームを作る
+docker volume create my-volume
+
+# my-volume ボリュームを削除する
+docker volume rm my-volume</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ボリュームをコンテナに渡す際も <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">-v</code> オプションを使います。書き方は「<strong>ボリューム名：コンテナ側のパス</strong>」です。バインドマウントとの違いは、ホスト側にパスを書く代わりに<strong>ボリューム名</strong>を書く点だけです。
+                    </p>
+
+                    <!-- Mermaid図: バインドマウントとボリュームの比較 -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図2: バインドマウントとボリュームの違い</p>
+                        <div class="mermaid">
+flowchart TD
+    subgraph BIND["バインドマウント"]
+        B1["PC側の特定フォルダ<br/>（例: ./html）"] -->|"-v ./html:コンテナ側パス"| B2["コンテナ内のフォルダ"]
+    end
+    subgraph VOL["ボリューム"]
+        V1["Dockerが管理する<br/>保管領域"] -->|"-v my-volume:コンテナ側パス"| V2["コンテナ内のフォルダ"]
+    end
+    BIND -->|"ホストのパスを直接指定"| NOTE1["開発中に便利<br/>ファイルをすぐ反映できる"]
+    VOL -->|"Dockerが管理"| NOTE2["永続データに適している<br/>コンテナ削除後もデータが残る"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 使い分けのポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バインドマウントとボリューム、どちらを使えばよいのでしょうか。シンプルな目安があります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-code text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">開発中のソースファイル</h3>
+                            <p class="text-sm text-slate-600">→ <strong>バインドマウント</strong>が便利。ファイルを書き換えるだけで即座にコンテナに反映されるため、開発のサイクルが速くなります。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-database text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">消えては困る永続データ</h3>
+                            <p class="text-sm text-slate-600">→ <strong>ボリューム</strong>が適している。データベースのデータやログなど、コンテナを削除しても残したいデータの保存に使います。</p>
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 使い分けの基準</p>
+                                <ul class="text-emerald-900 text-sm space-y-1">
+                                    <li><i class="fas fa-check text-emerald-500 mr-1"></i><strong>開発中のファイル（HTML・コードなど）</strong> → バインドマウント（書き換えがすぐ反映される）</li>
+                                    <li><i class="fas fa-check text-emerald-500 mr-1"></i><strong>消えてはいけないデータ（DBなど）</strong> → ボリューム（Docker管理で安全に保存）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- よくあるエラー -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        よくあるエラーと対処法
+                    </h2>
+
+                    <!-- エラー1: マウント元パスが違う -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">エラー: マウント元のパスが見つからない</p>
+                                <p class="text-red-900 text-sm mb-2"><strong>原因</strong>: <code class="bg-red-100 px-1 rounded font-mono">-v ./html:...</code> と書いたのに、現在のフォルダに <code class="bg-red-100 px-1 rounded font-mono">html</code> フォルダが存在しない。</p>
+                                <p class="text-red-900 text-sm"><strong>対処</strong>: コマンドを実行する前に、<code class="bg-red-100 px-1 rounded font-mono">ls</code>（Macなど）または <code class="bg-red-100 px-1 rounded font-mono">dir</code>（Windows）で <code class="bg-red-100 px-1 rounded font-mono">html</code> フォルダが存在するか確認する。<code class="bg-red-100 px-1 rounded font-mono">mount-sample</code> フォルダの中でコマンドを実行しているかも確認しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- エラー2: 空のページ -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: ブラウザで空のページが表示される</p>
+                                <p class="text-orange-900 text-sm mb-2"><strong>原因</strong>: ホスト側の <code class="bg-orange-100 px-1 rounded font-mono">html</code> フォルダに <code class="bg-orange-100 px-1 rounded font-mono">index.html</code> が存在しない。</p>
+                                <p class="text-orange-900 text-sm"><strong>対処</strong>: <code class="bg-orange-100 px-1 rounded font-mono">html/index.html</code> を作成してから、ブラウザを再読み込みする。ファイル名のスペルミスにも注意。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- エラー3: ポート使用中 -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">エラー: ポート8080がすでに使用中</p>
+                                <p class="text-red-900 text-sm mb-2"><strong>原因</strong>: 前の章で起動したコンテナや別のアプリがポート8080を使っている。</p>
+                                <p class="text-red-900 text-sm"><strong>対処</strong>: <code class="bg-red-100 px-1 rounded font-mono">docker ps</code> で動いているコンテナを確認し、不要なコンテナを <code class="bg-red-100 px-1 rounded font-mono">docker stop</code> で停止してから再試行する。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- この章のまとめ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-clipboard-check text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">この章のまとめ</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンテナを削除すると、その中で変更したファイルも消える。大事なファイルはホスト側に置いてコンテナに渡す。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>バインドマウント</strong>は <code class="bg-emerald-100 px-1 rounded font-mono text-sm">-v ホスト側パス:コンテナ側パス</code> で指定する。PC側のフォルダ変更がコンテナにすぐ反映される。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>ボリューム</strong>はDockerが管理する保管領域。コンテナを削除してもデータが残り続ける。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>開発中のソースファイルにはバインドマウント、消えてはいけない永続データにはボリュームを使うのが基本の使い分け。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 確認問題 -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">確認問題</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. コンテナを <code class="bg-blue-100 px-1 rounded font-mono text-sm">docker rm</code> で削除すると、コンテナ内で変更したファイルはどうなりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            コンテナと一緒に削除されて、なくなります。コンテナは「使い捨ての箱」として設計されているため、中で変更したファイルもコンテナ削除で消えます。消えてほしくないファイルはホスト側に置いてコンテナに渡す必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. バインドマウントの <code class="bg-blue-100 px-1 rounded font-mono text-sm">-v</code> オプションの書き方を答えてください。また、ホスト側の <code class="bg-blue-100 px-1 rounded font-mono text-sm">./html</code> フォルダをコンテナの <code class="bg-blue-100 px-1 rounded font-mono text-sm">/var/www/html</code> にマウントする場合、どのように書きますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            書き方は <code class="bg-blue-200 px-1 rounded font-mono">-v ホスト側のパス:コンテナ側のパス</code> です。例の場合は <code class="bg-blue-200 px-1 rounded font-mono">-v ./html:/var/www/html</code> と書きます。コロン（:）で区切り、左にホスト側、右にコンテナ側のパスを指定します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. バインドマウントとボリュームはそれぞれどんな場面で使いますか？簡単に説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            バインドマウントは開発中のソースファイル（HTMLやコードなど）を渡すときに便利です。ホスト側でファイルを書き換えるとコンテナにすぐ反映されます。ボリュームはデータベースのデータなど、コンテナを削除しても消えてほしくない永続データの保存に使います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="docker-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第5章: Dockerfileでイメージ化する</span>
+                        </div>
+                    </a>
+                    <a href="docker-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第7章: Docker Composeで起動をまとめる</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
