@@ -6,6 +6,7 @@ export const gitGithub: TechGuide = {
   slug: 'git-github',
   techTitle: 'Git/GitHub学習教材',
   icon: 'fa-github',
+  iconStyle: 'fab',
   level: '初級',
   categoryLabel: '開発手法・プロセス',
   totalTime: '約6時間',

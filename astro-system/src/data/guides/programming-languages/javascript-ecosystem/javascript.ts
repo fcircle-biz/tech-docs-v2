@@ -6,6 +6,7 @@ export const javascript: TechGuide = {
   slug: 'javascript',
   techTitle: 'JavaScript学習教材',
   icon: 'fa-js',
+  iconStyle: 'fab',
   level: '初級',
   categoryLabel: 'プログラミング言語',
   totalTime: '約24時間',

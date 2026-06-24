@@ -19,6 +19,12 @@ export interface TechGuide {
   techTitle: string;
   /** ヘッダーアイコン（Font Awesome クラス） */
   icon: string;
+  /**
+   * アイコンのスタイルプレフィックス（Font Awesome）。
+   * ブランドアイコン（fa-js・fa-github 等）は 'fab' を指定する。
+   * 未指定時は 'fas'（ソリッド）にフォールバックする。
+   */
+  iconStyle?: string;
   /** 難易度バッジ */
   level: string;
   /** 分類ラベル（ヘッダー表示用、例: "開発手法・プロセス"） */
