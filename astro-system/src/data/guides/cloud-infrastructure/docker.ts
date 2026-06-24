@@ -29,7 +29,7 @@ export const docker: TechGuide = {
     { number: 1, name: 'Dockerとは何か', file: 'docker-learning-material-01.html' },
     { number: 2, name: 'Rancher Desktopで環境を準備する', file: 'docker-learning-material-02.html' },
     { number: 3, name: 'はじめてのコンテナと基本コマンド', file: 'docker-learning-material-03.html' },
-    { number: 4, name: 'Nginxでwebサーバーを動かす', file: 'docker-learning-material-04.html' },
+    { number: 4, name: 'NginxでWebサーバーを動かす', file: 'docker-learning-material-04.html' },
     { number: 5, name: 'Dockerfileでイメージ化する', file: 'docker-learning-material-05.html' },
     { number: 6, name: 'バインドマウントとボリューム', file: 'docker-learning-material-06.html' },
     { number: 7, name: 'Docker Composeで起動をまとめる', file: 'docker-learning-material-07.html' },
