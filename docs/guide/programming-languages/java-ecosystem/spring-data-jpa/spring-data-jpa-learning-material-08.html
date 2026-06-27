@@ -292,7 +292,7 @@ flowchart LR
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning;
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning.entity;
 
 import jakarta.persistence.*;
 
@@ -361,7 +361,7 @@ public class Department {
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning;
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning.entity;
 
 import jakarta.persistence.*;
 
@@ -381,10 +381,13 @@ public class Employee {
     @JoinColumn(name = "department_id")  // 外部キー列
     private Department department;
 
-    // getter / setter（省略）
+    // getter / setter（フォームのバインドや画面表示で使うため両方そろえる）
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
     public Department getDepartment() { return department; }
     public void setDepartment(Department department) {
         this.department = department;
@@ -438,7 +441,7 @@ classDiagram
                         8.5 関連を使ってデータを取得する
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        関連を追加した <code class="bg-slate-100 px-1 rounded">Employee</code> を Repository で取得すると、JPA が自動的に関連先の <code class="bg-slate-100 px-1 rounded">Department</code> もデータベースから取得してくれます。取得後は <code class="bg-slate-100 px-1 rounded">getDepartment()</code> でそのまま部署オブジェクトにアクセスできます。
+                        関連を追加した <code class="bg-slate-100 px-1 rounded">Employee</code> を Repository で取得すると、JPA が<strong>標準設定では</strong>関連先の <code class="bg-slate-100 px-1 rounded">Department</code> もあわせてデータベースから取得してくれます。取得後は <code class="bg-slate-100 px-1 rounded">getDepartment()</code> でそのまま部署オブジェクトにアクセスできます（この「いつ取得するか」の設定については、このあとの補足で触れます）。
                     </p>
 
                     <div class="code-block-wrapper my-6">
@@ -453,16 +456,16 @@ classDiagram
 @Service
 public class EmployeeService {
 
-    private final EmployeeRepository repository;
+    private final EmployeeRepository employeeRepository;
 
-    public EmployeeService(EmployeeRepository repository) {
-        this.repository = repository;
+    public EmployeeService(EmployeeRepository employeeRepository) {
+        this.employeeRepository = employeeRepository;
     }
 
     // 社員IDから所属部署名を取得する
     public String getDepartmentName(Long employeeId) {
-        // findById で Employee を取得（関連の Department も自動取得）
-        Employee e = repository.findById(employeeId).orElseThrow();
+        // findById で Employee を取得（標準設定では関連の Department も一緒に取得される）
+        Employee e = employeeRepository.findById(employeeId).orElseThrow();
         // getDepartment() で Department オブジェクトにアクセス
         return e.getDepartment().getName(); // 例: "営業部"
     }
@@ -470,8 +473,20 @@ public class EmployeeService {
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <code class="bg-slate-100 px-1 rounded">e.getDepartment().getName()</code> とメソッドを2段チェーンするだけで所属部署名が取れます。SQL で言えば、<code class="bg-slate-100 px-1 rounded">employees</code> と <code class="bg-slate-100 px-1 rounded">departments</code> を JOIN して取得するのと同じ結果です。JPA がこの JOIN を裏側で自動的に発行してくれています。
+                        <code class="bg-slate-100 px-1 rounded">e.getDepartment().getName()</code> とメソッドを2段チェーンするだけで所属部署名が取れます。SQL で言えば、<code class="bg-slate-100 px-1 rounded">employees</code> と <code class="bg-slate-100 px-1 rounded">departments</code> を JOIN して取得するのと同じ結果です。私たちが JOIN を直接書かなくても、JPA が裏側でテーブルの結合（JOIN）や追加の問い合わせを自動的に行ってくれます。
                     </p>
+
+                    <!-- 補足: Fetch（EAGER / LAZY）と簡略化の注記 -->
+                    <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-amber-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-amber-800 mb-1">補足: 関連先を「いつ」取得するか（Fetch / EAGER / LAZY）</p>
+                                <p class="text-amber-900 text-sm mb-2"><strong>Fetch</strong> とは「関連先のデータをいつ読み込むか」の設定です。<code class="bg-amber-100 text-amber-900 px-1 rounded">@ManyToOne</code> は、fetch を指定しないと標準で <strong>EAGER（即時取得）</strong>になり、社員を取得する時点で部署も一緒に読み込まれます。本教材ではこの初期設定のまま進めるため、上のように <code class="bg-amber-100 text-amber-900 px-1 rounded">getDepartment()</code> でそのまま部署にアクセスできます。</p>
+                                <p class="text-amber-900 text-sm">ただし実務では、性能上の理由で <code class="bg-amber-100 text-amber-900 px-1 rounded">@ManyToOne(fetch = FetchType.LAZY)</code>（遅延取得＝必要になったときに読み込む）を使うことも多くあります。また、一覧で多数の社員を取得すると関連先の取得が件数分くり返される「<strong>N+1 問題</strong>」が起きることもあります。これらは発展的なテーマなので、<strong>本教材では初学者向けに初期設定のまま簡略化</strong>し、「標準では関連先も取得される」とだけ理解しておけば十分です。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- データ登録の例 -->
                     <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">社員を部署と一緒に登録する</h3>
