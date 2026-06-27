@@ -1,0 +1,457 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Spring Data JPA</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約55分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクションを理解する</h1>
+                    <p class="text-slate-600">複数のデータベース操作を「全部成功」か「全部取り消し」かで扱う仕組みが<strong>トランザクション</strong>です。この章では、銀行振込のような「どちらか一方だけ成功してはいけない」場面を例に、コミットとロールバックの意味を直感的につかみます。そして Spring Data JPA で使う <code class="bg-slate-100 px-1 rounded">@Transactional</code> を Service 層のメソッドに付ける理由と方法を、コードを通して理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションとは何か、「All or Nothing」の考え方を銀行振込の例で説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コミット（確定）とロールバック（取り消し）の違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 text-amber-900 px-1 rounded">@Transactional</code> を Service 層に付ける理由と使い方を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>RuntimeException が発生したときに自動でロールバックされる動作を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 トランザクションとは — All or Nothing の考え方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        データベースに対して複数の操作を行う場面は、実務でよく出てきます。たとえば「社員を1人追加し、同時にその社員の配属先部署の人数カウントを更新する」という処理を考えてみましょう。社員の追加は成功したけれど、人数の更新に失敗したら——データの整合性が崩れてしまいます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        こうした問題を防ぐのが<strong>トランザクション（Transaction）</strong>です。トランザクションとは、<strong>「複数のデータベース操作を1つの処理単位としてまとめ、全部成功するか全部取り消すかを保証する仕組み」</strong>です。英語では "All or Nothing"（全か無か）とも表現されます。
+                    </p>
+
+                    <!-- 銀行振込の例え：ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-piggy-bank text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">例え話: 銀行振込</p>
+                                <p class="text-blue-900 text-sm mb-2">銀行振込は「<strong>A口座から出金</strong>」と「<strong>B口座に入金</strong>」の2つの操作から成ります。</p>
+                                <ul class="space-y-1 text-blue-900 text-sm list-disc pl-4">
+                                    <li>A 口座から出金した後、システム障害でB口座への入金に失敗したら？</li>
+                                    <li>お金がA口座から消えたのに、B口座には届いていない——最悪の事態です。</li>
+                                </ul>
+                                <p class="text-blue-900 text-sm mt-2">トランザクションを使えば、「出金と入金が<strong>両方成功したときだけ確定</strong>し、片方でも失敗したら<strong>出金もなかったことにする</strong>」という動作を保証できます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このように、トランザクションは「複数の操作を1つの単位として安全に扱う」ための重要な概念です。データベースを扱うすべてのアプリケーションで欠かせない考え方です。
+                    </p>
+
+                    <!-- トランザクションの流れ（Mermaid図） -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700 mb-3 text-center">トランザクションの基本的な流れ</p>
+                        <div class="mermaid">
+flowchart TD
+    A["トランザクション開始"] --> B["DB操作1: 社員を登録"]
+    B --> C["DB操作2: 関連データを更新"]
+    C --> D{"成功？"}
+    D -->|"はい（全操作成功）"| E["コミット<br/>（確定・保存）"]
+    D -->|"いいえ（途中で失敗）"| F["ロールバック<br/>（全操作を取り消し）"]
+    E --> G["処理完了"]
+    F --> H["変更なし（元の状態を維持）"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 コミットとロールバック
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        トランザクションの中で出てくる重要な用語が<strong>コミット</strong>と<strong>ロールバック</strong>です。
+                    </p>
+
+                    <!-- コミット・ロールバック カード -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-circle-check text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">コミット（Commit）</h3>
+                            <p class="text-sm text-slate-600">トランザクション内のすべての操作が成功したとき、変更を<strong>データベースに確定（保存）する</strong>操作です。コミット後は変更が永続化され、他のユーザーからも反映後のデータが見えます。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-rotate-left text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-2">ロールバック（Rollback）</h3>
+                            <p class="text-sm text-slate-600">トランザクションの途中で失敗したとき、<strong>それまでのすべての変更をなかったことにする</strong>操作です。ロールバック後はデータベースはトランザクション開始前の状態に戻ります。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Spring Data JPA では、通常これらの操作を自分でコードに書く必要はありません。<code class="bg-slate-100 px-1 rounded">@Transactional</code> アノテーションを使えば、Spring が自動で管理してくれます。次のセクションで詳しく学びましょう。
+                    </p>
+
+                    <!-- 用語整理テーブル -->
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">用語</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">いつ発生するか</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-emerald-700">コミット</td>
+                                    <td class="px-4 py-3 text-slate-600">変更をデータベースに確定する</td>
+                                    <td class="px-4 py-3 text-slate-600">全操作が成功したとき</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-red-700">ロールバック</td>
+                                    <td class="px-4 py-3 text-slate-600">変更を全て取り消して元に戻す</td>
+                                    <td class="px-4 py-3 text-slate-600">途中で例外（エラー）が発生したとき</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium text-slate-700">トランザクション</td>
+                                    <td class="px-4 py-3 text-slate-600">複数操作をまとめた1つの処理単位</td>
+                                    <td class="px-4 py-3 text-slate-600">@Transactional メソッドの呼び出し時</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 @Transactional — トランザクション境界を指定する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Spring では <code class="bg-slate-100 px-1 rounded">@Transactional</code> アノテーションを使って、<strong>「ここからここまでをひとつのトランザクションとして扱う」という境界</strong>を指定します。このアノテーションを付けたメソッドの呼び出しが開始するとトランザクションが始まり、メソッドが正常終了するとコミット、<strong>RuntimeException（実行時例外）が発生するとロールバック</strong>されます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: RuntimeException（実行時例外）</p>
+                                <p class="text-blue-900 text-sm"><strong>RuntimeException</strong> は、Java の例外の一種で「プログラムの実行中に起きる予期せぬエラー」です。たとえば <code class="bg-blue-100 text-blue-900 px-1 rounded">NullPointerException</code>（null を参照した）や <code class="bg-blue-100 text-blue-900 px-1 rounded">IllegalArgumentException</code>（不正な引数）などが代表例です。<code class="bg-blue-100 text-blue-900 px-1 rounded">@Transactional</code> はデフォルトでこれらが発生したときにロールバックを実行します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 Service 層に @Transactional を付ける理由
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">@Transactional</code> は、<strong>基本的に Service 層のメソッドまたはクラスに付ける</strong>ことが推奨されます。その理由は、Service 層が「業務処理の単位」を担当しているからです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば「複数の社員をまとめて登録する」という業務処理は、複数の <code class="bg-slate-100 px-1 rounded">save()</code> 呼び出しから成ります。これを Service のメソッドにまとめ、そこに <code class="bg-slate-100 px-1 rounded">@Transactional</code> を付けることで、「複数の Repository 呼び出しをまとめた業務処理全体を1つのトランザクション」として管理できます。
+                    </p>
+
+                    <!-- 層の役割整理 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-display text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Controller 層</h3>
+                            <p class="text-sm text-slate-600">HTTP リクエストの受け取りと画面への返却。トランザクションの管理は行わない。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-primary-50 to-cyan-50 border border-primary-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-gears text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Service 層 ← ここに付ける</h3>
+                            <p class="text-sm text-slate-600"><strong>業務処理の単位</strong>を担当。複数の Repository 呼び出しをまとめた単位に <code class="bg-primary-100 text-primary-900 px-1 rounded">@Transactional</code> を付ける。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-database text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Repository 層</h3>
+                            <p class="text-sm text-slate-600">個別の DB 操作（save・findAll 等）を担当。Spring Data JPA が基本的に管理する。</p>
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: @Transactional は Service に付ける</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 text-emerald-900 px-1 rounded">@Transactional</code> を Repository ではなく Service に付けることで、「<strong>業務処理の単位（複数の Repository 呼び出しをまとめた全体）をひとつのトランザクション</strong>」として管理できます。Repository だけに付けると、各 DB 操作が個別のトランザクションになり、「途中で失敗したときに一部だけ確定してしまう」状態になります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- コード例: @Transactional を Service に付ける -->
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際のコードを見てみましょう。複数の社員をまとめて登録し、途中で失敗したら全件ロールバックされる Service メソッドの例です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+
+@Service
+public class EmployeeService {
+
+    private final EmployeeRepository employeeRepository;
+
+    // コンストラクタインジェクションで Repository を受け取る
+    public EmployeeService(EmployeeRepository employeeRepository) {
+        this.employeeRepository = employeeRepository;
+    }
+
+    // @Transactional を付けると「このメソッド全体が1つのトランザクション」になる
+    @Transactional
+    public void registerAll(List&lt;Employee&gt; employees) {
+        for (Employee employee : employees) {
+            // ここで例外が起きると、それまでの保存もすべて取り消される
+            employeeRepository.save(employee);
+        }
+        // メソッドを正常終了するとコミット（確定）される
+    }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        上のコードで、ループの途中（例えば3人目の登録中）に <code class="bg-slate-100 px-1 rounded">RuntimeException</code> が発生した場合、それまでに保存した1人目・2人目のデータも<strong>すべてロールバック（取り消し）</strong>されます。データベースはトランザクション開始前の状態に戻ります。
+                    </p>
+
+                    <!-- ロールバックの流れ（Mermaid図） -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700 mb-3 text-center">@Transactional によるロールバックの流れ</p>
+                        <div class="mermaid">
+flowchart TD
+    A["registerAll 呼び出し<br/>（トランザクション開始）"] --> B["1人目を save（一時保存）"]
+    B --> C["2人目を save（一時保存）"]
+    C --> D["3人目を save ..."]
+    D --> E{"RuntimeException<br/>が発生？"}
+    E -->|"はい"| F["ロールバック<br/>1人目・2人目の保存も取り消し"]
+    E -->|"いいえ（全員成功）"| G["コミット<br/>全員の保存が確定"]
+    F --> H["DBは元の状態を維持"]
+    G --> I["DBに全員が登録される"]
+                        </div>
+                    </div>
+
+                    <!-- クラス全体に @Transactional を付ける方法 -->
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        クラス全体のすべてのメソッドにトランザクションを適用したい場合は、クラスに <code class="bg-slate-100 px-1 rounded">@Transactional</code> を付けることもできます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">クラスレベルの @Transactional（参考）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// クラスに付けると全メソッドにトランザクションが適用される
+@Service
+@Transactional
+public class EmployeeService {
+
+    // findAll のような読み取り専用メソッドには readOnly = true を付けると良い
+    @Transactional(readOnly = true)
+    public List&lt;Employee&gt; findAll() {
+        return employeeRepository.findAll();
+    }
+
+    // 登録・更新・削除などの更新系は通常の @Transactional が適用される
+    public void delete(Long id) {
+        employeeRepository.deleteById(id); // 失敗するとロールバック
+    }
+}</code></pre>
+                    </div>
+
+                    <!-- 注意カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: チェック例外はロールバックされない</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900 px-1 rounded">@Transactional</code> がデフォルトでロールバックするのは <strong>RuntimeException（非チェック例外）</strong>です。<code class="bg-red-100 text-red-900 px-1 rounded">IOException</code> などのチェック例外では自動ロールバックされません。チェック例外でもロールバックしたい場合は <code class="bg-red-100 text-red-900 px-1 rounded">@Transactional(rollbackFor = Exception.class)</code> のように指定します。入門段階では「RuntimeException → 自動ロールバック」と覚えておけば十分です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: @Transactional のロールバックを体験する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">実際に <code class="bg-purple-100 text-purple-900 px-1 rounded">@Transactional</code> を付けたメソッドを動かし、例外が発生したときにデータがロールバックされることを確認しましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 text-purple-900 px-1 rounded">EmployeeService</code> に <code class="bg-purple-100 text-purple-900 px-1 rounded">@Transactional</code> を付けた <code class="bg-purple-100 text-purple-900 px-1 rounded">registerAll</code> メソッドを追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ループの途中（例: ループカウンタが 2 のとき）で <code class="bg-purple-100 text-purple-900 px-1 rounded">throw new RuntimeException("テスト例外")</code> を発生させるコードを一時的に追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">アプリを起動して処理を呼び出し、H2 コンソール（<code class="bg-purple-100 text-purple-900 px-1 rounded">http://localhost:8080/h2-console</code>）で <code class="bg-purple-100 text-purple-900 px-1 rounded">SELECT * FROM employees</code> を実行し、1人目のデータも保存されていないことを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">例外を発生させるコードを削除して再実行し、今度は全員が登録されることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 mt-2">
+                                <p class="text-purple-900 text-sm"><strong>確認ポイント</strong>: 例外あり → 全件ロールバックされDBは空のまま。例外なし → 全員がDBに登録される。この「All or Nothing」の動きがトランザクションの本質です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. トランザクションの「All or Nothing」とはどういう意味ですか？銀行振込を例に説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            「複数の DB 操作を全部成功するか全部取り消すかの二択にする」ことです。銀行振込では「出金と入金」の2つの操作がひとつのトランザクションになります。出金成功後に入金が失敗した場合、出金もロールバックされて元の残高に戻ります。どちらか片方だけが実行されてデータが崩れる状態を防ぎます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. コミットとロールバックの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            コミットは「トランザクション内のすべての操作が成功し、変更をデータベースに確定する」操作です。ロールバックは「途中で例外が発生したときに、それまでのすべての変更をなかったことにしてデータベースを元の状態に戻す」操作です。@Transactional のメソッドが正常終了するとコミット、RuntimeException が発生するとロールバックが行われます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. @Transactional を Repository ではなく Service に付けるのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Service 層が「業務処理の単位」を担当しており、複数の Repository 呼び出しをまとめた処理全体をひとつのトランザクションで管理する必要があるからです。Repository に付けると各 DB 操作が個別のトランザクションになり、途中で失敗しても「それ以前の操作は確定してしまう」という問題が起きます。Service に付けることで「業務処理の単位（全体）」を1トランザクションとして扱えます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="spring-data-jpa-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第8章: Entityの関連を扱う</span>
+                        </div>
+                    </a>
+                    <a href="spring-data-jpa-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: Spring MVCと連携する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
