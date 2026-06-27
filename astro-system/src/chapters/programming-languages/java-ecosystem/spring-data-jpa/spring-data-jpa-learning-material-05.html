@@ -1,0 +1,513 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Spring Data JPA</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第5章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第5章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ServiceからRepositoryを利用する</h1>
+                    <p class="text-slate-600">前章では Repository の CRUD メソッドを直接試しました。しかし実際のアプリでは、Controller が Repository を直接呼ぶのではなく、<strong>Service を経由</strong>させるのが基本です。この章では、なぜ Service 層が必要なのかを理解したうえで、コンストラクタインジェクションで Repository を注入し、一覧取得・登録・更新・削除を Service のメソッドとしてまとめる方法を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Service 層の役割と、Controller から Repository を直接呼ばない設計の理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コンストラクタインジェクションで Repository を Service に注入できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>一覧取得・登録・更新・削除を Service のメソッドとして整理できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>「Controller → Service → Repository → Database」という層の流れを図で理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション5.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.1 Service 層の役割 — 業務処理をまとめる場所
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Spring アプリには <strong>Controller・Service・Repository</strong> という3つの層があります。それぞれが担当を分けています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">層</th>
+                                    <th class="px-4 py-3 text-left font-semibold">クラス例</th>
+                                    <th class="px-4 py-3 text-left font-semibold">役割</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Controller</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeController</code></td>
+                                    <td class="px-4 py-3 text-slate-600">画面・HTTPリクエストの受け付けと振り分け</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">Service</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeService</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>業務処理（ビジネスロジック）のまとめ</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Repository</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeRepository</code></td>
+                                    <td class="px-4 py-3 text-slate-600">データベースへのアクセス（CRUD）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Controller</strong> は「画面からのリクエストを受け取り、どの処理を呼ぶか振り分ける」担当です。一方 <strong>Repository</strong> は「データベースに対して読み書きする」専門の担当です。<strong>Service</strong> はその中間に位置し、<strong>業務処理のロジックをまとめる</strong>役割を持ちます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「Controller から Repository を直接呼べばよいのでは？」と思うかもしれません。しかし、業務処理が増えると Controller が肥大化し、テストも難しくなります。Service に業務処理を集めることで、<strong>画面処理（Controller）と業務処理（Service）を明確に分離</strong>できます。
+                    </p>
+
+                    <!-- 全体フロー Mermaid -->
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["Controller<br/>（画面・リクエスト）"] --> B["Service<br/>（業務処理）"]
+    B --> C["Repository<br/>（データアクセス）"]
+    C --> D[("Database")]
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">Controller は Service だけを呼び、Repository は直接呼びません。Repository を直接呼ぶのは Service のみです。この原則を守ることで、それぞれの層が自分の役割に集中でき、コードの見通しが良くなります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション5.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.2 Repository の DI — コンストラクタインジェクション
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Service が Repository を使うには、Spring の <strong>DI（依存性の注入）</strong>で Repository のインスタンスを受け取ります。注入方法はいくつかありますが、現在の Spring ではコンストラクタインジェクションが推奨されています。
+                    </p>
+
+                    <!-- 復習ヒントカード（青） -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">Spring 基礎の復習: DI（コンストラクタインジェクション）</p>
+                                <p class="text-blue-900 text-sm">DI とは、クラスが必要とする別のクラス（依存オブジェクト）を、自分で <code class="bg-blue-100 text-blue-900 px-1 rounded">new</code> するのではなく <strong>Spring が外部から注入してくれる</strong>仕組みです。コンストラクタインジェクションでは、コンストラクタの引数として依存オブジェクトを受け取ります。Spring Boot では、<strong>コンストラクタが1つだけの場合は <code class="bg-blue-100 text-blue-900 px-1 rounded">@Autowired</code> を省略</strong>できます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">@Service</code> を付けると Spring が自動でこのクラスを Bean（管理対象）として登録します。コンストラクタで <code class="bg-slate-100 px-1 rounded">EmployeeRepository</code> を受け取ることで、Spring が Repository を注入してくれます。
+                    </p>
+
+                    <!-- EmployeeService の基本構造 -->
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（基本構造）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning;
+
+import org.springframework.stereotype.Service;
+
+// @Service を付けると Spring が Bean として管理する
+@Service
+public class EmployeeService {
+
+    // Repository を final で保持（変更不可）
+    private final EmployeeRepository repository;
+
+    // コンストラクタで Repository を受け取る（コンストラクタインジェクション）
+    public EmployeeService(EmployeeRepository repository) {
+        this.repository = repository;
+    }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">private final</code> にすることで、注入後に Repository が書き換えられるのを防ぎます。これはコンストラクタインジェクションを使う際の定型パターンです。
+                    </p>
+                </section>
+
+                <!-- セクション5.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.3 一覧取得・登録・更新・削除を Service にまとめる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Repository のメソッド（<code class="bg-slate-100 px-1 rounded">findAll</code>・<code class="bg-slate-100 px-1 rounded">findById</code>・<code class="bg-slate-100 px-1 rounded">save</code>・<code class="bg-slate-100 px-1 rounded">deleteById</code>）をそのまま呼ぶだけでなく、<strong>Service のメソッドとしてわかりやすい名前でラップ</strong>します。業務処理が増えても Service の中で完結します。
+                    </p>
+
+                    <!-- 一覧取得 -->
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2 mt-6">一覧取得: <code class="bg-slate-100 px-1 rounded text-sm">getAll()</code></h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        全社員を取得して返します。Repository の <code class="bg-slate-100 px-1 rounded">findAll()</code> をそのままラップするシンプルなメソッドです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（一覧取得）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">import java.util.List;
+
+// 全社員を取得する
+public List&lt;Employee&gt; getAll() {
+    // Repository の findAll() で全件取得
+    return repository.findAll();
+}</code></pre>
+                    </div>
+
+                    <!-- 1件取得 -->
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2 mt-6">1件取得: <code class="bg-slate-100 px-1 rounded text-sm">getById(Long id)</code></h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ID を指定して1件取得します。<code class="bg-slate-100 px-1 rounded">findById()</code> は <code class="bg-slate-100 px-1 rounded">Optional&lt;Employee&gt;</code> を返します。見つからない場合は例外を投げます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（1件取得）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ID で1件取得（見つからなければ例外）
+public Employee getById(Long id) {
+    // orElseThrow で見つからない場合に例外を投げる
+    return repository.findById(id)
+            .orElseThrow(() -&gt; new RuntimeException("社員が見つかりません: " + id));
+}</code></pre>
+                    </div>
+
+                    <!-- 登録処理 -->
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2 mt-6">登録処理: <code class="bg-slate-100 px-1 rounded text-sm">register(Employee employee)</code></h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        新規社員を登録します。<code class="bg-slate-100 px-1 rounded">save()</code> は INSERT を行い、保存後の Entity（ID が設定済み）を返します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（登録）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 社員を新規登録して保存済み Entity を返す
+public Employee register(Employee employee) {
+    // save() が INSERT を行い ID が設定された Entity を返す
+    return repository.save(employee);
+}</code></pre>
+                    </div>
+
+                    <!-- 更新処理 -->
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2 mt-6">更新処理: <code class="bg-slate-100 px-1 rounded text-sm">update(Employee employee)</code></h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        既存社員の情報を更新します。<code class="bg-slate-100 px-1 rounded">save()</code> に ID あり Entity を渡すと UPDATE が行われます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（更新）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 社員情報を更新する（ID ありの場合 save() は UPDATE になる）
+public Employee update(Employee employee) {
+    return repository.save(employee);
+}</code></pre>
+                    </div>
+
+                    <!-- 削除処理 -->
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2 mt-6">削除処理: <code class="bg-slate-100 px-1 rounded text-sm">delete(Long id)</code></h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ID を指定して社員を削除します。<code class="bg-slate-100 px-1 rounded">deleteById()</code> は対象が存在しない場合に例外を投げます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（削除）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// ID を指定して社員を削除する
+public void delete(Long id) {
+    // deleteById() は ID に該当する行を削除する
+    repository.deleteById(id);
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション5.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        5.4 EmployeeService の全体像
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまで作ったメソッドをまとめると、<code class="bg-slate-100 px-1 rounded">EmployeeService</code> の全体はこのようになります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">EmployeeService.java（全体）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.jpalearning;
+
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+public class EmployeeService {
+
+    private final EmployeeRepository repository;
+
+    // コンストラクタインジェクション
+    public EmployeeService(EmployeeRepository repository) {
+        this.repository = repository;
+    }
+
+    public List&lt;Employee&gt; getAll()               { return repository.findAll(); }
+    public Employee getById(Long id)             { return repository.findById(id).orElseThrow(); }
+    public Employee register(Employee employee)  { return repository.save(employee); }
+    public Employee update(Employee employee)    { return repository.save(employee); }
+    public void delete(Long id)                  { repository.deleteById(id); }
+}</code></pre>
+                    </div>
+
+                    <!-- 設計のまとめカード -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-display text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Controller</h3>
+                            <p class="text-sm text-slate-600">画面からのリクエストを受け取り、<strong>Service のメソッド</strong>を呼ぶだけ。Repository は知らない。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-gears text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Service</h3>
+                            <p class="text-sm text-slate-600"><strong>業務処理をまとめる。</strong> Repository を持ち、CRUD をメソッドとして整理する。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-database text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Repository</h3>
+                            <p class="text-sm text-slate-600">データベースの読み書きに専念。<strong>Service からだけ</strong>呼ばれる。</p>
+                        </div>
+                    </div>
+
+                    <!-- 注意カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">よくある誤解</p>
+                                <p class="text-red-900 text-sm">「登録も更新も <code class="bg-red-100 text-red-900 px-1 rounded">save()</code> を使うなら Service メソッドを分ける必要はない」と思われがちです。しかし、<code class="bg-red-100 text-red-900 px-1 rounded">register()</code> と <code class="bg-red-100 text-red-900 px-1 rounded">update()</code> を分けることで、将来「登録時だけ入力チェックをする」「更新時だけメール通知をする」といった業務処理の追加が Service に閉じてできます。Service メソッドを意味ある単位で分けておくことが重要です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 5-1: EmployeeService を作成する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">この章の内容を手元で実際に実装してみましょう。コードを写すだけでも「型が通る」体験をすることが大切です。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 text-purple-900 px-1 rounded">com.example.jpalearning</code> パッケージに <code class="bg-purple-100 text-purple-900 px-1 rounded">EmployeeService.java</code> を新規作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">クラスに <code class="bg-purple-100 text-purple-900 px-1 rounded">@Service</code> を付け、コンストラクタで <code class="bg-purple-100 text-purple-900 px-1 rounded">EmployeeRepository</code> を受け取る。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 text-purple-900 px-1 rounded">getAll()</code>・<code class="bg-purple-100 text-purple-900 px-1 rounded">getById()</code>・<code class="bg-purple-100 text-purple-900 px-1 rounded">register()</code>・<code class="bg-purple-100 text-purple-900 px-1 rounded">update()</code>・<code class="bg-purple-100 text-purple-900 px-1 rounded">delete()</code> の各メソッドを実装する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">アプリを起動してビルドエラーが出ないことを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">【発展】<code class="bg-purple-100 text-purple-900 px-1 rounded">EmployeeController</code>（仮）から <code class="bg-purple-100 text-purple-900 px-1 rounded">EmployeeService</code> をコンストラクタインジェクションで受け取り、<code class="bg-purple-100 text-purple-900 px-1 rounded">getAll()</code> を呼び出してみる。</span>
+                                </li>
+                            </ol>
+
+                            <!-- 動作確認カード -->
+                            <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                        rounded-xl p-4 mt-4">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas fa-circle-check text-emerald-500 mt-1"></i>
+                                    <div>
+                                        <p class="font-semibold text-emerald-800 mb-1">動作確認のポイント</p>
+                                        <ul class="text-emerald-900 text-sm space-y-1">
+                                            <li>・アプリ起動時にコンパイルエラーが出ないこと</li>
+                                            <li>・Spring のログに <code class="bg-emerald-100 text-emerald-900 px-1 rounded">EmployeeService</code> が Bean として登録されていること</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Controller から Repository を直接呼ばず、Service を経由させる理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            画面処理（Controller）と業務処理（Service）を明確に分離するためです。Service に業務処理を集めることで、Controller が肥大化せず、将来の処理追加もテストも容易になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. コンストラクタインジェクションで Repository を受け取るコードを書いてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <div class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="block whitespace-pre-wrap text-sm">private final EmployeeRepository repository;
+public EmployeeService(EmployeeRepository repository) {
+    this.repository = repository;
+}</code>
+                                            <p class="mt-2 text-sm">コンストラクタが1つだけの場合、Spring Boot では <code class="bg-blue-200 text-blue-900 px-1 rounded">@Autowired</code> を省略できます。</p>
+                                        </div>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100 px-1 rounded">register()</code> と <code class="bg-blue-100 px-1 rounded">update()</code> はどちらも内部で <code class="bg-blue-100 px-1 rounded">save()</code> を呼びますが、なぜメソッドを分けるのですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            将来「登録時だけ入力チェック」「更新時だけ通知処理」といった業務処理が追加されたとき、それぞれのメソッド内で対応できるためです。意味のある単位でメソッドを分けておくことで、Service 層が業務処理の追加に柔軟に対応できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="spring-data-jpa-learning-material-04.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第4章: RepositoryによるCRUD操作</span>
+                        </div>
+                    </a>
+                    <a href="spring-data-jpa-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第6章: 条件検索を作成する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
