@@ -13,6 +13,7 @@ import type { TechGuide } from './types';
 
 // 開発手法・プロセス
 import { claudeCode } from './development-processes/claude-code';
+import { claudeCodeSkills } from './development-processes/claude-code-skills';
 import { codex } from './development-processes/codex';
 import { gitGithub } from './development-processes/git-github';
 
@@ -51,6 +52,7 @@ const all: TechGuide[] = [
   javascript,
   // 開発手法・プロセス
   claudeCode,
+  claudeCodeSkills,
   codex,
   // データ・AI — 生成AI
   claude,

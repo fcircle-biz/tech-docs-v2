@@ -1,0 +1,42 @@
+import type { TechGuide } from '../types';
+
+// Claude Code Skills 入門学習ガイド（全12章）。技術色 = インディゴ。
+export const claudeCodeSkills: TechGuide = {
+  category: 'development-processes',
+  slug: 'claude-code-skills',
+  techTitle: 'Claude Code Skills学習教材',
+  icon: 'fa-puzzle-piece',
+  iconStyle: 'fas',
+  level: '初級',
+  categoryLabel: '開発手法・プロセス',
+  totalTime: '約8時間',
+  splashStop0: '#6366f1',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
+  },
+  chapters: [
+    { number: 1, name: 'スキルとは何か', file: 'claude-code-skills-learning-material-01.html' },
+    { number: 2, name: 'スキルの置き場所と優先順位', file: 'claude-code-skills-learning-material-02.html' },
+    { number: 3, name: '最初のスキルを作る', file: 'claude-code-skills-learning-material-03.html' },
+    { number: 4, name: 'スキルのテストと発見の仕組み', file: 'claude-code-skills-learning-material-04.html' },
+    { number: 5, name: '効果的な description の書き方', file: 'claude-code-skills-learning-material-05.html' },
+    { number: 6, name: 'メタデータと allowed-tools', file: 'claude-code-skills-learning-material-06.html' },
+    { number: 7, name: '段階的開示と複数ファイル構成', file: 'claude-code-skills-learning-material-07.html' },
+    { number: 8, name: 'スクリプト・参照資料・アセットの活用', file: 'claude-code-skills-learning-material-08.html' },
+    { number: 9, name: 'CLAUDE.md・スラッシュコマンドとの使い分け', file: 'claude-code-skills-learning-material-09.html' },
+    { number: 10, name: 'サブエージェント・フック・MCPとの比較', file: 'claude-code-skills-learning-material-10.html' },
+    { number: 11, name: 'スキルの共有と配布', file: 'claude-code-skills-learning-material-11.html' },
+    { number: 12, name: 'トラブルシューティングと次のステップ', file: 'claude-code-skills-learning-material-12.html' },
+  ],
+};
