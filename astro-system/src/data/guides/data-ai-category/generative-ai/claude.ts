@@ -1,0 +1,42 @@
+import type { TechGuide } from '../../types';
+
+// Claude入門学習ガイド（技術色 = 生成AI / LLM = fuchsia）
+export const claude: TechGuide = {
+  category: 'data-ai-category/generative-ai',
+  slug: 'claude',
+  techTitle: 'Claude入門学習教材',
+  icon: 'fa-robot',
+  iconStyle: 'fas',
+  level: '初級',
+  categoryLabel: 'データ・AI / 生成AI',
+  totalTime: '約6時間',
+  splashStop0: '#d946ef',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#fdf4ff',
+    100: '#fae8ff',
+    200: '#f5d0fe',
+    300: '#f0abfc',
+    400: '#e879f9',
+    500: '#d946ef',
+    600: '#c026d3',
+    700: '#a21caf',
+    800: '#86198f',
+    900: '#701a75',
+  },
+  chapters: [
+    { number: 1, name: 'Claudeとは', file: 'claude-learning-material-01.html' },
+    { number: 2, name: 'Claudeとの最初の会話', file: 'claude-learning-material-02.html' },
+    { number: 3, name: 'コンテキストを与える', file: 'claude-learning-material-03.html' },
+    { number: 4, name: 'より良い結果を得るために', file: 'claude-learning-material-04.html' },
+    { number: 5, name: 'AI Fluency と evals', file: 'claude-learning-material-05.html' },
+    { number: 6, name: 'デスクトップアプリの3モード', file: 'claude-learning-material-06.html' },
+    { number: 7, name: 'プロジェクトを使いこなす', file: 'claude-learning-material-07.html' },
+    { number: 8, name: 'アーティファクトで作成する', file: 'claude-learning-material-08.html' },
+    { number: 9, name: 'スキルを活用する', file: 'claude-learning-material-09.html' },
+    { number: 10, name: 'コネクタと MCP', file: 'claude-learning-material-10.html' },
+    { number: 11, name: 'エンタープライズ検索とリサーチ', file: 'claude-learning-material-11.html' },
+    { number: 12, name: '実践への展開と次のステップ', file: 'claude-learning-material-12.html' },
+  ],
+};
