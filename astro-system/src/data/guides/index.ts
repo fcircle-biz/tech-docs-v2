@@ -29,6 +29,9 @@ import { junit } from './programming-languages/java-ecosystem/junit';
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
+// データ・AI — 生成AI
+import { claude } from './data-ai-category/generative-ai/claude';
+
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
 
@@ -49,6 +52,8 @@ const all: TechGuide[] = [
   // 開発手法・プロセス
   claudeCode,
   codex,
+  // データ・AI — 生成AI
+  claude,
   // クラウド・インフラ
   docker,
   gitGithub,
