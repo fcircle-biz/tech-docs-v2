@@ -30,6 +30,9 @@ import { junit } from './programming-languages/java-ecosystem/junit';
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
+// Web技術
+import { markdown } from './web-technologies/markdown';
+
 // データ・AI — 生成AI
 import { claude } from './data-ai-category/generative-ai/claude';
 
@@ -50,6 +53,8 @@ const all: TechGuide[] = [
   junit,
   // プログラミング言語 — JavaScript エコシステム
   javascript,
+  // Web技術
+  markdown,
   // 開発手法・プロセス
   claudeCode,
   claudeCodeSkills,

@@ -1,0 +1,40 @@
+import type { TechGuide } from '../types';
+
+// Markdown 入門学習ガイド（全10章）。技術色 = ブルー（ドキュメント系）。
+export const markdown: TechGuide = {
+  category: 'web-technologies',
+  slug: 'markdown',
+  techTitle: 'Markdown学習教材',
+  icon: 'fa-markdown',
+  iconStyle: 'fab',
+  level: '初級',
+  categoryLabel: 'Web技術',
+  totalTime: '約6時間',
+  splashStop0: '#3b82f6',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#3b82f6',
+    600: '#2563eb',
+    700: '#1d4ed8',
+    800: '#1e40af',
+    900: '#1e3a8a',
+  },
+  chapters: [
+    { number: 1, name: 'Markdownとは', file: 'markdown-learning-material-01.html' },
+    { number: 2, name: '書く準備をしよう', file: 'markdown-learning-material-02.html' },
+    { number: 3, name: '見出しと段落', file: 'markdown-learning-material-03.html' },
+    { number: 4, name: '文字の装飾', file: 'markdown-learning-material-04.html' },
+    { number: 5, name: 'リスト', file: 'markdown-learning-material-05.html' },
+    { number: 6, name: 'リンクと画像', file: 'markdown-learning-material-06.html' },
+    { number: 7, name: 'コードブロックと引用', file: 'markdown-learning-material-07.html' },
+    { number: 8, name: '表（テーブル）', file: 'markdown-learning-material-08.html' },
+    { number: 9, name: 'その他の便利な記法', file: 'markdown-learning-material-09.html' },
+    { number: 10, name: '実践：READMEを書いてみよう', file: 'markdown-learning-material-10.html' },
+  ],
+};
