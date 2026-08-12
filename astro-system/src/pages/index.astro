@@ -4,6 +4,7 @@
 // （教材を追加すると自動でカードが増える。ハードコードはしない）。
 // スタンドアロンページのため <head> で Tailwind/Fonts/Font Awesome を自己完結読込する。
 import { guideRegistry } from '../data/guides';
+import type { TechGuide } from '../data/guides';
 
 const base = import.meta.env.BASE_URL;
 
@@ -16,6 +17,69 @@ const cards = guides.map((g) => {
   const href = `${base}guide/${g.category}/${g.slug}/${first.file}`;
   return { g, href };
 });
+
+/** 9分類のメタ情報（順序＝表示順）。tech-knowledge-map.md 準拠 */
+const CATEGORY_META = [
+  { key: 'programming-languages',     label: 'プログラミング言語', icon: 'fa-code' },
+  { key: 'web-technologies',          label: 'Web技術',           icon: 'fa-globe' },
+  { key: 'development-processes',     label: '開発プロセス',       icon: 'fa-diagram-project' },
+  { key: 'design-modeling',           label: '設計・モデリング',   icon: 'fa-compass-drafting' },
+  { key: 'cloud-infrastructure',      label: 'クラウド・インフラ', icon: 'fa-cloud' },
+  { key: 'data-ai-category',          label: 'データ・AI',        icon: 'fa-brain' },
+  { key: 'business-saas',             label: 'ビジネスSaaS',      icon: 'fa-briefcase' },
+  { key: 'certification',             label: '資格',              icon: 'fa-certificate' },
+  { key: 'business-domain-knowledge', label: '業務ドメイン知識',   icon: 'fa-building-columns' },
+] as const;
+
+/** サブグループ（第2セグメント）表示名。未登録キーは機械的フォールバック */
+const SUBGROUP_LABELS: Record<string, string> = {
+  'java-ecosystem':       'Java エコシステム',
+  'javascript-ecosystem': 'JavaScript エコシステム',
+  'python-ecosystem':     'Python エコシステム',
+  'generative-ai':        '生成AI',
+};
+const subgroupLabel = (k: string) =>
+  SUBGROUP_LABELS[k] ?? k.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+// カテゴリ別グループ分け（第1階層＝9分類、第2階層＝サブグループ）のデータ導出。
+type Card = { g: TechGuide; href: string };
+
+const topKey = (c: Card) => c.g.category.split('/')[0];
+const subKey = (c: Card) => c.g.category.split('/')[1] ?? '';
+
+const byTop = new Map<string, Card[]>();
+for (const c of cards) {
+  const k = topKey(c);
+  if (!byTop.has(k)) byTop.set(k, []);
+  byTop.get(k)!.push(c);
+}
+
+const buildSection = (key: string, label: string, icon: string) => {
+  const list = byTop.get(key)!;
+  const direct = list.filter((c) => !subKey(c));
+  const subKeys = [...new Set(list.filter((c) => subKey(c)).map(subKey))];
+  return {
+    key, label, icon,
+    id: `cat-${key}`,
+    count: list.length,
+    direct,
+    subgroups: subKeys.map((sk) => ({
+      key: sk,
+      label: subgroupLabel(sk),
+      id: `cat-${key}--${sk}`,
+      cards: list.filter((c) => subKey(c) === sk),
+    })),
+  };
+};
+
+// セクション順は CATEGORY_META の配列順。ガイド0件の分類は描画しない。
+// CATEGORY_META に無い第1セグメントは末尾に「その他」としてフォールバック。
+const known = CATEGORY_META.filter((m) => byTop.has(m.key))
+  .map((m) => buildSection(m.key, m.label, m.icon));
+const unknownKeys = [...byTop.keys()].filter((k) => !CATEGORY_META.some((m) => m.key === k));
+const sections = [...known, ...unknownKeys.map((k) => buildSection(k, 'その他', 'fa-folder'))];
+
+const showNav = sections.length >= 2;
 
 const title = 'tech-docs-v2 — IT・ソフトウェア開発の学習ガイド';
 const description =
@@ -53,6 +117,30 @@ const description =
       }
       .font-mono {
         font-family: 'JetBrains Mono', ui-monospace, monospace;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+      /* ナビのアクティブ状態（slate-100 / slate-900 / violet-500 と同値） */
+      .nav-link.is-active {
+        background-color: #f1f5f9;
+        color: #0f172a;
+        font-weight: 600;
+        border-left-color: #8b5cf6;
+      }
+      .nav-chip.is-active {
+        background-color: #0f172a;
+        border-color: #0f172a;
+        color: #ffffff;
+      }
+      .nav-chip.is-active .nav-chip-count,
+      .nav-chip.is-active .nav-chip-icon {
+        color: #cbd5e1;
       }
     </style>
   </head>
@@ -96,67 +184,238 @@ const description =
         </div>
       </section>
 
-      <!-- ガイド一覧 -->
+      <!-- ガイド一覧（カテゴリ別グループ分け＋サイドメニュー） -->
       <section class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <div class="flex items-end justify-between mb-8">
+        <div class="flex items-end justify-between mb-6">
           <h2 class="text-2xl font-bold text-slate-900">学習ガイド一覧</h2>
-          <span class="text-sm text-slate-500">{cards.length} 件</span>
+          <span class="text-sm text-slate-500">全 {cards.length} 件</span>
         </div>
 
         {
           cards.length === 0 ? (
             <p class="text-slate-500">現在公開中の学習ガイドはありません。</p>
           ) : (
-            <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {cards.map(({ g, href }) => (
-                <a
-                  href={href}
-                  class="group relative flex flex-col rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+            <>
+              {/* モバイル用：上部固定チップバー（横スクロール） */}
+              {showNav && (
+                <nav
+                  id="category-chip-bar"
+                  aria-label="カテゴリナビゲーション"
+                  class="lg:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 mb-8 border-b border-slate-200 bg-slate-50 px-4 sm:px-6 py-3"
                 >
-                  {/* primary→cyan のヘアラインレール */}
-                  <span
-                    class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-cyan-500"
-                    style={`background: linear-gradient(to right, ${g.primary[500]}, #06b6d4);`}
-                  />
-                  <div class="p-6 flex flex-col h-full">
-                    <div class="flex items-center gap-4 mb-4">
-                      <div
-                        class="w-14 h-14 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
-                        style={`background: linear-gradient(135deg, ${g.splashStop0}, ${g.splashStop1});`}
+                  <ul class="flex gap-2 overflow-x-auto pb-1">
+                    {sections.map((s) => (
+                      <li class="flex-shrink-0">
+                        <a
+                          href={`#${s.id}`}
+                          data-nav-cat={s.key}
+                          class="nav-chip inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors"
+                        >
+                          <i class:list={['fas', s.icon, 'text-slate-400 nav-chip-icon']} />
+                          {s.label}
+                          <span class="nav-chip-count text-slate-400">{s.count}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
+
+              <div class="lg:flex lg:items-start lg:gap-8">
+                {/* デスクトップ用：左サイドメニュー */}
+                {showNav && (
+                  <aside class="hidden lg:block lg:w-60 flex-shrink-0">
+                    <nav
+                      aria-labelledby="cat-nav-title"
+                      class="sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto pr-1"
+                    >
+                      <p
+                        id="cat-nav-title"
+                        class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500"
                       >
-                        <i class:list={[g.iconStyle ?? 'fas', g.icon, 'text-2xl', 'text-white']} />
-                      </div>
-                      <div class="min-w-0">
-                        <h3 class="text-lg font-bold text-slate-900 truncate">
-                          {g.techTitle}
-                        </h3>
-                        <p class="text-xs text-slate-500 mt-0.5">{g.categoryLabel}</p>
-                      </div>
-                    </div>
+                        カテゴリ
+                      </p>
+                      <ul class="space-y-1">
+                        {sections.map((s) => (
+                          <li>
+                            <a
+                              href={`#${s.id}`}
+                              data-nav-cat={s.key}
+                              class="nav-link flex items-center gap-2.5 rounded-lg border-l-2 border-transparent py-2 pl-3 pr-2 text-sm text-slate-600 transition-colors hover:bg-slate-100"
+                            >
+                              <i class:list={['fas', s.icon, 'w-4 flex-shrink-0 text-center text-slate-400']} />
+                              <span class="truncate">{s.label}</span>
+                              <span class="ml-auto flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                                {s.count}
+                              </span>
+                            </a>
+                            {s.subgroups.length >= 2 && (
+                              <ul class="mb-1 mt-1 space-y-0.5 pl-8">
+                                {s.subgroups.map((sg) => (
+                                  <li>
+                                    <a
+                                      href={`#${sg.id}`}
+                                      class="block truncate rounded-md px-2 py-1.5 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                    >
+                                      {sg.label}
+                                      <span class="text-slate-400">（{sg.cards.length}）</span>
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </nav>
+                  </aside>
+                )}
 
-                    <div class="flex flex-wrap items-center gap-2 mb-5">
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                        <i class="fas fa-star text-amber-400 text-[10px]" />
-                        {g.level}
-                      </span>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                        <i class="fas fa-clock text-[10px]" />
-                        {g.totalTime}
-                      </span>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                        <i class="fas fa-list-ol text-[10px]" />
-                        全{g.chapters.length}章
-                      </span>
-                    </div>
+                {/* カテゴリ別セクション群 */}
+                <div class="min-w-0 flex-1 space-y-14">
+                  {sections.map((s) => (
+                    <section
+                      id={s.id}
+                      data-cat={s.key}
+                      aria-labelledby={`${s.id}-heading`}
+                      class="scroll-mt-24 lg:scroll-mt-8"
+                    >
+                      <h2
+                        id={`${s.id}-heading`}
+                        class="mb-6 flex items-center gap-3 border-b border-slate-200 pb-3 text-xl font-bold text-slate-900"
+                      >
+                        <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-sm">
+                          <i class:list={['fas', s.icon, 'text-base']} />
+                        </span>
+                        <span class="truncate">{s.label}</span>
+                        <span class="ml-auto flex-shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                          {s.count} 件
+                        </span>
+                      </h2>
 
-                    <span class="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
-                      第1章から学習を始める
-                      <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform" />
-                    </span>
-                  </div>
-                </a>
-              ))}
-            </div>
+                      {/* 直下ガイド（サブグループ無し） */}
+                      {s.direct.length > 0 && (
+                        <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                          {s.direct.map(({ g, href }) => (
+                            <a
+                              href={href}
+                              class="group relative flex flex-col rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                            >
+                              {/* primary→cyan のヘアラインレール */}
+                              <span
+                                class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-cyan-500"
+                                style={`background: linear-gradient(to right, ${g.primary[500]}, #06b6d4);`}
+                              />
+                              <div class="p-6 flex flex-col h-full">
+                                <div class="flex items-center gap-4 mb-4">
+                                  <div
+                                    class="w-14 h-14 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
+                                    style={`background: linear-gradient(135deg, ${g.splashStop0}, ${g.splashStop1});`}
+                                  >
+                                    <i class:list={[g.iconStyle ?? 'fas', g.icon, 'text-2xl', 'text-white']} />
+                                  </div>
+                                  <div class="min-w-0">
+                                    <h3 class="text-lg font-bold text-slate-900 truncate">
+                                      {g.techTitle}
+                                    </h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">{g.categoryLabel}</p>
+                                  </div>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-2 mb-5">
+                                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                    <i class="fas fa-star text-amber-400 text-[10px]" />
+                                    {g.level}
+                                  </span>
+                                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                    <i class="fas fa-clock text-[10px]" />
+                                    {g.totalTime}
+                                  </span>
+                                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                    <i class="fas fa-list-ol text-[10px]" />
+                                    全{g.chapters.length}章
+                                  </span>
+                                </div>
+
+                                <span class="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
+                                  第1章から学習を始める
+                                  <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform" />
+                                </span>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* サブグループ */}
+                      {s.subgroups.length > 0 && (
+                        <div class:list={['space-y-10', s.direct.length > 0 && 'mt-10']}>
+                          {s.subgroups.map((sg) => (
+                            <div id={sg.id} class="scroll-mt-24 lg:scroll-mt-8">
+                              <h3 class="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500">
+                                <span class="h-4 w-1 rounded-full bg-violet-500"></span>
+                                {sg.label}
+                                <span class="font-normal normal-case text-slate-400">（{sg.cards.length}）</span>
+                              </h3>
+                              <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                                {sg.cards.map(({ g, href }) => (
+                                  <a
+                                    href={href}
+                                    class="group relative flex flex-col rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                                  >
+                                    {/* primary→cyan のヘアラインレール */}
+                                    <span
+                                      class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-cyan-500"
+                                      style={`background: linear-gradient(to right, ${g.primary[500]}, #06b6d4);`}
+                                    />
+                                    <div class="p-6 flex flex-col h-full">
+                                      <div class="flex items-center gap-4 mb-4">
+                                        <div
+                                          class="w-14 h-14 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
+                                          style={`background: linear-gradient(135deg, ${g.splashStop0}, ${g.splashStop1});`}
+                                        >
+                                          <i class:list={[g.iconStyle ?? 'fas', g.icon, 'text-2xl', 'text-white']} />
+                                        </div>
+                                        <div class="min-w-0">
+                                          <h3 class="text-lg font-bold text-slate-900 truncate">
+                                            {g.techTitle}
+                                          </h3>
+                                          <p class="text-xs text-slate-500 mt-0.5">{g.categoryLabel}</p>
+                                        </div>
+                                      </div>
+
+                                      <div class="flex flex-wrap items-center gap-2 mb-5">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                          <i class="fas fa-star text-amber-400 text-[10px]" />
+                                          {g.level}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                          <i class="fas fa-clock text-[10px]" />
+                                          {g.totalTime}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                                          <i class="fas fa-list-ol text-[10px]" />
+                                          全{g.chapters.length}章
+                                        </span>
+                                      </div>
+
+                                      <span class="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
+                                        第1章から学習を始める
+                                        <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform" />
+                                      </span>
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              </div>
+            </>
           )
         }
       </section>
@@ -183,5 +442,58 @@ const description =
         </div>
       </div>
     </footer>
+
+    <!-- カテゴリナビゲーションの scroll-spy（サイドメニュー／チップバーのアクティブ表示同期） -->
+    <script is:inline>
+      (function () {
+        const sections = Array.from(document.querySelectorAll('section[data-cat]'));
+        const links = Array.from(document.querySelectorAll('[data-nav-cat]'));
+        if (sections.length < 2 || links.length === 0) return;
+
+        const bar = document.getElementById('category-chip-bar');
+        let currentKey = null;
+
+        function setActive(key) {
+          if (key === currentKey) return;
+          currentKey = key;
+          links.forEach((a) => {
+            const on = a.dataset.navCat === key;
+            a.classList.toggle('is-active', on);
+            if (on) a.setAttribute('aria-current', 'true');
+            else a.removeAttribute('aria-current');
+            if (on && bar && bar.contains(a)) {
+              const scroller = bar.querySelector('ul');
+              scroller.scrollTo({
+                left: a.offsetLeft - (scroller.clientWidth - a.offsetWidth) / 2,
+                behavior: 'smooth',
+              });
+            }
+          });
+        }
+
+        const visible = new Map();
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => visible.set(e.target, e.isIntersecting));
+            const hit = sections.find((s) => visible.get(s));
+            if (hit) setActive(hit.dataset.cat);
+          },
+          { rootMargin: '-96px 0px -60% 0px', threshold: 0 }
+        );
+        sections.forEach((s) => io.observe(s));
+
+        window.addEventListener(
+          'scroll',
+          () => {
+            if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+              setActive(sections[sections.length - 1].dataset.cat);
+            }
+          },
+          { passive: true }
+        );
+
+        setActive(sections[0].dataset.cat);
+      })();
+    </script>
   </body>
 </html>
