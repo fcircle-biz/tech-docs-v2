@@ -7,13 +7,15 @@
 ### 必要な環境
 - Windows / macOS / Linux いずれかの PC
 - テキストエディタ（**Visual Studio Code を推奨**・無料。オンラインエディタでも学習可能）
-- （第10章）GitHub アカウント（任意。README 作成演習で使用）
+- （第11章）GitHub アカウント（任意。README 作成演習で使用）
 
 ### 参考リソース
 - [Markdown 公式（Daring Fireball）](https://daringfireball.net/projects/markdown/)
 - [CommonMark（標準仕様）](https://commonmark.org/)
 - [GitHub Flavored Markdown 仕様](https://github.github.com/gfm/)
 - [GitHub Docs - GitHub での書き込み](https://docs.github.com/ja/get-started/writing-on-github)
+- [Mermaid 公式ドキュメント](https://mermaid.js.org/)
+- [Mermaid Live Editor（ブラウザで試せる）](https://mermaid.live/)
 
 ### 前提知識
 - **必須**: PC の基本操作（ファイルの作成・保存・フォルダ操作）
@@ -48,7 +50,10 @@ Markdown を書く環境を整える章。.md ファイルとは何か（ただ�
 ### [9. その他の便利な記法](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/markdown/markdown-learning-material-09.html)
 知っていると差がつく記法を学ぶ章。水平線（`---`・`***`。直前の行に文字があると見出し扱いになる罠に注意）、エスケープ（`\` を付けて記号をそのまま表示する）、HTML タグの併用（`<br>`・折りたたみの `<details>` など。使いすぎない）、コメント（`<!-- -->`・表示されないメモ）、脚注（`[^1]`・対応している環境）、絵文字コード（`:smile:` など GitHub 等で使える）を扱う。最後に「方言（フレーバー）」の存在（CommonMark・GitHub Flavored Markdown＝GFM）を紹介し、環境によって使える記法が少し違うことを理解する。
 
-### [10. 実践：READMEを書いてみよう](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/markdown/markdown-learning-material-10.html)
+### [10. Mermaidで図を描く](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/markdown/markdown-learning-material-10.html)
+Markdown 文書に図を描ける Mermaid 記法を学ぶ章。`` ```mermaid `` のコードブロックで囲むだけで図を生成できる仕組みと、画像ファイル不要・修正が簡単・差分が見えるといった利点を確認し、フローチャート（`flowchart TD`/`LR`、ノードの形、矢印とラベル付き分岐）、シーケンス図（`sequenceDiagram`）、円グラフやガントチャートなどの図の種類を学ぶ。GitHub・Notion・Zenn・Obsidian・VS Code など表示できる環境とできない環境の違い、日本語や括弧の扱いでつまずかないコツ、Mermaid Live Editor での試し方も紹介する。
+
+### [11. 実践：READMEを書いてみよう](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/markdown/markdown-learning-material-11.html)
 総仕上げの章。GitHub Flavored Markdown（GFM）でこれまでの記法がどう活きるかを確認し、README の役割と定番の構成（タイトル・概要・特徴・インストール方法・使い方・ライセンス）を学ぶ。架空のプロジェクトを題材に、見出し→リスト→表→コードブロック→リンク・画像と、学んだ記法を総動員して README を段階的に完成させる総合演習を行う。仕上げに全記法のチートシート（早見表）で復習し、次のステップ（Qiita/Zenn での記事執筆・HTML/CSS の学習など）を示す。
 
 ## 推奨所要時間
@@ -64,8 +69,9 @@ Markdown を書く環境を整える章。.md ファイルとは何か（ただ�
 | 第7章 | コードブロックと引用 | 35分 |
 | 第8章 | 表（テーブル） | 30分 |
 | 第9章 | その他の便利な記法 | 35分 |
-| 第10章 | 実践：READMEを書いてみよう | 45分 |
-| **合計** | | **約6時間** |
+| 第10章 | Mermaidで図を描く | 40分 |
+| 第11章 | 実践：READMEを書いてみよう | 45分 |
+| **合計** | | **約6時間30分** |
 
 ## 学習目標
 
@@ -75,6 +81,7 @@ Markdown を書く環境を整える章。.md ファイルとは何か（ただ�
 - VS Code などのエディタで .md ファイルを作成し、プレビューしながら編集できる
 - 見出し・段落・装飾・リスト・リンク・画像・コードブロック・引用・表などの基本記法を使い分けて、読みやすい文書を書ける
 - 記号をそのまま表示したいときのエスケープや、HTML タグの併用など、応用的な書き方ができる
+- Mermaid 記法でフローチャートやシーケンス図を書き、文書に図を埋め込める
 - GitHub の README を定番の構成で自分で作成できる
 
 ## 次のステップ

@@ -1,6 +1,6 @@
 import type { TechGuide } from '../types';
 
-// Markdown 入門学習ガイド（全10章）。技術色 = ブルー（ドキュメント系）。
+// Markdown 入門学習ガイド（全11章）。技術色 = ブルー（ドキュメント系）。
 export const markdown: TechGuide = {
   category: 'web-technologies',
   slug: 'markdown',
@@ -9,7 +9,7 @@ export const markdown: TechGuide = {
   iconStyle: 'fab',
   level: '初級',
   categoryLabel: 'Web技術',
-  totalTime: '約6時間',
+  totalTime: '約6時間30分',
   splashStop0: '#3b82f6',
   splashStop1: '#06b6d4',
   splashBg: '#090b11',
@@ -35,6 +35,7 @@ export const markdown: TechGuide = {
     { number: 7, name: 'コードブロックと引用', file: 'markdown-learning-material-07.html' },
     { number: 8, name: '表（テーブル）', file: 'markdown-learning-material-08.html' },
     { number: 9, name: 'その他の便利な記法', file: 'markdown-learning-material-09.html' },
-    { number: 10, name: '実践：READMEを書いてみよう', file: 'markdown-learning-material-10.html' },
+    { number: 10, name: 'Mermaidで図を描く', file: 'markdown-learning-material-10.html' },
+    { number: 11, name: '実践：READMEを書いてみよう', file: 'markdown-learning-material-11.html' },
   ],
 };
