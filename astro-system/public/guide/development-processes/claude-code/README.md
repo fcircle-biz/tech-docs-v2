@@ -18,7 +18,7 @@
 
 - [Claude Code 公式ドキュメント](https://docs.claude.com/ja/docs/claude-code/overview)
 - [Anthropic 公式サイト](https://www.anthropic.com/)
-- **Claude Code Skills 入門** — スキル機能は本ガイドの対象外です。別ガイドとして提供予定です。
+- **Claude Skills 入門** — スキル機能は本ガイドの対象外です。別ガイドとして提供予定です。
 
 ### 前提知識
 
@@ -120,7 +120,7 @@ Model Context Protocol（MCP）で Claude Code を外部サービスに接続す
 
 ## 次のステップ
 
-- **Claude Code Skills 入門** — 本ガイドでは概要のみ触れた「スキル（Agent Skills）」を、作り方から実践まで体系的に学びます
+- **Claude Skills 入門** — 本ガイドでは概要のみ触れた「スキル（Agent Skills）」を、作り方から実践まで体系的に学びます
 - [Git・GitHub 入門学習ガイド](https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/git-github/git-github-learning-material-01.html) — 第10章の Git 連携をより深く理解するための基礎
 - [Claude 入門学習ガイド](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/generative-ai/claude/claude-learning-material-01.html) — Claude そのものの使い方とプロンプトの基礎
 - [Claude Code 公式ドキュメント](https://docs.claude.com/ja/docs/claude-code/overview) — 最新の機能・オプションの確認

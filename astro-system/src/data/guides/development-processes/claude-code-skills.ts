@@ -1,10 +1,10 @@
 import type { TechGuide } from '../types';
 
-// Claude Code Skills 入門学習ガイド（全12章）。技術色 = インディゴ。
+// Claude Skills 入門学習ガイド（全12章）。技術色 = インディゴ。
 export const claudeCodeSkills: TechGuide = {
   category: 'development-processes',
   slug: 'claude-code-skills',
-  techTitle: 'Claude Code Skills学習教材',
+  techTitle: 'Claude Skills学習教材',
   icon: 'fa-puzzle-piece',
   iconStyle: 'fas',
   level: '初級',
