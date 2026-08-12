@@ -1,4 +1,4 @@
-# Claude Code Skills 学習ガイドライン
+# Claude Skills 学習ガイドライン
 
 このガイドラインでは、Claude Code の **スキル（Agent Skills）** 機能の基礎を、入門者向けに段階的に学習するためのカリキュラムを提供しています。
 
