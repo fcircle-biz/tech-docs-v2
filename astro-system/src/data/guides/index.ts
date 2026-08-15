@@ -26,6 +26,7 @@ import { springDataJdbc } from './programming-languages/java-ecosystem/spring-da
 import { springMvc } from './programming-languages/java-ecosystem/spring-mvc';
 import { springDataJpa } from './programming-languages/java-ecosystem/spring-data-jpa';
 import { junit } from './programming-languages/java-ecosystem/junit';
+import { struts1 } from './programming-languages/java-ecosystem/struts1';
 
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
@@ -51,6 +52,7 @@ const all: TechGuide[] = [
   springMvc,
   springDataJpa,
   junit,
+  struts1,
   // プログラミング言語 — JavaScript エコシステム
   javascript,
   // Web技術

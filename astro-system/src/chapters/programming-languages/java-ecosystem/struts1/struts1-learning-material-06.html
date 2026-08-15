@@ -1,0 +1,759 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Struts 1</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約90分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">DBと連携する</h1>
+                    <p class="text-slate-600">第1〜5章で「画面から Action までの流れ」を固めました。この章ではその先——<strong>Action が DB とどうやりとりするか</strong>を学びます。合言葉は「<strong>Action に SQL を書かない</strong>」です。JavaBeans（DTO）・DAO という2つの部品を導入し、一覧表示と検索処理を実際に組み立てます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Struts（Action）と DAO の責務分担（「画面制御」と「データアクセス」の分離）を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JavaBeans（DTO）の役割と、JSP から使えるための getter の必要性を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>DAO で Connection・PreparedStatement・ResultSet を安全に扱えるようになる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>一覧表示・検索処理を Action → DAO → DB → JSP の流れで組み立てられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SQL 文字列連結を避けるべき理由（SQL インジェクション）を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 Struts と DAO の責務分担
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第1章の MVC 対応表を思い出してください。Model の実体は「ActionForm・JavaBeans・DAO」でした。この章ではその中の <strong>JavaBeans（DTO）</strong> と <strong>DAO</strong> を扱います。まず大切なのは、それぞれの担当を明確に線引きすることです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">登場人物</th>
+                                    <th class="px-4 py-3 text-left font-semibold">担当すること</th>
+                                    <th class="px-4 py-3 text-left font-semibold">担当しないこと</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">Action</td>
+                                    <td class="px-4 py-3 text-slate-600">画面制御（DAOの呼び出し、結果をrequestへ渡す、遷移先の決定）</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL を書くこと</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">DAO</td>
+                                    <td class="px-4 py-3 text-slate-600">データアクセス（SQL の実行、ResultSet の詰め替え）</td>
+                                    <td class="px-4 py-3 text-slate-600">画面遷移や入力チェック</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">JavaBeans（DTO）</td>
+                                    <td class="px-4 py-3 text-slate-600">データの運び屋（1件分のデータを保持する入れ物）</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL・画面制御のどちらも</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        業務ロジックが複雑になる場合は、Action と DAO の間に <strong>Service（任意）</strong> を挟むこともあります（6.6 で扱います）。まずはこの縦の流れとデータの戻り方を図で確認しましょう。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["JSP<br/>画面表示"] --> B["Action<br/>画面制御"]
+    B --> C["（Service）<br/>業務ロジック（任意）"]
+    C --> D["DAO<br/>データアクセス（SQL）"]
+    D --> E["DB"]
+    E --> D
+    D --> C
+    C --> B
+    B --> A
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイント -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">なぜ「Action に SQL を書かない」のか</p>
+                                <p class="text-emerald-900 text-sm">理由は3つあります。①<strong>テストしやすさ</strong>: DAO を分けると DB 接続なしでロジックだけをテストしやすくなります。②<strong>再利用性</strong>: 同じ SQL 処理を別の Action からも呼び出せます。③<strong>可読性</strong>: Action を開けば「何をする画面か」が一目で分かり、SQL の詳細は DAO を見ればよいと役割が明確になります。既存システムを読むときも、この線引きを知っていれば「この処理はどこに書いてあるはずか」を予測できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 JavaBeans（DTO）を用意する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAO が DB から取得した1件分のデータを、Java のオブジェクトとして持ち運ぶための入れ物が <strong>JavaBeans（DTO: Data Transfer Object）</strong>です。ここでは「社員」を表す <code class="bg-slate-100 px-1 rounded">Employee</code> クラスを作ります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dto/Employee.java — フィールド定義</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.dto;
+
+import java.util.Date;
+
+// 社員情報を表すJavaBeans（DTO）
+public class Employee {
+    private int id;                  // 社員ID
+    private String name;             // 氏名
+    private String department;       // 所属部署
+    private Date hireDate;           // 入社日
+    // ここから先はgetter/setterのみ（下のコードを参照）
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        各フィールドに <strong>getter/setter</strong> を用意します。第5章で学んだ <code class="bg-slate-100 px-1 rounded">&lt;bean:write&gt;</code> は、内部で <strong>getter を呼び出して</strong>値を取得しています。getter が無いフィールドは JSP から表示できません。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dto/Employee.java — getter/setter（抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// Employeeクラスの続き（departmentも同様に用意する）
+public int getId() { return id; }
+public void setId(int id) { this.id = id; }
+public String getName() { return name; }
+public void setName(String name) { this.name = name; }
+public Date getHireDate() { return hireDate; }
+public void setHireDate(Date hireDate) { this.hireDate = hireDate; }</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSP 側での対応関係も確認しておきましょう。<code class="bg-slate-100 px-1 rounded">property</code> に指定した名前から、Struts は決まったルールで getter メソッド名を組み立てます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">JSP側の記述</th>
+                                    <th class="px-4 py-3 text-left font-semibold">呼び出されるgetter</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">property="name"</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">getName()</code></td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">property="department"</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">getDepartment()</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">DTOとActionFormは似ているが役割が違う</p>
+                                <p class="text-blue-900 text-sm">第4章で学んだ <code class="bg-blue-100 px-1 rounded">ActionForm</code> も getter/setter を持つ入れ物でしたが、役割は「<strong>画面からの入力を受け取る</strong>」ことでした。一方 DTO は「<strong>DB から取り出したデータを運ぶ</strong>」役割です。似た形でも用途が違う、と覚えておくと既存コードを読むときに混乱しません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 DAOの実装
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAO（Data Access Object）は「DB とやりとりする専門の窓口」です。<code class="bg-slate-100 px-1 rounded">Connection</code> の取得、<code class="bg-slate-100 px-1 rounded">PreparedStatement</code> の実行、<code class="bg-slate-100 px-1 rounded">ResultSet</code> から <code class="bg-slate-100 px-1 rounded">List</code> への詰め替えという一連の作業を、いつも同じ手順で行います。まずはフィールド部分です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dao/EmployeeDao.java — 接続情報</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">package com.example.dao;
+
+import java.sql.*;
+import java.util.*;
+import com.example.dto.Employee;
+
+public class EmployeeDao {
+    // JDBC接続情報（本来は設定ファイルなどから読み込む）
+    private static final String URL  = "jdbc:mysql://localhost:3306/sample";
+    private static final String USER = "app_user";
+    private static final String PASS = "app_pass";
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">ResultSet</code> の1行を <code class="bg-slate-100 px-1 rounded">Employee</code> に詰め替える処理は、複数のメソッドで共通して使うのでメソッドに切り出しておきます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dao/EmployeeDao.java — 行の詰め替え</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// 1行分のResultSetをEmployeeへ詰め替える（findAll・検索処理で共通利用）
+private Employee toEmployee(ResultSet rs) throws SQLException {
+    Employee e = new Employee();
+    e.setId(rs.getInt("id"));
+    e.setName(rs.getString("name"));
+    e.setDepartment(rs.getString("department"));
+    e.setHireDate(rs.getDate("hire_date"));
+    return e;
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        いよいよ全件取得の <code class="bg-slate-100 px-1 rounded">findAll()</code> です。Struts 1 が現役だった時代は Java 7 未満の現場も多く、<code class="bg-slate-100 px-1 rounded">try-with-resources</code>（Java 7 で追加）が使えないことがあります。そのため <code class="bg-slate-100 px-1 rounded">finally</code> で明示的にクローズする書き方を基本形として覚えてください。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dao/EmployeeDao.java — findAll()（前半）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public List&lt;Employee&gt; findAll() throws SQLException {
+    String sql = "SELECT id, name, department, hire_date "
+               + "FROM employee ORDER BY id";
+    List&lt;Employee&gt; list = new ArrayList&lt;Employee&gt;();
+    Connection con = null;
+    PreparedStatement ps = null;
+    ResultSet rs = null;
+    try {
+        con = DriverManager.getConnection(URL, USER, PASS);
+        ps = con.prepareStatement(sql);
+        rs = ps.executeQuery();</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dao/EmployeeDao.java — findAll()（後半）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">        while (rs.next()) {
+            list.add(toEmployee(rs));   // 詰め替えはtoEmployeeに任せる
+        }
+    } finally {
+        // Java 7未満の現場も多く、try-with-resourcesが使えないことがある
+        if (rs != null) try { rs.close(); } catch (SQLException ignore) {}
+        if (ps != null) try { ps.close(); } catch (SQLException ignore) {}
+        if (con != null) try { con.close(); } catch (SQLException ignore) {}
+    }
+    return list;
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1 rounded">List&lt;Employee&gt;</code> のようなジェネリクス表記は、比較的新しめの環境（Java 5 以降）で使えます。古い現場のコードでは、型を指定しない素の <code class="bg-slate-100 px-1 rounded">List</code> のまま書かれていることもあります。動きは同じなので、読むときは読み替えてください。
+                    </p>
+
+                    <!-- ヒントカード（接続の取得方法） -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">補足: Connectionの取得方法いろいろ</p>
+                                <p class="text-blue-900 text-sm mb-2">上の例は学習用に <code class="bg-blue-100 px-1 rounded">DriverManager</code> を直接使っていますが、現場では次のような方法もよく見られます。</p>
+                                <ul class="text-blue-900 text-sm space-y-1 list-disc list-inside">
+                                    <li><strong>DriverManager 直接</strong>: 学習用・小規模向け。接続のたびにコネクションを新規作成する。なお <strong>JDBC 4 未満（Java 6 以前）の旧環境</strong>では、<code class="bg-blue-100 px-1 rounded">DriverManager.getConnection()</code> の前に <code class="bg-blue-100 px-1 rounded">Class.forName("com.mysql.jdbc.Driver")</code> のようにドライバクラスを明示的にロードする一文が必要になる（JDBC 4 以降は自動検出されるため不要）</li>
+                                    <li><strong>DataSource（JNDI・commons-dbcp 等）</strong>: 実務で主流。コネクションプールにより接続を使い回し、性能とリソース管理に優れる</li>
+                                    <li><strong>Struts 1 の <code class="bg-blue-100 px-1 rounded">&lt;data-sources&gt;</code></strong>: struts-config.xml で DB 接続を定義できる古い機能。<strong>現在は非推奨</strong>であり、新規に使うべきではない（既存コードで見かけたら「昔の書き方」と理解する程度でよい）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 一覧表示を作る
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        部品が揃ったので、第3章で学んだ <code class="bg-slate-100 px-1 rounded">Action</code> と第5章で学んだ <code class="bg-slate-100 px-1 rounded">&lt;logic:iterate&gt;</code> を使って、実際に一覧画面をつなげます。流れは第1章 1.4 で見た全体像そのものです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/action/ListAction.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">public ActionForward execute(ActionMapping mapping, ActionForm form,
+        HttpServletRequest request, HttpServletResponse response) throws Exception {
+    // DAOを呼び出して社員一覧を取得する（SQLはここに書かない）
+    EmployeeDao dao = new EmployeeDao();
+    List&lt;Employee&gt; employees = dao.findAll();
+    // JSPへ渡す（属性名"employees"はJSP側のnameと一致させる）
+    request.setAttribute("employees", employees);
+    return mapping.findForward("success");
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSP 側は、<code class="bg-slate-100 px-1 rounded">request.setAttribute("employees", ...)</code> と<strong>同じ名前</strong> <code class="bg-slate-100 px-1 rounded">name="employees"</code> を <code class="bg-slate-100 px-1 rounded">&lt;logic:iterate&gt;</code> に指定してループ表示します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">list.jsp — 一覧表示</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;table&gt;
+  &lt;logic:iterate id="employee" name="employees"&gt;
+    &lt;tr&gt;
+      &lt;td&gt;&lt;bean:write name="employee" property="id" /&gt;&lt;/td&gt;
+      &lt;td&gt;&lt;bean:write name="employee" property="name" /&gt;&lt;/td&gt;
+      &lt;td&gt;&lt;bean:write name="employee" property="department" /&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/logic:iterate&gt;
+&lt;/table&gt;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        struts-config.xml 側の定義は第2章で学んだ形と同じです。<code class="bg-slate-100 px-1 rounded">/employee/list.do</code> が来たら <code class="bg-slate-100 px-1 rounded">ListAction</code> を呼び、成功時に <code class="bg-slate-100 px-1 rounded">list.jsp</code> へ進みます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">struts-config.xml — 一覧画面の対応</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-xml">&lt;action path="/employee/list"
+        type="com.example.action.ListAction"
+        scope="request"&gt;
+    &lt;forward name="success" path="/list.jsp" /&gt;
+&lt;/action&gt;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでで「画面 → <code class="bg-slate-100 px-1 rounded">.do</code> → Action → DAO → DB → JSP」という一連の流れが、第1〜6章で学んだ知識だけで説明できることに気づいたはずです。次は、これに検索条件を加えます。
+                    </p>
+                </section>
+
+                <!-- セクション6.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 検索処理を作る
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        検索画面では、第4章で学んだ <code class="bg-slate-100 px-1 rounded">ActionForm</code>（<code class="bg-slate-100 px-1 rounded">EmployeeForm</code>）が入力値（氏名・部署）を受け取り、それを DAO に渡して SQL の条件に反映します。ここで<strong>絶対にやってはいけない</strong>書き方から見ておきましょう。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">NG例 — 文字列連結でSQLを組み立てる</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// NG: nameをそのまま文字列連結している
+String sql = "SELECT * FROM employee WHERE name LIKE '%" + name + "%'";
+Statement stmt = con.createStatement();
+ResultSet rs = stmt.executeQuery(sql);  // name次第で任意のSQLが実行されうる</code></pre>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">SQL文字列連結はSQLインジェクションの原因になる</p>
+                                <p class="text-red-900 text-sm">検索キーワードに <code class="bg-red-100 px-1 rounded">' OR '1'='1</code> のような文字列が入力されると、意図しない SQL が実行されてしまいます。これを<strong>SQLインジェクション</strong>と呼びます。既存の Struts 1 システムで文字列連結の SQL を見つけたら、それは<strong>修正すべき脆弱性</strong>として扱ってください。対策は次に示す <code class="bg-red-100 px-1 rounded">PreparedStatement</code> の <code class="bg-red-100 px-1 rounded">?</code>（プレースホルダ）を使うことです。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        正しくは、SQL に <code class="bg-slate-100 px-1 rounded">?</code> を書いておき、値は <code class="bg-slate-100 px-1 rounded">setString()</code> などで<strong>あとから安全にバインド</strong>します。JDBC ドライバが特殊文字を適切にエスケープしてくれるため、値がそのまま SQL の一部として解釈されることはありません。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">com/example/dao/EmployeeDao.java — search()</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// name・department条件で検索する（?プレースホルダなのでSQLインジェクションの心配がない）
+public List&lt;Employee&gt; search(String name, String department) throws SQLException {
+    // 空文字・nullは全件相当の条件にする（LIKE '%'は全件ヒット）
+    String nameCond = (name == null || name.length() == 0) ? "%" : "%" + name + "%";
+    String deptCond = (department == null || department.length() == 0) ? "%" : "%" + department + "%";
+    String sql = "SELECT id, name, department, hire_date "
+               + "FROM employee WHERE name LIKE ? AND department LIKE ? ORDER BY id";
+    List&lt;Employee&gt; list = new ArrayList&lt;Employee&gt;();
+    PreparedStatement ps = con.prepareStatement(sql);  // ※ Connection の取得とクローズは 6.3 と同じため省略
+    ps.setString(1, nameCond);
+    ps.setString(2, deptCond);
+    ResultSet rs = ps.executeQuery();
+    while (rs.next()) list.add(toEmployee(rs));
+    return list;
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コード中のコメントの通り、<code class="bg-slate-100 px-1 rounded">Connection</code> の取得と <code class="bg-slate-100 px-1 rounded">finally</code> によるクローズ処理は紙面の都合上省略していますが、実際には <code class="bg-slate-100 px-1 rounded">findAll()</code>（6.3）とまったく同じ手順で書きます。<strong>省略してよいのは紙面上の話だけで、実装では必ず書いてください。</strong>
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        検索条件が「氏名」「部署」の2つだけでなく「入社日の範囲」など、さらに条件が増える場合は、<code class="bg-slate-100 px-1 rounded">StringBuilder</code> で SQL を組み立てながら、条件が指定された項目だけ <code class="bg-slate-100 px-1 rounded">AND</code> でつなぐのが基本方針です。この場合も<strong>値は必ず <code class="bg-slate-100 px-1 rounded">?</code> でバインドし、値そのものを文字列連結しない</strong>という原則は変わりません。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">動的SQLの組み立て方針（イメージ）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">// SQL文の"骨組み"はStringBuilderで作るが、値は連結しない
+StringBuilder sql = new StringBuilder("SELECT * FROM employee WHERE 1=1");
+if (department != null) sql.append(" AND department = ?");   // 条件を追加
+if (from != null) sql.append(" AND hire_date &gt;= ?");        // さらに追加
+// ps.setString(1, department) のように、追加した順に値をバインドしていく</code></pre>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["検索フォーム（JSP）<br/>氏名・部署を入力"] --> B["EmployeeForm<br/>ActionForm"]
+    B --> C["SearchAction"]
+    C --> D["EmployeeDao<br/>search（name, department）"]
+    D --> E["PreparedStatement<br/>? へバインド"]
+    E --> F["DB"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.6 Service層を挟むかどうか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでは <strong>Action → DAO</strong> の2階建てで話を進めてきました。小〜中規模の画面ではこれで十分です。しかし、次のようなケースでは間に <strong>Service（業務ロジック層）</strong> を挟むことがあります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-diagram-project text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">業務ロジックが複雑</h3>
+                            <p class="text-sm text-slate-600">複数の判定・計算をまとめる場合、Action に書くと肥大化するため Service に切り出します。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-arrows-rotate text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">複数DAOを1つのトランザクションに</h3>
+                            <p class="text-sm text-slate-600">例えば「社員登録」と「履歴登録」を同時に行い、両方成功して初めて<code class="bg-purple-100 px-1 rounded">commit</code>、片方失敗したら両方<code class="bg-purple-100 px-1 rounded">rollback</code>する場合。</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph 小規模
+    A1["Action"] --> A2["DAO"]
+    end
+    subgraph トランザクションが必要
+    B1["Action"] --> B2["Service<br/>commit／rollbackを制御"]
+    B2 --> B3["DAO その1"]
+    B2 --> B4["DAO その2"]
+    end
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        既存の Struts 1 システムでは、Service 層のクラス名に統一されたルールはなく、現場ごとに次のような命名がよく使われます。読むときは、名前から役割を推測してください。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">よく見る命名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">傾向</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeService</code></td>
+                                    <td class="px-4 py-3 text-slate-600">業務処理をまとめて呼ぶ、比較的新しめの命名</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeLogic</code></td>
+                                    <td class="px-4 py-3 text-slate-600">「業務ロジック」を意味する命名。国内の現場でよく見られる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">EmployeeBusiness</code></td>
+                                    <td class="px-4 py-3 text-slate-600">Logic と同様の位置づけ。命名規約は現場ごとに異なる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">迷ったら「まずAction→DAO」でよい</p>
+                                <p class="text-blue-900 text-sm">本ガイドの第7章では、学習をシンプルに保つため Action → DAO の2階建てで CRUD を作ります。Service を挟むかどうかは<strong>後からでも変更できる設計判断</strong>です。まずは責務分担の基本形（6.1）を体に染み込ませましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- つまずきやすいポイント -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        つまずきやすいポイント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DB 連携は既存システムの不具合調査で頻繁に出会う領域です。よくあるつまずきを事前に押さえておきましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <p class="font-semibold text-red-800 mb-1"><i class="fas fa-triangle-exclamation mr-1"></i>ResultSetの閉じ忘れ</p>
+                            <p class="text-red-900 text-sm"><code class="bg-red-100 px-1 rounded">finally</code> でクローズし忘れると接続が枯渇し、しばらく動いた後に急にエラーが出るようになります。</p>
+                        </div>
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <p class="font-semibold text-red-800 mb-1"><i class="fas fa-triangle-exclamation mr-1"></i>例外の握りつぶし</p>
+                            <p class="text-red-900 text-sm">DAOで <code class="bg-red-100 px-1 rounded">catch (Exception e) {}</code> のように空のcatchを書くと、失敗しても原因が分からなくなります。最低限ログに残しましょう。</p>
+                        </div>
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <p class="font-semibold text-red-800 mb-1"><i class="fas fa-triangle-exclamation mr-1"></i>getterの欠落</p>
+                            <p class="text-red-900 text-sm">DTOにgetterが無いと、JSPで <code class="bg-red-100 px-1 rounded">No getter method</code> というエラーになります（6.2参照）。</p>
+                        </div>
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <p class="font-semibold text-red-800 mb-1"><i class="fas fa-triangle-exclamation mr-1"></i>文字コードによる文字化け</p>
+                            <p class="text-red-900 text-sm">DB接続URLの文字コード指定（例: <code class="bg-red-100 px-1 rounded">characterEncoding=UTF-8</code>）が抜けていると、日本語が化けることがあります。</p>
+                        </div>
+                        <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 md:col-span-2">
+                            <p class="font-semibold text-red-800 mb-1"><i class="fas fa-triangle-exclamation mr-1"></i>属性名の不一致</p>
+                            <p class="text-red-900 text-sm"><code class="bg-red-100 px-1 rounded">request.setAttribute("employees", ...)</code> のキーと、JSP側 <code class="bg-red-100 px-1 rounded">&lt;logic:iterate name="..."&gt;</code> のname属性が1文字でも違うと、一覧が空のまま表示されます（エラーにならないぶん気づきにくい）。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 6-1: 社員一覧をDBから取得して表示する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">DTO → DAO → Action → JSP という一連の流れを、実際に手を動かして組み立ててみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">Employee</code> クラス（DTO）を作成し、id・name・department・hireDate の4フィールドと getter/setter を用意する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">EmployeeDao</code> に <code class="bg-purple-100 px-1 rounded">findAll()</code> を実装する。<code class="bg-purple-100 px-1 rounded">try/finally</code> でのクローズを忘れないこと。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 px-1 rounded">ListAction</code> を作成し、DAO を呼び出して <code class="bg-purple-100 px-1 rounded">request.setAttribute("employees", ...)</code> する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">struts-config.xml に <code class="bg-purple-100 px-1 rounded">/employee/list</code> の <code class="bg-purple-100 px-1 rounded">&lt;action&gt;</code> を追加し、list.jsp への <code class="bg-purple-100 px-1 rounded">&lt;forward&gt;</code> を設定する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">list.jsp に <code class="bg-purple-100 px-1 rounded">&lt;logic:iterate&gt;</code> と <code class="bg-purple-100 px-1 rounded">&lt;bean:write&gt;</code> で一覧テーブルを書き、<code class="bg-purple-100 px-1 rounded">/employee/list.do</code> にアクセスして表示を確認する。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「Action に SQL を書かない」べき理由を2つ以上挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            テストしやすさ（DBなしでロジックだけテストしやすい）、再利用性（同じDAOを別のActionからも呼べる）、可読性（Actionを見れば画面の流れが分かり、SQLの詳細はDAOに集約される）の3点です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. JSPの<code class="bg-blue-100">&lt;bean:write property="name"&gt;</code>が正しく動くために、DTO側に何が必要ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-100">getName()</code>というgetterメソッドが必要です。<code class="bg-blue-100">&lt;bean:write&gt;</code>は内部でgetterを呼び出しているため、getterが無いと「No getter method」というエラーになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. SQL文字列連結の代わりにPreparedStatementの<code class="bg-blue-100">?</code>を使うべき理由は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            文字列連結でSQLを組み立てると、入力値に悪意あるSQL断片が混ざるSQLインジェクションのリスクがあるためです。<code class="bg-blue-100">?</code>プレースホルダに値をバインドすれば、値がSQLの一部として解釈されず安全になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. どのような場合にAction→DAOの間にServiceを挟むことを検討しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            業務ロジックが複雑でActionに書くと肥大化する場合や、複数のDAO呼び出しを1つのトランザクション（commit／rollback）としてまとめたい場合です。小規模な画面ではAction→DAOの2階建てで十分です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="struts1-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第5章: JSPとStrutsタグ</span>
+                        </div>
+                    </a>
+                    <a href="struts1-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第7章: CRUDを作る</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
