@@ -33,6 +33,7 @@ import { javascript } from './programming-languages/javascript-ecosystem/javascr
 
 // Web技術
 import { html } from './web-technologies/html';
+import { css } from './web-technologies/css';
 import { markdown } from './web-technologies/markdown';
 
 // データ・AI — 生成AI
@@ -58,6 +59,7 @@ const all: TechGuide[] = [
   javascript,
   // Web技術
   html,
+  css,
   markdown,
   // 開発手法・プロセス
   claudeCode,
