@@ -63,7 +63,7 @@ description: work/<名称>/ に置いた画像群と差し込み指示Markdown�
 
 1. 対象章の本文断片を読み、指示書の各「差し込み箇所」（見出し・アンカーテキスト・既存図の直後など）を特定する。
 2. 各箇所へ `references/figure-snippet.md` の **標準 `<figure>` スニペット** を挿入する。`src`・`class`・`alt`・`figcaption`・**周辺インデント整合**の規約を厳守する。
-3. 既存図（Mermaid 等）は指示書の方針に従う（既定は **残置**＝説明→画像→既存図の順で補完）。
+3. 既存図（Mermaid 等）・比較表・「表示イメージ」ブロックは指示書の `既存要素の扱い` に従う。**明記が無い場合は機械的に併置せず**、`references/figure-snippet.md` の判定表で「置換／両方残す／画像を差し込まない」を決める（同じ流れの図が2つ続く状態を作らない）。
 
 ### Step 5: ビルドと検証
 
@@ -80,6 +80,7 @@ description: work/<名称>/ に置いた画像群と差し込み指示Markdown�
 
 - **配置先**: `astro-system/public/guide/<分類パス>/<slug>/images/<論理名>.<拡張子>`
 - **参照 src**: base 付き絶対URL `/tech-docs-v2/guide/<分類パス>/<slug>/images/<論理名>.<拡張子>`（base は `astro.config.mjs` の `base`、現状 `/tech-docs-v2/`。`_shared` 参照と同じ規約に統一）
+- **重複の禁止**: 画像と同じ情報を持つ既存要素（Mermaid 図・比較表・「表示イメージ」）を画像の隣に残さない。判定表は `references/figure-snippet.md`
 - **サイズ**: `class="w-full max-w-2xl mx-auto ..."`（全幅は大きすぎる。`max-w-2xl`=672px・中央寄せが既定。指示があれば `max-w-xl`/`max-w-3xl` 等に調整）
 - **キャプション**: `<figcaption class="mt-2 text-center text-sm text-slate-600">`（`text-slate-600` はダーク自動補正の範囲内＝ライト/ダーク両モードで可読）
 - **alt**: 本文に沿った説明的な日本語（装飾でなく内容を述べる）
