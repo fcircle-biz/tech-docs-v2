@@ -1,0 +1,42 @@
+import type { TechGuide } from '../types';
+
+// HTML 入門学習ガイド（全12章）。技術色 = オレンジ（HTML / CSS）。
+export const html: TechGuide = {
+  category: 'web-technologies',
+  slug: 'html',
+  techTitle: 'HTML学習教材',
+  icon: 'fa-html5',
+  iconStyle: 'fab',
+  level: '初級',
+  categoryLabel: 'Web技術',
+  totalTime: '約7時間20分',
+  splashStop0: '#f97316',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#fff7ed',
+    100: '#ffedd5',
+    200: '#fed7aa',
+    300: '#fdba74',
+    400: '#fb923c',
+    500: '#f97316',
+    600: '#ea580c',
+    700: '#c2410c',
+    800: '#9a3412',
+    900: '#7c2d12',
+  },
+  chapters: [
+    { number: 1, name: 'HTMLとは', file: 'html-learning-material-01.html' },
+    { number: 2, name: '環境の準備と最初のページ', file: 'html-learning-material-02.html' },
+    { number: 3, name: 'HTMLの基本構造とタグのルール', file: 'html-learning-material-03.html' },
+    { number: 4, name: '見出しと段落・文字の装飾', file: 'html-learning-material-04.html' },
+    { number: 5, name: 'リスト', file: 'html-learning-material-05.html' },
+    { number: 6, name: 'リンク', file: 'html-learning-material-06.html' },
+    { number: 7, name: '画像とメディア', file: 'html-learning-material-07.html' },
+    { number: 8, name: '表（テーブル）', file: 'html-learning-material-08.html' },
+    { number: 9, name: 'フォーム', file: 'html-learning-material-09.html' },
+    { number: 10, name: 'セマンティックHTMLと文書構造', file: 'html-learning-material-10.html' },
+    { number: 11, name: 'CSSとの連携入門', file: 'html-learning-material-11.html' },
+    { number: 12, name: '実践：プロフィールページを作ろう', file: 'html-learning-material-12.html' },
+  ],
+};

@@ -32,6 +32,7 @@ import { struts1 } from './programming-languages/java-ecosystem/struts1';
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
 // Web技術
+import { html } from './web-technologies/html';
 import { markdown } from './web-technologies/markdown';
 
 // データ・AI — 生成AI
@@ -56,6 +57,7 @@ const all: TechGuide[] = [
   // プログラミング言語 — JavaScript エコシステム
   javascript,
   // Web技術
+  html,
   markdown,
   // 開発手法・プロセス
   claudeCode,
