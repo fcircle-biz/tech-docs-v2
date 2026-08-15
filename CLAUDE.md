@@ -95,7 +95,10 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 |-------|---------|------------|
 | `docs-readme-updater` | ディスク上の実構成からルート `README.md` を再生成 | `/docs-readme-updater` |
 | `re-estimate-learning-time` | 既存資料の README.md を読み、推奨所要時間を再見積もりして更新 | `/re-estimate-learning-time [dir]` |
+| `docs-image-creator` | 章HTMLの内容から挿絵の図案を設計し、codex CLI（GPT Image 2 / imagegen）で画像を生成 → `work/<slug>/` へ保存 → 差し込み・ビルドまで一気通貫 | `/docs-image-creator [章HTML or ガイド] [枚数]` |
 | `docs-image-inserter` | `work/<名称>/` の画像群＋差し込み指示Markdownを基に、学習ガイドの該当章HTMLへ画像を `<figure>` 差し込み・配置・ビルド | `/docs-image-inserter [名称]` |
+
+> **画像系スキルの使い分け**: 画像が**まだ無い**なら `docs-image-creator`（生成から差し込みまで）。画像を**すでに用意済み**なら `docs-image-inserter`（差し込みのみ）。前者は Phase 4（差し込み・ビルド）を後者に委譲するため、差し込み規約の真実源は `docs-image-inserter/references/` にある。
 
 ### Git / GitHub 運用スキル
 
