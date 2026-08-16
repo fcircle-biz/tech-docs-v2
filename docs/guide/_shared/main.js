@@ -14,28 +14,18 @@
         storageKey: 'darkMode',
 
         init: function() {
-            // 保存された設定またはシステム設定を適用
+            // 既定はライトモード。ユーザーが明示的にダークを選んだ場合のみ適用する
+            // （OS のカラースキーム設定は参照しない）
             const savedMode = localStorage.getItem(this.storageKey);
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-            if (savedMode === 'dark' || (savedMode === null && prefersDark)) {
+            if (savedMode === 'dark') {
                 document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
             }
 
             // トグルボタンを生成
             this.createToggleButton();
-
-            // システム設定の変更を監視
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                if (localStorage.getItem(this.storageKey) === null) {
-                    if (e.matches) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                    this.updateIcon();
-                }
-            });
         },
 
         createToggleButton: function() {
