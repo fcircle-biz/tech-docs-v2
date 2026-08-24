@@ -1,0 +1,43 @@
+import type { TechGuide } from '../../types';
+
+// VB.NET 入門学習ガイド（全14章）。技術色 = バイオレット（.NET / C# 系）。
+export const vbnet: TechGuide = {
+  category: 'programming-languages/dotnet-ecosystem',
+  slug: 'vbnet',
+  techTitle: 'VB.NET学習教材',
+  icon: 'fa-code',
+  level: '初級',
+  categoryLabel: 'プログラミング言語',
+  totalTime: '約21時間',
+  splashStop0: '#8b5cf6',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#f5f3ff',
+    100: '#ede9fe',
+    200: '#ddd6fe',
+    300: '#c4b5fd',
+    400: '#a78bfa',
+    500: '#8b5cf6',
+    600: '#7c3aed',
+    700: '#6d28d9',
+    800: '#5b21b6',
+    900: '#4c1d95',
+  },
+  chapters: [
+    { number: 1, name: 'VB.NETプログラミングの世界へようこそ', file: 'vbnet-learning-material-01.html' },
+    { number: 2, name: 'データを入れる箱 - 変数とデータ型', file: 'vbnet-learning-material-02.html' },
+    { number: 3, name: '計算と文字列を扱う - 演算子と文字列操作', file: 'vbnet-learning-material-03.html' },
+    { number: 4, name: 'プログラムに判断させる - 条件分岐', file: 'vbnet-learning-material-04.html' },
+    { number: 5, name: '同じ処理を繰り返す - ループ', file: 'vbnet-learning-material-05.html' },
+    { number: 6, name: 'データをまとめて扱う - 配列とコレクション', file: 'vbnet-learning-material-06.html' },
+    { number: 7, name: '処理を部品にする - SubプロシージャとFunction', file: 'vbnet-learning-material-07.html' },
+    { number: 8, name: '設計図からモノを作る - クラスとオブジェクト', file: 'vbnet-learning-material-08.html' },
+    { number: 9, name: 'データを守る - プロパティとカプセル化', file: 'vbnet-learning-material-09.html' },
+    { number: 10, name: 'クラスを受け継ぐ - 継承とポリモーフィズム', file: 'vbnet-learning-material-10.html' },
+    { number: 11, name: 'エラーに備える - 例外処理とデバッグ', file: 'vbnet-learning-material-11.html' },
+    { number: 12, name: 'ファイルを読み書きする - 入出力の基本', file: 'vbnet-learning-material-12.html' },
+    { number: 13, name: '画面のあるアプリを作る - Windows Forms入門', file: 'vbnet-learning-material-13.html' },
+    { number: 14, name: 'データベースとつなぐ - ADO.NET入門と次のステップ', file: 'vbnet-learning-material-14.html' },
+  ],
+};

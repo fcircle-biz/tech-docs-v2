@@ -47,6 +47,10 @@
 
 - [**JavaScript入門学習ガイド**](docs/guide/programming-languages/javascript-ecosystem/javascript/README.md) - プログラミング未経験者・初心者向けJavaScript入門16章構成カリキュラム。開発環境準備とはじめてのプログラム、変数、条件分岐（if文）、ループ（for / while）、関数、配列とオブジェクトの基礎から、Webページを動かすDOM操作・イベント処理・入力フォーム操作、そして学んだ知識を組み合わせて作るToDoアプリ制作まで、ブラウザ1つで動く題材で段階的に学習（全16章・約24時間）
 
+#### .NET
+
+- [**VB.NET入門学習ガイド**](docs/guide/programming-languages/dotnet-ecosystem/vbnet/README.md) - プログラミング未経験者・初心者向けVB.NET（Visual Basic .NET）入門14章構成カリキュラム。Visual Studio 2022 Communityによる開発環境構築とHello World、変数とデータ型、演算子と文字列操作、条件分岐（If / Select Case）、ループ（For / Do / For Each）、配列とコレクション（List / Dictionary）、SubプロシージャとFunctionの基礎から、オブジェクト指向の核心（クラスとオブジェクト、プロパティとカプセル化、継承とポリモーフィズム）、さらに例外処理とデバッグ、ファイル入出力（CSV含む）、Windows Formsによる画面付きアプリ開発、ADO.NETによるデータベース接続とSQLインジェクション対策まで、業務システム開発を見据えて段階的に学習（全14章・約21時間）
+
 ### クラウド／インフラ
 
 - [**Docker学習ガイド**](docs/guide/cloud-infrastructure/docker/README.md) - 入門者向けDocker入門8章構成カリキュラム。「自分のPCでは動くのに他の人のPCでは動かない」問題をDockerがどう解決するのかという考え方から始め、Rancher Desktopでのコマンド環境構築とhello-worldによる最初のコンテナ実行、docker run / ps / stop / rm / images などの基本コマンド、NginxによるWebサーバー起動とポート公開（-p）の仕組み、Dockerfile（FROM / COPY）でのオリジナルイメージ作成、バインドマウントとボリューム、Docker Compose（compose.yml）による起動手順のまとめ、よくあるエラーの確認手順まで、コマンドの意味を1行ずつ確認しながら段階的に学習（全8章・約6時間）
