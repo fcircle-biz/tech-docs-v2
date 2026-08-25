@@ -202,6 +202,18 @@ flowchart TD
 | 緑 (Green) | `bg-emerald-100` | `text-emerald-900` |
 | 橙 (Orange) | `bg-orange-100` | `text-orange-900` |
 
+### テーブル行の色分けルール（重要）
+
+`<tr class="bg-primary-50">` による行の色分けは**既定で使わない**。技術色そのままの面なので行1本に敷くとヘッダー行より目立ち、読者は「なぜこの行だけ色が付いているのか」を探してしまう。
+
+色分けしてよいのは、次を**すべて**満たすときだけ。
+
+1. その色の意味を**一言で説明できる**（例: 合計・小計行）
+2. 表の直後に**色見本付きの凡例を1行**添える
+3. **1つのガイド内で意味を1種類に統一**する
+
+ゼブラ縞（`divide-y` の罫線で足りる）、単なる注目行（`font-bold` を優先）には使わない。規約の真実源は `astro-system/templates/v1/reference/css-styles.md`「13. テーブル > 行の色分けルール」。
+
 ### 使い方（学習ガイドの追加 — Astro フロー）
 1. `astro-system/src/data/guides/<分類>/<slug>.ts` に `TechGuide` を定義し（`primary`・`chapters[]`）、`src/data/guides/index.ts` に import 登録する
 2. `astro-system/src/chapters/<分類>/<slug>/<slug>-learning-material-NN.html` に各章の**本文断片**を置く（共通シェルはレイアウトが供給。テンプレートのコピー・プレースホルダー置換は不要）
