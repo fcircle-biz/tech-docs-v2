@@ -362,14 +362,37 @@ HTML クラスは 従来どおり。`styles.css` が自動で角丸・影・ヘ�
             <tr class="hover:bg-slate-50">
                 <td class="px-6 py-4 text-sm text-slate-900">データ</td>
             </tr>
-            <!-- primary ハイライト行 -->
+            <!-- 行の色分けは既定で使わない。下の「行の色分けルール」を満たす場合のみ -->
             <tr class="bg-primary-50">
-                <td class="px-6 py-4 text-sm text-slate-900">強調データ</td>
+                <td class="px-6 py-4 text-sm font-bold text-slate-800">合計</td>
             </tr>
         </tbody>
     </table>
 </div>
 ```
+
+### 行の色分けルール（重要）
+
+`<tr class="bg-primary-50">` は**既定では使わない**。`bg-primary-50` は技術色そのままの面なので、行1本に敷くとヘッダー行より目立ち、読者は「なぜこの行だけ色が付いているのか」を探してしまう。
+
+使ってよいのは、次を**すべて**満たすときだけ。
+
+1. その色が何を意味するかを**一言で説明できる**（例: 「上の項目を足し引きした合計・小計行」）。
+2. 表の直後に**凡例を1行**添える（下記）。
+3. **1つのガイド内で意味を1種類に統一**する。同じ色を「合計行」と「注目行」の両方に使わない。
+
+```html
+<p class="text-sm text-slate-600 mb-4">
+    <span class="inline-block w-3 h-3 rounded-sm bg-primary-50 border border-primary-300 align-middle mr-1"></span>
+    色を付けた行は、上の項目を足し引きして求めた<strong>合計・小計</strong>です。
+</p>
+```
+
+**理由にならないもの**（＝色分けしない）:
+
+- 「なんとなく目立たせたい」「主役の例だから」… 本文やセル内の文言で説明する。
+- **ゼブラ縞にしたい** … `divide-y divide-slate-200` の罫線で十分。1行おきに色を敷かない。
+- **その行が重要だから** … 色より軽い `font-bold` / `font-semibold` を優先する。太字だけで足りるなら色は付けない。
 
 ---
 

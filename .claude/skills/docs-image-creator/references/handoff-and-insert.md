@@ -40,9 +40,11 @@ work/<slug>/
 | 元ファイル | 論理名 | 差し込み箇所 | 既存要素の扱い | 役割 |
 |-----------|--------|------------|--------------|------|
 | `<slug>-<NN>-<topic1>.png` | `<slug>-chapter<NN>-<topic1>.png` | 学習目標カード（「この章で学ぶこと」）の直後、`<!-- セクション1.1 -->` の直前 | — | <役割> |
-| `<slug>-<NN>-<topic2>.png` | `<slug>-chapter<NN>-<topic2>.png` | セクション<N.M>「<見出し>」の既存 Mermaid 図の位置 | **置換**（同じ流れのため既存 Mermaid を削除） | <役割> |
+| `<slug>-<NN>-<topic2>.png` | `<slug>-chapter<NN>-<topic2>.png` | セクション<N.M>「<見出し>」の既存 Mermaid 図の位置 | **置換**（同じ流れのため既存 Mermaid をコメントアウトして退避） | <役割> |
 
-`既存要素の扱い` 列は**必須**。`—`（周辺に重複要素なし）／`置換（<対象>を削除）`／`両方残す（切り口が別）` のいずれかを必ず書く。空欄にすると差し込み側が機械的に併置して重複が生まれる。
+`既存要素の扱い` 列は**必須**。`—`（周辺に重複要素なし）／`置換（<対象>をコメントアウトで退避）`／`両方残す（切り口が別）` のいずれかを必ず書く。空欄にすると差し込み側が機械的に併置して重複が生まれる。
+
+> **置換は「削除」ではなく「コメントアウトで退避」**。書式と Mermaid 矢印（`-->`）のエスケープ規則は `docs-image-inserter/references/figure-snippet.md`「コメントアウト退避の書式」が真実源。
 
 ## 差し込みイメージ
 
@@ -74,7 +76,7 @@ work/<slug>/
 | 項目 | 既定 | 理由 |
 |------|------|------|
 | `<figure>` の最大幅 | **`max-w-3xl`** | 本スキルが生成するのは 1536x1024 の横長インフォグラフィック。リポジトリ実績も `max-w-3xl` が多数派（`max-w-3xl` 34 件 / `max-w-2xl` 10 件）。指示があれば `max-w-2xl` 等に変更する |
-| 既存 Mermaid 図・比較表・「表示イメージ」 | **図案ごとに判定**（`illustration-design.md` の「重複棚卸し」／`figure-snippet.md` の「既存図の扱い」） | 同じ流れの図が2つ続く・同じサンプルの表示イメージが2箇所にある状態を作らない |
+| 既存 Mermaid 図・比較表・「表示イメージ」 | **図案ごとに判定**（置換時は削除でなくコメントアウト退避）（`illustration-design.md` の「重複棚卸し」／`figure-snippet.md` の「既存図の扱い」） | 同じ流れの図が2つ続く・同じサンプルの表示イメージが2箇所にある状態を作らない |
 | 章導入画像の位置 | 学習目標カードの直後（最初の `<section>` の直前） | 既存教材（git-github 第1章）と同じ配置。ただし**後続節のダイジェストにはしない** |
 
 その他（src の base、alt の書き方、figcaption の色 `text-slate-600`、インデント整合）は `figure-snippet.md` の規約をそのまま守る。
@@ -102,7 +104,12 @@ grep -o 'images/[A-Za-z0-9_-]*\.png' docs/guide/<分類パス>/<slug>/<slug>-lea
 ls -la docs/guide/<分類パス>/<slug>/images/
 
 # 既存 Mermaid 図の増減が指示書の「既存要素の扱い」列と一致すること
-grep -c 'class="mermaid"' docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>.html
+# ※ 退避コメント内の class="mermaid" も文字列としてはヒットする。
+#    「生きている図」の数は、コメントを除去してから数える。
+grep -c 'class="mermaid"' docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>.html   # 生存＋退避の合計
+python3 -c "import re,sys; s=open(sys.argv[1],encoding='utf-8').read(); \
+print('生存:', re.sub(r'<!--.*?-->','',s,flags=re.S).count('class=\"mermaid\"'))" \
+  docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>.html
 
 # 重複の目視確認（画像と同じ内容の表・表示イメージ・図が残っていないか）
 grep -n 'class="mermaid"\|<table\|表示イメージ\|grid-cols-' docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>.html
@@ -116,8 +123,10 @@ git status --short
 1. ビルドが成功している
 2. `<figure>` の数 = 差し込んだ画像枚数
 3. 各 `src` が `docs/` の実ファイルに 1:1 で解決する（リンク切れなし）
-4. Mermaid 図・表・「表示イメージ」の増減が指示書の `既存要素の扱い` 列と一致している（意図しない削除も、意図しない併置＝重複も無い）
-5. `git status` の変更が「章の本文断片」「`public/.../images/`」「`docs/` のビルド出力」だけである
+4. Mermaid 図・表・「表示イメージ」の**生存数**（コメント除去後）が指示書の `既存要素の扱い` 列と一致している（意図しない削除も、意図しない併置＝重複も無い）
+5. 置換した要素が**行ごと消えておらず、退避コメントとして残っている**（`git diff` の削除行が、コメント化に伴う行の書き換えだけであること）
+6. 退避コメントの直後に本文テキストが漏れ出していない（`-->` エスケープ漏れの検出。ビルド後の HTML を確認する）
+7. `git status` の変更が「章の本文断片」「`public/.../images/`」「`docs/` のビルド出力」だけである
 
 ## 完了後の案内
 
