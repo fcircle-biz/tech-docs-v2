@@ -30,7 +30,7 @@ description: 学習ガイドの章HTMLの内容を読み取って挿絵の図案
     - `astro-system/src/chapters/<分類パス>/<slug>/<slug>-learning-material-NN.html`
   - ガイドディレクトリ（`docs/guide/<分類パス>/<slug>` 等）… 章指定が無ければ**第1章**を既定対象とする
   - 自然言語（例: `docker 第3章`）
-- `[枚数]`（任意）: その章に作る画像の枚数。省略時は **章の内容量に応じて 1〜3 枚（既定 2 枚）** を本スキルが決める。
+- `[枚数]`（任意）: その章に作る画像の枚数。省略時は **章の内容量に応じて 1〜5 枚（見出し3つ以下＝1枚／見出し4〜6＝2〜3枚／見出し7以上＝4〜5枚）** を本スキルが決める。重複棚卸しを通過した図案の数が実際の枚数になるため、レンジ下限を割り込むこともある。
 
 例:
 - `/docs-image-creator docs/guide/web-technologies/markdown/markdown-learning-material-01.html`
