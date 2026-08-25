@@ -45,6 +45,9 @@ import { claude } from './data-ai-category/generative-ai/claude';
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
 
+// 業務ドメイン知識
+import { businessKnowledgeBasics } from './business-domain-knowledge/business-knowledge-basics';
+
 // 一覧の並び順 ＝ ランディングページ（src/pages/index.astro）のカード表示順。
 // 分類は初出順、分類内はこの配列順で並ぶ。
 const all: TechGuide[] = [
@@ -75,6 +78,8 @@ const all: TechGuide[] = [
   // クラウド・インフラ
   docker,
   gitGithub,
+  // 業務ドメイン知識
+  businessKnowledgeBasics,
 ];
 
 /** 分類 → 技術slug → TechGuide のレジストリ */
