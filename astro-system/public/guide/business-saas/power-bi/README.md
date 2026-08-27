@@ -30,7 +30,7 @@ Microsoft の BI ツール **Power BI** を、BI ツールも SQL も初めて�
 ## 学習コンテンツ
 
 ### [1. Power BIとは](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/power-bi/power-bi-learning-material-01.html)
-そもそも BI（ビジネスインテリジェンス）とは何かという出発点から、Power BI の役割、Power BI Desktop と Power BI Service の関係、そして「データ → Power Query → データモデル → DAX → レポート → 共有」という全体の流れをつかみます。Excel との違いもここで整理します。
+そもそも BI（ビジネスインテリジェンス）とは何かという出発点から、Power BI の役割、Power BI Desktop と Power BI Service の関係、そして「データ → Power Query → データモデル → DAX → レポート → 共有」という基本フローをつかみます。Excel との違いもここで整理します。
 
 ### [2. Power BI Desktop入門](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/power-bi/power-bi-learning-material-02.html)
 Power BI Desktop のインストールから、リボン・キャンバス・各ペインといった画面構成、レポートビュー／テーブルビュー／モデルビューの使い分け、`.pbix` ファイルの正体までを学びます。最後に Excel データを読み込んで最初のグラフを作ります。
