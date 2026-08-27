@@ -1,0 +1,41 @@
+import type { TechGuide } from '../types';
+
+// 新人SE向け Power BI 入門学習ガイド（全12章）。技術色 = アンバー（Power BI のブランドカラー）。
+export const powerBi: TechGuide = {
+  category: 'business-saas',
+  slug: 'power-bi',
+  techTitle: 'Power BI学習教材',
+  icon: 'fa-chart-column',
+  level: '初級',
+  categoryLabel: 'ビジネスSaaS',
+  totalTime: '約13時間',
+  splashStop0: '#f59e0b',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+  },
+  chapters: [
+    { number: 1, name: 'Power BIとは', file: 'power-bi-learning-material-01.html' },
+    { number: 2, name: 'Power BI Desktop入門', file: 'power-bi-learning-material-02.html' },
+    { number: 3, name: 'データを取得する', file: 'power-bi-learning-material-03.html' },
+    { number: 4, name: 'Power Query入門', file: 'power-bi-learning-material-04.html' },
+    { number: 5, name: 'データモデリング', file: 'power-bi-learning-material-05.html' },
+    { number: 6, name: 'スタースキーマ', file: 'power-bi-learning-material-06.html' },
+    { number: 7, name: 'DAX入門', file: 'power-bi-learning-material-07.html' },
+    { number: 8, name: 'レポート作成', file: 'power-bi-learning-material-08.html' },
+    { number: 9, name: '分かりやすいレポート設計', file: 'power-bi-learning-material-09.html' },
+    { number: 10, name: 'Power BI Service', file: 'power-bi-learning-material-10.html' },
+    { number: 11, name: 'セキュリティと運用', file: 'power-bi-learning-material-11.html' },
+    { number: 12, name: 'AI時代のPower BI', file: 'power-bi-learning-material-12.html' },
+  ],
+};

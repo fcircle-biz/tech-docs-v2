@@ -45,6 +45,9 @@ import { claude } from './data-ai-category/generative-ai/claude';
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
 
+// ビジネスSaaS
+import { powerBi } from './business-saas/power-bi';
+
 // 業務ドメイン知識
 import { businessKnowledgeBasics } from './business-domain-knowledge/business-knowledge-basics';
 
@@ -78,6 +81,8 @@ const all: TechGuide[] = [
   // クラウド・インフラ
   docker,
   gitGithub,
+  // ビジネスSaaS
+  powerBi,
   // 業務ドメイン知識
   businessKnowledgeBasics,
 ];

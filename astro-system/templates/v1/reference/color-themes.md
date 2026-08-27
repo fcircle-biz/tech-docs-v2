@@ -54,6 +54,7 @@ CSS 変数内では数値のみをカンマ区切りで書く（`rgb()` ラッ�
 | SAS | `#93c5fd` | `#60a5fa` | `#3b82f6` | `#2563eb` | `#1d4ed8` | `59, 130, 246` |
 | 機械学習 / AI | `#d8b4fe` | `#c084fc` | `#a855f7` | `#9333ea` | `#7e22ce` | `168, 85, 247` |
 | Excel / VBA | `#6ee7b7` | `#34d399` | `#10b981` | `#059669` | `#047857` | `16, 185, 129` |
+| Power BI / BI ツール | `#fcd34d` | `#fbbf24` | `#f59e0b` | `#d97706` | `#b45309` | `245, 158, 11` |
 | ビジネス文書 | `#d6d3d1` | `#a8a29e` | `#78716c` | `#57534e` | `#44403c` | `120, 113, 108` |
 | HTML / CSS | `#fdba74` | `#fb923c` | `#f97316` | `#ea580c` | `#c2410c` | `249, 115, 22` |
 | Tailwind CSS | `#67e8f9` | `#22d3ee` | `#06b6d4` | `#0891b2` | `#0e7490` | `6, 182, 212` |
@@ -397,6 +398,24 @@ primary: {
 - **アイコン**: `fas fa-file-excel`
 - **用途**: Excel, VBA, Office自動化
 
+#### Power BI / BI ツール
+```javascript
+primary: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+}
+```
+- **アイコン**: `fas fa-chart-column`
+- **用途**: Power BI, BI ツール, データ可視化
+
 #### ビジネス文書
 ```javascript
 primary: {
@@ -628,6 +647,7 @@ primary: {
 | SAS | `#3b82f6` | blue-500 | `fas fa-chart-bar` | SAS, 統計分析 |
 | AI / ML | `#a855f7` | purple-500 | `fas fa-brain` | 機械学習, 深層学習 |
 | Excel | `#10b981` | emerald-500 | `fas fa-file-excel` | Excel, VBA |
+| Power BI | `#f59e0b` | amber-500 | `fas fa-chart-column` | Power BI, BI ツール |
 | ビジネス文書 | `#78716c` | stone-500 | `fas fa-file-alt` | ビジネス・技術文書 |
 | HTML / CSS | `#f97316` | orange-500 | `fab fa-html5` | HTML, CSS |
 | Tailwind | `#06b6d4` | cyan-500 | `fas fa-wind` | Tailwind CSS |
