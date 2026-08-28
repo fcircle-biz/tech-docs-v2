@@ -22,7 +22,7 @@
 - **段階的学習**: 基礎から応用まで順序立てて学べる構成
 - **テンプレート標準**: `/astro-system/templates/v1/`（"Graphite × Iris" デザイン）に準拠した統一フォーマット
 
-> **現状**: 学習ガイドのみを収録しています。旧 `tech_docs`（v1）にあったチュートリアル・練習問題・実践課題・チートシート・スライド等は本リポジトリには含まれていません。
+> **現状**: 学習ガイドのみを収録しています。旧 `tech_docs`（v1）にあった学習パス・チュートリアル・練習問題・実践課題・チートシート・スライド等は本リポジトリには含まれていないため、対応するセクションは記載していません。
 
 ------------------------------------------------------------------------
 
@@ -42,6 +42,7 @@
 - [**Spring MVC学習ガイド**](docs/guide/programming-languages/java-ecosystem/spring-mvc/README.md) - Spring基礎・Spring Data JDBCを学んだ初心者向けSpring MVC入門10章構成カリキュラム（Spring学習シリーズ3作目）。Spring MVCがWebアプリケーションを作る仕組みであることの理解から、プロジェクトの基本構成、@Controllerと@GetMappingによるリクエスト処理、Modelを使った画面へのデータ受け渡し、Thymeleaf（th:each・th:object・th:field）による一覧・詳細・フォーム表示、@PathVariableと@ModelAttribute、GETとPOSTの違いとリダイレクト、登録・編集・削除機能まで、ユーザー管理Webアプリケーションを作りながら段階的に学習（全10章・約10時間）
 - [**Spring Data JPA学習ガイド**](docs/guide/programming-languages/java-ecosystem/spring-data-jpa/README.md) - Spring基礎・Spring Data JDBC・Spring MVCを学んだ初心者向けSpring Data JPA入門11章構成カリキュラム（Spring学習シリーズ4作目）。JPA・Hibernate・Spring Data JPAの関係と役割から、Spring Bootプロジェクトの作成、@Entity・@Id・@GeneratedValue・@ColumnによるEntity定義、JpaRepositoryによるCRUD操作、ServiceとRepositoryの役割分担、メソッド名による条件検索、@QueryとJPQL、@ManyToOne・@JoinColumnによる関連テーブルの扱い、@Transactionalによるトランザクション、Spring MVCとの連携、部署・社員管理アプリの総合演習まで、関連を持つ2つのテーブルをJavaのEntityとして扱う方法を段階的に学習（全11章・約11時間）
 - [**JUnit学習ガイド**](docs/guide/programming-languages/java-ecosystem/junit/README.md) - プログラミング初心者・テスト未経験者向けJUnit（JUnit 5）入門12章構成カリキュラム。「テストとは何か」という素朴な疑問から始め、Mavenプロジェクトへの導入とはじめてのテスト、アサーション（assertEquals等）、テストクラスの構成と@Test、@BeforeEach/@AfterEachなどのライフサイクル、パラメータ化テスト、assertThrowsによる例外テスト、@DisplayName・@Nested、電卓アプリのテスト実践とカバレッジ、テスト駆動開発（TDD）、F.I.R.S.T原則に基づくベストプラクティスまで段階的に学習（全12章・約10時間）
+- [**Struts 1学習ガイド**](docs/guide/programming-languages/java-ecosystem/struts1/README.md) - 既存システムの保守を担当する開発者向けStruts 1入門8章構成カリキュラム。Struts 1がどんなフレームワークで現在どう位置づけられるのかという整理から、web.xmlとstruts-config.xmlによる入口と設定、Actionクラスによるリクエスト処理、ActionFormによる画面値の受け渡し、JSPとStrutsタグライブラリ、JDBCを使ったデータベース連携、一覧・登録・更新・削除（CRUD）の実装、そして既存Struts 1システムのコードを読み解く手順まで、レガシー資産の保守を見据えて段階的に学習（全8章・約12時間）
 
 #### JavaScript/Node.js
 
@@ -51,15 +52,32 @@
 
 - [**VB.NET入門学習ガイド**](docs/guide/programming-languages/dotnet-ecosystem/vbnet/README.md) - プログラミング未経験者・初心者向けVB.NET（Visual Basic .NET）入門14章構成カリキュラム。Visual Studio 2022 Communityによる開発環境構築とHello World、変数とデータ型、演算子と文字列操作、条件分岐（If / Select Case）、ループ（For / Do / For Each）、配列とコレクション（List / Dictionary）、SubプロシージャとFunctionの基礎から、オブジェクト指向の核心（クラスとオブジェクト、プロパティとカプセル化、継承とポリモーフィズム）、さらに例外処理とデバッグ、ファイル入出力（CSV含む）、Windows Formsによる画面付きアプリ開発、ADO.NETによるデータベース接続とSQLインジェクション対策まで、業務システム開発を見据えて段階的に学習（全14章・約21時間）
 
-### クラウド／インフラ
+### Web技術
 
-- [**Docker学習ガイド**](docs/guide/cloud-infrastructure/docker/README.md) - 入門者向けDocker入門8章構成カリキュラム。「自分のPCでは動くのに他の人のPCでは動かない」問題をDockerがどう解決するのかという考え方から始め、Rancher Desktopでのコマンド環境構築とhello-worldによる最初のコンテナ実行、docker run / ps / stop / rm / images などの基本コマンド、NginxによるWebサーバー起動とポート公開（-p）の仕組み、Dockerfile（FROM / COPY）でのオリジナルイメージ作成、バインドマウントとボリューム、Docker Compose（compose.yml）による起動手順のまとめ、よくあるエラーの確認手順まで、コマンドの意味を1行ずつ確認しながら段階的に学習（全8章・約6時間）
+- [**HTML学習ガイド**](docs/guide/web-technologies/html/README.md) - Web制作がまったく初めての方向けHTML入門12章構成カリキュラム。HTMLとは何かという出発点から、エディタの準備と最初のページ作成、HTMLの基本構造とタグのルール、見出しと段落・文字の装飾、リスト、リンク、画像とメディア、表（テーブル）、フォーム、セマンティックHTMLと文書構造、CSSとの連携入門、そして総仕上げとなるプロフィールページ制作まで、実際に手を動かしながら段階的に学習（全12章・約7時間20分）
+- [**CSS学習ガイド**](docs/guide/web-technologies/css/README.md) - HTMLの基礎を学んだ方向けCSS入門14章構成カリキュラム。CSSの役割と書き方・適用方法から、セレクタの基本、カスケード・継承・詳細度、文字とテキストのスタイル、色と背景、ボックスモデル、display と position、Flexbox と CSS Grid によるレイアウト、レスポンシブデザイン、装飾とアニメーション、CSS変数を使った保守しやすい書き方、そしてプロフィールページのデザイン実践まで、つまずきやすい概念を図解しながら段階的に学習（全14章・約9時間50分）
+- [**Markdown学習ガイド**](docs/guide/web-technologies/markdown/README.md) - ドキュメント作成が初めての方向けMarkdown入門11章構成カリキュラム。Markdownとは何かと使われる場面から、書く準備、見出しと段落、文字の装飾、リスト、リンクと画像、コードブロックと引用、表（テーブル）、その他の便利な記法、Mermaidによる作図、そして実践としてのREADME作成まで、GitHubやドキュメントツールで日常的に使う記法を段階的に学習（全11章・約6時間30分）
 
 ### 開発手法・プロセス
 
 - [**Git/GitHub学習ガイド**](docs/guide/development-processes/git-github/README.md) - まったくの初心者向けGit/GitHub入門7章構成カリキュラム。「ファイル名に日付を付けて管理する」段階から一歩進み、Git・VS Code・GitHubアカウントの環境構築とgit configによる初期設定・SSH鍵の作成と登録、git init / status / add / commit / log / diffによる変更記録の基本サイクル、push / clone / pullによるGitHubとの連携、ブランチ（branch / switch）を使った作業、Pull Requestの作成・レビュー・マージによるチーム開発の流れ、変更の取り消しやコンフリクト解決などよくあるトラブルへの対処まで、専門用語をかみ砕きながら段階的に学習（全7章・約6時間）
 - [**Claude Code入門学習ガイド**](docs/guide/development-processes/claude-code/README.md) - 入門者向けClaude Code（Anthropic公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作、ファイル編集とコードベース探索、スラッシュコマンド、CLAUDE.mdとメモリ・コンテキスト管理、Git・GitHub連携、権限と設定、MCP連携、サブエージェントと自動化、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16時間）
+- [**Claude Skills学習ガイド**](docs/guide/development-processes/claude-code-skills/README.md) - Claude Codeを一通り使える方向けのスキル（Skills）入門12章構成カリキュラム。スキルとは何かという整理から、スキルの置き場所と優先順位、最初のスキル作成、テストと発見の仕組み、効果的なdescriptionの書き方、メタデータとallowed-tools、段階的開示と複数ファイル構成、スクリプト・参照資料・アセットの活用、CLAUDE.mdやスラッシュコマンドとの使い分け、サブエージェント・フック・MCPとの比較、スキルの共有と配布、トラブルシューティングまで、自分の作業を自動化するスキルを作れるようになることを目標に段階的に学習（全12章・約8時間）
 - [**Codex入門学習ガイド**](docs/guide/development-processes/codex/README.md) - 入門者向けCodex（OpenAI公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作と最初のセッション、ファイルの読み書きとコード編集、コードベースの探索、承認モードとサンドボックス、AGENTS.mdとメモリ・コンテキスト管理、設定ファイル（config.toml）とプロファイル、Git・GitHub連携、MCPによる外部ツール連携、非対話実行と自動化（codex exec）、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16.5時間）
+
+### クラウド／インフラ
+
+- [**Docker学習ガイド**](docs/guide/cloud-infrastructure/docker/README.md) - 入門者向けDocker入門8章構成カリキュラム。「自分のPCでは動くのに他の人のPCでは動かない」問題をDockerがどう解決するのかという考え方から始め、Rancher Desktopでのコマンド環境構築とhello-worldによる最初のコンテナ実行、docker run / ps / stop / rm / images などの基本コマンド、NginxによるWebサーバー起動とポート公開（-p）の仕組み、Dockerfile（FROM / COPY）でのオリジナルイメージ作成、バインドマウントとボリューム、Docker Compose（compose.yml）による起動手順のまとめ、よくあるエラーの確認手順まで、コマンドの意味を1行ずつ確認しながら段階的に学習（全8章・約6時間）
+
+### データ・AI
+
+#### データベース
+
+- [**SQL Server入門学習ガイド**](docs/guide/data-ai-category/database/sqlserver/README.md) - データベース未経験者向けSQL Server入門14章構成カリキュラム。データベースとRDBMSの基礎、SQL Serverのエディションとアーキテクチャ（インスタンス・データベース・スキーマ・システムDB）から、Windows/Dockerでの環境構築とSSMSの基本操作、CREATE TABLEとデータ型・制約・IDENTITY、SELECT・WHERE・ORDER BY・TOP、INSERT/UPDATE/DELETEとOUTPUT句、JOIN・集計・サブクエリ・CTE・ウィンドウ関数、T-SQLプログラミング（変数・制御構文・TRY...CATCH・ストアドプロシージャ）、トランザクションとロック・分離レベル、インデックスと実行プラン、ログインとユーザー・ロールによる権限管理、復旧モデルとバックアップ／復元・運用まで、学習用DB「SampleShop」を作りながら段階的に学習。全章に**PostgreSQLとの違い**の比較コーナーを設け、最終章で総まとめと移行時の注意点を整理（全14章・約16時間）
+
+#### 生成AI
+
+- [**Claude入門学習ガイド**](docs/guide/data-ai-category/generative-ai/claude/README.md) - 生成AIを初めて使う方向けClaude入門12章構成カリキュラム。Claudeとは何かという出発点から、最初の会話の始め方、コンテキストの与え方、より良い結果を得るための指示のコツ、AI Fluencyとevalsの考え方、デスクトップアプリの3モード、プロジェクト機能の活用、アーティファクトによる成果物作成、スキルの活用、コネクタとMCPによる外部連携、エンタープライズ検索とリサーチ、そして日々の業務への展開と次のステップまで、実際に触りながら段階的に学習（全12章・約6時間）
 
 ### ビジネスSaaS
 
