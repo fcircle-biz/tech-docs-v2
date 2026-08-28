@@ -42,6 +42,9 @@ import { markdown } from './web-technologies/markdown';
 // データ・AI — 生成AI
 import { claude } from './data-ai-category/generative-ai/claude';
 
+// データ・AI — データベース
+import { sqlserver } from './data-ai-category/database/sqlserver';
+
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
 
@@ -78,6 +81,8 @@ const all: TechGuide[] = [
   codex,
   // データ・AI — 生成AI
   claude,
+  // データ・AI — データベース
+  sqlserver,
   // クラウド・インフラ
   docker,
   gitGithub,

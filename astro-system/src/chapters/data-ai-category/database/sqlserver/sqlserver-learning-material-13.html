@@ -1,0 +1,671 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL Server</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第13章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第13章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">バックアップと復旧・運用</h1>
+                    <p class="text-slate-600">データベースは、いつか必ず「壊れる」「消える」「動かなくなる」ことを前提に運用します。この章では、なぜバックアップが必要なのかという基本の考え方から、復旧モデル、完全・差分・ログの3種類のバックアップ、実際の復元手順、そして日常の運用チェックまでを学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>バックアップが必要な理由と、RPO・RTOという2つの指標を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>単純・完全・一括ログという3つの復旧モデルの違いと使い分けが分かる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>完全・差分・トランザクションログバックアップを実行し、正しい順序で復元できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SQL Server Agent によるジョブ自動化と、日常の運用確認項目を理解する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション13.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.1 なぜバックアップが必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        どれほど堅牢に設計されたシステムでも、データが失われる可能性をゼロにはできません。代表的な原因を3つ挙げます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-hard-drive text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">ハードウェア障害</h3>
+                            <p class="text-sm text-slate-600">ディスクの故障、サーバーの電源異常、火災や水害など物理的なトラブルでデータファイルごと失われることがあります。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-user-large-slash text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">操作ミス</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-slate-100">WHERE</code> 句を付け忘れた <code class="bg-slate-100">DELETE</code>、誤った <code class="bg-slate-100">DROP TABLE</code> など、人為的なミスは今でも主要な原因のひとつです。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-lock text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">ランサムウェア</h3>
+                            <p class="text-sm text-slate-600">データを暗号化して身代金を要求する攻撃です。バックアップ自体が同時に暗号化・削除されないよう、隔離された場所への保管が重要です。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「バックアップを取る」だけでは不十分で、「どこまで戻ってよいか」「どれだけ早く戻すか」という目標をあらかじめ決めておく必要があります。これを表す2つの指標が <strong>RPO</strong> と <strong>RTO</strong> です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">指標</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">バックアップ設計への影響</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">RPO<br><span class="text-xs font-normal text-slate-500">目標復旧時点</span></td>
+                                    <td class="px-4 py-3 text-slate-600">障害発生時、どこまでのデータを失ってよいか（例: 「直近15分以内のデータまでは失ってもよい」）</td>
+                                    <td class="px-4 py-3 text-slate-600">RPOが短いほど、ログバックアップの頻度を上げる必要がある</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">RTO<br><span class="text-xs font-normal text-slate-500">目標復旧時間</span></td>
+                                    <td class="px-4 py-3 text-slate-600">障害発生から、どれだけ早くシステムを復旧させるか（例: 「2時間以内に復旧する」）</td>
+                                    <td class="px-4 py-3 text-slate-600">RTOが短いほど、復元の練習と手順の自動化が重要になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">たとえ話: RPOとRTO</p>
+                                <p class="text-blue-900 text-sm">RPO は「巻き戻してよい時間の幅」、RTO は「復旧作業にかけてよい時間の長さ」と覚えるとイメージしやすいです。ネットショップなら「直近5分の注文は失いたくない（RPOが短い）」、社内の日報システムなら「半日止まっても業務に支障は出ない（RTOが長い）」というように、システムの重要度によって目標値は変わります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.2 復旧モデル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server のデータベースには、トランザクションログをどのように扱うかを決める <strong>復旧モデル</strong>という設定があります。データベース作成時に既定値が決まり、後から変更することもできます。3種類の復旧モデルを比較します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">復旧モデル</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ログバックアップ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">特定時点への復旧</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ログの肥大化</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">単純<br><span class="text-xs font-normal text-slate-500">SIMPLE</span></td>
+                                    <td class="px-4 py-3 text-slate-600">不可（ログは自動的に切り捨てられる）</td>
+                                    <td class="px-4 py-3 text-slate-600">不可。最後の完全／差分バックアップ時点まで</td>
+                                    <td class="px-4 py-3 text-slate-600">起きにくい。管理が簡単</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">完全<br><span class="text-xs font-normal text-slate-500">FULL</span></td>
+                                    <td class="px-4 py-3 text-slate-600">可能（むしろ必須。取らないとログが肥大化し続ける）</td>
+                                    <td class="px-4 py-3 text-slate-600">可能。任意の時点まで戻せる</td>
+                                    <td class="px-4 py-3 text-slate-600">ログバックアップを怠ると肥大化する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">一括ログ<br><span class="text-xs font-normal text-slate-500">BULK_LOGGED</span></td>
+                                    <td class="px-4 py-3 text-slate-600">可能</td>
+                                    <td class="px-4 py-3 text-slate-600">一括操作を含む期間は不可な場合がある</td>
+                                    <td class="px-4 py-3 text-slate-600">大量データ投入時のログ量を抑えられる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        一括ログは、大量データの一括インポートなど特定の作業を一時的に高速化するための特殊なモデルで、常用するものではありません。初心者のうちは<strong>単純</strong>と<strong>完全</strong>の2つを使い分けられれば十分です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 使い分けの目安</p>
+                                <p class="text-emerald-900 text-sm">本ガイドのように<strong>学習・検証用のデータベースは「単純」</strong>で構いません。データが多少失われても学習し直せるからです。一方、<strong>業務で使うデータベースは基本的に「完全」</strong>を選び、ログバックアップを定期的に取得して、障害直前まで復旧できるようにしておきます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">recovery-model.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 現在の復旧モデルを確認する
+SELECT name, recovery_model_desc
+FROM sys.databases
+WHERE name = 'SampleShop';
+
+-- 業務データベース向けに「完全」へ変更する
+ALTER DATABASE SampleShop SET RECOVERY FULL;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション13.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.3 バックアップの種類
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server の代表的なバックアップは3種類あり、組み合わせて使います。それぞれ「何を取得するか」が異なります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">取得する内容</th>
+                                    <th class="px-4 py-3 text-left font-semibold">頻度の目安</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">完全バックアップ</td>
+                                    <td class="px-4 py-3 text-slate-600">データベース全体のコピー</td>
+                                    <td class="px-4 py-3 text-slate-600">週1回程度（すべての基点になる）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">差分バックアップ</td>
+                                    <td class="px-4 py-3 text-slate-600">直近の完全バックアップ以降に変更されたデータのみ</td>
+                                    <td class="px-4 py-3 text-slate-600">1日1回程度</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">トランザクションログバックアップ</td>
+                                    <td class="px-4 py-3 text-slate-600">直近のログバックアップ以降の、すべての更新履歴</td>
+                                    <td class="px-4 py-3 text-slate-600">15分〜1時間ごと（RPOに応じて）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["日曜: 完全バックアップ"] --> B["月〜土: 差分バックアップ（毎日1回）"]
+    A --> C["随時: トランザクションログバックアップ（15分間隔など）"]
+    B --> D["障害発生"]
+    C --> D
+    D --> E["復元の順序: 完全 → 差分 → ログ"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まずは完全バックアップを取得します。バックアップ先フォルダはあらかじめ作成しておいてください（Windows の例では <code class="bg-slate-100">C:\Backup\</code>、Linux コンテナの例では <code class="bg-slate-100">/var/opt/mssql/backup/</code>）。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">backup-full.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 完全バックアップ: データベース全体を取得する
+BACKUP DATABASE SampleShop
+TO DISK = 'C:\Backup\SampleShop_Full.bak'
+WITH INIT,          -- 既存の同名ファイルを上書きする
+     COMPRESSION,   -- バックアップを圧縮して容量を節約する
+     STATS = 10;    -- 進捗を10%刻みで表示する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        続いて差分バックアップです。<code class="bg-slate-100">WITH DIFFERENTIAL</code> を付けるだけで、直近の完全バックアップからの差分のみが記録されます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">backup-diff.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 差分バックアップ: 直近の完全バックアップ以降の変更分のみ取得
+BACKUP DATABASE SampleShop
+TO DISK = 'C:\Backup\SampleShop_Diff.bak'
+WITH DIFFERENTIAL,  -- 差分バックアップであることを指定する
+     COMPRESSION,
+     STATS = 10;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後にログバックアップです。<strong>復旧モデルが「完全」または「一括ログ」の場合のみ</strong>実行できます（「単純」では <code class="bg-slate-100">BACKUP LOG</code> はエラーになります）。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">backup-log.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- トランザクションログバックアップ:
+-- 直近のログバックアップ以降の更新履歴をすべて取得する
+BACKUP LOG SampleShop
+TO DISK = 'C:\Backup\SampleShop_Log.bak'
+WITH COMPRESSION,
+     STATS = 10;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション13.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.4 復元する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        復元（リストア）は、取得したバックアップを<strong>正しい順序</strong>で適用していく作業です。ポイントは、続きのバックアップを適用する予定があるあいだは <code class="bg-slate-100">WITH NORECOVERY</code> を指定し、最後のひとつだけ <code class="bg-slate-100">WITH RECOVERY</code> にすることです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">restore-sequence.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1. 完全バックアップを「復旧中」状態で復元（この後も適用するのでRECOVERYしない）
+RESTORE DATABASE SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Full.bak'
+WITH NORECOVERY, REPLACE;
+
+-- 2. 差分バックアップを重ねて復元
+RESTORE DATABASE SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Diff.bak'
+WITH NORECOVERY;
+
+-- 3. 最後のログバックアップまで適用し、復旧を確定する
+RESTORE LOG SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Log.bak'
+WITH RECOVERY;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログバックアップには <code class="bg-slate-100">STOPAT</code> を指定でき、「誤って削除する直前」のような<strong>特定時点</strong>まで戻すことができます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">restore-stopat.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 特定時点（誤操作の直前）まで復旧する例
+RESTORE DATABASE SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Full.bak'
+WITH NORECOVERY, REPLACE;
+
+RESTORE LOG SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Log.bak'
+WITH RECOVERY, STOPAT = '2026-08-28 10:15:00';</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バックアップファイルの中身（論理ファイル名）を確認したいときは <code class="bg-slate-100">RESTORE FILELISTONLY</code> を使います。また、元とは別の名前・別のパスへ復元したい場合は <code class="bg-slate-100">WITH MOVE</code> でファイルの配置先を指定します。この章末の「やってみよう 13-1」でも使う書き方です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">restore-move.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- バックアップに含まれる論理ファイル名を確認する
+RESTORE FILELISTONLY
+FROM DISK = 'C:\Backup\SampleShop_Full.bak';
+
+-- 別名データベースとして、別のパスに復元する（動作確認用）
+RESTORE DATABASE SampleShop_Test
+FROM DISK = 'C:\Backup\SampleShop_Full.bak'
+WITH MOVE 'SampleShop' TO 'C:\Data\SampleShop_Test.mdf',
+     MOVE 'SampleShop_log' TO 'C:\Data\SampleShop_Test_log.ldf',
+     RECOVERY;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">警告: 復元は上書きです</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900">RESTORE DATABASE</code> は既定で<strong>接続中のデータベースを丸ごと置き換えます</strong>。本番環境で同名のデータベースに対して実行すると、それまでのデータがすべて失われます。まずは本章の実習のように<strong>別名（例: <code class="bg-red-100 text-red-900">SampleShop_Test</code>）で復元して中身を確認する</strong>のが安全な手順です。本番のデータベースへ上書き復元する際は、対象名・対象環境（本番かどうか）を作業前に必ず指差し確認しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.5 定期実行と日常運用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バックアップは人手で毎回実行するものではなく、<strong>自動化</strong>しておくのが基本です。SQL Server には <strong>SQL Server Agent</strong> という組み込みのジョブスケジューラがあり、「毎日23時に完全バックアップ」のような処理を自動実行できます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">注意: Express Edition では Agent が使えない</p>
+                                <p class="text-blue-900 text-sm">SQL Server Agent は Developer / Standard / Enterprise では利用できますが、<strong>Express Edition では機能自体が搭載されていません</strong>。Express でバックアップを自動化したい場合は、Windows のタスクスケジューラや Linux の cron から <code class="bg-blue-100">sqlcmd</code> でバックアップスクリプトを起動する方法が代わりになります。 また、本章の例で使っている <code class="bg-blue-100">WITH COMPRESSION</code>（バックアップ圧縮）も Express Edition では利用できないため、Express で試す場合はこのオプションを外してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SSMS のオブジェクトエクスプローラーから「SQL Server Agent」→「ジョブ」を右クリックして新規ジョブを作成すると、実行するTSQL（バックアップコマンドなど）とスケジュール（毎日・毎週など）をGUIで設定できます。あわせて「メンテナンスプラン」というウィザードを使うと、バックアップに加えてインデックスの再構成や整合性チェック（<code class="bg-slate-100">DBCC CHECKDB</code>）などをまとめて自動化できます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        自動化したら「動いているはず」で終わらせず、日常的に次の項目を確認する習慣をつけましょう。
+                    </p>
+
+                    <div class="bg-white rounded-xl border border-slate-200 p-5 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-clipboard-check text-primary-600"></i>
+                            日常運用チェックリスト
+                        </h3>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <input type="checkbox" class="mt-1.5 flex-shrink-0" disabled>
+                                <span><strong>バックアップジョブの成功可否</strong> — ジョブ履歴でエラー終了していないか確認する</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <input type="checkbox" class="mt-1.5 flex-shrink-0" disabled>
+                                <span><strong>バックアップ先のディスク空き容量</strong> — 空きが尽きるとバックアップ自体が失敗する</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <input type="checkbox" class="mt-1.5 flex-shrink-0" disabled>
+                                <span><strong>SQL Server エラーログ</strong> — 予期しないエラーや警告が出ていないか（SSMSの「管理」→「SQL Server ログ」）</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <input type="checkbox" class="mt-1.5 flex-shrink-0" disabled>
+                                <span><strong>メンテナンスジョブの実行結果</strong> — インデックス再構成・整合性チェックが正常に完了しているか</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- セクション13.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.6 「バックアップは取れているか」より大事なこと
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バックアップジョブが毎日「成功」と表示されていても、それだけでは安心できません。バックアップファイル自体が壊れていたり、必要なファイルの一部だけ取り漏れていたりしても、ジョブの見た目上は「成功」のままだからです。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 復元テストこそが本当のバックアップ確認</p>
+                                <p class="text-emerald-900 text-sm">「バックアップが取れている」と「必要なときに復元できる」はまったく別の話です。<strong>定期的に別名・別環境へ実際にRESTOREしてみて、中身が正しいことを確認する</strong>（＝復元テスト）まで行って、はじめて「バックアップが機能している」と言えます。本番と同じ手順を練習しておけば、実際の障害時にも落ち着いて対応でき、RTO（目標復旧時間）の短縮にも直結します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.7 PostgreSQLとの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        バックアップ・復旧のしくみは、SQL Server と PostgreSQL で用語も設計思想もかなり異なります。あらかじめ対応関係を押さえておくと、どちらの製品のドキュメントを読んでも迷いにくくなります。
+                    </p>
+
+                    <!-- PostgreSQL との違い -->
+                    <div class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code-compare text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-indigo-800 mb-3 break-words">PostgreSQL との違い（バックアップと復旧）</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-indigo-200">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">観点</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">SQL Server</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">PostgreSQL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-indigo-200">
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">論理バックアップ</td>
+                                                <td class="px-3 py-2 text-indigo-900">SSMS のスクリプト生成や BACPAC（<code class="bg-indigo-100">.bacpac</code>）。<code class="bg-indigo-100">BACKUP DATABASE</code> は論理形式ではない</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_dump</code> / <code class="bg-indigo-100">pg_dumpall</code>（SQL文形式のダンプ）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">物理バックアップ</td>
+                                                <td class="px-3 py-2 text-indigo-900">同じ <code class="bg-indigo-100">BACKUP DATABASE</code> のバックアップファイル（.bak）</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_basebackup</code>（データディレクトリ全体を複製）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">特定時点への復旧</td>
+                                                <td class="px-3 py-2 text-indigo-900">完全復旧モデル＋ログバックアップ（<code class="bg-indigo-100">STOPAT</code>）</td>
+                                                <td class="px-3 py-2 text-indigo-900">WALアーカイブ＋PITR（<code class="bg-indigo-100">recovery_target_time</code>）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">「復旧モデル」という概念</td>
+                                                <td class="px-3 py-2 text-indigo-900">単純／完全／一括ログを明示的に切り替える</td>
+                                                <td class="px-3 py-2 text-indigo-900">この概念自体が存在しない。WALは常に出力され、アーカイブするかどうかを設定で決める</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">スケジューラ</td>
+                                                <td class="px-3 py-2 text-indigo-900">SQL Server Agent（製品に内蔵）</td>
+                                                <td class="px-3 py-2 text-indigo-900">製品には内蔵されず、cron や pg_cron など外部で組む</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">復元の手順</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">RESTORE DATABASE</code> を NORECOVERY で重ねてから RECOVERY</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_restore</code>（ダンプの場合）や、ベースバックアップ＋WAL再生（PITRの場合）</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="text-indigo-900 text-sm mt-3 break-words">大きな違いは、SQL Server が「復旧モデル」という設定でログの扱いを切り替えるのに対し、PostgreSQL は常に WAL（Write-Ahead Log）を出力し続け、それをアーカイブするかどうかだけを設定する点です。目的（特定時点への復旧）は同じでも、たどり着き方の設計が異なります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 用語だけ覚えれば概念は共通</p>
+                                <p class="text-blue-900 text-sm">「完全バックアップ＝ベースの複製」「ログ／WAL＝そこからの差分の記録」「特定時点への復旧＝ベース＋差分の記録を途中まで適用すること」という骨格はSQL ServerでもPostgreSQLでも同じです。製品ごとのコマンド名と設定項目の対応さえ押さえれば、片方の知識をもう片方に応用できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 13-1: バックアップ→削除→復元で中身を確認する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">実際に手を動かして「バックアップは復元できてこそ意味がある」ことを体感します。第5〜7章で作成した <code class="bg-purple-100">SampleShop</code> データベースを使います。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">SampleShop</code> の完全バックアップを取得する（13.3節の <code class="bg-purple-100">BACKUP DATABASE</code> を実行）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">SampleShop</code> の中の任意のテーブルをひとつ選び、<code class="bg-purple-100">DROP TABLE</code> で削除する（実際の事故を再現）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">13.4節の <code class="bg-purple-100">WITH MOVE</code> の例を参考に、手順1のバックアップから <strong>別名</strong>（<code class="bg-purple-100">SampleShop_Test</code>）で復元する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">SampleShop_Test</code> 側で手順2で削除したテーブルが残っていること、データが正しいことを <code class="bg-purple-100">SELECT</code> で確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">確認が終わったら <code class="bg-purple-100">DROP DATABASE SampleShop_Test;</code> で検証用データベースを片付ける。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> 「バックアップを取る」だけでなく「復元して中身を確認する」までを一通り経験することで、13.6節の復元テストの重要性を実感として身につけます。<code class="bg-purple-200">SampleShop_Test</code> という別名を使うことで、元の <code class="bg-purple-200">SampleShop</code> を壊さずに安全に検証できる点にも注目しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 差分バックアップとトランザクションログバックアップは、それぞれ何を取得しますか。違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            差分バックアップは「直近の完全バックアップ以降に変更された<strong>データそのもの</strong>」を取得します。一方、トランザクションログバックアップは「直近のログバックアップ以降の<strong>更新履歴（操作の記録）</strong>」を取得するもので、これを使うと特定時点まで正確に巻き戻せます。差分は直近の完全バックアップを基点としてしか使えず、ログバックアップは復旧モデルが「完全」または「一括ログ」のときだけ利用できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 復旧モデルが「単純（SIMPLE）」のデータベースでは、なぜトランザクションログバックアップが取得できないのですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            「単純」モデルでは、コミットが完了したトランザクションのログはSQL Serverによって自動的に切り捨てられ、ログバックアップの対象として保持されないためです。そのため特定時点への復旧はできず、最後に取得した完全／差分バックアップの時点までしか戻せません。管理は簡単になりますが、RPO（許容できるデータ損失の範囲）は長くなります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 「バックアップジョブが毎日成功と表示されている」だけでは十分と言えない理由は何ですか。どう対応すればよいですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ジョブが「成功」と表示されていても、バックアップファイル自体が壊れていたり、実際に復元すると必要なデータが欠けていたりする可能性を否定できないためです。「取れているはず」で終わらせず、定期的に別名・別環境へ実際にRESTOREして中身を確認する<strong>復元テスト</strong>を行うことで、初めてバックアップが機能していると確認できます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sqlserver-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第12章: セキュリティとユーザー管理</span>
+                        </div>
+                    </a>
+                    <a href="sqlserver-learning-material-14.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第14章: PostgreSQLとの違い総まとめ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

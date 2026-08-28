@@ -1,0 +1,597 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL Server</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第10章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第10章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約75分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクションとロック</h1>
+                    <p class="text-slate-600">複数の更新を「まとめて成功させるか、まとめて取り消すか」を制御する<strong>トランザクション</strong>と、複数の利用者が同時にデータへアクセスしても矛盾が起きないようにする<strong>ロック</strong>の仕組みを学びます。分離レベルや <code class="bg-slate-100">READ_COMMITTED_SNAPSHOT</code>、デッドロックへの対処もあわせて理解します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションがなぜ必要かを、ACID特性とあわせて説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 text-amber-900">BEGIN TRAN</code> / <code class="bg-amber-100 text-amber-900">COMMIT</code> / <code class="bg-amber-100 text-amber-900">ROLLBACK</code> を使い、TRY...CATCHで安全に書ける</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロックの粒度とブロッキングが起きる仕組みを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>分離レベルの違いと、SQL Server と PostgreSQL の同時実行制御の違いを説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション10.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.1 トランザクションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>銀行振込</strong>を例に考えてみましょう。Aさんの口座から1,000円を引き、Bさんの口座に1,000円を足す処理は、SQLで書けば <code class="bg-slate-100">UPDATE</code> 文が2回実行されます。もし1回目の「引く」が成功した直後に、停電やシステム障害で2回目の「足す」が実行されなかったら、1,000円がこの世から消えてしまいます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これを防ぐのが<strong>トランザクション</strong>です。複数のSQL文を1つの「ひとまとまりの作業」として扱い、<strong>「全部成功したことにする」か「全部なかったことにする」かのどちらかしか許さない</strong>仕組みです。「引く」と「足す」の間で処理が止まっても、トランザクションが正しく使われていれば、データベースは振込前の状態に自動的に巻き戻ります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">特性（ACID）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">原子性（Atomicity）</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクション内の処理は「全部成功」か「全部なかったことにする」かのどちらかしかない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">一貫性（Consistency）</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクションの前後で、制約やルールに反したデータが生まれない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">分離性（Isolation）</td>
+                                    <td class="px-4 py-3 text-slate-600">複数のトランザクションが同時に動いても、互いの途中経過が見えず干渉しない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">永続性（Durability）</td>
+                                    <td class="px-4 py-3 text-slate-600">一度コミットされたデータは、その後障害が起きても失われない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: ACID</p>
+                                <p class="text-blue-900 text-sm">Atomicity（原子性）・Consistency（一貫性）・Isolation（分離性）・Durability（永続性）の頭文字です。SQL Server に限らず、まともなRDBMSであればすべてこの4つを満たすように設計されています。この章の10.3〜10.5は、主に<strong>分離性（Isolation）</strong>をどう実現するかという話です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.2 T-SQLでの書き方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server は既定で<strong>自動コミットモード</strong>で動作します。つまり、明示的にトランザクションを開始しない限り、<code class="bg-slate-100">UPDATE</code> や <code class="bg-slate-100">INSERT</code> を1文実行するたびに、その文単独が自動的にコミットされます。複数の文をひとまとめにしたい場合は、<code class="bg-slate-100">BEGIN TRAN</code>（<code class="bg-slate-100">BEGIN TRANSACTION</code> の省略形）で明示的に開始します。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-play text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-white">BEGIN TRAN</code></h3>
+                            <p class="text-sm text-slate-600">ここからひとまとまりの作業として扱う、という開始の合図。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-check text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-white">COMMIT</code></h3>
+                            <p class="text-sm text-slate-600">ここまでの変更を確定する。以降、変更は他の利用者からも見える。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-rose-50 to-red-50 border border-rose-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-rose-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-rotate-left text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-white">ROLLBACK</code></h3>
+                            <p class="text-sm text-slate-600">ここまでの変更をすべて取り消し、トランザクション開始前の状態に戻す。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実務では「エラーが起きたら必ずロールバックする」ことを保証するため、<code class="bg-slate-100">TRY...CATCH</code>（第9章）と組み合わせるのが定石です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">transfer.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 振込処理を安全なトランザクションで実行する型
+BEGIN TRY
+    BEGIN TRAN;
+        UPDATE Accounts SET Balance = Balance - 1000 WHERE AccountId = 1;
+        UPDATE Accounts SET Balance = Balance + 1000 WHERE AccountId = 2;
+    COMMIT TRAN;
+END TRY
+BEGIN CATCH
+    -- @@TRANCOUNTが1以上なら、開いたままのトランザクションが残っている
+    IF @@TRANCOUNT > 0
+        ROLLBACK TRAN;
+    THROW;  -- エラー内容を呼び出し元に伝える
+END CATCH;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">@@TRANCOUNT</code> は、現在ネストして開いているトランザクションの数を返すシステム関数です。0なら未開始、1以上なら開始中を意味します。また、<code class="bg-slate-100">SET XACT_ABORT ON</code> をバッチの先頭に置くと、実行時エラーが発生した際に SQL Server が<strong>トランザクション全体を確実に取り消す</strong>ようになり、「一部の文だけ失敗して更新が中途半端に残る」事故を防げます。ストアドプロシージャの冒頭ではよく使われる設定です。ただし <code class="bg-slate-100">TRY...CATCH</code> と併用した場合はトランザクションがコミット不可の状態で CATCH に入るだけなので、上の例のように<strong>CATCH内で明示的に <code class="bg-slate-100">ROLLBACK</code> を書くことは省略できません</strong>。
+                    </p>
+                </section>
+
+                <!-- セクション10.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.3 ロックの基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        複数の利用者が同時に同じデータへアクセスしても矛盾が起きないよう、SQL Server はデータへの「鍵」である<strong>ロック</strong>を自動的にかけます。代表的なロックには次の2種類があります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-eye text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">共有ロック（S）</h3>
+                            <p class="text-sm text-slate-600"><strong>読み取り</strong>の際にかかるロック。他の共有ロックとは共存できるが、後述の排他ロックとは共存できない。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-lock text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">排他ロック（X）</h3>
+                            <p class="text-sm text-slate-600"><strong>更新・削除・挿入</strong>の際にかかるロック。他のどのロックとも共存できず、他のアクセスをすべて待たせる。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロックがかかる範囲を<strong>粒度</strong>と呼びます。SQL Server は状況に応じて<strong>行ロック</strong>（1行だけ）、<strong>ページロック</strong>（8KB単位のまとまり）、<strong>テーブルロック</strong>（表全体）を自動的に使い分け、ロックの数が多くなりすぎるとより大きな粒度へ「エスカレーション」することもあります。基本的にはSQL Serverの最適化に任せればよく、開発者が粒度を細かく指定する必要はほとんどありません。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        あるセッションが排他ロックを保持している間、他のセッションがそのデータにアクセスしようとすると、ロックが解放されるまで<strong>待たされます</strong>。この「待たされる状態」を<strong>ブロッキング</strong>と呼びます。ブロッキング自体は異常ではなく、同時実行制御の正常な動作です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant A as セッションA
+    participant B as セッションB
+    participant DB as SQL Server
+    A->>DB: BEGIN TRAN
+    A->>DB: UPDATE 商品テーブル 行1（排他ロックX取得）
+    B->>DB: SELECT 商品テーブル 行1
+    DB-->>B: 待機（Aのロック解放待ち＝ブロッキング）
+    A->>DB: COMMIT TRAN
+    DB-->>A: ロック解放
+    DB-->>B: 待機が解け、結果を返す
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セッションBは何もおかしなことをしていません。単にセッションAがトランザクションを終えるまで待たされているだけです。この待ち時間が長いと「アプリが固まった」ように感じられるため、トランザクションはできるだけ短く保つことが重要になります。
+                    </p>
+                </section>
+
+                <!-- セクション10.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.4 分離レベル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「他のトランザクションの途中経過を、どこまで見せるか（見せないか）」の強さを段階的に選べる設定が<strong>分離レベル</strong>です。分離レベルを厳しくするほどデータの矛盾は起きにくくなりますが、その分ブロッキングが増え、性能は落ちる傾向にあります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">分離レベル</th>
+                                    <th class="px-4 py-3 text-left font-semibold">概要</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">READ UNCOMMITTED</td>
+                                    <td class="px-4 py-3 text-slate-600">最も緩い。他のトランザクションがまだコミットしていない変更も読めてしまう</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">READ COMMITTED（既定）</td>
+                                    <td class="px-4 py-3 text-slate-600">コミット済みのデータしか読まない。SQL Serverの初期設定</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">REPEATABLE READ</td>
+                                    <td class="px-4 py-3 text-slate-600">一度読んだ行は、同じトランザクション内では常に同じ値が読める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SERIALIZABLE</td>
+                                    <td class="px-4 py-3 text-slate-600">最も厳格。同じ条件で再検索しても、新しい行の出現すら許さない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SNAPSHOT</td>
+                                    <td class="px-4 py-3 text-slate-600">標準SQLにはない追加レベル。行バージョンを使い、読み取りが書き込みをブロックしない（利用にはデータベースで <code class="bg-slate-100">ALLOW_SNAPSHOT_ISOLATION</code> を ON にする必要がある）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        分離レベルの違いは、次の3つの「望ましくない現象」がどこまで起きるかで整理すると分かりやすくなります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">分離レベル</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ダーティリード</th>
+                                    <th class="px-4 py-3 text-left font-semibold">反復不能読み取り</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ファントムリード</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">READ UNCOMMITTED</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">READ COMMITTED</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">REPEATABLE READ</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SERIALIZABLE</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SNAPSHOT</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                    <td class="px-4 py-3 text-slate-600">発生しない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>ダーティリード</strong>はまだコミットされていない変更を読んでしまうこと、<strong>反復不能読み取り</strong>は同じ行を2回読んだら値が変わっていたこと、<strong>ファントムリード</strong>は同じ条件で再検索したら行が増減していたことを指します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <button onclick="copyCode(this)" class="copy-btn px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre class="!bg-slate-800 !rounded-lg overflow-x-auto"><code class="language-sql">-- このセッションの分離レベルをREPEATABLE READに変更
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+BEGIN TRAN;
+    SELECT Balance FROM Accounts WHERE AccountId = 1;
+    -- ここで他セッションからの更新はブロックされる
+COMMIT TRAN;</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション10.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.5 READ_COMMITTED_SNAPSHOT
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        既定の READ COMMITTED は<strong>ロックベース</strong>で動くため、「読み取り（SELECT）」が「書き込み中の行」に対してブロッキングされることがあります。これを避けたい場合、データベース単位で <code class="bg-slate-100">READ_COMMITTED_SNAPSHOT</code> を有効化する方法があります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">enable-rcsi.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- データベース単位でスナップショット読み取りを有効化
+ALTER DATABASE SampleShop
+    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この設定の切り替えにはデータベースへの排他アクセスが必要なため、他の接続を切断して即座に適用する <code class="bg-slate-100">WITH ROLLBACK IMMEDIATE</code> を付けています（学習環境では安全ですが、本番では影響を確認してから実行してください）。有効にすると、<code class="bg-slate-100">SELECT</code> は更新中の行の「更新される前の版」を <code class="bg-slate-100">tempdb</code> に保持された<strong>行バージョン</strong>から読み取るようになり、書き込みを待たなくなります。分離レベルの名前は変わらず「READ COMMITTED」のままですが、内部の実現方式がロックからバージョン管理に変わる、という点がポイントです。なお <strong>Azure SQL Database はこの設定が既定で有効</strong>になっています。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: <code class="bg-red-100 text-red-900">WITH (NOLOCK)</code> を安易に使わない</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900">SELECT ... FROM Table WITH (NOLOCK)</code> は「ロックを一切気にせず読む」ヒントで、ブロッキングを避ける目的でよく使われます。しかしこれは実質的に<strong>READ UNCOMMITTEDと同じ動作</strong>で、コミット前の中途半端なデータ（ダーティリード）を読んでしまう可能性があります。集計結果がずれる、存在しないはずのデータが見えるといった不具合につながるため、性能改善が必要な場合は <code class="bg-red-100 text-red-900">NOLOCK</code> ではなく <code class="bg-red-100 text-red-900">READ_COMMITTED_SNAPSHOT</code> の有効化やインデックスの見直し（第11章）を検討しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.6 デッドロック
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ブロッキングが「片方が終われば解決する」一時的な待ちであるのに対し、<strong>デッドロック</strong>は2つ（以上）のセッションが<strong>互いに互いのロック解放を待ち続け、永遠に解決しない</strong>状態です。たとえばセッションAが行1をロックして行2を待ち、同時にセッションBが行2をロックして行1を待つと、両者とも永遠に待ち続けることになります。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server はこの状況を自動的に検出し、どちらか一方（一般に処理コストが小さい方）を<strong>デッドロックの犠牲者（victim）</strong>として選び、そのトランザクションを強制的にロールバックしてエラー（エラー番号1205）を返します。もう一方は処理を継続できます。アプリケーション側では、このエラーを捕捉して<strong>処理をリトライする</strong>実装が定石です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: デッドロックの主な対策</p>
+                                <ul class="text-emerald-900 text-sm space-y-1 mt-2 list-disc list-inside">
+                                    <li>複数テーブル・複数行を更新するときは、<strong>常に同じ順序</strong>でアクセスする</li>
+                                    <li>トランザクションは<strong>できるだけ短く</strong>し、不要な処理を中に含めない</li>
+                                    <li>検索条件に合った<strong>適切なインデックス</strong>を張り、ロックする行数自体を減らす（第11章）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション10.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        10.7 PostgreSQLとの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同時実行制御は、SQL Server と PostgreSQL でもっとも設計思想の違いが表れる分野の1つです。「既定の分離レベルの名前は同じでも、内部の仕組みが違う」という点をしっかり押さえておきましょう。
+                    </p>
+
+                    <!-- PostgreSQL との違い -->
+                    <div class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code-compare text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-indigo-800 mb-3 break-words">PostgreSQL との違い（トランザクションとロック）</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-indigo-200">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">観点</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">SQL Server</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">PostgreSQL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-indigo-200">
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">既定の分離レベル</td>
+                                                <td class="px-3 py-2 text-indigo-900">READ COMMITTED（既定はロックベース）</td>
+                                                <td class="px-3 py-2 text-indigo-900">READ COMMITTED（常にMVCCで実現）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">読み取りが書き込みを待つか</td>
+                                                <td class="px-3 py-2 text-indigo-900">既定では待つ（ブロッキングされうる）</td>
+                                                <td class="px-3 py-2 text-indigo-900">待たない（読み取りは常に旧版を見る）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">同等の挙動を得るには</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">READ_COMMITTED_SNAPSHOT</code> を ON にする</td>
+                                                <td class="px-3 py-2 text-indigo-900">（既定でMVCCのため設定不要）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">明示トランザクションの開始</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">BEGIN TRAN</code></td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">BEGIN</code></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">READ UNCOMMITTED</td>
+                                                <td class="px-3 py-2 text-indigo-900">指定するとダーティリードが実際に発生する</td>
+                                                <td class="px-3 py-2 text-indigo-900">指定してもREAD COMMITTEDとして動作（実質存在しない）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">行バージョンの保管場所</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">tempdb</code></td>
+                                                <td class="px-3 py-2 text-indigo-900">テーブル内に旧バージョン行を保持し、VACUUMで回収</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900"><code class="bg-indigo-100">NOLOCK</code> 相当のヒント</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">WITH (NOLOCK)</code> で明示指定できる</td>
+                                                <td class="px-3 py-2 text-indigo-900">相当する機能がない</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">現在のロックを確認する方法</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">sys.dm_tran_locks</code></td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_locks</code></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="text-indigo-900 text-sm mt-3 break-words">PostgreSQLは常にMVCC（多版型同時実行制御）で動くため「読み取りが書き込みをブロックしない」のが基本です。一方SQL Serverは既定でロックベースのため、その挙動に近づけたい場合は明示的に <code class="bg-indigo-100">READ_COMMITTED_SNAPSHOT</code> を有効化する、という発想の違いを押さえておきましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 10-1: ブロッキングを体験する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">SSMSで2つのクエリウィンドウを開き、実際に「待たされる」感覚を体験してみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">SSMSで「新しいクエリ」を2つ開く（ウィンドウ1・ウィンドウ2）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ウィンドウ1で <code class="bg-purple-100 text-purple-900">BEGIN TRAN;</code> の後、任意の1行を <code class="bg-purple-100 text-purple-900">UPDATE</code> する（<code class="bg-purple-100 text-purple-900">COMMIT</code> はまだ実行しない）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ウィンドウ2で、同じ行を対象に <code class="bg-purple-100 text-purple-900">SELECT</code> を実行する。クエリが完了せず「実行中」のまま止まることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">ウィンドウ1に戻り <code class="bg-purple-100 text-purple-900">ROLLBACK;</code> を実行する。ウィンドウ2のSELECTが即座に結果を返すことを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> ロックによるブロッキングは目に見えない現象ですが、この手順で「待たされている」状態を実際に体験できます。COMMITではなくROLLBACKを使うのは、練習データを変更したままにしないための配慮です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. トランザクションのACID特性のうち、「複数のSQL文をひとまとまりとして、全部成功か全部なかったことにするかのどちらかにする」性質は何と呼ばれますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            原子性（Atomicity）です。トランザクション内の処理が途中で終わることを許さず、全部成功か全部なかったことにするかのどちらかしかない、という性質を指します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. ブロッキングとデッドロックの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ブロッキングは、先にロックを取得したセッションの処理が終われば解決する一時的な待ちです。デッドロックは、2つ以上のセッションが互いのロック解放を待ち合って永遠に解決しない状態で、SQL Serverが片方を犠牲者として強制的にロールバックすることで解消します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. SQL Server の既定の分離レベルと PostgreSQL の既定の分離レベルは名前こそ同じ「READ COMMITTED」ですが、何が違いますか。また SQL Server で PostgreSQL に近い挙動を得るにはどう設定しますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            SQL Serverの既定はロックベースで、読み取りが書き込み中の行をブロックされることがあります。PostgreSQLは常にMVCCで動作し、読み取りが書き込みを待つことはありません。SQL Serverで同様の挙動にするには、データベースで <code>ALTER DATABASE ... SET READ_COMMITTED_SNAPSHOT ON;</code> を実行します（Azure SQL Databaseでは既定でON）。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sqlserver-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第9章: T-SQLプログラミング入門</span>
+                        </div>
+                    </a>
+                    <a href="sqlserver-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第11章: インデックスと性能の基礎</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

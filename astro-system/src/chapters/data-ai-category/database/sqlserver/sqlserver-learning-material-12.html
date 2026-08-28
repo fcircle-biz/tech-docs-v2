@@ -1,0 +1,577 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL Server</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">セキュリティとユーザー管理</h1>
+                    <p class="text-slate-600">データベースは大切な情報の保管庫だからこそ、「誰が・何を・どこまでできるか」を制御する仕組みが欠かせません。この章では、Windows 認証と SQL Server 認証、ログインとユーザーの二層構造、ロールによる権限のまとめ方、そして GRANT / DENY / REVOKE による権限の細かい制御までを学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>最小権限の原則を理解し、なぜ全員が sa で接続してはいけないのか説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Windows 認証と SQL Server 認証（混合モード）の違いを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ログイン（サーバーレベル）とユーザー（データベースレベル）の関係を図で説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サーバーロール・データベースロールを使い、GRANT / DENY / REVOKE で権限を制御できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 なぜ権限管理が必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server をインストールした直後は、管理者権限を持つ <code class="bg-slate-100">sa</code>（system administrator）アカウントや、自分の Windows アカウントですべての操作ができてしまいます。学習中はそれで問題ありませんが、実際の業務システムで「全員が管理者アカウントで接続する」状態のまま運用すると、次のような危険があります。
+                    </p>
+                    <ul class="list-disc pl-6 text-slate-600 leading-relaxed mb-4 space-y-1">
+                        <li>参照だけで良いはずの担当者が、誤操作で本番データを <code class="bg-slate-100">DELETE</code> してしまう</li>
+                        <li>アプリケーションのプログラムミスが、想定外のテーブルまで書き換えてしまう</li>
+                        <li>パスワードが漏えいした場合に、被害がシステム全体に及んでしまう</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        こうした事故を防ぐ基本的な考え方が<strong>最小権限の原則（Principle of Least Privilege）</strong>です。「その人・そのアプリが業務上どうしても必要な権限だけを与え、それ以上は与えない」というシンプルなルールです。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">身近な例え: オフィスの鍵</p>
+                                <p class="text-blue-900 text-sm">オフィスビルを想像してみましょう。清掃スタッフには共用部分の鍵だけ、経理担当には経理室の鍵だけ、そして経営陣だけがすべての部屋のマスターキーを持つ、という運用が普通です。全員にマスターキーを配ることはしません。データベースの権限管理も同じ発想で、「その人の役割に必要な鍵（権限）だけを渡す」のが基本です。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この章では、SQL Server がどのようにして「誰が・どのデータベースの・何に対して・何をしてよいか」を管理しているのかを、順を追って学んでいきます。
+                    </p>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 認証モード
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server に接続するには、まず「あなたは誰か」を確認する<strong>認証（Authentication）</strong>が必要です。第3章のインストール時にも触れましたが、SQL Server には2つの認証モードがあります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">認証モード</th>
+                                    <th class="px-4 py-3 text-left font-semibold">仕組み</th>
+                                    <th class="px-4 py-3 text-left font-semibold">利点</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">Windows 認証</td>
+                                    <td class="px-4 py-3 text-slate-600">Windows にログインしたアカウント情報をそのまま利用する</td>
+                                    <td class="px-4 py-3 text-slate-600">パスワードを別途管理不要。ドメインのアカウント無効化と連動できる。既定で推奨</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SQL Server 認証（混合モード）</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL Server 内部で管理する「ログイン名＋パスワード」で接続する</td>
+                                    <td class="px-4 py-3 text-slate-600">Windows ドメインに属さない環境（Linux／Docker／クラウド／他OSのアプリ）から接続できる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「混合モード（Mixed Mode）」とは、この2つの認証方式を<strong>両方とも受け付ける</strong>設定のことです。Windows 認証だけを許可するモードも選べますが、Docker コンテナや Linux から接続する場合、あるいは Web アプリケーションのようにドメインアカウントを持たない仕組みから接続する場合は、混合モードを有効にして SQL Server 認証を使う必要があります。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">sa アカウントの扱い</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">sa</code> は SQL Server 認証の組み込み管理者アカウントで、常に最高権限（sysadmin）を持ちます。名前が推測しやすく攻撃対象になりやすいため、実務では<strong>インストール時に強力なパスワードを設定した上で無効化する</strong>、あるいは名前を変更して日常運用には使わない、という扱いが一般的です。日常の管理作業には、後述するサーバーロール <code class="bg-blue-100">sysadmin</code> を持つ個人名のログインを使います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 ログインとユーザーの二層構造
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server の権限管理を理解するうえで、最初につまずきやすいのが「<strong>ログイン</strong>」と「<strong>ユーザー</strong>」という似た2つの用語です。この2つは階層が異なる、別のオブジェクトです。
+                    </p>
+                    <ul class="list-disc pl-6 text-slate-600 leading-relaxed mb-4 space-y-1">
+                        <li><strong>ログイン（Login）</strong>: SQL Server インスタンス全体（サーバーレベル）への「玄関の鍵」。第2章で学んだインスタンスに対して作成する</li>
+                        <li><strong>ユーザー（User）</strong>: 個々のデータベース（データベースレベル）への「部屋の鍵」。データベースごとに作成する</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        つまり、1つのログインでサーバーに接続した後、実際にどのデータベースの中で何ができるかは、そのデータベース内に対応するユーザーが存在するかどうかで決まります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["Windowsアカウント<br/>または SQL Serverログイン<br/>（サーバーレベル）"] --> B{"接続先データベースに<br/>対応するユーザーが存在するか"}
+    B -->|はい| C["データベースユーザー<br/>（DBレベル）"]
+    B -->|いいえ＝孤立| D["孤立ユーザー<br/>（orphaned user）"]
+    C --> E["ロール・権限に従って<br/>テーブル操作などを許可"]
+    D --> F["エラー、または<br/>権限なしで拒否される"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の手順としては、まず <code class="bg-slate-100">CREATE LOGIN</code> でサーバーレベルの鍵を作り、続けて対象データベースの中で <code class="bg-slate-100">CREATE USER ... FOR LOGIN ...</code> を実行して、そのログインに対応するユーザーを作ります。この2段階を踏んで初めて、データベース内のテーブルなどへアクセスできるようになります。
+                    </p>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">用語: 孤立ユーザー（orphaned user）</p>
+                                <p class="text-orange-900 text-sm">データベースだけを別のサーバーへバックアップ・復元すると、データベース内の「ユーザー」情報はそのまま移りますが、対応する「ログイン」が新しいサーバーに存在しないことがあります。この、対応するログインを失ったユーザーを<strong>孤立ユーザー</strong>と呼びます。復元後にログインできない場合は、まずこの状態を疑いましょう（第13章のバックアップ・復旧で改めて扱います）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 ロールで権限をまとめる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザーが増えてくると、一人ひとりに個別に権限を設定するのは大変です。そこで使うのが<strong>ロール（Role）</strong>です。ロールは「権限の詰め合わせセット」で、ユーザーをロールに追加するだけで、そのロールが持つ権限をまとめて与えられます。ロールにもサーバーレベルとデータベースレベルの2種類があります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">階層</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ロール名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">できること</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">サーバーロール</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">sysadmin</code></td>
+                                    <td class="px-4 py-3 text-slate-600">サーバー上のすべての操作が可能な最高権限（sa 相当）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-500">〃</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">dbcreator</code></td>
+                                    <td class="px-4 py-3 text-slate-600">データベースの作成・変更・削除ができる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">データベースロール</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">db_owner</code></td>
+                                    <td class="px-4 py-3 text-slate-600">そのデータベース内のすべての操作が可能</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-500">〃</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">db_datareader</code></td>
+                                    <td class="px-4 py-3 text-slate-600">すべてのテーブルを SELECT（参照）できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-500">〃</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">db_datawriter</code></td>
+                                    <td class="px-4 py-3 text-slate-600">すべてのテーブルに INSERT / UPDATE / DELETE できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-500">〃</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">db_ddladmin</code></td>
+                                    <td class="px-4 py-3 text-slate-600">テーブルの作成・変更など DDL（CREATE / ALTER / DROP）を実行できる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザーをデータベースロールに追加するには <code class="bg-slate-100">ALTER ROLE ... ADD MEMBER ...</code> を使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">add-role-member.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- SampleShop データベースを対象に切り替える
+USE SampleShop;
+GO
+
+-- ReadOnlyUser を db_datareader ロールに追加する
+-- これだけで全テーブルの SELECT 権限がまとめて付与される
+ALTER ROLE db_datareader ADD MEMBER ReadOnlyUser;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        1人のユーザーを複数のロールに同時に所属させることもできます。「参照はできるが更新はできない」担当者には <code class="bg-slate-100">db_datareader</code> だけ、「アプリの実行アカウント」には <code class="bg-slate-100">db_datareader</code> と <code class="bg-slate-100">db_datawriter</code> の2つ、というように組み合わせるのが実務の定番です。
+                    </p>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 権限の付与と剥奪
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        あらかじめ用意されたロールでは足りない、もっと細かい制御をしたい場合は、個別のオブジェクト（テーブル・ビューなど）やスキーマ単位で直接権限を操作します。使う命令は3つです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">命令</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code class="bg-slate-100">GRANT</code></td>
+                                    <td class="px-4 py-3 text-slate-600">権限を<strong>許可</strong>する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code class="bg-slate-100">DENY</code></td>
+                                    <td class="px-4 py-3 text-slate-600">権限を明示的に<strong>拒否</strong>する。他のどんな GRANT よりも<strong>最優先</strong>される</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code class="bg-slate-100">REVOKE</code></td>
+                                    <td class="px-4 py-3 text-slate-600">以前に GRANT または DENY した設定を<strong>取り消し、「未設定」の状態に戻す</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで最も間違えやすいのが <code class="bg-slate-100">DENY</code> と <code class="bg-slate-100">REVOKE</code> の違いです。<code class="bg-slate-100">REVOKE</code> は「許可も拒否もしていないニュートラルな状態」に戻すだけなのに対し、<code class="bg-slate-100">DENY</code> は「たとえロールから SELECT を許可されていても、絶対にこの操作はさせない」という<strong>強制的な拒否</strong>です。仮にユーザーが <code class="bg-primary-100 text-primary-900">db_owner</code> ロールに入っていても、個別に <code class="bg-slate-100">DENY</code> された操作は実行できません。ただしサーバーロール <code class="bg-slate-100">sysadmin</code> のメンバーは権限チェック自体を通らないため、<code class="bg-slate-100">DENY</code> でも止められない点だけは例外として覚えておきましょう。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        権限はテーブル1つ1つに与えることもできますが、<code class="bg-slate-100">SCHEMA::</code> を使えば、そのスキーマに属するすべてのオブジェクトへまとめて付与できます。第2章で学んだ既定スキーマ <code class="bg-slate-100">dbo</code> を例に見てみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">grant-deny-revoke.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- dbo スキーマ配下の全オブジェクトに SELECT 権限を許可する
+GRANT SELECT ON SCHEMA::dbo TO ReadOnlyUser;
+
+-- Orders テーブルへの更新だけは明示的に拒否する（GRANTより優先）
+DENY UPDATE ON dbo.Orders TO ReadOnlyUser;
+
+-- 付与した SELECT 権限を取り消す（未設定の状態に戻る）
+REVOKE SELECT ON SCHEMA::dbo FROM ReadOnlyUser;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">ロールでまとめて権限を管理し、例外的に禁止したい操作だけを <code class="bg-emerald-100 text-emerald-900">DENY</code> で個別に上書きする、というのが実務の定石です。1人ずつ細かく GRANT を積み上げるより、後から見て意図が分かりやすくなります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 実務での設計例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまで学んだ知識を組み合わせると、実際の業務システムでよく見られる「用途別に3種類のユーザーを分ける」設計ができます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-eye text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">参照専用ユーザー</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-slate-100">db_datareader</code> のみ。レポート作成担当や BI ツールの接続用。誤って更新できないので安心して渡せる。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-plug text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">アプリ用ユーザー</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-slate-100">db_datareader</code>＋<code class="bg-slate-100">db_datawriter</code>。業務アプリの接続専用。テーブル構造の変更（DDL）はできない。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-user-shield text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">管理者ユーザー</h3>
+                            <p class="text-sm text-slate-600"><code class="bg-slate-100">db_owner</code> や <code class="bg-slate-100">sysadmin</code>。テーブル設計やメンテナンスを行う個人名アカウント。日常運用では極力使わない。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        こうしてユーザーを分けておくと、「アプリのソースコードが漏えいしても、参照専用ユーザーの権限しか奪われない」「レポートツールの設定ミスでデータが消える心配がない」など、被害の範囲を最小限に抑えられます。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-600 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">警告: 接続文字列にパスワードを直書きしない</p>
+                                <p class="text-red-900 text-sm">アプリ用ユーザーを作っても、そのパスワードをソースコードや設定ファイルにそのまま書いてリポジトリへコミットしてしまっては意味がありません。パスワードは環境変数や、Azure Key Vault のようなシークレット管理サービス・OS のパスワード管理機能に保存し、コードからは参照だけする運用を徹底しましょう。GitHub などに誤って公開してしまう事故は、この直書きが原因であることがほとんどです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 PostgreSQLとの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        権限管理は、SQL Server と PostgreSQL で設計思想がはっきり異なる分野です。PostgreSQL には「ログイン」と「ユーザー」という区別自体がありません。
+                    </p>
+
+                    <!-- PostgreSQL との違い -->
+                    <div class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-code-compare text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-indigo-800 mb-3 break-words">PostgreSQL との違い（セキュリティ・ユーザー管理）</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-indigo-200">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">観点</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">SQL Server</th>
+                                                <th class="px-3 py-2 text-left font-semibold text-indigo-900">PostgreSQL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-indigo-200">
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">管理の単位</td>
+                                                <td class="px-3 py-2 text-indigo-900">ログイン（サーバー）＋ユーザー（DB）の二層構造</td>
+                                                <td class="px-3 py-2 text-indigo-900">ロールに一元化。ユーザーとグループの区別がない</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">接続の可否制御</td>
+                                                <td class="px-3 py-2 text-indigo-900">エンドポイント／ファイアウォール＋認証モードで制御</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_hba.conf</code> で接続元・認証方式を定義</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">明示的な拒否</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">DENY</code> で強制的に拒否できる</td>
+                                                <td class="px-3 py-2 text-indigo-900">DENY に相当する機能はなく、<code class="bg-indigo-100">REVOKE</code> で許可を取り消すのみ</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">既定の所有スキーマ</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">dbo</code></td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">public</code>（v15以降は public への CREATE 権限が既定で外れた）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">最上位権限</td>
+                                                <td class="px-3 py-2 text-indigo-900">サーバーロール <code class="bg-indigo-100">sysadmin</code>（<code class="bg-indigo-100">sa</code>）</td>
+                                                <td class="px-3 py-2 text-indigo-900">属性 <code class="bg-indigo-100">SUPERUSER</code>（既定は <code class="bg-indigo-100">postgres</code> ロール）</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-indigo-900">権限の確認方法</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">sys.fn_my_permissions</code>・<code class="bg-indigo-100">sys.database_permissions</code></td>
+                                                <td class="px-3 py-2 text-indigo-900">psql の <code class="bg-indigo-100">\dp</code>、<code class="bg-indigo-100">information_schema</code></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="text-indigo-900 text-sm mt-3 break-words">PostgreSQL では「ロール」1種類だけを使い、ログイン権限のあるロールを従来の「ユーザー」、ログイン権限のないロールを従来の「グループ」として使い分けます。また PostgreSQL 15 から、新規作成データベースの <code class="bg-indigo-100">public</code> スキーマに対して、一般ロールが既定で <code class="bg-indigo-100">CREATE</code>（オブジェクト作成）できなくなり、SQL Server の <code class="bg-indigo-100">dbo</code> より安全側に寄った点は覚えておく価値があります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: DENY がない代わりに</p>
+                                <p class="text-blue-900 text-sm">PostgreSQL に SQL Server の <code class="bg-blue-100">DENY</code> のような「強制拒否」はありません。権限を与えないことと、明示的に拒否することを区別できない代わりに、権限そのものをロール階層で慎重に設計する（不要な権限を最初から与えない）ことで安全性を保つ、という発想の違いがあります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: 参照専用ユーザーを作って動作を確認する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">SampleShop データベースに参照専用のログイン・ユーザーを作成し、「SELECT はできるが INSERT はできない」ことを実際に確認します。SSMS のクエリエディタで作業してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">sysadmin 権限のアカウントで接続し、<code class="bg-purple-100">CREATE LOGIN ReadOnlyUser WITH PASSWORD = 'Practice#2026';</code> を実行してサーバーレベルのログインを作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">USE SampleShop;</code> の後、<code class="bg-purple-100">CREATE USER ReadOnlyUser FOR LOGIN ReadOnlyUser;</code> でデータベースユーザーを作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">ALTER ROLE db_datareader ADD MEMBER ReadOnlyUser;</code> を実行し、参照専用ロールに追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">SSMS の「新しい接続」から ReadOnlyUser（SQL Server 認証）でログインし直し、<code class="bg-purple-100">SELECT * FROM dbo.Customers;</code> が成功することを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">同じ接続で <code class="bg-purple-100">INSERT INTO dbo.Customers (...) VALUES (...);</code> を試し、権限不足のエラーになることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> ロールに追加するだけで「できること」と「できないこと」が実際に切り替わることを、自分の手で体感するのが目的です。エラーメッセージに「<code class="bg-purple-100">The INSERT permission was denied</code>」のような文言が出れば成功です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「ログイン」と「ユーザー」の違いを、階層の観点から説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ログインは SQL Server インスタンス全体（サーバーレベル）への接続を許可する仕組みで、ユーザーは個々のデータベース（データベースレベル）内での操作を許可する仕組みです。1つのログインに対応するユーザーが各データベースに作成され、対応がない場合は孤立ユーザーになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. あるユーザーが db_owner ロールのメンバーですが、特定のテーブルに対して DENY UPDATE が設定されています。このユーザーはそのテーブルを更新できますか。理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            更新できません。DENY はロール経由で得た GRANT を含む、いかなる許可よりも優先される強制拒否だからです。db_owner のような強い権限を持っていても、個別に DENY された操作は実行できません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. アプリケーション用の接続アカウントを設計するとき、db_owner をそのまま使うべきではない理由を、最小権限の原則の観点から説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            db_owner はテーブルの削除や構造変更まで含むすべての操作ができてしまうため、アプリのバグや認証情報の漏えいが起きたときの被害が最大化します。アプリに必要なのは通常データの読み書き（db_datareader・db_datawriter）だけであり、業務上必要な権限だけを与える最小権限の原則に反するためです。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sqlserver-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第11章: インデックスと性能の基礎</span>
+                        </div>
+                    </a>
+                    <a href="sqlserver-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: バックアップと復旧・運用</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
