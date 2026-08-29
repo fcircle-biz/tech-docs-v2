@@ -14,10 +14,16 @@
 
 ```
 work/<slug>/
-├── <slug>-<NN>-<topic1>.png     ← codex が生成
+├── _raw/                         ← クロマキー原版（codex が生成・中間物／差し込み対象外）
+│   ├── <slug>-<NN>-<topic1>.png
+│   └── <slug>-<NN>-<topic2>.png
+├── <slug>-<NN>-<topic1>.png      ← 透過PNG（Step 4 で変換・差し込み対象）
 ├── <slug>-<NN>-<topic2>.png
-└── 差し込み箇所.md               ← 本スキルが Step 5 で作成
+├── _check-dark-*.png             ← ダーク可読性の確認用（中間物／差し込み対象外）
+└── 差し込み箇所.md                ← 本スキルが Step 5 で作成
 ```
+
+**`public/` へコピーするのは `work/<slug>/` 直下の透過PNGだけ**。`_raw/` と `_check-dark-*.png` は取り込まない。
 
 `work/` は `.gitignore` 対象（`/work/`）。素材は work/ に温存し、公開アセットは `public/` へ**コピー**で取り込む（移動しない）。
 
@@ -76,10 +82,13 @@ work/<slug>/
 | 項目 | 既定 | 理由 |
 |------|------|------|
 | `<figure>` の最大幅 | **`max-w-3xl`** | 本スキルが生成するのは 1536x1024 の横長インフォグラフィック。リポジトリ実績も `max-w-3xl` が多数派（`max-w-3xl` 34 件 / `max-w-2xl` 10 件）。指示があれば `max-w-2xl` 等に変更する |
+| 画像の背景 | **透過（アルファ付き PNG）** | ページの地色に馴染ませるため。`<figure>`／`<img>` 側に背景色は付けない（ライトは白地、ダークは暗い地がそのまま図の背景になる） |
 | 既存 Mermaid 図・比較表・「表示イメージ」 | **図案ごとに判定**（置換時は削除でなくコメントアウト退避）（`illustration-design.md` の「重複棚卸し」／`figure-snippet.md` の「既存図の扱い」） | 同じ流れの図が2つ続く・同じサンプルの表示イメージが2箇所にある状態を作らない |
 | 章導入画像の位置 | 学習目標カードの直後（最初の `<section>` の直前） | 既存教材（git-github 第1章）と同じ配置。ただし**後続節のダイジェストにはしない** |
 
 その他（src の base、alt の書き方、figcaption の色 `text-slate-600`、インデント整合）は `figure-snippet.md` の規約をそのまま守る。
+
+> `figure-snippet.md`「視認性・ダーク規約」の「画像自体が白背景でも `<figure>` に背景色を付けない」は本スキルでも同じ。**背景透過の場合はダークで暗い地が透ける**ため、Step 4 のダーク合成確認を通った画像だけを差し込む。
 
 ## 差し込みの実行
 
@@ -102,6 +111,12 @@ grep -c '<figure' docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>
 # src 参照と実ファイルの対応
 grep -o 'images/[A-Za-z0-9_-]*\.png' docs/guide/<分類パス>/<slug>/<slug>-learning-material-<NN>.html
 ls -la docs/guide/<分類パス>/<slug>/images/
+
+# 配置した画像がアルファ付き（RGBA）であること／中間物が混入していないこと
+uv run --quiet --with pillow python -c "
+from PIL import Image; import glob
+for p in sorted(glob.glob('docs/guide/<分類パス>/<slug>/images/*.png')): print(p, Image.open(p).mode)"
+ls docs/guide/<分類パス>/<slug>/images/ | grep -E '^_raw|^_check-dark' && echo 'NG: 中間物が混入'  
 
 # 既存 Mermaid 図の増減が指示書の「既存要素の扱い」列と一致すること
 # ※ 退避コメント内の class="mermaid" も文字列としてはヒットする。
@@ -127,6 +142,7 @@ git status --short
 5. 置換した要素が**行ごと消えておらず、退避コメントとして残っている**（`git diff` の削除行が、コメント化に伴う行の書き換えだけであること）
 6. 退避コメントの直後に本文テキストが漏れ出していない（`-->` エスケープ漏れの検出。ビルド後の HTML を確認する）
 7. `git status` の変更が「章の本文断片」「`public/.../images/`」「`docs/` のビルド出力」だけである
+8. 配置した画像がすべて **RGBA（透過）** で、`_raw/` や `_check-dark-*.png` が `public/`・`docs/` に混入していない
 
 ## 完了後の案内
 
