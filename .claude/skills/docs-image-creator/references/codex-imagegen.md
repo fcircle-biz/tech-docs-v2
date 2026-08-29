@@ -2,6 +2,8 @@
 
 codex CLI に**組み込みの `imagegen` スキル**を使わせて画像を生成する。codex は内部で `image_gen__imagegen` ツール（GPT Image 2 系）を呼ぶため、こちら側で API キーやエンドポイントを扱う必要はない。
 
+**本スキルの成果物は背景透過（アルファ付き）PNG** とする。GPT Image 2 は `background=transparent` に非対応なので、**クロマキー背景で生成 → ローカルでアルファ化**の2段構えで作る（手順は「透過PNG化」節）。
+
 ## 事前確認
 
 ```bash
@@ -31,6 +33,85 @@ file <候補パス>       # 1536x1024 であることを確認
 ```
 
 **必ず「style reference のみ。題材・文言・構図をコピーしない」と明記する。**参照画像がリポジトリに1枚も無い場合は参照なしで実行し、ビジュアル規約を文章で厚く書く。
+
+> 既存の参照画像は**白背景**のものが多い。プロンプトには「参照するのはトーン・情報密度・レイアウトのみ。**背景は参照画像の白ではなくキーカラーの単色**にする」と明記する。
+
+## 透過PNG化（必須）
+
+GPT Image 2（組み込み `image_gen`）は `background=transparent` をサポートしない。そのため次の2段で透過PNGを作る（codex 側 imagegen スキルの既定手順と同じ）。
+
+1. **codex にはクロマキー背景で生成させる** — 背景を `#00ff00` の完全にフラットな単色にし、`work/<slug>/_raw/` へ保存させる。
+2. **アルファ化は Claude 側（本スキル）が行う** — `remove_chroma_key.py` で `#00ff00` を透明化し、`work/<slug>/` 直下へ最終PNGを書き出す。
+
+| 段階 | 保存先 |
+|------|--------|
+| クロマキー原版（codex が生成） | `work/<slug>/_raw/<slug>-<NN>-<topic>.png` |
+| 透過PNG（本スキルが変換・差し込み対象） | `work/<slug>/<slug>-<NN>-<topic>.png` |
+
+### キーカラーの選択
+
+- 既定は `#00ff00`（グリーン）。
+- **図版の配色にグリーン系を使う場合は `#ff00ff`（マゼンタ）** に切り替える（技術色が emerald / green 系のガイドで発生する）。ブルー系ガイドで `#0000ff` は使わない。
+- 選んだキーカラーは「画像内のどこにも使わない」ことをプロンプトに明記する。
+
+### 変換コマンド
+
+`remove_chroma_key.py` は Pillow を要求するが、システム python には入っていない。**`uv run --with pillow` 経由で実行する**（グローバル `pip install` はしない）。
+
+```bash
+mkdir -p work/<slug>
+for f in work/<slug>/_raw/*.png; do
+  uv run --quiet --with pillow python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chroma_key.py" \
+    --input "$f" \
+    --out "work/<slug>/$(basename "$f")" \
+    --auto-key border \
+    --soft-matte \
+    --transparent-threshold 12 \
+    --opaque-threshold 220 \
+    --despill
+done
+```
+
+- 出力の `Key color:` と `Transparent pixels:` を確認する。透明画素が 0 なら背景がフラットでない（生成し直し）。
+- キーカラーの縁取り（グリーンのフリンジ）が残る場合は `--edge-contract 1` を足して1回だけ再実行する。ギザつきが目立つときのみ `--edge-feather 0.25` を足す。
+
+### 透過の検証
+
+```bash
+# アルファチャンネル・四隅の透明・不透明率
+uv run --quiet --with pillow python - <<'EOF'
+from PIL import Image
+import glob
+for p in sorted(glob.glob("work/<slug>/*.png")):
+    im = Image.open(p); a = im.convert("RGBA").split()[3]
+    corners = [im.convert("RGBA").getpixel(c)[3] for c in [(0,0),(im.width-1,0),(0,im.height-1),(im.width-1,im.height-1)]]
+    hist = a.histogram()
+    print(p, im.mode, im.size, "四隅alpha:", corners,
+          "透明率: %.1f%%" % (100*hist[0]/(im.width*im.height)))
+EOF
+```
+
+合格条件: `mode` が `RGBA` ／ 四隅の alpha が 0 ／ 透明率が概ね 10〜60%（0% は透過失敗、90%超は主題が消えている）。
+
+### ダーク背景での可読性確認（必須）
+
+透過にすると**ダークモードではページの暗い地色が図の背景として透ける**。地に直接置いた濃色テキストや細線はダークで読めなくなるため、暗い地に合成して目視する。
+
+```bash
+uv run --quiet --with pillow python - <<'EOF'
+from PIL import Image
+import glob, os
+for p in sorted(glob.glob("work/<slug>/*.png")):
+    im = Image.open(p).convert("RGBA")
+    bg = Image.new("RGBA", im.size, "#0f172a")   # ダークモードの本文背景
+    out = os.path.join(os.path.dirname(p), "_check-dark-" + os.path.basename(p))
+    Image.alpha_composite(bg, im).convert("RGB").save(out)
+    print(out)
+EOF
+```
+
+- 生成された `_check-dark-*.png` を **Read で開いて目視**する。読めない文字・消える線があれば、その要素を不透明カード内へ移す図案に直して再生成する（規約は `references/illustration-design.md`「透過を前提とした作図規約」）。
+- `_check-dark-*.png` と `_raw/` は差し込み対象ではない。**`public/` へコピーしない**（`work/` は `.gitignore` 対象なので削除は任意）。
 
 ## 実行コマンド（正規形）
 
@@ -74,12 +155,21 @@ until ! pgrep -f "codex exec" >/dev/null; do sleep 5; done; echo "codex-exec-fin
 ## 実行方法（厳守）
 
 - `imagegen` スキル（`~/.codex/skills/.system/imagegen/SKILL.md`）の手順に従い、**組み込みの image_gen ツール（GPT Image 2）** で生成する。
-- 画像は **`work/<slug>/` 配下へ PNG で保存**する（ディレクトリは作成済み）。
+- 画像は **`work/<slug>/_raw/` 配下へ PNG で保存**する（ディレクトリは作成済み）。
 - 保存ファイル名は必ず以下の通り:
-  1. `work/<slug>/<slug>-<NN>-<topic1>.png`
-  2. `work/<slug>/<slug>-<NN>-<topic2>.png`
+  1. `work/<slug>/_raw/<slug>-<NN>-<topic1>.png`
+  2. `work/<slug>/_raw/<slug>-<NN>-<topic2>.png`
 - サイズは **1536 x 1024（横長）**。既存教材画像（下記の参照画像）と同じ寸法にそろえる。
-- 生成後に `file work/<slug>/*.png` で寸法を確認し、`view_image` で自分の目で確認する。文字化け・意味不明な綴り・レイアウト崩れがあれば**作り直す**（最大2回までリトライ）。
+- **背景はクロマキー**（下記「背景の要件」）。**透明化（アルファ化）はこちら側で行うので、codex 側では行わない**。`remove_chroma_key.py` の実行や CLI `gpt-image-1.5` へのフォールバックは**不要**。
+- 生成後に `file work/<slug>/_raw/*.png` で寸法を確認し、`view_image` で自分の目で確認する。文字化け・意味不明な綴り・レイアウト崩れがあれば**作り直す**（最大2回までリトライ）。
+
+## 背景の要件（透過用クロマキー・厳守）
+
+- 背景は **`<キーカラー>`（既定 `#00ff00`）の完全にフラットな単色**にする。グラデーション・影・テクスチャ・床面・光のムラ・周辺減光を一切入れない。
+- **`<キーカラー>` を図版の中（カード・文字・矢印・アイコン）で一切使わない。**
+- カード・帯・図形に**ドロップシャドウやぼかしを付けない**（背景に落ちる影は透過後にキー色の汚れとして残る）。
+- 図版の周囲には**十分な余白**を取り、要素を画面端で見切らせない。
+- 白い面が必要な要素（カード・パネル）は**不透明な白 `#ffffff`** で塗る（背景のキー色を透かせない）。
 
 ## スタイル参照（style reference のみ。題材・文言・構図をそのままコピーしない）
 
@@ -88,7 +178,8 @@ until ! pgrep -f "codex exec" >/dev/null; do sleep 5; done; echo "codex-exec-fin
 
 ## 共通のビジュアル要件
 
-- クリーンなフラットベクター風の**教育用インフォグラフィック**。白背景、角丸カード、細い枠線、きれいな矢印、余白たっぷり。
+- クリーンなフラットベクター風の**教育用インフォグラフィック**。角丸カード、細い枠線、きれいな矢印、余白たっぷり（地は上記のクロマキー単色）。
+- **後で背景を透明化するため、情報は必ず不透明な面の上に置く**。タイトルも含め、地（キーカラー）の上に文字・細線を直接置かない。文字は白または淡色の不透明カード／角丸の帯の中に入れる。
 - **日本語**の見やすいゴシック体（Noto Sans JP 風）。文字は大きく、短い語句のみ。長文は入れない。
 - 配色: 教材の技術色に合わせ **<primary.500> を主役**、アクセントに **<splashStop1>**、面はごく薄いグレーブルー。過剰な彩色はしない。
 - 実在サービスの**ロゴマーク・商標は描かない**（必要なら日本語ラベルのみ）。
@@ -111,9 +202,11 @@ until ! pgrep -f "codex exec" >/dev/null; do sleep 5; done; echo "codex-exec-fin
 
 ## 完了条件
 
-- 指定した <枚数> ファイルが存在し、いずれも 1536x1024 の PNG である。
+- 指定した <枚数> ファイルが `work/<slug>/_raw/` に存在し、いずれも 1536x1024 の PNG である。
+- 背景が `<キーカラー>` のフラット単色で、影・グラデーション・テクスチャが無い。図版内に `<キーカラー>` を使っていない。
+- 地の上に直接置かれた文字・細線が無い（すべて不透明な面の上にある）。
 - 画像内の日本語が正しく読める。
-- リポジトリの他ファイル（`src/`・`docs/`・`astro-system/`）は**一切変更しない**。作業は `work/<slug>/` への画像保存のみ。
+- リポジトリの他ファイル（`src/`・`docs/`・`astro-system/`）は**一切変更しない**。作業は `work/<slug>/_raw/` への画像保存のみ。
 - 最後に、生成したファイルのパスと、それぞれ何を描いたかを日本語で簡潔に報告する。
 ```
 
@@ -122,7 +215,13 @@ until ! pgrep -f "codex exec" >/dev/null; do sleep 5; done; echo "codex-exec-fin
 | 症状 | 対処 |
 |------|------|
 | 承認待ちで止まる | `--sandbox workspace-write` を付ける。それでも止まるなら対象プロジェクトが `~/.codex/config.toml` で `trust_level = "trusted"` か確認する |
-| 画像が `work/` でなく `~/.codex/generated_images/` にしかない | プロンプトの保存先指定が弱い。「`work/<slug>/` へ**保存**する」「保存ファイル名は必ず以下の通り」を明記して再実行 |
+| 画像が `work/` でなく `~/.codex/generated_images/` にしかない | プロンプトの保存先指定が弱い。「`work/<slug>/_raw/` へ**保存**する」「保存ファイル名は必ず以下の通り」を明記して再実行 |
+| `Transparent pixels: 0` で透過されない | 背景がフラットでない（影・グラデーション・微妙なムラ）。プロンプトの「背景の要件」を強めて再生成する。`--transparent-threshold` を上げて誤魔化さない |
+| 図版の一部まで透明に抜ける | 図版内にキーカラーと近い色を使っている。キーカラーを `#ff00ff` に変えて再生成する（グリーン系配色のガイドで頻発） |
+| 縁にキーカラーのフリンジが残る | 変換を `--edge-contract 1` を足して1回だけ再実行する |
+| ダーク合成で文字が読めない | 図案の問題。地に直接置いた文字・細線を不透明カード内へ移す構成に直して再生成する（`--*-threshold` の調整では直らない） |
+| `ModuleNotFoundError: No module named 'PIL'` | 変換を `uv run --quiet --with pillow python …` 経由で実行する（システム python に Pillow は無い） |
+| codex が `gpt-image-1.5` や `OPENAI_API_KEY` を要求してくる | 透明化を codex にやらせようとしている。プロンプトに「アルファ化はこちら側で行う。クロマキー背景のまま保存する」を明記して再実行 |
 | 日本語が崩れる／意味不明な文字列になる | その画像に載せる文字数を減らし、文字列を箇条書きで明示して再生成 |
 | 寸法が違う | プロンプトで `1536 x 1024` を再明記し、参照画像も同寸法のものを渡す |
 | codex がリポジトリのファイルを編集した | 「他ファイルを一切変更しない」条項が抜けている。`git checkout -- <path>` で戻し、条項を入れて再実行 |
@@ -130,6 +229,6 @@ until ! pgrep -f "codex exec" >/dev/null; do sleep 5; done; echo "codex-exec-fin
 
 ## 複数章を一度に扱う場合
 
-- 章ごとに**サブエージェント（`model: sonnet`）を1メッセージで並列起動**する。各サブエージェントには「対象章パス」「枚数」「本 references のパス」「出力先 `work/<slug>/`」「生成ファイル名」を明示する。
+- 章ごとに**サブエージェント（`model: sonnet`）を1メッセージで並列起動**する。各サブエージェントには「対象章パス」「枚数」「本 references のパス」「出力先 `work/<slug>/_raw/`」「生成ファイル名」「キーカラー」を明示する。
 - **図案設計と最終検収は本体（Opus）が行う**。サブエージェントには codex 実行と一次確認までを任せる。
 - codex プロセスは章ごとに独立して並列実行できるが、`pgrep -f "codex exec"` での待機は**全プロセス共通**になる点に注意（各サブエージェントは自分の出力ファイルの存在と内容で完了判定する）。
