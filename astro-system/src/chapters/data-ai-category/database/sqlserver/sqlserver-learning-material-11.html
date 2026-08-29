@@ -104,7 +104,7 @@
                             <i class="fas fa-circle-info text-blue-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-blue-800 mb-1">ヒント: インデックスは多いほど良い、は誤解</p>
-                                <p class="text-blue-900 text-sm">「検索が速くなるならたくさん作ればいい」と考えがちですが誤りです。テーブルへの書き込みが発生するたびに、そのテーブルに紐づく<strong>すべてのインデックスが更新対象</strong>になります。使われないインデックスは、容量とメンテナンスコストだけを増やす「保守されない索引」になってしまいます（11.6節で詳しく扱います）。</p>
+                                <p class="text-blue-900 text-sm">「検索が速くなるならたくさん作ればいい」と考えがちですが誤りです。テーブルへの書き込みが発生するたびに、そのテーブルに紐づく<strong>関係するインデックスが更新対象</strong>になります（行の追加・削除は基本的に全ての非クラスター化インデックスが対象、更新は変更した列を含むインデックスが対象です）。使われないインデックスは、容量とメンテナンスコストだけを増やす「保守されない索引」になってしまいます（11.6節で詳しく扱います）。</p>
                             </div>
                         </div>
                     </div>
@@ -126,7 +126,7 @@
                                 <i class="fas fa-book text-white"></i>
                             </div>
                             <h3 class="font-semibold text-slate-800 mb-1">クラスター化インデックス</h3>
-                            <p class="text-sm text-slate-600">「データ行そのものが、この列の順に並んでいる」状態。国語辞典が五十音順に並んでいるイメージ。<strong>1テーブルに1つ</strong>だけ作れる。</p>
+                            <p class="text-sm text-slate-600">リーフレベル（末端）がデータ行そのもので、データがキーの順に論理的に整理される仕組み。国語辞典が五十音順に並んでいるイメージ。<strong>1テーブルに1つ</strong>だけ作れる。</p>
                         </div>
                         <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
                             <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
@@ -138,8 +138,29 @@
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        SQL Server では、<strong>主キー（PRIMARY KEY）を定義すると、既定でその列にクラスター化インデックスが自動的に作られます</strong>（第5章参照）。クラスター化インデックスが1つも無いテーブルは<strong>ヒープ（Heap）</strong>と呼ばれ、データが特定の順序を持たずに格納されます。
+                        より正確に言うと、<strong>クラスター化インデックスは、そのリーフレベル（末端）がデータ行そのもので構成され、データがインデックスキーの順に論理的に整理される仕組み</strong>です。国語辞典が五十音順に並んでいるイメージに近いですが、<strong>ディスク上で物理的に連続して並んでいることまでは保証されません</strong>。ページ分割やデータの追加・更新・削除を繰り返すと、論理的な並び順と実際の格納位置にズレが生じます（これを断片化と呼びます）。だからこそ 11.6節で扱うメンテナンスが必要になります。
                     </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL Server では、<strong>そのテーブルにまだクラスター化インデックスが存在せず、かつ <code class="bg-slate-100">NONCLUSTERED</code> を明示していない場合</strong>に、主キー（PRIMARY KEY）を定義すると既定でその列にクラスター化インデックスが作成されます（第5章参照）。すでに別の列にクラスター化インデックスが存在する場合や、<code class="bg-slate-100">PRIMARY KEY NONCLUSTERED</code> と明示した場合は、主キーは非クラスター化インデックスとして作成されます。クラスター化インデックスが1つも無いテーブルは<strong>ヒープ（Heap）</strong>と呼ばれ、データが特定の順序を持たずに格納されます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">primary_key_nonclustered.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 例：主キーをあえて非クラスター化インデックスとして作成する
+CREATE TABLE dbo.Orders (
+    OrderId    INT  NOT NULL,
+    CustomerId INT  NOT NULL,
+    OrderDate  DATE NOT NULL,
+    CONSTRAINT PK_Orders PRIMARY KEY NONCLUSTERED (OrderId)
+);
+-- クラスター化インデックスは別の列（例：OrderDate）に
+-- 明示的に作成する、といった運用で使う</code></pre>
+                    </div>
 
                     <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
                         <div class="mermaid">
@@ -171,12 +192,12 @@ flowchart LR
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">実体</td>
-                                    <td class="px-4 py-3 text-slate-600">データ行そのものの物理的な並び順</td>
+                                    <td class="px-4 py-3 text-slate-600">リーフレベル（末端）がデータ行そのもの。キー順に論理的に整理される</td>
                                     <td class="px-4 py-3 text-slate-600">データとは別の構造（キー列＋行への参照）</td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">既定での作成</td>
-                                    <td class="px-4 py-3 text-slate-600">主キーに自動作成される（変更可能）</td>
+                                    <td class="px-4 py-3 text-slate-600">条件を満たせば主キーに既定で作成される（本文参照）</td>
                                     <td class="px-4 py-3 text-slate-600">自分で明示的に作成する</td>
                                 </tr>
                                 <tr>
@@ -193,7 +214,17 @@ flowchart LR
                             <i class="fas fa-key text-emerald-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
-                                <p class="text-emerald-900 text-sm">非クラスター化インデックスでヒットしても、<code class="bg-emerald-100">SELECT *</code> のようにインデックスに含まれない列が必要な場合、SQL Server は索引からデータ本体（クラスター化インデックスまたはヒープ）へ改めて取りに行きます。この追加アクセスを<strong>キー・ルックアップ（Key Lookup）</strong>と呼び（ヒープの場合は <strong>RID Lookup</strong>）、行数が多いと性能低下の原因になります（11.4節）。</p>
+                                <p class="text-emerald-900 text-sm">非クラスター化インデックスでヒットしても、<code class="bg-emerald-100">SELECT *</code> のようにインデックスに含まれない列が必要な場合、SQL Server は索引からデータ本体（クラスター化インデックスまたはヒープ）へ改めて行を取りに行く動作が発生します。この追加アクセスが多いと性能低下の原因になります（11.4節）。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-violet-50 border-l-4 border-violet-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-graduation-cap text-violet-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-violet-800 mb-1">発展: 用語 — Key Lookup / RID Lookup</p>
+                                <p class="text-violet-900 text-sm">非クラスター化インデックスだけでは足りない列を取りに、クラスター化インデックス側へ追加で行を取りに行く動作を<strong>Key Lookup</strong>と呼びます。同じ動作のうち、クラスター化インデックスが無いテーブル（ヒープ）で行の物理位置を辿って取りに行くものは<strong>RID Lookup</strong>と呼びます。どちらも実行プラン上に演算子として表示されます（11.4節）。</p>
                             </div>
                         </div>
                     </div>
@@ -222,8 +253,26 @@ ON dbo.Orders (CustomerId);</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        複数の列を組み合わせた<strong>複合インデックス（Composite Index）</strong>も作成できます。このとき重要なのが<strong>列の順番</strong>です。「絞り込みの効く列（選択性の高い列）」を先頭に置くのが基本方針です。
+                        複数の列を組み合わせた<strong>複合インデックス（Composite Index）</strong>も作成できます。このとき重要なのが<strong>列の順番</strong>です。列の順番は、実際のクエリパターンをもとに決めるのが基本です。Microsoft のインデックス設計ガイドラインが示す基本方針は次のとおりです。
                     </p>
+                    <ul class="list-disc pl-6 text-slate-600 leading-relaxed mb-4 space-y-1">
+                        <li><code class="bg-slate-100">WHERE</code> の比較条件（<code class="bg-slate-100">=</code>、<code class="bg-slate-100">&gt;</code>、<code class="bg-slate-100">&lt;</code>、<code class="bg-slate-100">BETWEEN</code> など）や <code class="bg-slate-100">JOIN</code> の結合条件で使われる列を<strong>先頭</strong>に置く</li>
+                        <li>残りの列は、<strong>値の種類が多い（重複が少ない）順</strong>に並べる</li>
+                        <li><code class="bg-slate-100">ORDER BY</code> の並び順と一致させると、実行プランから並べ替え（Sort）処理を省ける場合がある</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なお、「等値条件（<code class="bg-slate-100">=</code>）の列を先頭に、範囲条件（<code class="bg-slate-100">&gt;</code>・<code class="bg-slate-100">&lt;</code>・<code class="bg-slate-100">BETWEEN</code>）の列を後ろに置く」という言い方も実務ではよく聞きますが、これは<strong>Microsoft公式の推奨事項ではなく、一般に知られている実務上の経験則</strong>です。公式ガイドラインの本質は「比較条件で使う列を先頭に、残りは値の種類が多い順に並べる」という考え方にあります。
+                    </p>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: 先頭列が条件に含まれないと効かない</p>
+                                <p class="text-orange-900 text-sm">複合インデックスは<strong>先頭列がクエリの条件に含まれて初めて</strong>効果を発揮します。たとえば <code class="bg-orange-100">(CustomerId, OrderDate)</code> の順で作成したインデックスは <code class="bg-orange-100">WHERE CustomerId = 123</code> を含む検索には使えますが、<code class="bg-orange-100">WHERE OrderDate >= '2025-01-01'</code> のように <code class="bg-orange-100">OrderDate</code> だけで絞り込む検索には使われません。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
@@ -232,8 +281,8 @@ ON dbo.Orders (CustomerId);</code></pre>
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 複合インデックス：等値検索する列(CustomerId)を先頭に、
--- 範囲検索する列(OrderDate)を後ろに置く
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 複合インデックス：CustomerId・OrderDateともに比較条件で使う列。
+-- ここではCustomerIdの方が値の種類が多い(重複が少ない)と考え先頭に置く
 CREATE NONCLUSTERED INDEX IX_Orders_CustomerId_OrderDate
 ON dbo.Orders (CustomerId, OrderDate);
 
@@ -245,7 +294,7 @@ WHERE CustomerId = 123
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        さらに <code class="bg-slate-100">INCLUDE</code> 句を使うと、検索条件には使わないが結果として取得したい列をインデックスに「間借り」させられます。これにより <strong>Key Lookup が不要になる</strong>ため、この状態を<strong>カバリングインデックス（Covering Index）</strong>と呼びます。
+                        さらに <code class="bg-slate-100">INCLUDE</code> 句を使うと、検索条件には使わないが結果として取得したい列をインデックスに「間借り」させられます。これにより非クラスター化インデックスだけで必要な列がすべてそろい、<strong>データ本体へ追加で行を取りに行く動作が不要になる</strong>ため、この状態を<strong>カバリングインデックス（Covering Index）</strong>と呼びます（この追加動作については 11.2節の発展欄を参照）。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -255,7 +304,7 @@ WHERE CustomerId = 123
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- OrderDate・ProductId・QuantityをINCLUDEし、Key Lookupを不要にする
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- OrderDate・ProductId・QuantityをINCLUDEし、データ本体への追加アクセスを不要にする
 CREATE NONCLUSTERED INDEX IX_Orders_CustomerId_Covering
 ON dbo.Orders (CustomerId)
 INCLUDE (OrderDate, ProductId, Quantity);</code></pre>
@@ -307,17 +356,16 @@ INCLUDE (OrderDate, ProductId, Quantity);</code></pre>
                                     <td class="px-4 py-3 text-slate-600">インデックスがない（ヒープの）テーブルを全件読む</td>
                                     <td class="px-4 py-3 text-slate-600">大きい表では特に遅い</td>
                                 </tr>
-                                <tr>
-                                    <td class="px-4 py-3 font-medium">Key Lookup</td>
-                                    <td class="px-4 py-3 text-slate-600">非クラスター化インデックスでヒットした後、足りない列をデータ本体まで取りに行く</td>
-                                    <td class="px-4 py-3 text-slate-600">対象行数が多いと重くなる</td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
                         各演算子の下には<strong>コスト</strong>が相対的な割合（%）で表示され、1つのクエリのプラン内で合計が100%になります。バッチに複数のクエリを含めた場合は、プランの上部に「バッチに対するクエリ コスト（相対値）」がクエリごとに表示され、こちらの合計が100%になります。演算子にマウスを重ねると、推定行数・実際の行数・アクセスしている列（例: <code class="bg-slate-100">Seek Predicate</code>）などの詳細が確認できます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このほか、非クラスター化インデックスだけでは列が足りず、データ本体へ追加で行を取りに行く演算子が表示されることもあります（詳しくは 11.2節の発展欄を参照）。
                     </p>
 
                     <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
@@ -338,17 +386,27 @@ INCLUDE (OrderDate, ProductId, Quantity);</code></pre>
                         11.5 インデックスが効かない書き方
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        インデックスを作っても、<code class="bg-slate-100">WHERE</code> 句の書き方によっては使われないことがあります。インデックスをそのまま使える条件のことを<strong>SARGable（サーガブル、Search ARGument able の略）</strong>と呼び、代表的な非SARGableのパターンを見ていきます。
+                        インデックスを作っても、<code class="bg-slate-100">WHERE</code> 句の書き方によっては使われないことがあります。<strong>WHERE 句の中で列に関数を使うと、インデックスの検索（Seek）が使えなくなり、全体を読む（Scan）動きになりやすくなります</strong>。ここでは代表的なパターンを見ていきます。
                     </p>
+
+                    <div class="bg-violet-50 border-l-4 border-violet-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-graduation-cap text-violet-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-violet-800 mb-1">発展: 用語 — SARGable</p>
+                                <p class="text-violet-900 text-sm">インデックスの検索（Seek）が使える形の条件式のことを<strong>SARGable</strong>（サーガブル、Search ARGument able の略）と呼びます。この節で紹介する「効きにくくなる書き方」は、裏を返せば「非SARGableな条件にしてしまう書き方」です。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">(1) 列に関数を適用している</h3>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <code class="bg-slate-100">OrderDate</code> 列に <code class="bg-slate-100">YEAR()</code> 関数をかけると、SQL Server はインデックスのキー値を直接比較できず、<strong>すべての行に対して関数を計算してから</strong>比較する必要が生じます。結果として <code class="bg-slate-100">OrderDate</code> にインデックスがあっても Scan になります。
+                        <code class="bg-slate-100">OrderDate</code> 列に <code class="bg-slate-100">YEAR()</code> 関数をかけると、SQL Server はインデックスのキー値と直接比較できなくなり、行ごとに関数を計算してから比較する必要が生じます。その結果、<code class="bg-slate-100">OrderDate</code> にインデックスがあっても Seek が使えず、Scan になりやすくなります。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
-                            <span class="text-slate-400 text-sm">not_sargable_function.sql</span>
+                            <span class="text-slate-400 text-sm">index_not_used_function.sql</span>
                             <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
                                 <i class="fas fa-copy"></i>
                             </button>
@@ -358,7 +416,7 @@ SELECT OrderId, CustomerId, OrderDate
 FROM dbo.Orders
 WHERE YEAR(OrderDate) = 2025;
 
--- アフター：範囲条件に書き換える（SARGable）
+-- アフター：範囲条件に書き換える（インデックスの検索(Seek)が使える形に）
 SELECT OrderId, CustomerId, OrderDate
 FROM dbo.Orders
 WHERE OrderDate >= '2025-01-01'
@@ -372,7 +430,7 @@ WHERE OrderDate >= '2025-01-01'
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
-                            <span class="text-slate-400 text-sm">not_sargable_like.sql</span>
+                            <span class="text-slate-400 text-sm">index_not_used_like.sql</span>
                             <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
                                 <i class="fas fa-copy"></i>
                             </button>
@@ -392,12 +450,12 @@ WHERE CustomerName LIKE N'山田%';
 
                     <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">(3) 暗黙の型変換</h3>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        比較する両辺のデータ型が異なると、SQL Server はどちらかを暗黙的に変換します。このとき<strong>変換が列側にかかる</strong>と、その列のインデックスが使えなくなります。たとえば列が <code class="bg-slate-100">varchar</code> 型なのに比較値を <code class="bg-slate-100">N'...'</code>（Unicode）で書くと、<code class="bg-slate-100">nvarchar</code> の方がデータ型の優先順位が高いため列側が変換対象になります。次の例は、本ガイドの <code class="bg-slate-100">Customers.CustomerName</code>（<code class="bg-slate-100">NVARCHAR</code>）が<strong>仮に <code class="bg-slate-100">varchar</code> 型だった場合</strong>を想定したものです。
+                        比較する両辺のデータ型が異なると、SQL Server はどちらかを暗黙的に変換します。このとき<strong>変換が列側にかかる</strong>と、その列のインデックスを検索（Seek）に使えなくなり、Scanになりやすくなります。たとえば列が <code class="bg-slate-100">varchar</code> 型なのに比較値を <code class="bg-slate-100">N'...'</code>（Unicode）で書くと、<code class="bg-slate-100">nvarchar</code> の方がデータ型の優先順位が高いため列側が変換対象になります。次の例は、本ガイドの <code class="bg-slate-100">Customers.CustomerName</code>（<code class="bg-slate-100">NVARCHAR</code>）が<strong>仮に <code class="bg-slate-100">varchar</code> 型だった場合</strong>を想定したものです。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
-                            <span class="text-slate-400 text-sm">not_sargable_conversion.sql</span>
+                            <span class="text-slate-400 text-sm">index_not_used_conversion.sql</span>
                             <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
                                 <i class="fas fa-copy"></i>
                             </button>
@@ -479,7 +537,7 @@ UPDATE STATISTICS dbo.Orders;</code></pre>
                             <i class="fas fa-circle-info text-blue-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-blue-800 mb-1">ヒント: インデックスの作りすぎに注意</p>
-                                <p class="text-blue-900 text-sm">1つの <code class="bg-blue-100">INSERT</code>・<code class="bg-blue-100">UPDATE</code>・<code class="bg-blue-100">DELETE</code> は、そのテーブルに設定された<strong>すべての非クラスター化インデックス</strong>を更新します。インデックスが10個あれば、書き込みのたびに最大10個の構造を保守することになり、容量・バックアップ時間・統計更新の負荷も増えます。「使われていないインデックス」は定期的に見直して削除しましょう。</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">INSERT</code>・<code class="bg-blue-100">DELETE</code> は、そのテーブルに設定された<strong>すべての非クラスター化インデックス</strong>が更新対象になります（<code class="bg-blue-100">UPDATE</code> の場合は、変更した列をキーまたは <code class="bg-blue-100">INCLUDE</code> 列に含むインデックスだけが対象です）。インデックスが10個あれば、書き込みのたびに最大10個の構造を保守することになり、容量・バックアップ時間・統計更新の負荷も増えます。「使われていないインデックス」は定期的に見直して削除しましょう。</p>
                             </div>
                         </div>
                     </div>
@@ -514,12 +572,12 @@ UPDATE STATISTICS dbo.Orders;</code></pre>
                                         <tbody class="divide-y divide-indigo-200">
                                             <tr>
                                                 <td class="px-3 py-2 font-medium text-indigo-900">クラスター化インデックス</td>
-                                                <td class="px-3 py-2 text-indigo-900">概念があり、主キーに既定で作成される</td>
+                                                <td class="px-3 py-2 text-indigo-900">概念があり、条件を満たせば主キーに既定で作成される</td>
                                                 <td class="px-3 py-2 text-indigo-900">概念がなく、テーブルは常にヒープ構造</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-3 py-2 font-medium text-indigo-900">データの並び順維持</td>
-                                                <td class="px-3 py-2 text-indigo-900">クラスター化インデックスが常に維持</td>
+                                                <td class="px-3 py-2 text-indigo-900">クラスター化インデックスが論理的な並び順を常に維持</td>
                                                 <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">CLUSTER</code> コマンドで一度だけ並べ替え可能（以後は維持されない）</td>
                                             </tr>
                                             <tr>
@@ -635,7 +693,7 @@ UPDATE STATISTICS dbo.Orders;</code></pre>
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            WHERE句の中で列に関数(YEAR)を適用すると、SQL Serverはインデックスのキー値をそのまま比較できず、すべての行に対して関数の計算結果を求めてから条件判定する必要が生じます。そのためインデックスを使ったSeekができず、Scanになってしまいます。範囲条件（OrderDate >= '2025-01-01' AND OrderDate < '2026-01-01'）に書き換えるとSARGableになり、インデックスが効くようになります。
+                                            WHERE句の中で列に関数(YEAR)を適用すると、SQL Serverはインデックスのキー値をそのまま比較できず、行ごとに関数の計算結果を求めてから条件判定する必要が生じます。そのためインデックスを使ったSeekが使えず、Scanになりやすくなります。範囲条件（OrderDate >= '2025-01-01' AND OrderDate < '2026-01-01'）に書き換えると、インデックスの検索（Seek）が使える形（発展用語ではSARGableと呼びます）になり、インデックスが効くようになります。
                                         </p>
                                     </details>
                                 </li>
@@ -646,7 +704,7 @@ UPDATE STATISTICS dbo.Orders;</code></pre>
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            非クラスター化インデックスです。クラスター化インデックスは「データ行そのものの物理的な並び順」を表すため、1つのテーブルにつき並び順は1通りしか持てず、最大1つしか作成できません。一方、非クラスター化インデックスはデータ本体とは別の構造（キーと行への参照）なので、目的に応じて複数作成できます。
+                                            非クラスター化インデックスです。クラスター化インデックスは、そのリーフレベル（末端）がデータ行そのもので構成され、データがインデックスキーの順に論理的に整理される仕組みです。1つのテーブルのデータ行が同時に持てる並び順は1通りしかないため、クラスター化インデックスは最大1つしか作成できません。一方、非クラスター化インデックスはデータ本体とは別の構造（キーと行への参照）なので、目的に応じて複数作成できます。
                                         </p>
                                     </details>
                                 </li>
