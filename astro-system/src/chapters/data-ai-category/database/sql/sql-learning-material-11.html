@@ -1,0 +1,934 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約75分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">テーブルを結合する（JOIN）</h1>
+                    <p class="text-slate-600">第2章で学んだとおり、<code class="bg-slate-100">shop_db</code> は顧客・商品・注文・注文明細という4つの表に分かれています。この章では、その分かれた表を <strong>JOIN（結合）</strong>でつなぎ直し、「どの顧客が、いつ、何を、いくつ買ったか」のような、1つの表だけでは答えられない問いに SQL で答えられるようになります。INNER JOIN・外部結合・自己結合・UNION まで、結合の全体像を一気に押さえましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-semibold text-amber-900 mb-3">この章の学習目標</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>なぜ表を分けたままではなく結合が必要になるのか説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>INNER JOIN とテーブル別名（エイリアス）の書き方、ON と WHERE の役割の違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>LEFT / RIGHT / FULL OUTER JOIN の違いを理解し、「注文が1件もない顧客」を探せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>3つ以上のテーブルの結合、結合と GROUP BY の組み合わせができる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>自己結合と UNION / UNION ALL（縦の結合）の使いどころが分かる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション11.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 なぜ結合が必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第2章で見たように、<code class="bg-slate-100">shop_db</code> では「顧客」と「注文」を1つの巨大な表にまとめず、<code class="bg-slate-100">customers</code>（顧客）と <code class="bg-slate-100">orders</code>（注文）という別々の表に分けています。ところが業務では「注文一覧に、注文番号や日付だけでなく<strong>顧客の名前</strong>も一緒に出したい」という要望がほぼ必ず出てきます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">orders</code> の中には顧客の名前は入っていません。入っているのは <code class="bg-slate-100">customer_id</code> という「顧客番号」だけです。つまり、名前を表示するには <code class="bg-slate-100">orders.customer_id</code> と <code class="bg-slate-100">customers.customer_id</code> が同じ値どうしを突き合わせて、2つの表を横につなぎ直す必要があります。これが <strong>結合（JOIN）</strong>です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph C["customers（顧客）"]
+        C1["customer_id = 1<br/>customer_name = 佐藤 花子"]
+    end
+    subgraph O["orders（注文）"]
+        O1["order_id = 1<br/>customer_id = 1"]
+    end
+    O1 -->|"customer_idが一致"| C1
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        イメージをつかむために、それぞれの表の一部を並べてみましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="2">customers</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_name</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">佐藤 花子</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">2</td>
+                                    <td class="px-4 py-3 text-slate-600">鈴木 一郎</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="3">orders</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">order_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">order_date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-01</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">2</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-03</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        <code class="bg-slate-100">orders</code> の <code class="bg-slate-100">customer_id = 1</code> と <code class="bg-slate-100">customers</code> の <code class="bg-slate-100">customer_id = 1</code> をつなげば、「注文1は佐藤花子さんの注文」だと分かります。この「つなぐ」処理を SQL でどう書くのか、11.2 から見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション11.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 INNER JOIN — 両方に存在する行だけをつなぐ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最も基本の結合が <strong>INNER JOIN</strong>（内部結合）です。「両方の表に存在するもの同士」だけをつなぎます。<code class="bg-slate-100">orders</code> と <code class="bg-slate-100">customers</code> を <code class="bg-slate-100">customer_id</code> でつないでみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">inner-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 注文一覧に顧客名を付けて表示する
+SELECT o.order_id, c.customer_name, o.order_date, o.status
+FROM orders o
+INNER JOIN customers c
+    ON o.customer_id = c.customer_id
+ORDER BY o.order_id;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">orders o</code> ・ <code class="bg-slate-100">customers c</code> の <code class="bg-slate-100">o</code> と <code class="bg-slate-100">c</code> は<strong>テーブル別名（エイリアス）</strong>です。<code class="bg-slate-100">FROM orders o</code> と書くと、以降はその文の中だけ <code class="bg-slate-100">orders</code> を <code class="bg-slate-100">o</code> と呼べます。エイリアスを付ける理由は、<code class="bg-slate-100">orders</code> にも <code class="bg-slate-100">customers</code> にも <code class="bg-slate-100">customer_id</code> という<strong>同じ名前の列</strong>があるためです。何も付けずに <code class="bg-slate-100">customer_id</code> とだけ書くと、データベースは「どちらの表の customer_id か」を判断できずエラーになります。<code class="bg-slate-100">o.customer_id</code> のように「テーブル別名.列名」で修飾すれば、曖昧さがなくなります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">order_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">order_date</th>
+                                    <th class="px-4 py-3 text-left font-semibold">status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-01</td>
+                                    <td class="px-4 py-3 text-slate-600">発送済</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">2</td>
+                                    <td class="px-4 py-3 text-slate-600">鈴木 一郎</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-03</td>
+                                    <td class="px-4 py-3 text-slate-600">発送済</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">3</td>
+                                    <td class="px-4 py-3 text-slate-600">田中 美咲</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-10</td>
+                                    <td class="px-4 py-3 text-slate-600">発送済</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">4</td>
+                                    <td class="px-4 py-3 text-slate-600">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-15</td>
+                                    <td class="px-4 py-3 text-slate-600">発送済</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium" colspan="4">
+                                        <span class="text-slate-400">…（以下、order_id 5〜15 と続く）</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで注目してほしいのは、注文が1件もない顧客（後述の「渡辺 大輔」さん）は<strong>結果に1行も出てこない</strong>という点です。INNER JOIN は「両方に対応するデータがある行」しか残さないからです。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: ON と WHERE は役割が違う</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">ON</code> は「2つの表を<strong>どう突き合わせるか</strong>」という結合条件です。<code class="bg-blue-100">WHERE</code> は結合が済んだ後の結果を「<strong>絞り込む</strong>」条件です。上の例に <code class="bg-blue-100">WHERE o.status = '発送済'</code> を追加すれば、「発送済みの注文だけ」にさらに絞り込めます。結合の仕方（ON）と、欲しい行の条件（WHERE）を混ぜて考えないようにしましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 外部結合 — 片方の表を全部残す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        INNER JOIN では「注文がない顧客」が消えてしまいました。しかし「注文がない顧客も含めて、全顧客を一覧にしたい」という場面もあります。そのために使うのが <strong>外部結合（OUTER JOIN）</strong>です。<code class="bg-slate-100">OUTER</code> というキーワードは省略でき、<code class="bg-slate-100">LEFT JOIN</code> と書けば <code class="bg-slate-100">LEFT OUTER JOIN</code> と同じ意味になります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">結合の種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">残る行</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対応が無い側</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">LEFT (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600">FROM に書いた<strong>左側の表は全行</strong>残る</td>
+                                    <td class="px-4 py-3 text-slate-600">右側の表の列はすべて NULL になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">RIGHT (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600">JOIN に書いた<strong>右側の表は全行</strong>残る</td>
+                                    <td class="px-4 py-3 text-slate-600">左側の表の列はすべて NULL になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">FULL (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>両方の表の全行</strong>が残る</td>
+                                    <td class="px-4 py-3 text-slate-600">対応が無い側の列は NULL になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実務では <code class="bg-slate-100">LEFT JOIN</code> が圧倒的によく使われます。「主役の表を先（左）に書き、そこに関連情報を足す」という書き方が自然だからです。<code class="bg-slate-100">customers</code> を左にして <code class="bg-slate-100">orders</code> を LEFT JOIN してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">left-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 全顧客を対象に、注文があれば注文番号も表示する
+SELECT c.customer_name, o.order_id, o.order_date
+FROM customers c
+LEFT JOIN orders o
+    ON c.customer_id = o.customer_id
+ORDER BY c.customer_id;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">order_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">order_date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-01</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">4</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-15</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">15</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-04-20</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">鈴木 一郎</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-03</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">鈴木 一郎</td>
+                                    <td class="px-4 py-3 text-slate-600">9</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-03-18</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">田中 美咲</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-10</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">田中 美咲</td>
+                                    <td class="px-4 py-3 text-slate-600">12</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-04-05</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">高橋 健太</td>
+                                    <td class="px-4 py-3 text-slate-600">5</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-02-20</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">高橋 健太</td>
+                                    <td class="px-4 py-3 text-slate-600">13</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-04-10</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">伊藤 直美</td>
+                                    <td class="px-4 py-3 text-slate-600">6</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-03-05</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">渡辺 大輔</td>
+                                    <td class="px-4 py-3 text-slate-600">NULL</td>
+                                    <td class="px-4 py-3 text-slate-600">NULL</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">山本 恵子</td>
+                                    <td class="px-4 py-3 text-slate-600">7</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-03-10</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">山本 恵子</td>
+                                    <td class="px-4 py-3 text-slate-600">14</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-04-15</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">中村 翔太</td>
+                                    <td class="px-4 py-3 text-slate-600">8</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-03-15</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">小林 麻衣</td>
+                                    <td class="px-4 py-3 text-slate-600">10</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-03-25</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">加藤 隆</td>
+                                    <td class="px-4 py-3 text-slate-600">11</td>
+                                    <td class="px-4 py-3 text-slate-600">2024-04-01</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        「渡辺 大輔」さんは注文が1件もないため、右側の <code class="bg-slate-100">orders</code> 由来の列がすべて <code class="bg-slate-100">NULL</code> のまま1行だけ残りました。これこそが LEFT JOIN の最大の価値です。
+                    </p>
+                </section>
+
+                <!-- セクション11.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 外部結合の代表的な用途 — 「存在しない」を探す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        LEFT JOIN の最も定番の使い方は、<strong>「注文が1件もない顧客」のように、関連データが存在しない行だけを探す</strong>ことです。11.3 の結果を見ると、注文がない顧客は <code class="bg-slate-100">order_id</code> が <code class="bg-slate-100">NULL</code> になっていました。そこで第7章で学んだ <code class="bg-slate-100">IS NULL</code> を組み合わせます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">customers-without-orders.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 一度も注文したことがない顧客を探す
+SELECT c.customer_id, c.customer_name
+FROM customers c
+LEFT JOIN orders o
+    ON c.customer_id = o.customer_id
+WHERE o.order_id IS NULL;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_name</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">6</td>
+                                    <td class="px-4 py-3 text-slate-600">渡辺 大輔</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なぜ <code class="bg-slate-100">WHERE c.order_id IS NULL</code> ではなく <code class="bg-slate-100">WHERE o.order_id IS NULL</code> なのか、疑問に思うかもしれません。<code class="bg-slate-100">c.customer_id</code>（顧客側の主キー）は決して NULL にならないため意味を持ちません。一方 <code class="bg-slate-100">o.order_id</code>（注文側の列）は、対応する注文が無い顧客の行では LEFT JOIN によって NULL で埋められています。だからこそ「注文側の列が NULL」であることが、「注文が存在しない」ことの目印になるのです。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: LEFT JOIN + IS NULL は「未〇〇」検索の定石</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100">LEFT JOIN ... WHERE 右側.列 IS NULL</code> という形は、「未購入の会員」「未処理のタスク」「まだレビューが付いていない商品」など、業務システムで非常によく使う検索パターンです。ぜひこの形を覚えてください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 CROSS JOIN — すべての組み合わせ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>CROSS JOIN</strong>は、条件を指定せず、左の表の各行と右の表の各行を<strong>すべて組み合わせる</strong>結合です。顧客が10件、商品が12件あれば、結果は 10 × 12 = 120行になります。「全顧客に全商品を1回ずつ案内するダミー明細を作る」といった特殊な用途で使いますが、日常的に使う結合ではありません。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">cross-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 全顧客 × 全商品のすべての組み合わせを作る
+SELECT c.customer_name, p.product_name
+FROM customers c
+CROSS JOIN products p;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">警告: 意図せず CROSS JOIN になってしまう書き方</p>
+                                <p class="text-red-900 text-sm mb-2">次の2つは、意図せず CROSS JOIN と同じ結果になってしまう典型的なミスです。</p>
+                                <ul class="list-disc pl-5 space-y-1 text-red-900 text-sm">
+                                    <li><code class="bg-red-100">JOIN</code> の後ろに <code class="bg-red-100">ON</code> を書き忘れる（結合条件が無いため全組み合わせになる）</li>
+                                    <li><code class="bg-red-100">FROM orders o, customers c</code> のようにカンマ区切りで表を並べる古い書き方をし、<code class="bg-red-100">WHERE</code> での絞り込みを忘れる</li>
+                                </ul>
+                                <p class="text-red-900 text-sm mt-2">表の行数が多いと、想定外に巨大な結果（数百万行など）が返ってきて処理が固まることがあります。<code class="bg-red-100">JOIN ... ON</code> の形を必ずセットで書く習慣をつけましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 3つ以上のテーブルの結合
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JOIN は2つの表だけでなく、3つ以上つなげることもできます。「どの注文で、どの商品が、何個売れたか」を知るには、<code class="bg-slate-100">orders</code>（注文）→ <code class="bg-slate-100">order_items</code>（注文明細）→ <code class="bg-slate-100">products</code>（商品）の3つを順につなぐ必要があります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">three-table-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 注文ごとに、どの商品が何個売れたかを表示する
+SELECT o.order_id, p.product_name, oi.quantity
+FROM orders o
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+ORDER BY o.order_id;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">order_id</th>
+                                    <th class="px-4 py-3 text-left font-semibold">product_name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL入門ガイド</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">ボールペン（黒）</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">1</td>
+                                    <td class="px-4 py-3 text-slate-600">コーヒー豆（200g）</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">2</td>
+                                    <td class="px-4 py-3 text-slate-600">ワイヤレスマウス</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium" colspan="3">
+                                        <span class="text-slate-400">…（以下、order_id 2〜15 の残りの明細と続く）</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        ポイントは、<code class="bg-slate-100">JOIN</code> を1つ書くごとに <code class="bg-slate-100">ON</code> で「その2つの表をどうつなぐか」を1つずつ指定していくことです。<code class="bg-slate-100">orders</code> と <code class="bg-slate-100">products</code> は直接つながっている列を持ちませんが、間に立つ <code class="bg-slate-100">order_items</code> を経由することで、たどり着けます。
+                    </p>
+                </section>
+
+                <!-- セクション11.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.7 結合と集計の組み合わせ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第9章で学んだ <code class="bg-slate-100">GROUP BY</code> は、JOIN と組み合わせたときに真価を発揮します。まずは<strong>顧客別の購入金額合計</strong>です。1件の注文明細の金額は「数量 × 単価」なので、これを <code class="bg-slate-100">sum</code> で足し上げます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">customer-total.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 顧客別の購入金額合計（キャンセルも含めた単純集計）
+SELECT c.customer_name,
+       sum(oi.quantity * oi.unit_price) AS total_amount
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+JOIN order_items oi ON o.order_id = oi.order_id
+GROUP BY c.customer_name
+ORDER BY total_amount DESC;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">customer_name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">total_amount</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">山本 恵子</td>
+                                    <td class="px-4 py-3 text-slate-600">11,360.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">鈴木 一郎</td>
+                                    <td class="px-4 py-3 text-slate-600">11,300.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">田中 美咲</td>
+                                    <td class="px-4 py-3 text-slate-600">7,580.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">佐藤 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">6,880.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">高橋 健太</td>
+                                    <td class="px-4 py-3 text-slate-600">6,760.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">伊藤 直美</td>
+                                    <td class="px-4 py-3 text-slate-600">6,600.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">加藤 隆</td>
+                                    <td class="px-4 py-3 text-slate-600">3,520.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">中村 翔太</td>
+                                    <td class="px-4 py-3 text-slate-600">2,600.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">小林 麻衣</td>
+                                    <td class="px-4 py-3 text-slate-600">1,800.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次に、視点を変えて<strong>商品カテゴリ別の売上</strong>を出してみます。今度は <code class="bg-slate-100">customers</code> は使わず、<code class="bg-slate-100">order_items</code> と <code class="bg-slate-100">products</code> だけを結合します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">category-sales.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品カテゴリ別の売上合計
+SELECT p.category,
+       sum(oi.quantity * oi.unit_price) AS category_sales
+FROM order_items oi
+JOIN products p ON oi.product_id = p.product_id
+GROUP BY p.category
+ORDER BY category_sales DESC;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        「JOIN で必要な表をつなぎ、GROUP BY でまとめる」という組み立て方は、業務レポート作成の基本パターンです。第9章の GROUP BY は、実は結合とセットになって初めて完成する、と言ってもよいでしょう。
+                    </p>
+                </section>
+
+                <!-- セクション11.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.8 自己結合 — 同じ表を2回使う
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JOIN は、必ずしも異なる2つの表をつなぐとは限りません。<strong>同じ表を2回登場させて自分自身とつなぐ</strong>ことも可能で、これを<strong>自己結合（セルフジョイン）</strong>と呼びます。例として、「同じカテゴリの商品どうしを、価格を比べられるようにペアで並べる」を <code class="bg-slate-100">products</code> の自己結合で書いてみます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">self-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 文具カテゴリの商品どうしを価格比較用にペアにする
+SELECT p1.product_name AS 商品A, p2.product_name AS 商品B,
+       p1.category
+FROM products p1
+JOIN products p2
+    ON p1.category = p2.category
+    AND p1.product_id &lt; p2.product_id
+WHERE p1.category = '文具';</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">商品A</th>
+                                    <th class="px-4 py-3 text-left font-semibold">商品B</th>
+                                    <th class="px-4 py-3 text-left font-semibold">category</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ボールペン（黒）</td>
+                                    <td class="px-4 py-3 text-slate-600">ノートA5</td>
+                                    <td class="px-4 py-3 text-slate-600">文具</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ボールペン（黒）</td>
+                                    <td class="px-4 py-3 text-slate-600">付箋セット</td>
+                                    <td class="px-4 py-3 text-slate-600">文具</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ノートA5</td>
+                                    <td class="px-4 py-3 text-slate-600">付箋セット</td>
+                                    <td class="px-4 py-3 text-slate-600">文具</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        自己結合では、<code class="bg-slate-100">products</code> という同じ表を <code class="bg-slate-100">p1</code> と <code class="bg-slate-100">p2</code> という<strong>異なる別名</strong>で2回呼び出しています。別名を付けなければ、SQL 自身も「どちらの products のことか」を区別できません。また <code class="bg-slate-100">p1.product_id &lt; p2.product_id</code> という条件を加えているのは、これが無いと「ボールペン（黒）×ノートA5」と「ノートA5×ボールペン（黒）」のような同じペアの重複や、「ボールペン（黒）×ボールペン（黒）」のような自分自身とのペアまで出てきてしまうためです。<code class="bg-slate-100">WHERE p1.category = '文具'</code> は、結果を文具カテゴリだけに絞って全体像を見やすくするための条件で、外せば書籍・家電・食品を含むすべてのカテゴリのペアが出力されます。
+                    </p>
+                </section>
+
+                <!-- セクション11.9 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.9 UNION と UNION ALL — 縦につなぐ結合
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの JOIN は、複数の表を<strong>横に並べて列を増やす</strong>結合でした。これに対して <strong>UNION</strong> は、複数の <code class="bg-slate-100">SELECT</code> の結果を<strong>縦に積み重ねて行を増やす</strong>結合です。両者の違いを図で比べてみましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-white rounded-lg p-4 border border-slate-200">
+                            <p class="text-sm font-semibold text-slate-700 mb-2">JOIN（横につなぐ＝列が増える）</p>
+                            <table class="min-w-full text-sm divide-y divide-slate-200">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">customer_name</th>
+                                        <th class="px-3 py-2 text-left">order_id</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-3 py-2">佐藤 花子</td>
+                                        <td class="px-3 py-2 text-slate-600">1</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 border border-slate-200">
+                            <p class="text-sm font-semibold text-slate-700 mb-2">UNION（縦につなぐ＝行が増える）</p>
+                            <table class="min-w-full text-sm divide-y divide-slate-200">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">customer_name</th>
+                                        <th class="px-3 py-2 text-left">区分</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr>
+                                        <td class="px-3 py-2">佐藤 花子</td>
+                                        <td class="px-3 py-2 text-slate-600">東京都在住</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2">鈴木 一郎</td>
+                                        <td class="px-3 py-2 text-slate-600">家電購入あり</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        UNION を使うには、つなぎ合わせる各 <code class="bg-slate-100">SELECT</code> の<strong>列数がそろっていて、対応する列の型に互換性がある</strong>必要があります。「東京都在住の顧客」と「家電を買ったことがある顧客」をまとめて1つの注意リストにする例です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">union.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 東京都在住の顧客
+SELECT customer_name, '東京都在住' AS 区分
+FROM customers WHERE prefecture = '東京都'
+UNION
+-- 家電を買ったことがある顧客（結合結果の重複はDISTINCTで除く）
+SELECT DISTINCT c.customer_name, '家電購入あり' AS 区分
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+WHERE p.category = '家電';</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">UNION</code> は<strong>重複する行を1行にまとめて除去</strong>します。一方 <code class="bg-slate-100">UNION ALL</code> は重複をそのまま残すため、同じ顧客が両方の条件に当てはまれば2行出てきます。重複を気にせず、単純に結果を積み上げたいだけの場合は <code class="bg-slate-100">UNION ALL</code> の方が余計な重複チェックが走らない分、処理も軽くなります。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: UNION と UNION ALL の使い分け</p>
+                                <p class="text-blue-900 text-sm">「重複があってはならない一覧を作りたい」なら <code class="bg-blue-100">UNION</code>。「単純に複数のクエリ結果を積み上げたいだけで、重複が出ても構わない、あるいは重複が発生しないと分かっている」なら <code class="bg-blue-100">UNION ALL</code>、と覚えておきましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 11-1: 結合SQLを自分で書いてみる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">pgAdmin 4 または A5:SQL Mk-2 で、<code class="bg-purple-100">shop_db</code> に接続して次の4問を自分で書いて実行してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">問題</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">orders</code> と <code class="bg-purple-100">customers</code> を INNER JOIN し、注文番号・顧客名・注文日を新しい順に一覧表示してください。<strong>期待結果:</strong> 注文が存在する分だけの行数（注文がない顧客は含まれない）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">LEFT JOIN と <code class="bg-purple-100">IS NULL</code> を使い、一度も注文したことがない顧客だけを抽出してください。<strong>期待結果:</strong> 「渡辺 大輔」の1件だけが返る。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">orders</code>・<code class="bg-purple-100">order_items</code>・<code class="bg-purple-100">products</code> の3表を結合し、「注文番号・商品名・数量・(数量×単価)の小計」を一覧表示してください。<strong>期待結果:</strong> 注文明細と同じ件数の行が返り、小計が正しく計算されている。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">結合と <code class="bg-purple-100">GROUP BY</code> を組み合わせ、顧客ごとの購入金額合計を金額の多い順に並べてください。<strong>期待結果:</strong> 注文実績のある顧客だけが、合計金額の降順で並ぶ。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> 「どの表を左に置くか」「ON に何を書くか」「WHERE で何を絞るか」を自分の頭で組み立てる練習です。うまくいかないときは、まず結合だけのSELECTを実行して結果を目で確認してから、条件や集計を1つずつ足していくと原因を切り分けやすくなります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. INNER JOIN と LEFT JOIN の違いを、「顧客」と「注文」の例を使って説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            INNER JOIN は両方の表に対応するデータがある行だけを残すため、注文が1件もない顧客は結果に出てきません。LEFT JOIN は左側（例: customers）の表の行をすべて残し、対応する注文が無い顧客については右側（orders）由来の列を NULL で埋めて1行として残します。「存在しないデータを探したい」ときは LEFT JOIN が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. JOIN の <code class="bg-blue-100">ON</code> 句と <code class="bg-blue-100">WHERE</code> 句は、それぞれどんな役割を持ちますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ON は「2つの表をどの列どうしで突き合わせて結合するか」という結合条件を指定します。WHERE は、結合が終わった後の結果に対して「どの行を残すか」を絞り込む条件です。役割が異なるため、結合の仕方の指定と結果の絞り込みを混同しないことが大切です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 意図せず CROSS JOIN（全組み合わせ）になってしまうのは、どのような書き方をしたときですか。2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            (1) JOIN の後ろに ON 句（結合条件）を書き忘れた場合。(2) FROM orders o, customers c のようにカンマ区切りで表を並べる古い書き方をして、WHERE 句での絞り込みを忘れた場合。どちらも結合条件が無いため、両方の表の全組み合わせが返ってしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. <code class="bg-blue-100">UNION</code> と <code class="bg-blue-100">UNION ALL</code> の違いは何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            UNION は複数の SELECT の結果を縦に積み重ねたうえで、重複する行を1行にまとめて除去します。UNION ALL は重複除去を行わず、すべての行をそのまま積み重ねます。重複の可能性があり、それを取り除きたいなら UNION、単純に積み上げるだけでよいなら UNION ALL を使います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sql-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第10章: データの追加・更新・削除</span>
+                        </div>
+                    </a>
+                    <a href="sql-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: サブクエリとビュー</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

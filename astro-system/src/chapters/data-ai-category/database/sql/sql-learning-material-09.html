@@ -1,0 +1,804 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">データを集計する（GROUP BY）</h1>
+                    <p class="text-slate-600">前章では1行ずつの値を加工する関数を学びました。この章では視点を変え、「複数の行をまとめて1つの値にする」<strong>集約関数</strong>と、行をグループ分けしてグループごとに集計する <code class="bg-slate-100">GROUP BY</code> を学びます。「カテゴリ別の商品点数」「都道府県別の顧客数」など、業務レポートの土台になる考え方です。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-semibold text-amber-900 mb-3">この章の学習目標</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">count</code> / <code class="bg-amber-100">sum</code> / <code class="bg-amber-100">avg</code> / <code class="bg-amber-100">max</code> / <code class="bg-amber-100">min</code> の集約関数を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">count(*)</code> と <code class="bg-amber-100">count(列名)</code> の違い（NULL の扱い）を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">GROUP BY</code> でグループ集計ができ、SELECT句に書ける列のルールを守れる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">HAVING</code> と <code class="bg-amber-100">WHERE</code> の違いを理解し、両方を組み合わせられる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 集約関数とは — たくさんの行を1つの値にまとめる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第8章で学んだ <code class="bg-slate-100">upper</code> や <code class="bg-slate-100">round</code> は、<strong>1行の値を受け取って1行の値を返す</strong>関数でした（スカラ関数）。これに対し<strong>集約関数（集計関数）</strong>は、<strong>複数行の値をまとめて受け取り、たった1つの値を返す</strong>関数です。「注文は全部で何件？」「商品の平均単価はいくら？」といった質問に答えるための関数です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph S1["スカラ関数（第8章）"]
+        A1["1行入力"] --> A2["upper（）など"] --> A3["1行出力"]
+    end
+    subgraph S2["集約関数（この章）"]
+        B1["複数行入力"] --> B2["count・sumなど"] --> B3["1つの値に集約"]
+    end
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        代表的な集約関数は次の5つです。まずは一覧で押さえましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">関数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対象の列</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">count</code></td>
+                                    <td class="px-4 py-3 text-slate-600">行数を数える</td>
+                                    <td class="px-4 py-3 text-slate-600">任意（<code class="bg-slate-100">*</code> も可）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">sum</code></td>
+                                    <td class="px-4 py-3 text-slate-600">合計を求める</td>
+                                    <td class="px-4 py-3 text-slate-600">数値列のみ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">avg</code></td>
+                                    <td class="px-4 py-3 text-slate-600">平均を求める</td>
+                                    <td class="px-4 py-3 text-slate-600">数値列のみ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">max</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最大値を求める</td>
+                                    <td class="px-4 py-3 text-slate-600">数値・日付・文字列</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">min</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最小値を求める</td>
+                                    <td class="px-4 py-3 text-slate-600">数値・日付・文字列</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">aggregate-basic.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- products（商品）テーブル全体について
+-- 商品数・合計単価・平均単価・最高値・最安値を1行で求める
+SELECT count(*) AS 商品数,
+       sum(unit_price) AS 単価合計,
+       round(avg(unit_price), 0) AS 平均単価,
+       max(unit_price) AS 最高値,
+       min(unit_price) AS 最安値
+FROM products;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">結果イメージ:</p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">商品数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">単価合計</th>
+                                    <th class="px-4 py-3 text-left font-semibold">平均単価</th>
+                                    <th class="px-4 py-3 text-left font-semibold">最高値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">最安値</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">12</td>
+                                    <td class="px-4 py-3 text-slate-600">21880.00</td>
+                                    <td class="px-4 py-3 text-slate-600">1823</td>
+                                    <td class="px-4 py-3 text-slate-600">4200.00</td>
+                                    <td class="px-4 py-3 text-slate-600">150.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 集約関数を使うと結果は必ず1行になる</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">GROUP BY</code> を使わずに集約関数だけを <code class="bg-blue-100">SELECT</code> すると、元の表が何行あっても結果は必ず<strong>1行</strong>になります。「表全体を1つの数字（またはいくつかの数字）に要約する」というイメージです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 count(*) と count(列名) の違い — NULL の扱いがカギ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">count</code> には書き方が3通りあり、結果が変わることがあります。共通サンプルの <code class="bg-slate-100">customers</code>（顧客）テーブルには <code class="bg-slate-100">prefecture</code>（都道府県）が <code class="bg-slate-100">NULL</code> の行が意図的に含まれているので、これを例に確認します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">書き方</th>
+                                    <th class="px-4 py-3 text-left font-semibold">数えるもの</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">count(*)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">条件に合う<strong>行そのものの数</strong>。NULLの有無を問わずすべて数える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">count(列名)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">その列の値が<strong>NULLでない</strong>行の数</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">count(DISTINCT 列名)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">その列の<strong>重複を除いた値の種類数</strong>（NULLは数えない）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">count-variants.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 顧客の総行数、都道府県が分かる人数、都道府県の種類数を比べる
+SELECT count(*) AS 総顧客数,
+       count(prefecture) AS 都道府県が分かる人数,
+       count(DISTINCT prefecture) AS 都道府県の種類数
+FROM customers;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">結果イメージ（<code class="bg-slate-100">prefecture</code> が NULL の顧客が1名いる想定）:</p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">総顧客数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">都道府県が分かる人数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">都道府県の種類数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">10</td>
+                                    <td class="px-4 py-3 text-slate-600">9</td>
+                                    <td class="px-4 py-3 text-slate-600">6</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">count(*)</code> は10のままですが、<code class="bg-slate-100">count(prefecture)</code> はNULLの1行を除いた9になります。「全体件数」と「ある項目が入力済みの件数」を混同すると、集計レポートの数字がずれる原因になるので要注意です。
+                    </p>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 GROUP BY によるグループ集計
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでは「表全体」を1つに集約してきました。しかし実務で欲しいのは、たいてい「カテゴリ<strong>ごとの</strong>件数」のように<strong>グループ単位</strong>の集計です。これを実現するのが <code class="bg-slate-100">GROUP BY</code> です。<code class="bg-slate-100">GROUP BY</code> は「指定した列の値が同じ行どうしをひとまとめにして、そのまとまりごとに集約関数を計算する」という命令です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["products全行"] --> B{"categoryで<br/>グループ分け"}
+    B --> C["書籍グループ"]
+    B --> D["文具グループ"]
+    B --> E["家電グループ"]
+    B --> F["食品グループ"]
+    C --> G["件数：2"]
+    D --> H["件数：3"]
+    E --> I["件数：4"]
+    F --> J["件数：3"]
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">group-by-basic.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- カテゴリごとの商品数を数える
+SELECT category, count(*) AS 商品数
+FROM products
+GROUP BY category;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">結果イメージ:</p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">category</th>
+                                    <th class="px-4 py-3 text-left font-semibold">商品数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">書籍</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">文具</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">家電</td>
+                                    <td class="px-4 py-3 text-slate-600">4</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">食品</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">GROUP BY category</code> と書くだけで、PostgreSQL が自動的に<code class="bg-slate-100">category</code>の値が同じ行をまとめ、まとまりごとに<code class="bg-slate-100">count(*)</code>を計算してくれます。表を4回に分けて数える手間が、たった2行のSQLで済みます。
+                    </p>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 GROUP BY の重要ルール — SELECT句に書ける列
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">GROUP BY</code> には、初心者がほぼ全員つまずくルールがあります。<strong>SELECT句に書けるのは「GROUP BYに指定した列」か「集約関数」だけ</strong>という制約です。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1 flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-red-900 mb-1 break-words">最大のつまずきポイント: 「GROUPBYに無い列」をSELECTに書くとエラーになる</p>
+                                <p class="text-red-800 text-sm break-words">product_name（商品名）ごとの値はグループ内で複数あり得るため、「代表してどれを表示すればいいか」をPostgreSQLは決められません。だからエラーで止めてくれます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">エラーになる例と、修正した例を並べて確認しましょう。</p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ng-example.sql（エラーになる）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- product_nameはGROUP BYに無いのにSELECTに書いている → NG
+SELECT category, product_name, count(*)
+FROM products
+GROUP BY category;
+-- エラー: column "products.product_name" must
+--         appear in the GROUP BY clause</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ok-example.sql（修正版）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 修正1: product_nameもGROUP BYに加える（商品ごとの集計に変わる）
+SELECT category, product_name, count(*)
+FROM products
+GROUP BY category, product_name;
+
+-- 修正2: product_nameを諦めてcategoryだけの集計にする
+SELECT category, count(*)
+FROM products
+GROUP BY category;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        エラーメッセージ <code class="bg-slate-100">must appear in the GROUP BY clause</code> を見たら、「SELECT句にGROUP BY対象外の生の列がまぎれ込んでいないか」をまず疑ってください。原因のほとんどはこれです。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: SELECT句の3択</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100">GROUP BY</code> を使う<code class="bg-emerald-100">SELECT</code>句に書けるのは、(1) GROUP BYに指定した列、(2) 集約関数（<code class="bg-emerald-100">count</code>など）、(3) それらの計算式、の3種類だけです。それ以外の生の列は書けません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 複数列でのグループ化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">GROUP BY</code> にはカンマ区切りで複数の列を指定できます。この場合、<strong>指定した列の組み合わせが同じ行</strong>だけが1つのグループになります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">group-by-multi.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- カテゴリ×販売中/停止中の組み合わせごとに商品数を数える
+SELECT category, is_active, count(*) AS 商品数
+FROM products
+GROUP BY category, is_active
+ORDER BY category, is_active;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">結果イメージ:</p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">category</th>
+                                    <th class="px-4 py-3 text-left font-semibold">is_active</th>
+                                    <th class="px-4 py-3 text-left font-semibold">商品数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">書籍</td>
+                                    <td class="px-4 py-3 text-slate-600">true</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">文具</td>
+                                    <td class="px-4 py-3 text-slate-600">true</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">家電</td>
+                                    <td class="px-4 py-3 text-slate-600">false</td>
+                                    <td class="px-4 py-3 text-slate-600">1</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">家電</td>
+                                    <td class="px-4 py-3 text-slate-600">true</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">食品</td>
+                                    <td class="px-4 py-3 text-slate-600">true</td>
+                                    <td class="px-4 py-3 text-slate-600">3</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「同じ家電カテゴリでも、販売中（true）と販売停止（false）で行が分かれている」点に注目してください。家電には販売停止中の商品（旧型キーボード）が1点あるため、家電だけ<code class="bg-slate-100">true</code>と<code class="bg-slate-100">false</code>の2グループに分かれます。他のカテゴリは全商品が販売中（true）のため1グループのままです。<code class="bg-slate-100">GROUP BY</code>の列を増やすほど、グループはより細かく分割されます。
+                    </p>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 HAVING による絞り込み — 集計後の条件
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第7章の <code class="bg-slate-100">WHERE</code> は「集計する<strong>前</strong>の1行1行」に対する条件でした。これに対し <code class="bg-slate-100">HAVING</code> は「<code class="bg-slate-100">GROUP BY</code>でまとめた<strong>あと</strong>のグループ」に対する条件です。「商品が3点以上あるカテゴリだけ見たい」のように、集約関数の結果で絞り込みたいときに使います。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SQL文は書いた順番どおりに実行されるわけではありません。実際の処理順序を図で確認しましょう。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["①FROM<br/>表を決める"] --> B["②WHERE<br/>行を絞り込む"]
+    B --> C["③GROUP BY<br/>グループ分け"]
+    C --> D["④HAVING<br/>グループを絞り込む"]
+    D --> E["⑤SELECT<br/>列・集約関数を計算"]
+    E --> F["⑥ORDER BY<br/>並べ替え"]
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">句</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対象</th>
+                                    <th class="px-4 py-3 text-left font-semibold">集約関数は書ける？</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">WHERE</code></td>
+                                    <td class="px-4 py-3 text-slate-600">グループ分けする前の1行1行</td>
+                                    <td class="px-4 py-3 text-slate-600">書けない（まだ集計していないため）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">HAVING</code></td>
+                                    <td class="px-4 py-3 text-slate-600">グループ分けした後の各グループ</td>
+                                    <td class="px-4 py-3 text-slate-600">書ける（集計後の値に条件をかけるため）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">having-basic.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品数が3点以上あるカテゴリだけを表示する
+SELECT category, count(*) AS 商品数
+FROM products
+GROUP BY category
+HAVING count(*) &gt;= 3;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WHERE</code> と <code class="bg-slate-100">HAVING</code> は併用もできます。「販売中の商品だけを対象に、3点以上あるカテゴリを探す」なら次のようになります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">where-and-having.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 販売中(WHERE)の商品を対象に、3点以上あるカテゴリ(HAVING)を探す
+SELECT category, count(*) AS 商品数
+FROM products
+WHERE is_active = true
+GROUP BY category
+HAVING count(*) &gt;= 3;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 覚え方は「WHEREは行、HAVINGはグループ」</p>
+                                <p class="text-blue-900 text-sm">迷ったら「集約関数（<code class="bg-blue-100">count</code>など）を条件に使いたいか？」で判断してください。使いたいなら<code class="bg-blue-100">HAVING</code>、使わずに1行ごとの生の値で絞りたいなら<code class="bg-blue-100">WHERE</code>です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 集計結果の並べ替えと件数制限
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        集計した結果も、第6章で学んだ <code class="bg-slate-100">ORDER BY</code> と <code class="bg-slate-100">LIMIT</code> で並べ替え・件数制限ができます。「商品数が多いカテゴリ トップ3」を出してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">order-by-count.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品数が多い順にカテゴリを並べ、上位3件だけ表示する
+SELECT category, count(*) AS 商品数
+FROM products
+GROUP BY category
+ORDER BY 商品数 DESC
+LIMIT 3;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで <code class="bg-slate-100">ORDER BY</code> に <code class="bg-slate-100">count(*)</code> の別名である「商品数」をそのまま書けている点に注目してください。第6章で触れたとおり、<strong>ORDER BYではSELECT句で付けた別名（AS）が使えます</strong>。一方、<code class="bg-slate-100">WHERE</code>句では別名はまだ計算されていないため使えません（<code class="bg-slate-100">WHERE 商品数 &gt;= 3</code> のようには書けず、この用途は<code class="bg-slate-100">HAVING count(*) &gt;= 3</code>で書きます）。もちろん <code class="bg-slate-100">ORDER BY count(*) DESC</code> と関数のまま書いても同じ結果になります。
+                    </p>
+                </section>
+
+                <!-- セクション9.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.8 実務的な集計例
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後に、これまでの知識を組み合わせて実務でよく使う集計を3つ作ります。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">(1) カテゴリ別の商品点数と平均単価</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">category-summary.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- カテゴリごとの商品点数と平均単価をまとめて集計する
+SELECT category,
+       count(*) AS 商品点数,
+       round(avg(unit_price), 0) AS 平均単価
+FROM products
+GROUP BY category
+ORDER BY category;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">(2) 都道府県別の顧客数</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">prefecture-summary.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- prefectureがNULLの顧客はグループ化されず除外される点に注意
+SELECT prefecture, count(*) AS 顧客数
+FROM customers
+WHERE prefecture IS NOT NULL
+GROUP BY prefecture
+ORDER BY 顧客数 DESC;</code></pre>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">(3) 月別の注文件数</h3>
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">monthly-orders.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- to_char（第8章）で日付を「年-月」の文字列に変換してグループ化
+SELECT to_char(order_date, 'YYYY-MM') AS 注文月,
+       count(*) AS 注文件数
+FROM orders
+GROUP BY to_char(order_date, 'YYYY-MM')
+ORDER BY 注文月;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">結果イメージ:</p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">注文月</th>
+                                    <th class="px-4 py-3 text-left font-semibold">注文件数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">2024-02</td>
+                                    <td class="px-4 py-3 text-slate-600">5</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">2024-03</td>
+                                    <td class="px-4 py-3 text-slate-600">5</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">2024-04</td>
+                                    <td class="px-4 py-3 text-slate-600">5</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">予告: 「カテゴリ別の売上合計」は第11章で完成します</p>
+                                <p class="text-blue-900 text-sm">「カテゴリ別の売上金額」を出すには、商品の単価（<code class="bg-blue-100">products</code>）と注文明細の数量（<code class="bg-blue-100">order_items</code>）という<strong>別々の表</strong>を組み合わせる必要があります。表と表をつなぐ <code class="bg-blue-100">JOIN</code> は第11章のテーマです。この章の <code class="bg-blue-100">GROUP BY</code> ＋ <code class="bg-blue-100">HAVING</code> の知識は、そのままJOIN後の集計にも使えます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: 自力で集計SQLを書いてみる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">pgAdmin 4 または A5:SQL Mk-2 で <code class="bg-purple-100">shop_db</code> に接続し、次の4問に挑戦してください。answerの欄は自分で書いてから確認しましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">問題</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">customersテーブルの総顧客数と、emailが登録されている顧客数を1つのSELECTで求めてください。<br /><span class="text-sm text-purple-700">期待結果: 2つの数値が横に並んだ1行（count(*)とcount(email)）。</span></span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ordersテーブルを status（受付／発送済／キャンセル）ごとにグループ化し、それぞれの件数を求めてください。<br /><span class="text-sm text-purple-700">期待結果: statusと件数の2列、3行（3種類のstatus分）。</span></span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">productsテーブルをcategoryごとにグループ化し、平均単価が2000円以上のカテゴリだけを表示してください。<br /><span class="text-sm text-purple-700">期待結果: category・平均単価の2列。条件を満たすカテゴリのみ（HAVINGを使用）。</span></span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">order_itemsテーブルをproduct_idごとにグループ化し、注文された合計数量（quantityの合計）が多い順に上位3件を表示してください。<br /><span class="text-sm text-purple-700">期待結果: product_id・合計数量の2列、3行（ORDER BY ... DESC LIMIT 3）。</span></span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> 「まとめたい列をGROUP BYに、まとめた値の欲しい形を集約関数で、まとめた後の絞り込みをHAVINGで」という3点セットを、自分の手で組み立てられるようになることが目的です。エラーが出たら、まずSELECT句にGROUP BY対象外の生の列が無いか確認しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. <code class="bg-blue-100">count(*)</code> と <code class="bg-blue-100">count(列名)</code> は、何がどう違いますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">count(*)</code> は条件に合う行そのものの数を、NULLの有無に関係なくすべて数えます。<code class="bg-blue-200">count(列名)</code> はその列の値がNULLでない行だけを数えるため、対象列にNULLが含まれていると<code class="bg-blue-200">count(*)</code>より小さい値になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">WHERE</code> と <code class="bg-blue-100">HAVING</code> は、それぞれ何に対する条件ですか。両方を使う例も1つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">WHERE</code> はGROUP BYでグループ分けする<strong>前</strong>の1行1行に対する条件で、集約関数は書けません。<code class="bg-blue-200">HAVING</code> はグループ分けした<strong>後</strong>の各グループに対する条件で、<code class="bg-blue-200">count(*)</code>などの集約関数を条件に使えます。例: 「販売中の商品（WHERE is_active = true）を対象に、3点以上あるカテゴリ（HAVING count(*) &gt;= 3）を探す」。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 次のSQLはエラーになります。何が問題で、どう直せばよいですか。<br /><code class="bg-blue-100">SELECT category, product_name, count(*) FROM products GROUP BY category;</code></p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">product_name</code> がGROUP BYに指定されておらず、かつ集約関数でもないままSELECT句に書かれているのが原因です（<code class="bg-blue-200">column "products.product_name" must appear in the GROUP BY clause</code>というエラーになります）。直すには、(1) <code class="bg-blue-200">GROUP BY category, product_name</code> のようにproduct_nameもGROUP BYに加えるか、(2) SELECT句からproduct_nameを外す、のどちらかにします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 「売れ筋トップ3」を出すために <code class="bg-blue-100">ORDER BY count(*) DESC LIMIT 3</code> と書くとき、なぜ <code class="bg-blue-100">ORDER BY 商品数 DESC</code>（AS で付けた別名）のようにも書けるのですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            SQL文はFROM→WHERE→GROUP BY→HAVING→SELECT→ORDER BYの順に処理されます。<code class="bg-blue-200">ORDER BY</code> はSELECTの<strong>後</strong>に実行されるため、SELECT句で付けた別名（AS）がすでに計算済みで使えます。一方<code class="bg-blue-200">WHERE</code>や<code class="bg-blue-200">HAVING</code>はSELECTより先に処理されるので、SELECT句の別名はまだ存在せず使えません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sql-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第8章: 関数でデータを加工する</span>
+                        </div>
+                    </a>
+                    <a href="sql-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: データの追加・更新・削除</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
