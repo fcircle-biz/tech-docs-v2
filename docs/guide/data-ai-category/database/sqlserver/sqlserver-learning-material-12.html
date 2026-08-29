@@ -109,7 +109,7 @@ html.dark{ --primary-500:#38bdf8; }</style><!-- スタンドアロン展開中�
                         12.1 なぜ権限管理が必要か
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        SQL Server をインストールした直後は、管理者権限を持つ <code class="bg-slate-100">sa</code>（system administrator）アカウントや、自分の Windows アカウントですべての操作ができてしまいます。学習中はそれで問題ありませんが、実際の業務システムで「全員が管理者アカウントで接続する」状態のまま運用すると、次のような危険があります。
+                        SQL Server をインストールした直後は、多くの場合インストールを行った自分の Windows アカウントが sysadmin 権限を持ち、管理者としてすべての操作ができてしまいます（<code class="bg-slate-100">sa</code> アカウントがどういう状態になっているかは12.2で詳しく説明します）。学習中はそれで問題ありませんが、実際の業務システムで「全員が管理者アカウントで接続する」状態のまま運用すると、次のような危険があります。
                     </p>
                     <ul class="list-disc pl-6 text-slate-600 leading-relaxed mb-4 space-y-1">
                         <li>参照だけで良いはずの担当者が、誤操作で本番データを <code class="bg-slate-100">DELETE</code> してしまう</li>
@@ -170,15 +170,35 @@ html.dark{ --primary-500:#38bdf8; }</style><!-- スタンドアロン展開中�
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        「混合モード（Mixed Mode）」とは、この2つの認証方式を<strong>両方とも受け付ける</strong>設定のことです。Windows 認証だけを許可するモードも選べますが、Docker コンテナや Linux から接続する場合、あるいは Web アプリケーションのようにドメインアカウントを持たない仕組みから接続する場合は、混合モードを有効にして SQL Server 認証を使う必要があります。
+                        「混合モード（Mixed Mode）」とは、この2つの認証方式を<strong>両方とも受け付ける</strong>設定のことです。Windows 認証だけを許可するモードも選べますが、本教材で使う学習用の Docker 環境や、Web アプリケーションのようにドメインアカウントを持たない仕組みから接続する場合は、混合モードを有効にして SQL Server 認証を利用することが多いです。
                     </p>
 
                     <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
                         <div class="flex items-start gap-3">
                             <i class="fas fa-circle-info text-blue-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-blue-800 mb-1">sa アカウントの扱い</p>
-                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">sa</code> は SQL Server 認証の組み込み管理者アカウントで、常に最高権限（sysadmin）を持ちます。名前が推測しやすく攻撃対象になりやすいため、実務では<strong>インストール時に強力なパスワードを設定した上で無効化する</strong>、あるいは名前を変更して日常運用には使わない、という扱いが一般的です。日常の管理作業には、後述するサーバーロール <code class="bg-blue-100">sysadmin</code> を持つ個人名のログインを使います。</p>
+                                <p class="font-semibold text-blue-800 mb-1">用語: sa アカウント</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">sa</code>（system administrator）は SQL Server 認証の組み込み管理者アカウントで、有効になっていれば常に最高権限（sysadmin）を持ちます。ただし<strong>初期状態はインストール時に選んだ認証モードによって異なります</strong>。Windows 認証モードでインストールした場合、<code class="bg-blue-100">sa</code> ログイン自体は作成されますが<strong>無効（disabled）</strong>の状態で、そのままでは接続に使えません。一方、混合モードでインストールした場合は、インストール時に設定したパスワードで <code class="bg-blue-100">sa</code> が有効な状態になります。後から Windows 認証モードのインスタンスを混合モードへ切り替えた場合は、<code class="bg-blue-100">ALTER LOGIN sa ENABLE;</code> で明示的に有効化したうえで、パスワードを設定し直す必要があります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: sa を日常的に使わない</p>
+                                <p class="text-orange-900 text-sm"><code class="bg-orange-100">sa</code> は名前が推測しやすく、攻撃対象になりやすいアカウントです。実務では、<strong>無効のまま使わない・名前を変更する・強固なパスワードを設定する</strong>といった対策を取り、sa を日常の接続・運用には使わないのが基本です。日常の管理作業には、後述するサーバーロール <code class="bg-orange-100">sysadmin</code> を持つ個人名のログインを使います。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-violet-50 border-l-4 border-violet-500 p-4 my-6 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-graduation-cap text-violet-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-violet-800 mb-1">参考: Windows 認証系の仕組みは Windows 専用ではない</p>
+                                <p class="text-violet-900 text-sm">「Windows 認証＝ Windows 環境専用」というわけではありません。Linux 版の SQL Server でも、Windows ドメインのアカウントを一元管理する仕組みである Active Directory と連携する認証（AD 認証）を構成すれば、Windows 認証を利用できます。また Azure SQL Database・Azure SQL Managed Instance では、Microsoft のクラウド型ID管理サービスである Microsoft Entra ID（旧 Azure AD）による認証を利用できます。本教材では学習のしやすさを優先して SQL Server 認証（混合モード）を中心に扱いますが、実務ではこうした選択肢もあることを覚えておきましょう。</p>
                             </div>
                         </div>
                     </div>
@@ -216,12 +236,12 @@ flowchart TD
                         実際の手順としては、まず <code class="bg-slate-100">CREATE LOGIN</code> でサーバーレベルの鍵を作り、続けて対象データベースの中で <code class="bg-slate-100">CREATE USER ... FOR LOGIN ...</code> を実行して、そのログインに対応するユーザーを作ります。この2段階を踏んで初めて、データベース内のテーブルなどへアクセスできるようになります。
                     </p>
 
-                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
                         <div class="flex items-start gap-3">
-                            <i class="fas fa-exclamation-circle text-orange-600 mt-1"></i>
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-orange-800 mb-1">用語: 孤立ユーザー（orphaned user）</p>
-                                <p class="text-orange-900 text-sm">データベースだけを別のサーバーへバックアップ・復元すると、データベース内の「ユーザー」情報はそのまま移りますが、対応する「ログイン」が新しいサーバーに存在しないことがあります。この、対応するログインを失ったユーザーを<strong>孤立ユーザー</strong>と呼びます。復元後にログインできない場合は、まずこの状態を疑いましょう（第13章のバックアップ・復旧で改めて扱います）。</p>
+                                <p class="font-semibold text-blue-800 mb-1">用語: 孤立ユーザー（orphaned user）</p>
+                                <p class="text-blue-900 text-sm">データベースだけを別のサーバーへバックアップ・復元すると、データベース内の「ユーザー」情報はそのまま移りますが、対応する「ログイン」が新しいサーバーに存在しないことがあります。この、対応するログインを失ったユーザーを<strong>孤立ユーザー</strong>と呼びます。復元後にログインできない場合は、まずこの状態を疑いましょう（第13章のバックアップ・復旧で改めて扱います）。</p>
                             </div>
                         </div>
                     </div>
@@ -302,7 +322,7 @@ ALTER ROLE db_datareader ADD MEMBER ReadOnlyUser;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        1人のユーザーを複数のロールに同時に所属させることもできます。「参照はできるが更新はできない」担当者には <code class="bg-slate-100">db_datareader</code> だけ、「アプリの実行アカウント」には <code class="bg-slate-100">db_datareader</code> と <code class="bg-slate-100">db_datawriter</code> の2つ、というように組み合わせるのが実務の定番です。
+                        1人のユーザーを複数のロールに同時に所属させることもできます。「参照はできるが更新はできない」担当者には <code class="bg-slate-100">db_datareader</code> だけ、「アプリの実行アカウント」には <code class="bg-slate-100">db_datareader</code> と <code class="bg-slate-100">db_datawriter</code> の2つ、というように組み合わせるのが基本的な考え方です。ただしこれは学習のための単純化した例で、実務ではさらに踏み込んだ権限設計を行うことがあります（12.6で扱います）。
                     </p>
                 </section>
 
@@ -342,7 +362,7 @@ ALTER ROLE db_datareader ADD MEMBER ReadOnlyUser;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        ここで最も間違えやすいのが <code class="bg-slate-100">DENY</code> と <code class="bg-slate-100">REVOKE</code> の違いです。<code class="bg-slate-100">REVOKE</code> は「許可も拒否もしていないニュートラルな状態」に戻すだけなのに対し、<code class="bg-slate-100">DENY</code> は「たとえロールから SELECT を許可されていても、絶対にこの操作はさせない」という<strong>強制的な拒否</strong>です。仮にユーザーが <code class="bg-primary-100 text-primary-900">db_owner</code> ロールに入っていても、個別に <code class="bg-slate-100">DENY</code> された操作は実行できません。ただしサーバーロール <code class="bg-slate-100">sysadmin</code> のメンバーは権限チェック自体を通らないため、<code class="bg-slate-100">DENY</code> でも止められない点だけは例外として覚えておきましょう。
+                        ここで最も間違えやすいのが <code class="bg-slate-100">DENY</code> と <code class="bg-slate-100">REVOKE</code> の違いです。<code class="bg-slate-100">REVOKE</code> は「許可も拒否もしていないニュートラルな状態」に戻すだけなのに対し、<code class="bg-slate-100">DENY</code> は「たとえロールから SELECT を許可されていても、絶対にこの操作はさせない」という<strong>強制的な拒否</strong>です。仮にユーザーが <code class="bg-slate-100">db_owner</code> ロールに入っていても、個別に <code class="bg-slate-100">DENY</code> された操作は実行できません。ただしサーバーロール <code class="bg-slate-100">sysadmin</code> のメンバーは権限チェック自体を通らないため、<code class="bg-slate-100">DENY</code> でも止められない点だけは例外として覚えておきましょう。
                     </p>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -400,7 +420,7 @@ REVOKE SELECT ON SCHEMA::dbo FROM ReadOnlyUser;</code></pre>
                                 <i class="fas fa-plug text-white"></i>
                             </div>
                             <h3 class="font-semibold text-slate-800 mb-1">アプリ用ユーザー</h3>
-                            <p class="text-sm text-slate-600"><code class="bg-slate-100">db_datareader</code>＋<code class="bg-slate-100">db_datawriter</code>。業務アプリの接続専用。テーブル構造の変更（DDL）はできない。</p>
+                            <p class="text-sm text-slate-600"><code class="bg-slate-100">db_datareader</code>＋<code class="bg-slate-100">db_datawriter</code>。業務アプリの接続専用。テーブル構造の変更（DDL）はできない。<strong>学習用に単純化した例</strong>で、実務での設計はこの後で説明します。</p>
                         </div>
                         <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
                             <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
@@ -413,6 +433,40 @@ REVOKE SELECT ON SCHEMA::dbo FROM ReadOnlyUser;</code></pre>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
                         こうしてユーザーを分けておくと、「アプリのソースコードが漏えいしても、参照専用ユーザーの権限しか奪われない」「レポートツールの設定ミスでデータが消える心配がない」など、被害の範囲を最小限に抑えられます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なお、先ほどの「アプリ用ユーザーには <code class="bg-slate-100">db_datareader</code>＋<code class="bg-slate-100">db_datawriter</code> を与える」という例は<strong>学習用に単純化した例です</strong>。この2つの組み込みロールは、データベース内の<strong>すべて</strong>のテーブルに対する SELECT／INSERT／UPDATE／DELETE をまとめて許可してしまうため、本来そのアプリが触れる必要のないテーブルまで読み書きできてしまいます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        より実務に近い設計では、まず<strong>専用のデータベースロールを作成</strong>し（<code class="bg-slate-100">CREATE ROLE</code>）、<strong>そのアプリが本当に必要とするスキーマ・テーブル・ストアドプロシージャに対してだけ</strong>権限を与えます。このように「そのアプリが本当に必要とする操作だけを許す」という考え方も、12.1で紹介した<strong>最小権限の原則</strong>を、より具体的な権限設計に落とし込んだものです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">app-role-least-privilege.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1. 注文処理アプリ専用のデータベースロールを作成する
+CREATE ROLE app_order_role;
+
+-- 2. そのアプリが実際に使うテーブルにだけ、必要な操作を許可する
+--    db_datareader / db_datawriter と違い、対象テーブルも操作も絞り込める
+GRANT SELECT, INSERT ON dbo.Orders TO app_order_role;
+GRANT SELECT ON dbo.Products TO app_order_role;
+GRANT SELECT ON dbo.Customers TO app_order_role;
+
+-- 3. 特定のストアドプロシージャの実行だけを許可する
+GRANT EXECUTE ON dbo.usp_CreateOrder TO app_order_role;
+
+-- 4. アプリ用ユーザーをこのロールに追加する
+ALTER ROLE app_order_role ADD MEMBER AppUser;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        db_datareader・db_datawriter のような組み込みロールは、学習中に「まず動かしてみる」段階では便利です。実務でも小規模なシステムでは十分なことがありますが、扱うデータの重要度が上がるほど、こうして<strong>アプリごとに必要な範囲だけへ絞ったロール</strong>を設計する価値が大きくなります。
                     </p>
 
                     <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
@@ -593,7 +647,7 @@ REVOKE SELECT ON SCHEMA::dbo FROM ReadOnlyUser;</code></pre>
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            db_owner はテーブルの削除や構造変更まで含むすべての操作ができてしまうため、アプリのバグや認証情報の漏えいが起きたときの被害が最大化します。アプリに必要なのは通常データの読み書き（db_datareader・db_datawriter）だけであり、業務上必要な権限だけを与える最小権限の原則に反するためです。
+                                            db_owner はテーブルの削除や構造変更まで含むすべての操作ができてしまうため、アプリのバグや認証情報の漏えいが起きたときの被害が最大化します。アプリに必要なのは、そのアプリが実際に使うテーブルへの読み書きだけです。組み込みロールの db_datareader・db_datawriter でも、データベース内のすべてのテーブルが対象になってしまうため、実務では専用のデータベースロールを作り、必要な範囲だけを許可します（12.6 参照）。業務上必要な権限だけを与える最小権限の原則に沿った設計が重要です。
                                         </p>
                                     </details>
                                 </li>

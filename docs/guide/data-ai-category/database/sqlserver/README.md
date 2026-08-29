@@ -7,8 +7,8 @@
 ### 必要な環境
 
 - Windows 10/11、macOS、または Linux（macOS / Linux では Docker を利用）
-- SQL Server 2022 Developer Edition または Express Edition（いずれも無償）
-- SQL Server Management Studio (SSMS) 20 以降（Windows）、または Visual Studio Code ＋ MSSQL 拡張機能（macOS / Linux）
+- SQL Server 2025 Enterprise Developer Edition（本ガイドの推奨）、Standard Developer Edition、または Express Edition（いずれも無償）
+- SQL Server Management Studio (SSMS) 22（Windows。Visual Studio Installer 経由で導入）、または Visual Studio Code ＋ MSSQL 拡張機能（macOS / Linux）
 - ディスク空き容量 10GB 以上、メモリ 4GB 以上（8GB 推奨）
 
 ### 参考リソース
@@ -27,7 +27,7 @@
 ## 学習コンテンツ
 
 ### [1. SQL Serverとは](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-01.html)
-データベース／RDBMS とは何かという基礎から出発し、SQL Server の歴史・エディション（Developer / Express / Standard / Enterprise / Azure SQL）・得意分野を学びます。あわせて Oracle・MySQL・PostgreSQL との立ち位置の違いを俯瞰し、本ガイドの学び方を確認します。
+データベース／RDBMS とは何かという基礎から出発し、SQL Server の歴史・エディション（Enterprise Developer / Standard Developer / Express / Standard / Enterprise / Azure SQL）・得意分野を学びます。あわせて Oracle・MySQL・PostgreSQL との立ち位置の違いを俯瞰し、本ガイドの学び方を確認します。
 
 ### [2. アーキテクチャと基本用語](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-02.html)
 インスタンス・データベース・スキーマ・オブジェクトという SQL Server の構造を、身近な例えで理解します。データファイル (.mdf/.ndf) とトランザクションログ (.ldf)、システムデータベース (master/model/msdb/tempdb)、3部・4部構成の名前解決を扱います。PostgreSQL の「クラスタ＋データベース＋スキーマ」構造との対応関係も整理します。
@@ -48,22 +48,22 @@ SELECT / WHERE / ORDER BY / DISTINCT / TOP、比較・論理演算子、LIKE、B
 INSERT / UPDATE / DELETE の基本形と複数行 INSERT、SELECT INTO、TRUNCATE TABLE、OUTPUT 句、MERGE 文を学びます。WHERE 句を忘れた事故を防ぐ実務的な手順、PostgreSQL の RETURNING 句や UPSERT (ON CONFLICT) との違いも解説します。
 
 ### [8. テーブルの結合と集計](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-08.html)
-INNER JOIN / LEFT・RIGHT・FULL OUTER JOIN / CROSS JOIN を図で理解し、GROUP BY・HAVING・集計関数、サブクエリ、CTE (WITH)、ウィンドウ関数（ROW_NUMBER, SUM OVER）の入門までを扱います。文字列集約（STRING_AGG）など PostgreSQL との関数名の違いも比較します。
+INNER JOIN / LEFT・RIGHT・FULL OUTER JOIN / CROSS JOIN を図で理解し、GROUP BY・HAVING・集計関数、基本的なサブクエリまでを必須内容として学びます。CTE (WITH)、EXISTS、ウィンドウ関数（ROW_NUMBER, SUM OVER）は「発展」として本編と分けて扱います。文字列集約（STRING_AGG）など PostgreSQL との関数名の違いも比較します。
 
 ### [9. T-SQLプログラミング入門](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-09.html)
-変数 (DECLARE/SET)、IF / WHILE、TRY...CATCH によるエラー処理、ストアドプロシージャ、ユーザー定義関数、ビューの作り方を学びます。SQL Server の T-SQL と PostgreSQL の PL/pgSQL の書き方の違い（バッチ・ブロック構造・戻り値）を対比します。
+変数 (DECLARE/SET)、IF / WHILE、TRY...CATCH によるエラー処理、ストアドプロシージャまでを必須内容として学びます。ユーザー定義関数（UDF）とビューは「発展」として本編と分けて扱います。SQL Server の T-SQL と PostgreSQL の PL/pgSQL の書き方の違い（バッチ・ブロック構造・戻り値）を対比します。
 
 ### [10. トランザクションとロック](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-10.html)
 ACID 特性、BEGIN TRAN / COMMIT / ROLLBACK、自動コミットの挙動、分離レベル、ロックとブロッキング、デッドロックの基本を学びます。既定が READ COMMITTED（ロックベース）の SQL Server と、MVCC を前提とする PostgreSQL の違い、READ_COMMITTED_SNAPSHOT の意味を理解します。
 
 ### [11. インデックスと性能の基礎](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-11.html)
-クラスター化インデックスと非クラスター化インデックスの違い、インデックスが効く／効かない書き方、実行プランの読み方、統計情報、SARGability の考え方を学びます。PostgreSQL のヒープ＋インデックス構造・EXPLAIN ANALYZE との違いも扱います。
+クラスター化インデックスと非クラスター化インデックスの違い、インデックスが効く／効かない書き方、実行プランの読み方、統計情報を学びます。SARGable・Key Lookup・RID Lookup は「発展」用語として本編と分けて扱います。PostgreSQL のヒープ＋インデックス構造・EXPLAIN ANALYZE との違いも扱います。
 
 ### [12. セキュリティとユーザー管理](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-12.html)
 Windows 認証と SQL Server 認証、ログイン（サーバーレベル）とユーザー（データベースレベル）の二層構造、ロール、GRANT / DENY / REVOKE、最小権限の原則を学びます。PostgreSQL のロール一元管理・pg_hba.conf との考え方の違いを比較します。
 
 ### [13. バックアップと復旧・運用](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-13.html)
-復旧モデル（単純・完全・一括ログ）、完全／差分／トランザクションログバックアップ、RESTORE と特定時点への復旧、SQL Server Agent によるジョブ自動化、日常の運用確認項目を学びます。PostgreSQL の pg_dump / WAL アーカイブとの対応も示します。
+復旧モデル（単純・完全・一括ログ）、完全／差分／トランザクションログバックアップ、正しい復元手順（完全→差分→必要なログを古い順にすべて適用し、途中は NORECOVERY、最後に RECOVERY）、STOPAT による特定時点への復旧、SQL Server Agent によるジョブ自動化、日常の運用確認項目を学びます。PostgreSQL の pg_dump / WAL アーカイブとの対応も示します。
 
 ### [14. PostgreSQLとの違い総まとめ](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/sqlserver/sqlserver-learning-material-14.html)
 これまで各章で学んだ SQL Server と PostgreSQL の違いを一覧に整理し、ライセンス・構文・型・トランザクション・運用の観点から総復習します。移行時に注意すべきポイント、Azure SQL Database へのステップアップ、次に学ぶとよいテーマと学習ロードマップを示します。
@@ -96,8 +96,8 @@ Windows 認証と SQL Server 認証、ログイン（サーバーレベル）と
 - 自分の PC に SQL Server と SSMS を導入し、データベースへ接続できる
 - テーブルを設計・作成し、適切なデータ型と制約を選べる
 - SELECT / INSERT / UPDATE / DELETE を使ってデータを自在に操作できる
-- JOIN・集計・サブクエリ・CTE を用いて実務的なクエリを書ける
-- T-SQL でストアドプロシージャやビューを作成できる
+- JOIN・集計・サブクエリを用いて実務的なクエリを書ける（CTE・ウィンドウ関数は発展）
+- T-SQL でストアドプロシージャを作成できる（ユーザー定義関数・ビューは発展）
 - トランザクション・ロック・分離レベルを理解し、安全にデータを更新できる
 - インデックスと実行プランを手がかりに、遅いクエリの原因を推測できる
 - ユーザー・権限を設定し、バックアップと復旧の手順を実施できる

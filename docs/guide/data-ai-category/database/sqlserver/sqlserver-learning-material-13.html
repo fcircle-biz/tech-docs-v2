@@ -151,7 +151,7 @@ html.dark{ --primary-500:#38bdf8; }</style><!-- スタンドアロン展開中�
                             </thead>
                             <tbody class="divide-y divide-slate-200">
                                 <tr>
-                                    <td class="px-4 py-3 font-bold">RPO<br><span class="text-xs font-normal text-slate-500">目標復旧時点</span></td>
+                                    <td class="px-4 py-3 font-bold">RPO<br><span class="text-xs font-normal text-slate-500">目標復旧地点</span></td>
                                     <td class="px-4 py-3 text-slate-600">障害発生時、どこまでのデータを失ってよいか（例: 「直近15分以内のデータまでは失ってもよい」）</td>
                                     <td class="px-4 py-3 text-slate-600">RPOが短いほど、ログバックアップの頻度を上げる必要がある</td>
                                 </tr>
@@ -295,7 +295,7 @@ flowchart LR
     A --> C["随時: トランザクションログバックアップ（15分間隔など）"]
     B --> D["障害発生"]
     C --> D
-    D --> E["復元の順序: 完全 → 差分 → ログ"]
+    D --> E["復元の順序: 完全 → 差分 → ログ（該当する分を取得順にすべて適用）"]
                         </div>
                     </div>
 
@@ -364,8 +364,56 @@ WITH COMPRESSION,
                         13.4 復元する
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        復元（リストア）は、取得したバックアップを<strong>正しい順序</strong>で適用していく作業です。ポイントは、続きのバックアップを適用する予定があるあいだは <code class="bg-slate-100">WITH NORECOVERY</code> を指定し、最後のひとつだけ <code class="bg-slate-100">WITH RECOVERY</code> にすることです。
+                        復元（リストア）は、取得したバックアップを<strong>正しい順序</strong>で適用していく作業です。基本の流れは次のとおりです。
                     </p>
+
+                    <div class="bg-white rounded-xl border border-slate-200 p-5 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-list-ol text-primary-600"></i>
+                            復元の基本手順
+                        </h3>
+                        <ol class="space-y-3">
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">1</span>
+                                <span class="flex-1 min-w-0">（可能であれば）<strong>末尾のログバックアップ</strong>（tail-log backup）を取得する — 障害発生時点までの未バックアップの更新分を退避しておきます。</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">2</span>
+                                <span class="flex-1 min-w-0"><strong>完全バックアップ</strong>を <code class="bg-slate-100">WITH NORECOVERY</code> で復元する。</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">3</span>
+                                <span class="flex-1 min-w-0">（差分バックアップがあれば）<strong>最新の差分バックアップ</strong>を <code class="bg-slate-100">WITH NORECOVERY</code> で復元する。</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">4</span>
+                                <span class="flex-1 min-w-0">復旧させたい時点までに必要な<strong>トランザクションログバックアップを、取得した順（古い順）に、途切れなくすべて</strong> <code class="bg-slate-100">WITH NORECOVERY</code> で適用する。<strong>1本だけではありません。</strong>復元の基点（完全または差分）より後に取得されたログバックアップを、順番どおりに全部適用します。</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">5</span>
+                                <span class="flex-1 min-w-0">最後の1本だけ <code class="bg-slate-100">WITH RECOVERY</code> を指定し、データベースを利用可能な状態に戻す。</span>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>差分バックアップとログバックアップでは、復元時に使う本数の考え方が異なります。</strong>差分バックアップは常に直近の完全バックアップからの累積のため、復元時に使うのは<strong>最新の1本だけ</strong>で十分です。一方、ログバックアップは直近のログバックアップ以降の更新分でしかないため、<strong>必要な分をすべて、取得した順に</strong>適用しなければ、途中の更新が抜け落ちてしまいます。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: NORECOVERY と RECOVERY</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">WITH NORECOVERY</code> は「まだ後続のバックアップを適用する」ことをSQL Serverに伝えるオプションです。この状態のデータベースは「復元中」で、まだ接続して使うことはできません。一方 <code class="bg-blue-100">WITH RECOVERY</code> を実行すると、その時点でデータベースは「使える状態」に確定し、<strong>それ以降はログを追加で適用できなくなります</strong>。<strong>RECOVERY は省略時の既定値です。</strong>続きのバックアップを適用するつもりで <code class="bg-blue-100">WITH NORECOVERY</code> を書き忘れると、そこで復旧が確定してしまい、以降のログを適用できなくなるので注意してください。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
@@ -374,25 +422,49 @@ WITH COMPRESSION,
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1. 完全バックアップを「復旧中」状態で復元（この後も適用するのでRECOVERYしない）
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1. （可能なら）末尾のログバックアップを取得しておく
+BACKUP LOG SampleShop
+TO DISK = 'C:\Backup\SampleShop_Log_Tail.bak'
+WITH NORECOVERY;
+
+-- 2. 完全バックアップを「復旧中」状態で復元する（この後も適用するのでRECOVERYしない）
 RESTORE DATABASE SampleShop
 FROM DISK = 'C:\Backup\SampleShop_Full.bak'
-WITH NORECOVERY, REPLACE;
+WITH NORECOVERY;
 
--- 2. 差分バックアップを重ねて復元
+-- 3. 差分バックアップを重ねて復元する（あれば。最新の1本でよい）
 RESTORE DATABASE SampleShop
 FROM DISK = 'C:\Backup\SampleShop_Diff.bak'
 WITH NORECOVERY;
 
--- 3. 最後のログバックアップまで適用し、復旧を確定する
+-- 4. 差分より後のログバックアップを「古い順に、必要な分すべて」適用する
 RESTORE LOG SampleShop
-FROM DISK = 'C:\Backup\SampleShop_Log.bak'
+FROM DISK = 'C:\Backup\SampleShop_Log_01.bak'
+WITH NORECOVERY;
+
+RESTORE LOG SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Log_02.bak'
+WITH NORECOVERY;
+
+-- 5. 末尾のログバックアップまで含め、最後の1本だけRECOVERYで締める（ここでデータベースが使える状態になる）
+RESTORE LOG SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Log_Tail.bak'
 WITH RECOVERY;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        ログバックアップには <code class="bg-slate-100">STOPAT</code> を指定でき、「誤って削除する直前」のような<strong>特定時点</strong>まで戻すことができます。
+                        ログバックアップを使うと、<code class="bg-slate-100">STOPAT</code> オプションで「誤って削除する直前」のような<strong>特定時点</strong>まで戻す復元ができます。<code class="bg-slate-100">STOPAT</code> は<strong>完全</strong>または<strong>一括ログ</strong>の復旧モデルで利用できます（一括ログ復旧モデルでは、一括操作を含む期間の途中の時点には戻せない場合があります）。目標の時刻が既存のログバックアップの範囲に含まれているのであれば、この復元のために新たに末尾のログバックアップを取得する必要はありません（<code class="bg-slate-100">STOPAT</code> を指定すること自体が、後述する安全確認のうち「末尾ログの未取得」に関する確認を満たします）。
                     </p>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: STOPAT は「目的の1本だけ」に付けるのではない</p>
+                                <p class="text-orange-900 text-sm"><code class="bg-orange-100 text-orange-900">STOPAT</code> は、復元シーケンス中の<strong>すべての RESTORE LOG 文に、同じ値を指定</strong>します。「目的の時刻を含むログバックアップだけに付ける」のは誤りです。また、STOPAT を使う復元では、末尾の復旧確定は <code class="bg-orange-100 text-orange-900">RESTORE LOG ... WITH STOPAT = '…', RECOVERY</code> のように1文にまとめず、<strong>ログをすべて WITH NORECOVERY で適用したあと、<code class="bg-orange-100 text-orange-900">RESTORE DATABASE SampleShop WITH RECOVERY;</code> を単独で実行して締める</strong>のが基本の書き方です。指定した時刻が最後のログバックアップより後だった場合、データベースは復旧が確定しない（NORECOVERYの）ままになるため、対象時刻を含むログバックアップが揃っているか事前に確認してください。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="code-block-wrapper mb-4">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
@@ -402,13 +474,26 @@ WITH RECOVERY;</code></pre>
                             </button>
                         </div>
                         <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 特定時点（誤操作の直前）まで復旧する例
+-- 1. 完全バックアップを復元する（まだ使える状態にしない）
+--    STOPATを添えることで「特定時点への復元」であることを明示できる
+--    （末尾ログを取っていない場合の安全確認もこれで通る）
 RESTORE DATABASE SampleShop
 FROM DISK = 'C:\Backup\SampleShop_Full.bak'
-WITH NORECOVERY, REPLACE;
+WITH NORECOVERY, STOPAT = '2026-08-28 10:15:00';
+
+-- 2. 復旧させたい時点までのログバックアップを、古い順にすべて適用する
+--    STOPATは「目的の1本だけ」ではなく、すべてのRESTORE LOGに同じ値を指定する
+RESTORE LOG SampleShop
+FROM DISK = 'C:\Backup\SampleShop_Log_01.bak'
+WITH NORECOVERY, STOPAT = '2026-08-28 10:15:00';
 
 RESTORE LOG SampleShop
-FROM DISK = 'C:\Backup\SampleShop_Log.bak'
-WITH RECOVERY, STOPAT = '2026-08-28 10:15:00';</code></pre>
+FROM DISK = 'C:\Backup\SampleShop_Log_02.bak'
+WITH NORECOVERY, STOPAT = '2026-08-28 10:15:00';
+
+-- 3. 最後に RESTORE DATABASE を単独で実行し、復旧を確定する
+RESTORE DATABASE SampleShop
+WITH RECOVERY;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -438,8 +523,18 @@ WITH MOVE 'SampleShop' TO 'C:\Data\SampleShop_Test.mdf',
                         <div class="flex items-start gap-3">
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-red-800 mb-1">警告: 復元は上書きです</p>
-                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900">RESTORE DATABASE</code> は既定で<strong>接続中のデータベースを丸ごと置き換えます</strong>。本番環境で同名のデータベースに対して実行すると、それまでのデータがすべて失われます。まずは本章の実習のように<strong>別名（例: <code class="bg-red-100 text-red-900">SampleShop_Test</code>）で復元して中身を確認する</strong>のが安全な手順です。本番のデータベースへ上書き復元する際は、対象名・対象環境（本番かどうか）を作業前に必ず指差し確認しましょう。</p>
+                                <p class="font-semibold text-red-800 mb-1">警告: 復元はデータを上書きします</p>
+                                <p class="text-red-900 text-sm">安全確認（次の注意ボックスを参照）を通過して <code class="bg-red-100 text-red-900">RESTORE DATABASE</code> が実行されると、対象のデータベースはバックアップ時点の内容に置き換わります。本番環境で同名のデータベースに対して実行すると、それまでのデータが失われます。まずは本章の実習のように<strong>別名（例: <code class="bg-red-100 text-red-900">SampleShop_Test</code>）で復元して中身を確認する</strong>のが安全な手順です。本番のデータベースへ上書き復元する際は、対象名・対象環境（本番かどうか）を作業前に必ず指差し確認しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: WITH REPLACE は安全確認を上書きするオプション</p>
+                                <p class="text-orange-900 text-sm">SQL Server の <code class="bg-orange-100 text-orange-900">RESTORE</code> は既定で、誤った復元を防ぐための<strong>安全確認（safety check）</strong>を行います。<strong>「復元先と同じ名前のデータベースが既に存在し、かつそのバックアップセットが記録している元のデータベース名が復元先の名前と異なる」場合</strong>、別のデータベースを誤って上書きしてしまうのを防ぐため RESTORE はエラーで停止します。また、完全または一括ログ復旧モデルのデータベースを、<strong>末尾のログバックアップも取らず、<code class="bg-orange-100 text-orange-900">STOPAT</code> も指定せずに</strong>上書きしようとした場合も、失われるログがないか確認できないため停止します。<code class="bg-orange-100 text-orange-900">WITH REPLACE</code> は、こうした安全確認（別データベースの上書き・末尾ログ未取得での上書き・既存ファイルの上書き）を上書き（回避）して、強制的に復元を進める強いオプションです。Microsoft のドキュメントも「REPLACE の使用は稀であるべきで、十分に検討したうえでのみ使うこと」と明記しています。<strong>状況を十分に確認したうえで、本当に必要な場合にだけ</strong>使用してください。</p>
                             </div>
                         </div>
                     </div>
@@ -575,13 +670,23 @@ WITH MOVE 'SampleShop' TO 'C:\Data\SampleShop_Test.mdf',
                                             </tr>
                                             <tr>
                                                 <td class="px-3 py-2 font-medium text-indigo-900">復元の手順</td>
-                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">RESTORE DATABASE</code> を NORECOVERY で重ねてから RECOVERY</td>
+                                                <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">RESTORE DATABASE</code> と <code class="bg-indigo-100">RESTORE LOG</code> を NORECOVERY で順に重ね、最後の1本だけ RECOVERY</td>
                                                 <td class="px-3 py-2 text-indigo-900"><code class="bg-indigo-100">pg_restore</code>（ダンプの場合）や、ベースバックアップ＋WAL再生（PITRの場合）</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                                <p class="text-indigo-900 text-sm mt-3 break-words">大きな違いは、SQL Server が「復旧モデル」という設定でログの扱いを切り替えるのに対し、PostgreSQL は常に WAL（Write-Ahead Log）を出力し続け、それをアーカイブするかどうかだけを設定する点です。目的（特定時点への復旧）は同じでも、たどり着き方の設計が異なります。</p>
+                                <p class="text-indigo-900 text-sm mt-3 break-words">大きな違いは、SQL Server が「復旧モデル」という設定でログの扱いを切り替えるのに対し、PostgreSQL は常に WAL を出力し続け、それをアーカイブするかどうかだけを設定する点です。目的（特定時点への復旧）は同じでも、たどり着き方の設計が異なります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: WAL と PITR</p>
+                                <p class="text-blue-900 text-sm"><strong>WAL</strong> は、データ本体を書き換える前に「何をどう変えるか」をログへ先に書き込む方式です（英語で <strong>Write-Ahead Logging</strong>、略して <strong>WAL</strong>。日本語では<strong>先行書き込みログ</strong>と呼びます）。<strong>PITR</strong> は「何月何日の何時何分の状態」を指定して戻す復元のやり方です（正式名称: PITR＝特定時点復旧）。SQL Server の <code class="bg-blue-100">STOPAT</code> による復元も、PostgreSQL の PITR も、目指すところは同じです。</p>
                             </div>
                         </div>
                     </div>
@@ -666,7 +771,7 @@ WITH MOVE 'SampleShop' TO 'C:\Data\SampleShop_Test.mdf',
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
                                             差分バックアップは「直近の完全バックアップ以降に変更された<strong>データそのもの</strong>」を取得します。一方、トランザクションログバックアップは「直近のログバックアップ以降の<strong>更新履歴（操作の記録）</strong>」を取得するもので、これを使うと特定時点まで正確に巻き戻せます。差分は直近の完全バックアップを基点としてしか使えず、ログバックアップは復旧モデルが「完全」または「一括ログ」のときだけ利用できます。
-                                        </p>
+                                        なお復元するときは、<strong>差分は最新の1本だけでよい</strong>のに対し、<strong>ログはその基点より後のものを古い順にすべて</strong>適用する必要があります。</p>
                                     </details>
                                 </li>
                                 <li class="text-blue-900">
