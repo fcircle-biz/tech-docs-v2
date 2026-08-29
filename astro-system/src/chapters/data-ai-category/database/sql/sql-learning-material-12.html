@@ -1,0 +1,765 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">サブクエリとビュー</h1>
+                    <p class="text-slate-600">この章では、SQL の中に SQL を書く「サブクエリ」という考え方を学びます。<code class="bg-slate-100">WHERE</code> 句のサブクエリ・<code class="bg-slate-100">IN</code>・<code class="bg-slate-100">EXISTS</code>・<code class="bg-slate-100">FROM</code> 句のサブクエリ（導出テーブル）を一通り経験したあと、それらを読みやすく書き直す <code class="bg-slate-100">WITH</code> 句（CTE）、そしてよく使う SELECT に名前を付けて保存する <code class="bg-slate-100">CREATE VIEW</code> を学びます。最後に発展として、集計しても行が消えないウィンドウ関数の入口にも触れます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-semibold text-amber-900 mb-3">この章の学習目標</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブクエリが「内側を先に実行し、その結果を外側が使う」入れ子の仕組みであることを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>スカラサブクエリ・<code class="bg-amber-100">IN</code>・<code class="bg-amber-100">EXISTS</code> を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">FROM</code> 句のサブクエリ（導出テーブル）と <code class="bg-amber-100">WITH</code> 句（CTE）で段階的な集計を書ける</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">CREATE VIEW</code> でよく使う SELECT に名前を付けて再利用できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 サブクエリとは — 「SQL の中に書く SQL」
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第11章までに学んだ <code class="bg-slate-100">SELECT</code> は、いつも「1回書けば1回で完結する」ものでした。しかし実務では、「まず〇〇を求めて、その結果を使って△△を絞り込む」という<strong>二段階の問い合わせ</strong>が頻繁に必要になります。たとえば「平均単価より高い商品を知りたい」という要求には、(1) 平均単価を求める、(2) その値より高い商品を絞り込む、という2つの手順が隠れています。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この2つの手順を1つの SQL 文の中に<strong>入れ子（ネスト）</strong>にして書けるのが<strong>サブクエリ（副問い合わせ）</strong>です。カッコで囲んだ内側の <code class="bg-slate-100">SELECT</code> が先に実行され、その<strong>結果</strong>を外側の <code class="bg-slate-100">SELECT</code> が材料として使います。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["① 内側のSELECT（サブクエリ）を先に実行"] --> B["② 内側の実行結果（値・値のリスト・表）ができる"]
+    B --> C["③ 外側のSELECTが②の結果を材料として使う"]
+    C --> D["④ 外側の実行結果が最終的な答えになる"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブクエリは、<strong>どこに書くか</strong>によって返せる形と使い道が変わります。この章では代表的な3つの位置を順番に見ていきます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">書く位置</th>
+                                    <th class="px-4 py-3 text-left font-semibold">サブクエリが返すもの</th>
+                                    <th class="px-4 py-3 text-left font-semibold">主な用途</th>
+                                    <th class="px-4 py-3 text-left font-semibold">節</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">WHERE</code> 句</td>
+                                    <td class="px-4 py-3 text-slate-600">1つの値、または値のリスト</td>
+                                    <td class="px-4 py-3 text-slate-600">条件式の一部として絞り込みに使う</td>
+                                    <td class="px-4 py-3 text-slate-600">12.2〜12.4</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">FROM</code> 句</td>
+                                    <td class="px-4 py-3 text-slate-600">1つの表（導出テーブル）</td>
+                                    <td class="px-4 py-3 text-slate-600">集計結果をさらに集計するなど二段階の処理に使う</td>
+                                    <td class="px-4 py-3 text-slate-600">12.5</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">WITH</code> 句（先頭）</td>
+                                    <td class="px-4 py-3 text-slate-600">1つ以上の名前付きの表</td>
+                                    <td class="px-4 py-3 text-slate-600">複雑なサブクエリを上から順に読める形に整理する</td>
+                                    <td class="px-4 py-3 text-slate-600">12.6</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 WHERE句のサブクエリ（スカラサブクエリ）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>スカラサブクエリ</strong>とは、実行結果が「1行1列＝1つの値」だけになるサブクエリのことです。<code class="bg-slate-100">= &gt; &lt; &gt;=</code> などの比較演算子は、比較する相手が1つの値である必要があるため、スカラサブクエリと相性がよく使われます。第9章で学んだ集約関数はまさに「表全体から1つの値を返す」ものなので、ここで生きてきます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「平均単価より高い商品」を求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">scalar-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品の平均単価より高い商品だけを取り出す
+SELECT product_name, unit_price
+FROM products
+WHERE unit_price &gt; (
+    SELECT avg(unit_price) FROM products
+)
+ORDER BY unit_price DESC;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        内側の <code class="bg-slate-100">SELECT avg(unit_price) FROM products</code> が先に実行されて<strong>1つの数値</strong>（<code class="bg-slate-100">1823.33</code>）になり、外側からは <code class="bg-slate-100">WHERE unit_price &gt; 1823.33</code> と書いたのと同じ結果になります。平均値をあらかじめ調べて数値を打ち込む必要がない点が最大の利点です。もし商品が追加されて平均が変われば、同じ SQL を実行するだけで結果も自動的に更新されます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">product_name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">unit_price</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">旧型キーボード</td>
+                                    <td class="px-4 py-3 text-slate-600">4200.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">モバイルバッテリー</td>
+                                    <td class="px-4 py-3 text-slate-600">3500.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">データベース設計の教科書</td>
+                                    <td class="px-4 py-3 text-slate-600">3200.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">SQL入門ガイド</td>
+                                    <td class="px-4 py-3 text-slate-600">2800.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">ワイヤレスマウス</td>
+                                    <td class="px-4 py-3 text-slate-600">2400.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 2行以上返るとエラーになる</p>
+                                <p class="text-red-900 text-sm">スカラサブクエリの位置に <code class="bg-red-100">SELECT product_name FROM products</code> のように複数行を返す SELECT を書くと、実行時に「1行しか使えない場所に複数行が返った」というエラーになります。<code class="bg-red-100">=</code> の相手には必ず集約関数などで1行1列に絞った SELECT を書きます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 IN を使うサブクエリ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブクエリが複数行を返す場合は、<code class="bg-slate-100">=</code> ではなく第7章で学んだ <code class="bg-slate-100">IN</code> を使います。「東京都の顧客が出した注文」を、注文（<code class="bg-slate-100">orders</code>）を軸に求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">in-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 東京都の顧客が出した注文だけを取り出す
+SELECT order_id, order_date, status
+FROM orders
+WHERE customer_id IN (
+    SELECT customer_id FROM customers
+    WHERE prefecture = '東京都'
+)
+ORDER BY order_date;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        内側の SELECT が「東京都の顧客番号の一覧」（<code class="bg-slate-100">1, 4, 8</code>）を返し、外側は <code class="bg-slate-100">customer_id IN (1, 4, 8)</code> と書いたのと同じ意味になります。第11章の <code class="bg-slate-100">JOIN</code> でも同じ結果は作れますが、「注文の列だけが欲しく、顧客側の列は結果に出したくない」場合は <code class="bg-slate-100">IN</code> サブクエリのほうが素直に書けます。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">重要な復習: NOT IN と NULL の罠（第7章）</p>
+                                <p class="text-red-900 text-sm mb-2">第7章で学んだ通り、<code class="bg-red-100">NOT IN</code> のリストの中に <code class="bg-red-100">NULL</code> が1つでも混じると、比較結果が「不明」になり<strong>行が1件も返らなくなる</strong>ことがあります。<code class="bg-red-100">customers.prefecture</code> には <code class="bg-red-100">NULL</code> の行があるため、次のような書き方は危険です。</p>
+                                <div class="code-block-wrapper mb-2">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">danger-not-in.sql</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 危険: prefectureがNULLの顧客がいると
+-- customer_idのリストにNULLが混ざり、結果が0件になりうる
+SELECT * FROM customers
+WHERE customer_id NOT IN (
+    SELECT customer_id FROM orders WHERE status = 'キャンセル'
+);</code></pre>
+                                </div>
+                                <p class="text-red-900 text-sm">安全に書くには、内側に <code class="bg-red-100">WHERE customer_id IS NOT NULL</code> を足すか、次に学ぶ <code class="bg-red-100">NOT EXISTS</code> を使います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 EXISTS — 「存在するかどうか」だけを判定する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">EXISTS</code> は、サブクエリが<strong>1行でも返せば真</strong>、1行も返さなければ偽と判定する演算子です。値そのものではなく「該当する行があるかどうか」だけに関心がある場合に使います。特徴的なのは、<code class="bg-slate-100">EXISTS</code> の中で使うサブクエリは<strong>外側の行を参照できる</strong>という点です。これを<strong>相関サブクエリ</strong>と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        相関サブクエリは、外側の <code class="bg-slate-100">SELECT</code> が1行処理するたびに、その行の値を使って内側のサブクエリが評価される、という動き方をします。「注文のない顧客」を <code class="bg-slate-100">NOT EXISTS</code> で求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">not-exists.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1件も注文をしていない顧客を探す
+SELECT c.customer_id, c.customer_name
+FROM customers AS c
+WHERE NOT EXISTS (
+    -- 顧客ごとに「この顧客のorders行があるか」を確認する
+    SELECT 1 FROM orders AS o
+    WHERE o.customer_id = c.customer_id
+);</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        内側の <code class="bg-slate-100">o.customer_id = c.customer_id</code> が、外側の顧客1人ぶんごとに評価される「相関」の部分です。<code class="bg-slate-100">SELECT 1</code> は「値は何でもよく、行があるかどうかだけを見たい」という意図を表すための慣習的な書き方です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この結果は、第11章で学んだ <code class="bg-slate-100">LEFT JOIN ... WHERE ... IS NULL</code>（外部結合で相手がいない行を探す書き方）とまったく同じになります。2つを比べてみましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">書き方</th>
+                                    <th class="px-4 py-3 text-left font-semibold">SQL</th>
+                                    <th class="px-4 py-3 text-left font-semibold">考え方</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">NOT EXISTS<br /><span class="text-sm text-slate-500">（本章）</span></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">「一致するorders行が存在しない」ことを直接問う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">LEFT JOIN + IS NULL<br /><span class="text-sm text-slate-500">（第11章）</span></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id WHERE o.order_id IS NULL</code></td>
+                                    <td class="px-4 py-3 text-slate-600">まず全顧客を残す結合をしてから、相手がいない（NULLになった）行だけを残す</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        結果はどちらも同じ「注文のない顧客」の一覧になります。どちらを選んでも構いませんが、<strong>存在確認だけなら NOT EXISTS のほうが意図が読み取りやすい</strong>、<strong>結合した相手の列も一緒に使いたいなら LEFT JOIN のほうが自然</strong>、という目安を持っておくとよいでしょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: EXISTS は NULL の罠に強い</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">EXISTS</code> / <code class="bg-blue-100">NOT EXISTS</code> は「行があるか無いか」だけを見る演算子で、値そのものを比較しないため、12.3で見た <code class="bg-blue-100">NOT IN</code> と <code class="bg-blue-100">NULL</code> の罠が起きません。「存在しないことを確認したい」場面では <code class="bg-blue-100">NOT IN</code> より <code class="bg-blue-100">NOT EXISTS</code> を選ぶのが安全です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 FROM句のサブクエリ（導出テーブル）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブクエリは <code class="bg-slate-100">FROM</code> 句にも書けます。この場合、サブクエリの実行結果は<strong>1つの表</strong>として扱われ、外側の <code class="bg-slate-100">SELECT</code> はその表に対して普通に列を選んだり条件を付けたりできます。この一時的な表を<strong>導出テーブル</strong>と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「顧客ごとの購入金額を出してから、その平均を求める」という二段階の集計をやってみましょう。<code class="bg-slate-100">avg(sum(...))</code> のように集約関数を二重に重ねて書くことはできないため、このような場面こそ導出テーブルの出番です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">derived-table.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ①顧客ごとの合計購入金額を作り、②その平均を求める
+SELECT round(avg(total_amount), 2) AS avg_customer_total
+FROM (
+    SELECT o.customer_id, sum(oi.quantity * oi.unit_price) AS total_amount
+    FROM orders AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    GROUP BY o.customer_id
+) AS customer_totals;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで重要な決まりが1つあります。<strong>導出テーブルには必ず別名（エイリアス）を付ける</strong>ことです。上の例の <code class="bg-slate-100">AS customer_totals</code> がそれにあたり、これが無いと文法エラーになります（PostgreSQL の場合）。外側から見ると <code class="bg-slate-100">customer_totals</code> という名前の、<code class="bg-slate-100">customer_id</code> と <code class="bg-slate-100">total_amount</code> という2つの列を持つ表がある、という扱いです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">avg_customer_total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">6488.89</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 WITH句（CTE・共通テーブル式）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        12.5 のように <code class="bg-slate-100">FROM</code> 句の中にサブクエリを入れ子にしていくと、段階が増えるほど<strong>カッコの中にカッコがある</strong>状態になり、どこからどこまでが1つのまとまりか読み取りにくくなります。この問題を解決するのが <code class="bg-slate-100">WITH</code> 句、通称 <strong>CTE（共通テーブル式）</strong>です。基本の書き方は次の通りです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">with-syntax.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- WITH 名前 AS ( ... ) の形で、先に名前を付けた表を作る
+WITH 名前 AS (
+    SELECT ...
+)
+SELECT ...
+FROM 名前;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        12.5 の例を <code class="bg-slate-100">WITH</code> 句で書き直すと、上から下へ「まず何を作り、それを使って何をするか」の順に読める文章になります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                            <p class="font-semibold text-red-800 mb-2 text-sm">Before: FROM句のサブクエリ</p>
+                            <div class="code-block-wrapper mb-0">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">before.sql</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 顧客ごとの合計を導出テーブルとして作り、その平均を求める
+SELECT round(avg(total_amount), 2)
+FROM (
+    SELECT o.customer_id,
+           sum(oi.quantity * oi.unit_price)
+             AS total_amount
+    FROM orders AS o
+    JOIN order_items AS oi
+      ON oi.order_id = o.order_id
+    GROUP BY o.customer_id
+) AS customer_totals;</code></pre>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                            <p class="font-semibold text-emerald-800 mb-2 text-sm">After: WITH句（CTE）</p>
+                            <div class="code-block-wrapper mb-0">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">after.sql</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 顧客ごとの合計をCTEとして先に定義しておく
+WITH customer_totals AS (
+    SELECT o.customer_id,
+           sum(oi.quantity * oi.unit_price)
+             AS total_amount
+    FROM orders AS o
+    JOIN order_items AS oi
+      ON oi.order_id = o.order_id
+    GROUP BY o.customer_id
+)
+SELECT round(avg(total_amount), 2)
+FROM customer_totals;</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        処理内容も結果もまったく同じですが、<code class="bg-slate-100">customer_totals</code> という名前が先に宣言されるぶん、「顧客ごとの合計を作る → その平均を求める」という2段構えの意図が一目で伝わります。<code class="bg-slate-100">WITH</code> 句はカンマで区切ることで<strong>複数</strong>並べることもでき、3段階・4段階の集計でも入れ子を深くせずに書き進められます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">multiple-cte.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 複数のCTEをカンマで並べて段階的に組み立てる
+WITH customer_totals AS (
+    SELECT o.customer_id, sum(oi.quantity * oi.unit_price) AS total_amount
+    FROM orders AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    GROUP BY o.customer_id
+),
+high_spenders AS (
+    SELECT customer_id, total_amount FROM customer_totals
+    WHERE total_amount &gt; (SELECT avg(total_amount) FROM customer_totals)
+)
+SELECT c.customer_name, h.total_amount
+FROM high_spenders AS h
+JOIN customers AS c ON c.customer_id = h.customer_id
+ORDER BY h.total_amount DESC;</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: WITH句は「読みやすさ」のための道具</p>
+                                <p class="text-emerald-900 text-sm">導出テーブルと <code class="bg-emerald-100">WITH</code> 句は、多くの場合どちらでも同じ結果が得られます。違いは主に<strong>読みやすさ</strong>です。段階が2つ以上になったら <code class="bg-emerald-100">WITH</code> 句を使う、と決めておくと、後で見返したときや他の人が読むときに理解の速さが大きく変わります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 ビュー（VIEW）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WITH</code> 句は1回のクエリの中だけで使える「その場限りの名前」でした。もし同じ複雑な <code class="bg-slate-100">SELECT</code> を<strong>何度も繰り返し使う</strong>のであれば、データベースに恒久的な名前として登録してしまう方法があります。それが<strong>ビュー</strong>です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">create-view.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 「顧客ごとの合計購入金額」に名前を付けて保存する
+CREATE VIEW customer_totals_view AS
+SELECT o.customer_id, sum(oi.quantity * oi.unit_price) AS total_amount
+FROM orders AS o
+JOIN order_items AS oi ON oi.order_id = o.order_id
+GROUP BY o.customer_id;
+
+-- 以降は、テーブルと同じ感覚でSELECTできる
+SELECT * FROM customer_totals_view WHERE total_amount &gt; 50000;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで初心者がつまずきやすいのが、「ビューはデータを持っているのか」という点です。答えは<strong>持っていません</strong>。ビューの実体は<strong>保存された SELECT 文そのもの</strong>で、<code class="bg-slate-100">customer_totals_view</code> を参照するたびに、裏側で元の <code class="bg-slate-100">SELECT</code> が実行され直します。そのため <code class="bg-slate-100">orders</code> や <code class="bg-slate-100">order_items</code> のデータが更新されれば、ビューの結果も自動的に最新のものになります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        不要になったビューは <code class="bg-slate-100">DROP VIEW</code> で削除します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">drop-view.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 不要になったビューを削除する（データ本体には影響しない）
+DROP VIEW customer_totals_view;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ビューの主な用途は2つです。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-box-archive text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">複雑なSQLを隠す</h3>
+                            <p class="text-sm text-slate-600">何段にも結合・集計した長い SELECT を1つの名前にまとめておけば、利用する側は <code class="bg-blue-100">SELECT * FROM ビュー名</code> と書くだけで済みます。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-user-shield text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">見せる列を絞る</h3>
+                            <p class="text-sm text-slate-600">元テーブルに個人情報などの列があっても、ビューでは必要な列だけを選んで見せることで、権限的な使い方（アクセス制御の入口）ができます。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.8: 発展（本編と視覚的に区別） -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.8 発展: ウィンドウ関数の入口
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここからは<strong>発展</strong>の内容です。第9章の <code class="bg-slate-100">GROUP BY</code> による集計には、1つの弱点がありました。グループ化すると、元の行が集約されて<strong>行数が減ってしまう</strong>のです。「各顧客の注文を1件ずつ見せながら、その隣に顧客の合計金額も表示したい」といった要求には応えられません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この「集計しても行が消えない集計」を実現するのが<strong>ウィンドウ関数</strong>です。<code class="bg-slate-100">OVER</code> というキーワードが目印です。
+                    </p>
+
+                    <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-dashed border-indigo-300 rounded-xl p-5 my-6">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fas fa-flask text-indigo-500"></i>
+                            <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wide">発展・次の学習段階への入口</span>
+                        </div>
+                        <div class="code-block-wrapper mb-4">
+                            <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                <span class="text-slate-400 text-sm">window-preview.sql</span>
+                                <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ①注文ごとの小計をCTEで作る
+WITH order_totals AS (
+    SELECT o.customer_id, o.order_id, o.order_date,
+           sum(oi.quantity * oi.unit_price) AS order_total
+    FROM orders AS o
+    JOIN order_items AS oi ON oi.order_id = o.order_id
+    GROUP BY o.customer_id, o.order_id, o.order_date
+)
+-- ②注文を1件ずつ表示しつつ、連番と顧客合計も付ける
+SELECT customer_id, order_id,
+    ROW_NUMBER() OVER (
+        PARTITION BY customer_id ORDER BY order_date
+    ) AS order_no,
+    sum(order_total) OVER (PARTITION BY customer_id) AS customer_total
+FROM order_totals;</code></pre>
+                        </div>
+                        <div class="overflow-x-auto mb-4">
+                            <table class="min-w-full divide-y divide-indigo-200">
+                                <thead class="bg-indigo-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-indigo-900">customer_id</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-indigo-900">order_id</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-indigo-900">order_no</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-indigo-900">customer_total</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-indigo-200">
+                                    <tr>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">6880.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">4</td>
+                                        <td class="px-4 py-3 text-indigo-900">2</td>
+                                        <td class="px-4 py-3 text-indigo-900">6880.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-indigo-900">2</td>
+                                        <td class="px-4 py-3 text-indigo-900">2</td>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">11300.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-indigo-900 text-sm">
+                            <code class="bg-indigo-100 text-indigo-900">GROUP BY</code> なら顧客ごとに1行へまとめられてしまう場面でも、<code class="bg-indigo-100 text-indigo-900">OVER (PARTITION BY ...)</code> は「顧客ごとのまとまり（ウィンドウ）を意識しつつ、行は1件ずつ残す」という動きをします。<code class="bg-indigo-100 text-indigo-900">ROW_NUMBER()</code> は「そのまとまりの中で何番目か」という連番を振る関数です。ウィンドウ関数には他にも <code class="bg-indigo-100 text-indigo-900">RANK()</code>・<code class="bg-indigo-100 text-indigo-900">LAG()</code>・<code class="bg-indigo-100 text-indigo-900">LEAD()</code> など多くの種類があり、ランキング表示や前月比の算出などに使われますが、<strong>詳しい使い方は本ガイドの次の学習段階（応用編）で扱います</strong>。ここでは「集計しても行が消えない、こういう仕組みがある」ということを覚えておけば十分です。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: サブクエリとCTEで同じ問題を解いて読みやすさを比べる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">「カテゴリ別の平均単価より高い商品を、そのカテゴリ名と一緒に一覧表示する」という同じ問題を、2通りの書き方で解いて比較します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">まず <code class="bg-purple-100">FROM</code> 句の導出テーブルだけを使って、「カテゴリごとの平均単価」を計算するSELECTを書き、実行して結果を確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">手順1の導出テーブルと <code class="bg-purple-100">products</code> を結合し、「自分のカテゴリの平均より単価が高い商品」だけを絞り込むSELECT文を、導出テーブル方式（FROM句にサブクエリを直接書く）で完成させる。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">同じ問題を、今度は <code class="bg-purple-100">WITH category_avg AS (...)</code> という <code class="bg-purple-100">WITH</code> 句を使って書き直す。実行結果が手順2とまったく同じであることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">2つのSQL文を見比べて、「どちらが後から読んだときに理解しやすいか」「何行目を見ればカテゴリ平均の計算だと分かるか」を自分の言葉でメモに書く。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> 導出テーブルとWITH句は結果が同じでも読みやすさが違う、という体感を得ることが目的です。段階が2つ以上ある集計では、まずWITH句で書く癖をつけましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. スカラサブクエリとは何ですか。<code class="bg-blue-100">WHERE unit_price = (SELECT product_name FROM products)</code> がエラーになる理由も説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            スカラサブクエリとは、実行結果が「1行1列＝1つの値」だけになるサブクエリです。例の <code class="bg-blue-100">SELECT product_name FROM products</code> は商品の数だけ複数行を返す可能性があるため、1つの値としか比較できない <code class="bg-blue-100">=</code> の相手には使えず、実行時にエラーになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 「注文のない顧客」を求めるとき、<code class="bg-blue-100">NOT IN</code> ではなく <code class="bg-blue-100">NOT EXISTS</code> を使うべき理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-100">NOT IN</code> は、比較するリストの中に <code class="bg-blue-100">NULL</code> が1件でも混ざると3値論理により結果が「不明」となり、行が1件も返らなくなる罠があります。<code class="bg-blue-100">NOT EXISTS</code> は値そのものを比較せず「一致する行があるかどうか」だけを判定するため、この罠が起きず安全です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100">FROM</code> 句にサブクエリを書くとき、必ず守らなければならない決まりは何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            サブクエリ（導出テーブル）には必ず <code class="bg-blue-100">AS 別名</code> のように別名を付ける必要があります。別名がないと文法エラーになります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. ビュー（VIEW）はテーブルのようにデータを保持していますか。<code class="bg-blue-100">CREATE VIEW</code> と <code class="bg-blue-100">CREATE TABLE ... AS SELECT</code> の違いを踏まえて答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            保持していません。ビューの実体は保存された<code class="bg-blue-100">SELECT</code>文そのものであり、参照するたびに元の <code class="bg-blue-100">SELECT</code> が実行し直されるため、元テーブルの更新が常に反映されます。これに対し（テーブルとしてコピーを作る）<code class="bg-blue-100">CREATE TABLE ... AS SELECT</code> はその時点のデータを実体としてコピーするため、元テーブルが更新されても自動では追従しません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sql-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第11章: テーブルを結合する（JOIN）</span>
+                        </div>
+                    </a>
+                    <a href="sql-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: トランザクションと同時実行制御</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

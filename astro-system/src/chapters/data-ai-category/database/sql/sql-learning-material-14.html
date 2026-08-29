@@ -1,0 +1,726 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">SQL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第14章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第14章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">インデックス・権限・運用の基礎</h1>
+                    <p class="text-slate-600">いよいよ最終章です。ここまでで SQL を書いて「取り出す・変える・まとめて確定する」ことはできるようになりました。この章では、そのデータベースを長く安全に「使い続ける」ための基礎知識として、検索を速くする<strong>インデックス</strong>、誰に何を許すかを決める<strong>権限管理</strong>、もしものときの<strong>バックアップ</strong>、日々の<strong>メンテナンス</strong>を学びます。最後に全14章を振り返り、次に進む道を示します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-semibold text-amber-900 mb-3">この章の学習目標</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>インデックスの仕組みと、効くケース・効かないケースを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 text-amber-900">EXPLAIN</code> で実行計画を読み、Seq Scan と Index Scan の違いが分かる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールと <code class="bg-amber-100 text-amber-900">GRANT</code> / <code class="bg-amber-100 text-amber-900">REVOKE</code> による最小権限の考え方を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>バックアップ・復元・<code class="bg-amber-100 text-amber-900">VACUUM</code> の必要性を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>全14章の学習内容を振り返り、次に学ぶとよいテーマを描ける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション14.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.1 インデックスとは — 「本の索引」の考え方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        分厚い専門書で特定の用語を探すとき、私たちは巻末の<strong>索引</strong>を使います。索引がなければ、1ページ目から順番にすべてのページをめくって探す（全件走査）しかありません。データベースのテーブルも同じで、行数が増えるほど「先頭から1行ずつ全部確認する」検索は遅くなります。この全件走査のことを、PostgreSQL では<strong>シーケンシャルスキャン（Seq Scan）</strong>と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>インデックス</strong>は、この本の索引にあたる仕組みです。特定の列の値を、あらかじめ検索しやすい形（既定では <strong>B-tree</strong> という木構造）に整理しておき、目的の行へすばやくたどり着けるようにします。<code class="bg-slate-100">CREATE INDEX</code> で作成し、<code class="bg-slate-100">DROP INDEX</code> で削除します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">create-index.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- customers テーブルの prefecture 列にインデックスを作成
+-- （PostgreSQL の既定はB-tree方式）
+CREATE INDEX idx_customers_prefecture
+    ON customers (prefecture);
+
+-- 不要になったインデックスは削除できる
+DROP INDEX idx_customers_prefecture;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: インデックス名の慣例</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100 text-blue-900">idx_テーブル名_列名</code> のように命名すると、あとで見返したときにどのテーブルの何のためのインデックスか一目で分かります。本ガイドでもこの慣例に従っています。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.2 どの列にインデックスを作るとよいか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実は、<code class="bg-slate-100">PRIMARY KEY</code> 制約を付けた列には、テーブル作成時に<strong>自動でユニークインデックスが作られます</strong>。第5章で <code class="bg-slate-100">customer_id</code> などに主キーを設定したときから、皆さんは既にインデックスの恩恵を受けていたことになります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        では、主キー以外にどの列へインデックスを追加するとよいのでしょうか。目安は次の2点です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">目安</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                    <th class="px-4 py-3 text-left font-semibold">具体例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">WHERE / JOIN でよく使う列</td>
+                                    <td class="px-4 py-3 text-slate-600">絞り込みや結合の条件に頻繁に登場する列は候補になる</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">orders.customer_id</code>（第11章の結合条件）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">カーディナリティが高い列</td>
+                                    <td class="px-4 py-3 text-slate-600">値の種類が多く、1つの値で行を大きく絞り込める列ほど効果が出やすい</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">email</code>（ほぼ全行が異なる値）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        逆に、<code class="bg-slate-100">orders.status</code> のように値の種類が「受付／発送済／キャンセル」の3つしかない列（カーディナリティが低い列）は、インデックスを作っても効果が薄いことが多くなります。次の14.3で理由を見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション14.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.3 インデックスが効かないケース
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        インデックスを作っても使われない（＝ Seq Scan のままになる）代表的なケースが3つあります。第7章・第8章で「これは後の章で説明します」と予告していた内容の回収です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">ケース</th>
+                                    <th class="px-4 py-3 text-left font-semibold">具体例</th>
+                                    <th class="px-4 py-3 text-left font-semibold">理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">列に関数を適用している</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE upper(customer_name) = 'SATO'</code>（第8章の文字列関数）</td>
+                                    <td class="px-4 py-3 text-slate-600">索引は「元の値」を並べたもの。<code class="bg-slate-100">upper()</code> で変換した後の値は索引に無い</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">前方ワイルドカードの LIKE</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE product_name LIKE '%ノート%'</code>（第7章のLIKE）</td>
+                                    <td class="px-4 py-3 text-slate-600">先頭が不明だと、索引の「先頭文字から辿る」性質を活かせない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">対象行が多すぎる（低選択性）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE status = '受付'</code>（全体の大半を占める値）</td>
+                                    <td class="px-4 py-3 text-slate-600">索引を辿ってから本体を1行ずつ見に行くより、最初から全件を読んだほうが速いとプランナが判断する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        つまり、インデックスを作ったからといって必ず使われるわけではありません。実際に使われているかどうかは、次の14.5で紹介する <code class="bg-slate-100">EXPLAIN</code> で確認する必要があります。
+                    </p>
+                </section>
+
+                <!-- セクション14.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.4 インデックスの代償 — 「とりあえず全列」が誤りである理由
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまで読むと「検索が速くなるなら、全部の列にインデックスを作ればよいのでは」と思うかもしれません。しかし、インデックスは無料の仕組みではありません。主に2つの代償があります。
+                    </p>
+                    <ul class="space-y-2 mb-4">
+                        <li class="flex items-start gap-2 text-slate-600">
+                            <i class="fas fa-circle text-primary-400 mt-2 flex-shrink-0" style="font-size: 4px;"></i>
+                            <span><strong>追加・更新・削除が遅くなる</strong> — <code class="bg-slate-100">INSERT</code> / <code class="bg-slate-100">UPDATE</code> / <code class="bg-slate-100">DELETE</code> のたびに、テーブル本体だけでなく、そこに付いているすべてのインデックスも更新しなければならない</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-600">
+                            <i class="fas fa-circle text-primary-400 mt-2 flex-shrink-0" style="font-size: 4px;"></i>
+                            <span><strong>ディスク容量を消費する</strong> — インデックス自体もデータであり、テーブル本体とは別に保存領域を必要とする</span>
+                        </li>
+                    </ul>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 「とりあえず全列にインデックス」は誤り</p>
+                                <p class="text-red-900 text-sm">検索は速くなりますが、書き込みのたびにすべてのインデックスを更新するコストがのしかかり、更新の多いテーブルほど全体が遅くなります。<strong>WHERE や JOIN の条件で実際によく使う列に絞って</strong>作るのが基本方針です。迷ったら、まずインデック無しで運用し、実際に遅いクエリが見つかってから14.5の <code class="bg-red-100 text-red-900">EXPLAIN</code> で原因を確認し、必要な列にだけ追加しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.5 実行計画を見る — EXPLAIN と EXPLAIN ANALYZE
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQL は <code class="bg-slate-100">SELECT</code> を実行する前に「どういう手順でデータを取り出すか」という<strong>実行計画</strong>を立てます。この計画を覗き見るのが <code class="bg-slate-100">EXPLAIN</code> です。実際にはクエリを実行せず、計画だけを表示します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">explain-before.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- インデックス作成前の実行計画を確認する
+EXPLAIN SELECT customer_name
+FROM customers
+WHERE prefecture = '東京都';</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        インデックス作成前は、次のように <strong>Seq Scan（シーケンシャルスキャン＝全件走査）</strong>と表示されます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（インデックス無し）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">                          QUERY PLAN
+------------------------------------------------------
+ Seq Scan on customers  (cost=0.00..1.12 rows=1 width=20)
+   Filter: (prefecture = '東京都'::text)</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">idx_customers_prefecture</code> を作成後、同じクエリを実行すると次のように <strong>Index Scan（索引利用）</strong>へ切り替わります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（インデックス作成後）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">                                QUERY PLAN
+------------------------------------------------------------------
+ Index Scan using idx_customers_prefecture on customers
+   (cost=0.14..8.16 rows=1 width=20)
+   Index Cond: (prefecture = '東京都'::text)</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">cost=0.14..8.16</code> の部分は「開始コスト..合計コスト」という<strong>推定の重さ</strong>を表す目安の数値で、単位は秒ではありません。今の段階では「小さいほど軽いと見積もられている」とだけ覚えておけば十分です。実際に実行して本当の時間まで測りたいときは <code class="bg-slate-100">EXPLAIN ANALYZE</code> を使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（EXPLAIN ANALYZE）</span>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext"> Index Scan using idx_customers_prefecture on customers
+   (cost=0.14..8.16 rows=1 width=20)
+   (actual time=0.021..0.023 rows=2 loops=1)
+   Index Cond: (prefecture = '東京都'::text)
+ Planning Time: 0.082 ms
+ Execution Time: 0.041 ms</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">actual time</code> はミリ秒単位の実測値です。<code class="bg-slate-100">EXPLAIN ANALYZE</code> は<strong>実際にクエリを実行してしまう</strong>点に注意してください。<code class="bg-slate-100">DELETE</code> や <code class="bg-slate-100">UPDATE</code> の計画を確認するときにうっかり本当に実行してしまわないよう、対象は基本的に <code class="bg-slate-100">SELECT</code> にとどめましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: pgAdmin の「Explain」ボタン</p>
+                                <p class="text-blue-900 text-sm">pgAdmin 4 のクエリツールには、SQL を書いたあと押すだけで実行計画を<strong>図（ツリー）</strong>として表示してくれる「Explain」ボタンがあります。文字の出力より直感的に読めるので、まずはこちらで全体の形をつかみ、細かい数値をテキスト出力で確認する、という使い分けがおすすめです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.6 ユーザーと権限 — ロールと GRANT / REVOKE
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        PostgreSQL では「ユーザー」と「グループ」を区別せず、<strong>ロール</strong>という1つの概念にまとめています。ロールには、ログインしてSQLを実行できる「ログインロール」と、権限をまとめておくだけの「グループロール」がありますが、作り方はどちらも <code class="bg-slate-100">CREATE ROLE</code> です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">roles-and-grant.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- アプリケーション専用のロールを作成する
+CREATE ROLE app_user LOGIN PASSWORD 'secure_password';
+
+-- customers テーブルの参照だけを許可する
+GRANT SELECT ON customers TO app_user;
+
+-- orders テーブルは参照と追加のみ許可する
+GRANT SELECT, INSERT ON orders TO app_user;
+
+-- 追加の権限が不要になったら取り消す
+REVOKE INSERT ON orders FROM app_user;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで意識したいのが<strong>最小権限の原則</strong>です。「そのユーザーが本当に必要な操作だけを許可し、それ以外はすべて拒否する」という考え方で、権限管理の基本方針になります。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: アプリ用ユーザーに postgres を使ってはいけない</p>
+                                <p class="text-red-900 text-sm">インストール時に作られる <code class="bg-red-100 text-red-900">postgres</code> はすべての操作を行える<strong>スーパーユーザー</strong>です。アプリケーションの接続にこれを使うと、SQLインジェクションなどでアプリが乗っ取られた場合に<strong>データベース全体</strong>が危険にさらされます。アプリごとに最小限の権限を持つ専用ロールを作り、<code class="bg-red-100 text-red-900">postgres</code> は管理作業のときだけ使うのが鉄則です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.7 バックアップと復元
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        どれだけ気をつけて運用していても、操作ミスやハードウェア障害でデータが失われる可能性はゼロにできません。だからこそ、<strong>定期的なバックアップ</strong>が欠かせません。PostgreSQL には <code class="bg-slate-100">pg_dump</code> というコマンドがあり、データベースの内容を1つのファイル（論理バックアップ）として書き出せます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">backup-and-restore.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># shop_db をカスタム形式でバックアップする
+pg_dump -U postgres -Fc shop_db > shop_db_backup.dump
+
+# 練習用データベース shop_db_practice へ復元する
+pg_restore -U postgres -d shop_db_practice shop_db_backup.dump
+
+# SQL形式（プレーンテキスト）で書き出した場合は psql で復元する
+psql -U postgres -d shop_db_practice -f shop_db_backup.sql</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コマンドを覚えなくても、pgAdmin 4 ではデータベースを右クリックして「Backup...」「Restore...」を選ぶだけで、同じ操作を画面から行えます。日常の運用では、こちらの GUI から実行することが多くなるでしょう。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 復元は必ず練習用データベースで試す</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900">pg_restore</code> や「Restore」を本番のデータベースに直接試すのは絶対にやめましょう。復元先を間違えると、現在のデータが上書き・混在してしまう危険があります。<strong>まず練習用のデータベース（<code class="bg-red-100 text-red-900">shop_db_practice</code> のような別名）を作って復元を試し</strong>、手順に問題がないことを確認してから本番の運用計画に組み込みます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.8 メンテナンス — VACUUM と ANALYZE
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第13章で「PostgreSQL は更新のたびに古い行の版を残す MVCC という仕組みで動いている」と学びました。この不要になった古い版をそのままにしておくと、テーブルが無駄に膨らんでいきます。それを回収するのが <code class="bg-slate-100">VACUUM</code> です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">maintenance.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 不要になった古い行の領域を回収する
+VACUUM customers;
+
+-- 実行計画のもとになる統計情報を更新する
+ANALYZE customers;
+
+-- 2つをまとめて実行することも多い
+VACUUM ANALYZE customers;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">ANALYZE</code> は「この列にはどんな値がどれくらいの割合で入っているか」という統計情報を更新するコマンドです。14.5で見た実行計画は、この統計情報をもとにプランナが立てているため、統計が古いままだと不適切な計画（本来 Index Scan にすべきなのに Seq Scan を選ぶなど）を選んでしまうことがあります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際には、PostgreSQL は<strong>自動バキューム（autovacuum）</strong>という仕組みを標準で備えており、テーブルの更新量に応じて自動的に <code class="bg-slate-100">VACUUM</code> と <code class="bg-slate-100">ANALYZE</code> を実行してくれます。個人学習やごく小規模な運用では、これに任せておくだけで基本的に困りません。日常の確認項目としては、次のようなものを覚えておきましょう。
+                    </p>
+                    <ul class="space-y-2 mb-4">
+                        <li class="flex items-start gap-2 text-slate-600">
+                            <i class="fas fa-circle text-primary-400 mt-2 flex-shrink-0" style="font-size: 4px;"></i>
+                            <span>バックアップが定期的に、かつ<strong>正常に</strong>取得できているか</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-600">
+                            <i class="fas fa-circle text-primary-400 mt-2 flex-shrink-0" style="font-size: 4px;"></i>
+                            <span>ディスクの空き容量が十分にあるか</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-slate-600">
+                            <i class="fas fa-circle text-primary-400 mt-2 flex-shrink-0" style="font-size: 4px;"></i>
+                            <span>特定のクエリだけ極端に遅くなっていないか（遅ければ14.5の <code class="bg-slate-100">EXPLAIN</code> で原因を調べる）</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- セクション14.9 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.9 全14章の総復習
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        長い道のりでした。ここまでの14章で学んだことを、章ごとに1行で振り返ってみましょう。分からなくなったら、この表から該当の章に戻って読み返すのがおすすめです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">章</th>
+                                    <th class="px-4 py-3 text-left font-semibold">テーマ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">代表的な構文・キーワード</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第1章</td>
+                                    <td class="px-4 py-3 text-slate-600">データベースとSQLの世界</td>
+                                    <td class="px-4 py-3 text-slate-600">データベース／DBMS／RDBMS、SQLの4分類</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第2章</td>
+                                    <td class="px-4 py-3 text-slate-600">リレーショナルデータベースの構造</td>
+                                    <td class="px-4 py-3 text-slate-600">行・列・主キー・外部キー、ER図</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第3章</td>
+                                    <td class="px-4 py-3 text-slate-600">環境構築</td>
+                                    <td class="px-4 py-3 text-slate-600">PostgreSQL・pgAdmin 4・A5:SQL Mk-2 のインストール</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第4章</td>
+                                    <td class="px-4 py-3 text-slate-600">ツールの基本操作</td>
+                                    <td class="px-4 py-3 text-slate-600">クエリツール、F5実行、SQLの基本ルール</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第5章</td>
+                                    <td class="px-4 py-3 text-slate-600">テーブルを作る</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">CREATE TABLE</code>、<code class="bg-slate-100">PRIMARY KEY</code>、<code class="bg-slate-100">FOREIGN KEY</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第6章</td>
+                                    <td class="px-4 py-3 text-slate-600">データを取り出す</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">SELECT</code>、<code class="bg-slate-100">ORDER BY</code>、<code class="bg-slate-100">LIMIT</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第7章</td>
+                                    <td class="px-4 py-3 text-slate-600">条件を指定して絞り込む</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE</code>、<code class="bg-slate-100">LIKE</code>、<code class="bg-slate-100">IS NULL</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第8章</td>
+                                    <td class="px-4 py-3 text-slate-600">関数でデータを加工する</td>
+                                    <td class="px-4 py-3 text-slate-600">文字列・数値・日付関数、<code class="bg-slate-100">COALESCE</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第9章</td>
+                                    <td class="px-4 py-3 text-slate-600">データを集計する</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">GROUP BY</code>、<code class="bg-slate-100">HAVING</code>、集約関数</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第10章</td>
+                                    <td class="px-4 py-3 text-slate-600">追加・更新・削除</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">INSERT</code>、<code class="bg-slate-100">UPDATE</code>、<code class="bg-slate-100">DELETE</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第11章</td>
+                                    <td class="px-4 py-3 text-slate-600">テーブルを結合する</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">INNER JOIN</code>、<code class="bg-slate-100">LEFT JOIN</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第12章</td>
+                                    <td class="px-4 py-3 text-slate-600">サブクエリとビュー</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">EXISTS</code>、<code class="bg-slate-100">WITH</code>、<code class="bg-slate-100">CREATE VIEW</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第13章</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクションと同時実行制御</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">BEGIN</code>、<code class="bg-slate-100">COMMIT</code>、<code class="bg-slate-100">ROLLBACK</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第14章</td>
+                                    <td class="px-4 py-3 text-slate-600">インデックス・権限・運用の基礎</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">CREATE INDEX</code>、<code class="bg-slate-100">EXPLAIN</code>、<code class="bg-slate-100">GRANT</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション14.10 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.10 次のステップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本ガイドで学んだのは、SQL を書いて「データベースと対話する」ための土台です。ここから先は、目的に応じて次のような方向に学習を広げていけます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["第14章までの学習<br/>お疲れさまでした"] --> B["(a) データベース設計・正規化<br/>ER図の描き方"]
+    A --> C["(b) プログラムからSQLを実行する<br/>JavaのJDBCなど"]
+    A --> D["(c) 他のRDBMSへの横展開<br/>SQL ServerのT-SQL・MySQL"]
+    A --> E["(d) 性能チューニング<br/>ウィンドウ関数"]
+    A --> F["(e) クラウドの<br/>マネージドDB"]
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">方向</th>
+                                    <th class="px-4 py-3 text-left font-semibold">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(a) DB設計・正規化</td>
+                                    <td class="px-4 py-3 text-slate-600">第2章で触れたテーブル分割の考え方を体系的に学び、自分でER図からテーブル設計ができるようになる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(b) プログラムからの実行</td>
+                                    <td class="px-4 py-3 text-slate-600">Java の JDBC などを使い、アプリケーションのコードから SQL を送って結果を受け取る方法を学ぶ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(c) 他のRDBMSへの横展開</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL Server の T-SQL や MySQL は、標準SQLの部分がそのまま通用する。製品ごとの方言の違いを押さえるだけでよい</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(d) 性能チューニング</td>
+                                    <td class="px-4 py-3 text-slate-600">第12章で入口だけ触れたウィンドウ関数や、より高度な実行計画の読み方を深める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(e) クラウドのマネージドDB</td>
+                                    <td class="px-4 py-3 text-slate-600">クラウド事業者が提供するPostgreSQL互換サービスを使い、自分でサーバーを構築・保守せずに運用する方法を知る</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        学習を続ける際は、<a href="https://www.postgresql.jp/document/" class="text-primary-600 hover:text-primary-700 underline" target="_blank" rel="noopener noreferrer">PostgreSQL公式ドキュメント（日本語版）</a>を手元に置いておくことをおすすめします。本ガイドで扱いきれなかった機能や、バージョンごとの違いも正確に確認できます。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 14-1: インデックスの前後で実行計画を見比べる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">14.5で紹介した <code class="bg-purple-100">EXPLAIN</code> を、自分の手で実行して確かめてみましょう。<code class="bg-purple-100">orders</code> テーブルを <code class="bg-purple-100">customer_id</code> で絞り込むクエリを題材にします。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">インデックスを作る前に <code class="bg-purple-100">EXPLAIN SELECT * FROM orders WHERE customer_id = 3;</code> を実行し、結果に <code class="bg-purple-100">Seq Scan</code> と表示されることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">CREATE INDEX idx_orders_customer_id ON orders (customer_id);</code> を実行してインデックスを作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">同じ <code class="bg-purple-100">EXPLAIN</code> を再実行し、<code class="bg-purple-100">Index Scan</code> に変わったか確認する。pgAdmin の「Explain」ボタンで図として見比べるのもおすすめ。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">練習が終わったら <code class="bg-purple-100">DROP INDEX idx_orders_customer_id;</code> で後片付けする。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>注意:</strong> 本ガイドの <code class="bg-purple-100">orders</code> は約15件しかないため、行数が少なすぎるとプランナが「全件見ても大差ない」と判断し、インデックス作成後も <code class="bg-purple-100">Seq Scan</code> のままになることがあります。それ自体が誤りではなく、<strong>データ量が少ないときはプランナが賢く判断している</strong>という良い学びです。実務で数百万行のテーブルに対して同じ実験をすると、より明確に <code class="bg-purple-100">Index Scan</code> への変化が見られます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. インデックスを作成すると検索が速くなる一方で、何が遅くなりますか。またその理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">INSERT</code> / <code class="bg-blue-200">UPDATE</code> / <code class="bg-blue-200">DELETE</code> が遅くなります。これらの操作のたびに、テーブル本体だけでなく、そのテーブルに付いているすべてのインデックスも更新する必要があるためです。あわせてディスク容量も消費します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">WHERE upper(customer_name) = 'SATO'</code> のように書くと、<code class="bg-blue-100">customer_name</code> にインデックスを作っていても効かないことがあります。なぜですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            インデックスは列の「元の値」を整理して並べたものです。<code class="bg-blue-200">upper()</code> で変換した後の値はインデックスの中に存在しないため、そのままでは索引を使って絞り込めず、全件走査（Seq Scan）になってしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. アプリケーションの接続ユーザーに、スーパーユーザーである <code class="bg-blue-100">postgres</code> をそのまま使うべきではない理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">postgres</code> はすべての操作を無制限に行えるスーパーユーザーです。アプリがSQLインジェクションなどで乗っ取られた場合、データベース全体が危険にさらされます。最小権限の原則に従い、アプリごとに必要な操作だけを許可した専用ロールを作成して使うべきです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. <code class="bg-blue-100">pg_dump</code> で取得したバックアップを <code class="bg-blue-100">pg_restore</code> で復元する練習をするとき、真っ先に守るべきことは何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            復元先を本番のデータベースにしないことです。復元先を間違えると現在のデータが上書き・混在してしまう危険があるため、必ず練習用の別データベースを用意し、そこに復元して手順を確認してから本番の運用に組み込みます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 完走メッセージ（重要ポイント） -->
+                <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-5 my-6">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-star text-emerald-500 mt-1"></i>
+                        <div>
+                            <p class="font-semibold text-emerald-800 mb-1">全14章、お疲れさまでした</p>
+                            <p class="text-emerald-900 text-sm">「データベースとは何か」も知らない状態から出発し、<code class="bg-emerald-100 text-emerald-900">CREATE TABLE</code> でテーブルを作り、<code class="bg-emerald-100 text-emerald-900">SELECT</code> で自在にデータを取り出し、<code class="bg-emerald-100 text-emerald-900">JOIN</code> で複数の表を組み合わせ、トランザクションで安全性を守り、そして今、インデックスと権限とバックアップという運用の基礎にまでたどり着きました。ここまで読み進めたあなたは、実務で書かれているSQLの大部分を読み解ける力を、すでに身につけています。あとは実際に手を動かし、自分の題材でクエリを書き続けることが、いちばんの近道です。お疲れさまでした。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="sql-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-primary-100 block">前の章</span>
+                            <span class="font-medium">第13章: トランザクションと同時実行制御</span>
+                        </div>
+                    </a>
+                    <span class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 opacity-60 cursor-not-allowed">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-500 block">次の章</span>
+                            <span class="text-slate-700 font-medium">最終章です</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                    </span>
+                </nav>
