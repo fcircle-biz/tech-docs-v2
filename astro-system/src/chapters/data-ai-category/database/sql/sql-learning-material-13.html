@@ -20,6 +20,7 @@
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクションと同時実行制御</h1>
                     <p class="text-slate-600">これまでの章では、1つの <code class="bg-slate-100">INSERT</code> や <code class="bg-slate-100">UPDATE</code> を単発で実行してきました。しかし実務では「在庫を減らす」と「注文を登録する」のように、<strong>複数の変更をワンセットで確定させたい</strong>場面がほとんどです。この章では、その仕組みである<strong>トランザクション</strong>と、複数人が同時にデータベースを使うときに何が起きるかを学びます。</p>
+                    <p class="text-slate-600 mt-2 text-sm"><i class="fas fa-signs-post mr-1"></i>この章はボリュームがあります。まずは 13.1 と、<code class="bg-slate-100">BEGIN</code> / <code class="bg-slate-100">COMMIT</code> / <code class="bg-slate-100">ROLLBACK</code> とオートコミット（13.3・13.5）までを確実に身につければ十分です。それ以外（13.2・13.4・13.6〜13.9）は<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>の内容なので、必要になったときに読み返せば問題ありません。</p>
                 </header>
 
                 <!-- 学習目標カード -->
@@ -62,11 +63,17 @@
                     </div>
                 </div>
 
+                <!-- 実習データの扱いに関する注意 -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 my-6">
+                    <p class="text-amber-900 text-sm break-words"><i class="fas fa-circle-info mr-1"></i><strong>この章のSQLを実行する前に：</strong> 本章には、変更を <code class="bg-amber-100 text-amber-900">COMMIT;</code> で確定する例（13.3・13.4）と、<code class="bg-amber-100 text-amber-900">BEGIN</code> を付けずに実行して即座に確定される例（13.5）が出てきます。そのまま実行すると <code class="bg-amber-100 text-amber-900">shop_db</code> の在庫数や注文件数が実際に書き換わります。これらの例には<strong>直後に「後片付け」の SQL を用意してある</strong>ので、確認が終わったら必ず実行して元の状態に戻してください。そうすれば第14章まで、第5章の投入直後と同じデータで進められます。戻し方が分からなくなった場合は、第10章の「困ったときは: shop_db を元に戻す」（<code class="bg-amber-100 text-amber-900">reset_shop_db.sql</code>）の手順で作り直せます。</p>
+                </div>
+
                 <!-- セクション13.1 -->
                 <section class="prose prose-slate max-w-none mb-8">
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.1 なぜトランザクションが必要か
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         銀行の口座振替を思い浮かべてください。「Aさんの口座から1万円を引いて、Bさんの口座に1万円を足す」という処理は、内部的には<strong>2つの独立した更新</strong>です。もしこの2つを別々にバラバラに実行していたらどうなるでしょうか。
@@ -103,6 +110,7 @@ flowchart TD
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.2 ACID特性 — トランザクションが守る4つの約束
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         トランザクションが満たすべき性質は、頭文字を取って <strong>ACID（アシッド）特性</strong>と呼ばれます。難しい用語ですが、1つずつ平易に言い換えれば怖くありません。
@@ -152,6 +160,7 @@ flowchart TD
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.3 基本の書き方 — BEGIN・COMMIT・ROLLBACK
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         PostgreSQL でトランザクションを明示的に扱うには、<code class="bg-slate-100">BEGIN;</code> で開始し、うまくいったら <code class="bg-slate-100">COMMIT;</code> で確定、失敗や取り消したい事情があれば <code class="bg-slate-100">ROLLBACK;</code> で全部を無かったことにします。<code class="bg-slate-100">shop_db</code> を使って、「在庫を1つ減らして、注文を登録する」処理をまとめてみましょう。
@@ -175,6 +184,32 @@ INSERT INTO orders (customer_id, order_date, status)
 VALUES (1, CURRENT_DATE, '受付');
 
 COMMIT;  -- ここで初めて両方とも確定される</code></pre>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 my-4">
+                        <p class="text-amber-900 text-sm break-words mb-2"><i class="fas fa-broom mr-1"></i><strong>後片付け：</strong> 上の例を <code class="bg-amber-100 text-amber-900">COMMIT;</code> まで実行すると、注文が1件増え、在庫が1つ減った状態が確定します。第14章までデータを第5章の投入直後の状態に保っておきたい場合は、次の手順で元に戻しておきましょう。</p>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">cleanup-13-3.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ①いま追加された注文の order_id を確認する
+SELECT order_id, customer_id, order_date FROM orders ORDER BY order_id DESC LIMIT 1;
+
+-- ②確認した order_id を指定して、追加した注文と減らした在庫を元に戻す
+BEGIN;
+
+DELETE FROM orders WHERE order_id = 16;   -- ①で確認した値に読み替える
+
+UPDATE products
+SET stock_quantity = stock_quantity + 1
+WHERE product_id = 3;
+
+COMMIT;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -218,6 +253,7 @@ SELECT stock_quantity FROM products WHERE product_id = 3;  -- 20に戻ってい�
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.4 SAVEPOINT — 一部分だけを取り消す
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">ROLLBACK</code> はトランザクション全体を取り消しますが、「注文ヘッダーはそのまま残し、明細の登録だけをやり直したい」ということもあります。そこで使うのが<strong>途中に目印を置く</strong> <code class="bg-slate-100">SAVEPOINT</code> です。
@@ -237,10 +273,12 @@ VALUES (2, CURRENT_DATE, '受付');
 
 SAVEPOINT before_items;  -- ここに目印を置く
 
+-- order_id は直前のINSERTで採番された実際の値に読み替える（例では16と仮定）
+-- product_id = 99 は products に存在しないため、この行はエラーになる
 INSERT INTO order_items (order_id, product_id, quantity, unit_price)
 VALUES (16, 99, 1, 500);  -- 商品IDを間違えてしまった
 
-ROLLBACK TO SAVEPOINT before_items;  -- 明細だけを取り消す
+ROLLBACK TO SAVEPOINT before_items;  -- 明細の失敗だけを取り消す
 
 COMMIT;  -- 注文ヘッダーはそのまま確定される</code></pre>
                     </div>
@@ -248,6 +286,31 @@ COMMIT;  -- 注文ヘッダーはそのまま確定される</code></pre>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">ROLLBACK TO SAVEPOINT 名前;</code> は、トランザクション自体は継続したまま、その目印より後の変更だけを取り消します。1つのトランザクション内に複数の <code class="bg-slate-100">SAVEPOINT</code> を置くこともできます。
                     </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この例の <code class="bg-slate-100">product_id = 99</code> は <code class="bg-slate-100">products</code> に存在しない商品なので、<code class="bg-slate-100">INSERT</code> は外部キー制約違反のエラーになります。PostgreSQL では、トランザクションの途中でエラーが起きると、それ以降の SQL は「現在のトランザクションはアボートしました」というエラーで実行できなくなります。しかし <code class="bg-slate-100">SAVEPOINT</code> を置いてあれば、<code class="bg-slate-100">ROLLBACK TO SAVEPOINT</code> で失敗の直前の状態まで戻り、そのまま処理を続けられます。これが <code class="bg-slate-100">SAVEPOINT</code> の実用的な使いどころです。
+                    </p>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 my-4">
+                        <p class="text-amber-900 text-sm break-words"><i class="fas fa-broom mr-1"></i><strong>後片付け：</strong> この例も <code class="bg-amber-100 text-amber-900">COMMIT;</code> まで実行すると注文ヘッダーが1件残ります。第14章までデータを第5章の投入直後の状態に保っておきたい場合は、下の SQL で取り消しておきましょう。</p>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">cleanup-13-4.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ①いま確定された注文の order_id を確認する
+SELECT order_id, customer_id, order_date FROM orders ORDER BY order_id DESC LIMIT 1;
+
+-- ②確認した order_id を指定して削除する（明細は登録されていないので orders だけでよい）
+DELETE FROM orders WHERE order_id = 17;   -- ①で確認した値に読み替える</code></pre>
+                    </div>
+
+                    <div class="bg-slate-100 border-l-4 border-slate-400 rounded-r-lg p-3 my-4">
+                        <p class="text-slate-800 text-sm break-words"><i class="fas fa-book mr-1"></i><strong>用語メモ：シーケンス</strong> — <code class="bg-slate-200">GENERATED ALWAYS AS IDENTITY</code> の連番を発行している裏方の仕組みです。行を <code class="bg-slate-200">DELETE</code> しても発行済みの番号は戻らないため、次に追加する注文の <code class="bg-slate-200">order_id</code> は 16・17 ではなく、その続きの番号になります。件数さえ元に戻っていれば、以降の章の学習に支障はありません。</p>
+                    </div>
                 </section>
 
                 <!-- セクション13.5 -->
@@ -255,6 +318,7 @@ COMMIT;  -- 注文ヘッダーはそのまま確定される</code></pre>
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.5 自動コミット — BEGINを書かなかったらどうなるか
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         ここまでの章では、一度も <code class="bg-slate-100">BEGIN</code> を書かずに <code class="bg-slate-100">UPDATE</code> や <code class="bg-slate-100">INSERT</code> を実行してきました。それでも変更はきちんと反映されています。これは PostgreSQL が「<code class="bg-slate-100">BEGIN</code> を書かない単独の SQL 文は、実行した瞬間に自動的に <code class="bg-slate-100">COMMIT</code> される」という<strong>自動コミット（オートコミット）</strong>の仕組みを持っているためです。
@@ -271,7 +335,12 @@ COMMIT;  -- 注文ヘッダーはそのまま確定される</code></pre>
 UPDATE products
 SET stock_quantity = stock_quantity - 1
 WHERE product_id = 5;
--- この後でROLLBACKしても、既に確定済みなので取り消せない</code></pre>
+-- この後でROLLBACKしても、既に確定済みなので取り消せない
+
+-- 後片付け：確認できたら在庫を元に戻す（この文も実行した瞬間に確定する）
+UPDATE products
+SET stock_quantity = stock_quantity + 1
+WHERE product_id = 5;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -318,6 +387,7 @@ WHERE product_id = 5;
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.6 同時実行で起こる問題
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         複数の人が同時に同じテーブルを読み書きすると、1人で使っているときには起きない、奇妙な見え方の問題が起こることがあります。代表的な3つを押さえておきましょう。
@@ -358,21 +428,27 @@ WHERE product_id = 5;
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.7 分離レベル — どこまで他人の影響を遮断するか
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        SQL 標準では4段階の<strong>分離レベル（Isolation Level）</strong>が定義されています。レベルを上げるほど同時実行での安全性は増しますが、その分だけ処理が待たされやすくなるという代償もあります。PostgreSQL では実質的に3段階を使い分けます。
+                        SQL 標準では4段階の<strong>分離レベル（Isolation Level）</strong>が定義されています。レベルを上げるほど同時実行時の制約は強くなりますが、それは単に「待たされやすくなる」だけではありません。PostgreSQL では、競合を検知したトランザクションが待たされるのではなく、<strong>直列化失敗（serialization failure）というエラーで中断される</strong>ことがあります（この節の後半で扱います）。まずは標準SQLが定義する4段階と、PostgreSQL の実装の対応を見てみましょう。
                     </p>
 
                     <div class="overflow-x-auto my-6">
                         <table class="min-w-full divide-y divide-slate-200">
                             <thead class="bg-slate-100">
                                 <tr>
-                                    <th class="px-4 py-3 text-left font-semibold">分離レベル</th>
-                                    <th class="px-4 py-3 text-left font-semibold">防げる問題</th>
-                                    <th class="px-4 py-3 text-left font-semibold">備考</th>
+                                    <th class="px-4 py-3 text-left font-semibold">分離レベル<br /><span class="text-xs text-slate-500 font-normal">（標準SQLの名称）</span></th>
+                                    <th class="px-4 py-3 text-left font-semibold">標準SQLの定義<br /><span class="text-xs text-slate-500 font-normal">（防ぐと定義されている問題）</span></th>
+                                    <th class="px-4 py-3 text-left font-semibold">PostgreSQL の実装<br /><span class="text-xs text-slate-500 font-normal">（実際に防げる問題）</span></th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">READ UNCOMMITTED</td>
+                                    <td class="px-4 py-3 text-slate-600">何も防がない（ダーティリードを許す）</td>
+                                    <td class="px-4 py-3 text-slate-600">指定しても<strong>READ COMMITTED として動作</strong>する（PostgreSQL 独自の挙動）。ダーティリードは発生しない</td>
+                                </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">READ COMMITTED</td>
                                     <td class="px-4 py-3 text-slate-600">ダーティリードのみ防ぐ</td>
@@ -380,16 +456,26 @@ WHERE product_id = 5;
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">REPEATABLE READ</td>
-                                    <td class="px-4 py-3 text-slate-600">ダーティリード＋反復不能読み取りを防ぐ</td>
-                                    <td class="px-4 py-3 text-slate-600">トランザクション開始時点の見え方を最後まで維持する。PostgreSQL では実質ファントムリードもほぼ防げる</td>
+                                    <td class="px-4 py-3 text-slate-600">ダーティリード＋反復不能読み取りを防ぐ（ファントムリードは標準SQLの定義上は起こりうる）</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>ファントムリードも発生しない</strong>（PostgreSQL 独自の挙動。詳細は次の補足を参照）</td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">SERIALIZABLE</td>
                                     <td class="px-4 py-3 text-slate-600">3つすべてを防ぐ</td>
-                                    <td class="px-4 py-3 text-slate-600">最も厳格。複数のトランザクションが「順番に1つずつ実行した」のと同じ結果を保証する。競合を検知すると片方がエラーになりやり直しが必要になることがある</td>
+                                    <td class="px-4 py-3 text-slate-600">最も厳格。複数のトランザクションが「順番に1つずつ実行した」のと同じ結果を保証する。競合を検知すると片方が直列化失敗エラーで中断されることがある</td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">補足: PostgreSQL の REPEATABLE READ ではファントムリードは発生しない</p>
+                                <p class="text-blue-900 text-sm">標準SQLでは REPEATABLE READ でもファントムリードが起きうると定義されていますが、<strong>PostgreSQL の REPEATABLE READ では、ファントムリードは発生しません。</strong> これは、PostgreSQL がこの分離レベルを「トランザクション開始時点のデータの断面（スナップショット）を最後まで見続ける」という仕組みで実装しているためです。トランザクション中に他人が行を <code class="bg-blue-100">INSERT</code> して <code class="bg-blue-100">COMMIT</code> しても、自分のスナップショットには反映されないので、同じ条件の <code class="bg-blue-100">SELECT</code> を何度実行しても行数は増えません。標準SQLの最低ラインより厳しい動作になっている一例です。</p>
+                            </div>
+                        </div>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -416,6 +502,21 @@ SELECT stock_quantity FROM products WHERE product_id = 3;
 COMMIT;</code></pre>
                     </div>
 
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">
+                                    注意: 分離レベルを上げると「待たされる」だけでなく「エラーで中断される」ことがある
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
+                                </p>
+                                <p class="text-red-900 text-sm mb-2">READ COMMITTED より厳しい分離レベル（REPEATABLE READ・SERIALIZABLE）では、他のトランザクションとの競合を検知すると、PostgreSQL が待たせる代わりに<strong>直列化失敗（serialization failure）</strong>というエラーを返してそのトランザクションを中断することがあります。エラーメッセージの例は次のとおりです。</p>
+                                <pre class="!mt-0 bg-red-100 text-red-900 text-xs rounded-lg p-3 overflow-x-auto">ERROR:  could not serialize access due to concurrent update</pre>
+                                <p class="text-red-900 text-sm mt-2">このため、REPEATABLE READ や SERIALIZABLE を使う場合は、<strong>アプリケーション側で「直列化失敗のエラーを受け取ったらトランザクションを最初からやり直す」処理を組み込んでおく</strong>必要があります。READ COMMITTED のみを使う一般的な業務処理では、通常はこの考慮は不要です。</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-slate-600 leading-relaxed mb-4">
                         普段の学習や多くの業務システムでは、既定の <strong>READ COMMITTED</strong> のままで問題ありません。「集計結果の一貫性が特に重要な処理」や「在庫の取り合いのような競合が起きやすい処理」でのみ、より厳しいレベルを検討します。
                     </p>
@@ -426,6 +527,7 @@ COMMIT;</code></pre>
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.8 PostgreSQL の MVCC — 読み取りが書き込みを邪魔しない仕組み
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         「複数人が同時に読み書きしても安全」と言われても、内部では何が起きているのでしょうか。PostgreSQL は <strong>MVCC（Multi-Version Concurrency Control／多版型同時実行制御）</strong>という方式を採用しています。
@@ -438,8 +540,9 @@ COMMIT;</code></pre>
                         <div class="flex items-start gap-3">
                             <i class="fas fa-star text-emerald-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-emerald-800 mb-1">重要: 読み取りが書き込みをブロックしない</p>
-                                <p class="text-emerald-900 text-sm">誰かが行を更新している最中でも、他の人は更新前の古い版を読み続けられるため、<code class="bg-emerald-100">SELECT</code> は <code class="bg-emerald-100">UPDATE</code> の完了を待たされません。逆に <code class="bg-emerald-100">SELECT</code> が実行中でも <code class="bg-emerald-100">UPDATE</code> は待たされません。「読み取り専用のロックで書き込みが止まる」という、単純なロック方式でありがちな渋滞が起きにくいのが PostgreSQL の強みです。</p>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: 通常の SELECT と UPDATE は互いをブロックしにくい</p>
+                                <p class="text-emerald-900 text-sm">通常の <code class="bg-emerald-100">SELECT</code> と <code class="bg-emerald-100">UPDATE</code> は、MVCC により、互いをブロックしにくくなっています。誰かが行を更新している最中でも、他の人は更新前の古い版を読み続けられるため、<code class="bg-emerald-100">SELECT</code> は <code class="bg-emerald-100">UPDATE</code> の完了を待たされにくく、逆に <code class="bg-emerald-100">SELECT</code> が実行中でも <code class="bg-emerald-100">UPDATE</code> は待たされにくくなっています。「読み取り専用のロックで書き込みが止まる」という、単純なロック方式でありがちな渋滞が起きにくいのが PostgreSQL の強みです。</p>
+                                <p class="text-emerald-900 text-sm mt-2"><strong>ただし例外があります。</strong> <code class="bg-emerald-100">SELECT ... FOR UPDATE</code> のように<strong>行にロックをかける SELECT</strong>（<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>）は、他のトランザクションの更新と待ち合わせになります。また <code class="bg-emerald-100">ALTER TABLE</code> などの一部の操作は通常の SELECT ともぶつかります。</p>
                             </div>
                         </div>
                     </div>
@@ -457,6 +560,7 @@ COMMIT;</code></pre>
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         13.9 ロックとデッドロック
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         MVCC は読み取りと書き込みの競合を避けてくれますが、<strong>同じ行を同時に更新しようとする書き込み同士</strong>は話が別です。ある行を <code class="bg-slate-100">UPDATE</code> しているトランザクションがコミットまたはロールバックするまで、その行に対する他の <code class="bg-slate-100">UPDATE</code> は<strong>行ロック</strong>によって待たされます。
@@ -530,6 +634,11 @@ flowchart LR
                                                  flex items-center justify-center text-sm font-medium">5</span>
                                     <span class="flex-1 min-w-0 break-words">余裕があれば、手順4の代わりに <code class="bg-purple-100">ROLLBACK;</code> を実行し、ウィンドウBから見える値が最初のまま変わっていないことも確認してみる。</span>
                                 </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">6</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>後片付け:</strong> 手順4で <code class="bg-purple-100">COMMIT;</code> まで実行した場合は、在庫数が1つ減ったままになっています。<code class="bg-purple-100">UPDATE products SET stock_quantity = stock_quantity + 1 WHERE product_id = 3;</code> を実行して、元の値に戻しておく。</span>
+                                </li>
                             </ol>
 
                             <div class="bg-purple-100 rounded-lg p-3">
@@ -584,13 +693,13 @@ flowchart LR
                                     </details>
                                 </li>
                                 <li class="text-blue-900">
-                                    <p class="font-medium mb-2 break-words">Q4. PostgreSQL の MVCC が「読み取りが書き込みをブロックしない」を実現できるのはなぜですか。デッドロックが起きたときに PostgreSQL はどう対応しますか。</p>
+                                    <p class="font-medium mb-2 break-words">Q4. PostgreSQL の MVCC によって、通常の SELECT と UPDATE が互いをブロックしにくくなっているのはなぜですか。また、ブロックされる例外にはどのようなものがありますか。デッドロックが起きたときに PostgreSQL はどう対応しますか。</p>
                                     <details class="mt-2">
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            更新時に古いデータをその場で上書きせず、新しい版を追記する「多版型（追記型）」の仕組みだからです。他の人は更新中でも古い版を読み続けられるため、SELECT が UPDATE の完了を待つ必要がありません。デッドロックが発生した場合、PostgreSQL は自動的に検出し、どちらか一方のトランザクションを強制的にエラーで中断します。
+                                            更新時に古いデータをその場で上書きせず、新しい版を追記する「多版型（追記型）」の仕組みだからです。他の人は更新中でも古い版を読み続けられるため、通常の SELECT は UPDATE の完了を待たされにくくなっています。ただし <code class="bg-blue-100">SELECT ... FOR UPDATE</code> のように行にロックをかける SELECT は他の更新と待ち合わせになり、<code class="bg-blue-100">ALTER TABLE</code> なども通常の SELECT とぶつかります。デッドロックが発生した場合、PostgreSQL は自動的に検出し、どちらか一方のトランザクションを強制的にエラーで中断します。
                                         </p>
                                     </details>
                                 </li>

@@ -20,6 +20,11 @@
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">サブクエリとビュー</h1>
                     <p class="text-slate-600">この章では、SQL の中に SQL を書く「サブクエリ」という考え方を学びます。<code class="bg-slate-100">WHERE</code> 句のサブクエリ・<code class="bg-slate-100">IN</code>・<code class="bg-slate-100">EXISTS</code>・<code class="bg-slate-100">FROM</code> 句のサブクエリ（導出テーブル）を一通り経験したあと、それらを読みやすく書き直す <code class="bg-slate-100">WITH</code> 句（CTE）、そしてよく使う SELECT に名前を付けて保存する <code class="bg-slate-100">CREATE VIEW</code> を学びます。最後に発展として、集計しても行が消えないウィンドウ関数の入口にも触れます。</p>
+                    <p class="text-slate-600 text-sm mt-2 flex items-center gap-2 flex-wrap">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
+                        <span>この章は 12.2〜12.3 のスカラサブクエリ・<code class="bg-slate-100">IN</code>、12.5 の FROM句のサブクエリ、12.7 の <code class="bg-slate-100">CREATE VIEW</code> / <code class="bg-slate-100">DROP VIEW</code> の基本が必須、12.4 の相関サブクエリ・12.6 のCTE・12.8 のウィンドウ関数は発展です。まずは必須の項目を確実にしましょう。</span>
+                    </p>
                 </header>
 
                 <!-- 学習目標カード -->
@@ -35,7 +40,7 @@
                             <ul class="space-y-2">
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>サブクエリが「内側を先に実行し、その結果を外側が使う」入れ子の仕組みであることを説明できる</span>
+                                    <span>サブクエリが「内側のSELECTの結果を、外側のSELECTが使う」入れ子の仕組みであることを説明できる</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -64,17 +69,21 @@
                         第11章までに学んだ <code class="bg-slate-100">SELECT</code> は、いつも「1回書けば1回で完結する」ものでした。しかし実務では、「まず〇〇を求めて、その結果を使って△△を絞り込む」という<strong>二段階の問い合わせ</strong>が頻繁に必要になります。たとえば「平均単価より高い商品を知りたい」という要求には、(1) 平均単価を求める、(2) その値より高い商品を絞り込む、という2つの手順が隠れています。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        この2つの手順を1つの SQL 文の中に<strong>入れ子（ネスト）</strong>にして書けるのが<strong>サブクエリ（副問い合わせ）</strong>です。カッコで囲んだ内側の <code class="bg-slate-100">SELECT</code> が先に実行され、その<strong>結果</strong>を外側の <code class="bg-slate-100">SELECT</code> が材料として使います。
+                        この2つの手順を1つの SQL 文の中に<strong>入れ子（ネスト）</strong>にして書けるのが<strong>サブクエリ（副問い合わせ）</strong>です。カッコで囲んだ内側の <code class="bg-slate-100">SELECT</code> の<strong>結果</strong>を、外側の <code class="bg-slate-100">SELECT</code> が材料として使う、と考えると理解しやすくなります。
                     </p>
 
                     <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
                         <div class="mermaid">
 flowchart TD
-    A["① 内側のSELECT（サブクエリ）を先に実行"] --> B["② 内側の実行結果（値・値のリスト・表）ができる"]
+    A["① 内側のSELECT（サブクエリ）の結果を先に考える"] --> B["② 内側の結果（値・値のリスト・表）ができたとみなす"]
     B --> C["③ 外側のSELECTが②の結果を材料として使う"]
     C --> D["④ 外側の実行結果が最終的な答えになる"]
                         </div>
                     </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これは<strong>SQL を読み解くための論理的な順序</strong>です。実際にどのような順序・方法でサブクエリを処理するかは、PostgreSQL の<strong>オプティマイザ</strong>（最も速いと判断した実行方法を自動的に選ぶ仕組み）が実行のたびに決めます。「内側の結果を外側が使う」と考えれば SQL の意味は正しく読み解けますが、物理的に必ずその順番で処理が行われるとは限らない、ということは覚えておきましょう。
+                    </p>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
                         サブクエリは、<strong>どこに書くか</strong>によって返せる形と使い道が変わります。この章では代表的な3つの位置を順番に見ていきます。
@@ -119,6 +128,7 @@ flowchart TD
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.2 WHERE句のサブクエリ（スカラサブクエリ）
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <strong>スカラサブクエリ</strong>とは、実行結果が「1行1列＝1つの値」だけになるサブクエリのことです。<code class="bg-slate-100">= &gt; &lt; &gt;=</code> などの比較演算子は、比較する相手が1つの値である必要があるため、スカラサブクエリと相性がよく使われます。第9章で学んだ集約関数はまさに「表全体から1つの値を返す」ものなので、ここで生きてきます。
@@ -144,7 +154,7 @@ ORDER BY unit_price DESC;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        内側の <code class="bg-slate-100">SELECT avg(unit_price) FROM products</code> が先に実行されて<strong>1つの数値</strong>（<code class="bg-slate-100">1823.33</code>）になり、外側からは <code class="bg-slate-100">WHERE unit_price &gt; 1823.33</code> と書いたのと同じ結果になります。平均値をあらかじめ調べて数値を打ち込む必要がない点が最大の利点です。もし商品が追加されて平均が変われば、同じ SQL を実行するだけで結果も自動的に更新されます。
+                        内側の <code class="bg-slate-100">SELECT avg(unit_price) FROM products</code> の結果は<strong>1つの数値</strong>（<code class="bg-slate-100">1823.33</code>）になり、外側からは <code class="bg-slate-100">WHERE unit_price &gt; 1823.33</code> と書いたのと同じ結果になります。平均値をあらかじめ調べて数値を打ち込む必要がない点が最大の利点です。もし商品が追加されて平均が変われば、同じ SQL を実行するだけで結果も自動的に更新されます。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -184,8 +194,46 @@ ORDER BY unit_price DESC;</code></pre>
                         <div class="flex items-start gap-3">
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-red-800 mb-1">注意: 2行以上返るとエラーになる</p>
-                                <p class="text-red-900 text-sm">スカラサブクエリの位置に <code class="bg-red-100">SELECT product_name FROM products</code> のように複数行を返す SELECT を書くと、実行時に「1行しか使えない場所に複数行が返った」というエラーになります。<code class="bg-red-100">=</code> の相手には必ず集約関数などで1行1列に絞った SELECT を書きます。</p>
+                                <p class="font-semibold text-red-800 mb-1">注意: サブクエリが2行以上返るとエラーになる</p>
+                                <p class="text-red-900 text-sm mb-2">スカラサブクエリの位置に、複数行を返す可能性がある SELECT を書くとエラーになります。次の例は <code class="bg-red-100">unit_price</code> どうしを比較しているので型は合っていますが、内側の SELECT が products の全件（複数行）を返してしまいます。</p>
+                                <div class="code-block-wrapper mb-2">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">scalar-error.sql</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- エラーになる例：サブクエリが複数行を返してしまう
+SELECT product_id, product_name, unit_price
+  FROM products
+ WHERE unit_price = (SELECT unit_price FROM products);</code></pre>
+                                </div>
+                                <p class="text-red-900 text-sm mb-2">実行すると、次のようなエラーメッセージになります。</p>
+                                <div class="code-block-wrapper mb-2">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">Messages</span>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ERROR:  more than one row returned by a subquery used as an expression</code></pre>
+                                </div>
+                                <p class="text-red-900 text-sm mb-2">スカラサブクエリとして使うには、内側の SELECT が<strong>1行だけ</strong>返るように集約関数などで絞り込みます。</p>
+                                <div class="code-block-wrapper mb-2">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">scalar-fixed.sql</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 1行だけ返るようにする（最も高い単価の商品を取り出す）
+SELECT product_id, product_name, unit_price
+  FROM products
+ WHERE unit_price = (SELECT max(unit_price) FROM products);
+
+-- 複数行を相手にしたいときは = ではなく IN を使う
+SELECT product_id, product_name, unit_price
+  FROM products
+ WHERE unit_price IN (SELECT unit_price FROM products WHERE category = '家電');</code></pre>
+                                </div>
+                                <p class="text-red-900 text-sm">1つ目の例は <code class="bg-red-100">max(unit_price)</code> が <code class="bg-red-100">4200.00</code>（product_id=12「旧型キーボード」）になるため、この商品だけが1件返ります。</p>
                             </div>
                         </div>
                     </div>
@@ -196,6 +244,7 @@ ORDER BY unit_price DESC;</code></pre>
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.3 IN を使うサブクエリ
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         サブクエリが複数行を返す場合は、<code class="bg-slate-100">=</code> ではなく第7章で学んだ <code class="bg-slate-100">IN</code> を使います。「東京都の顧客が出した注文」を、注文（<code class="bg-slate-100">orders</code>）を軸に求めてみましょう。
@@ -227,7 +276,7 @@ ORDER BY order_date;</code></pre>
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-red-800 mb-1">重要な復習: NOT IN と NULL の罠（第7章）</p>
-                                <p class="text-red-900 text-sm mb-2">第7章で学んだ通り、<code class="bg-red-100">NOT IN</code> のリストの中に <code class="bg-red-100">NULL</code> が1つでも混じると、比較結果が「不明」になり<strong>行が1件も返らなくなる</strong>ことがあります。<code class="bg-red-100">customers.prefecture</code> には <code class="bg-red-100">NULL</code> の行があるため、次のような書き方は危険です。</p>
+                                <p class="text-red-900 text-sm mb-2">第7章で学んだ通り、<code class="bg-red-100">NOT IN</code> のリストの中に <code class="bg-red-100">NULL</code> が1つでも混じると、比較結果が「不明」になり<strong>行が1件も返らなくなる</strong>ことがあります。危険なのは、<strong>内側の SELECT が「NULL を含みうる列」を返している</strong>ときです。<code class="bg-red-100">customers.prefecture</code> には <code class="bg-red-100">NULL</code> の行（customer_id=7「山本 恵子」）があるため、次のような書き方は危険です。</p>
                                 <div class="code-block-wrapper mb-2">
                                     <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
                                         <span class="text-slate-400 text-sm">danger-not-in.sql</span>
@@ -235,14 +284,17 @@ ORDER BY order_date;</code></pre>
                                             <i class="fas fa-copy"></i>
                                         </button>
                                     </div>
-                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 危険: prefectureがNULLの顧客がいると
--- customer_idのリストにNULLが混ざり、結果が0件になりうる
-SELECT * FROM customers
-WHERE customer_id NOT IN (
-    SELECT customer_id FROM orders WHERE status = 'キャンセル'
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 危険: 内側のSELECTが返す prefecture に NULL が混ざるため、結果が0件になる
+-- やりたいこと: 「注文実績のある顧客が誰も住んでいない都道府県」の顧客を探す
+SELECT customer_id, customer_name, prefecture
+FROM customers
+WHERE prefecture NOT IN (
+    SELECT prefecture FROM customers
+    WHERE customer_id IN (SELECT customer_id FROM orders)
 );</code></pre>
                                 </div>
-                                <p class="text-red-900 text-sm">安全に書くには、内側に <code class="bg-red-100">WHERE customer_id IS NOT NULL</code> を足すか、次に学ぶ <code class="bg-red-100">NOT EXISTS</code> を使います。</p>
+                                <p class="text-red-900 text-sm mb-2">本来なら、注文が1件もない「渡辺 大輔（福岡県）」の1件が返ってほしいところですが、内側の <code class="bg-red-100">SELECT</code> が返す都道府県のリストに <code class="bg-red-100">NULL</code> が1つ混じっているため、結果は<strong>0件</strong>になります。</p>
+                                <p class="text-red-900 text-sm">安全に書くには、内側に <code class="bg-red-100">WHERE prefecture IS NOT NULL</code> を足してリストから <code class="bg-red-100">NULL</code> を取り除くか、次に学ぶ <code class="bg-red-100">NOT EXISTS</code> を使います（<code class="bg-red-100">NOT EXISTS</code> は値そのものを比較しないため、この罠が起きません）。</p>
                             </div>
                         </div>
                     </div>
@@ -253,12 +305,13 @@ WHERE customer_id NOT IN (
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.4 EXISTS — 「存在するかどうか」だけを判定する
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">EXISTS</code> は、サブクエリが<strong>1行でも返せば真</strong>、1行も返さなければ偽と判定する演算子です。値そのものではなく「該当する行があるかどうか」だけに関心がある場合に使います。特徴的なのは、<code class="bg-slate-100">EXISTS</code> の中で使うサブクエリは<strong>外側の行を参照できる</strong>という点です。これを<strong>相関サブクエリ</strong>と呼びます。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        相関サブクエリは、外側の <code class="bg-slate-100">SELECT</code> が1行処理するたびに、その行の値を使って内側のサブクエリが評価される、という動き方をします。「注文のない顧客」を <code class="bg-slate-100">NOT EXISTS</code> で求めてみましょう。
+                        相関サブクエリは、「外側の <code class="bg-slate-100">SELECT</code> が1行処理するたびに、その行の値を使って内側のサブクエリが評価される」と考えると理解しやすくなります。実際にどのような手順で処理するかは、これも PostgreSQL のオプティマイザが決めます。「注文のない顧客」を <code class="bg-slate-100">NOT EXISTS</code> で求めてみましょう。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -282,7 +335,7 @@ WHERE NOT EXISTS (
                         内側の <code class="bg-slate-100">o.customer_id = c.customer_id</code> が、外側の顧客1人ぶんごとに評価される「相関」の部分です。<code class="bg-slate-100">SELECT 1</code> は「値は何でもよく、行があるかどうかだけを見たい」という意図を表すための慣習的な書き方です。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        この結果は、第11章で学んだ <code class="bg-slate-100">LEFT JOIN ... WHERE ... IS NULL</code>（外部結合で相手がいない行を探す書き方）とまったく同じになります。2つを比べてみましょう。
+                        この結果は、第11章で学んだ <code class="bg-slate-100">LEFT JOIN ... WHERE ... IS NULL</code>（外部結合で相手がいない行を探す書き方）と同じ結果になります。2つを比べてみましょう。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -329,6 +382,7 @@ WHERE NOT EXISTS (
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.5 FROM句のサブクエリ（導出テーブル）
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         サブクエリは <code class="bg-slate-100">FROM</code> 句にも書けます。この場合、サブクエリの実行結果は<strong>1つの表</strong>として扱われ、外側の <code class="bg-slate-100">SELECT</code> はその表に対して普通に列を選んだり条件を付けたりできます。この一時的な表を<strong>導出テーブル</strong>と呼びます。
@@ -355,7 +409,7 @@ FROM (
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        ここで重要な決まりが1つあります。<strong>導出テーブルには必ず別名（エイリアス）を付ける</strong>ことです。上の例の <code class="bg-slate-100">AS customer_totals</code> がそれにあたり、これが無いと文法エラーになります（PostgreSQL の場合）。外側から見ると <code class="bg-slate-100">customer_totals</code> という名前の、<code class="bg-slate-100">customer_id</code> と <code class="bg-slate-100">total_amount</code> という2つの列を持つ表がある、という扱いです。
+                        上の例の <code class="bg-slate-100">AS customer_totals</code> のように、導出テーブルには<strong>別名（エイリアス）</strong>を付けています。<strong>PostgreSQL 16 以降では、FROM 句のサブクエリの別名は省略できます</strong>（それより前のバージョンでは、省略すると文法エラーになりました）。ただし、別名を付けておくと <code class="bg-slate-100">customer_totals.total_amount</code> のように<code class="bg-slate-100">別名.列名</code>の形でサブクエリの列を参照でき SQL が読みやすくなるうえ、別名が必須のデータベース製品もあるため他のデータベースへ移植しやすくなります。そのため<strong>本教材では、FROM 句のサブクエリには別名を付けることを推奨します</strong>。外側から見ると <code class="bg-slate-100">customer_totals</code> という名前の、<code class="bg-slate-100">customer_id</code> と <code class="bg-slate-100">total_amount</code> という2つの列を持つ表がある、という扱いです。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -379,9 +433,10 @@ FROM (
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.6 WITH句（CTE・共通テーブル式）
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        12.5 のように <code class="bg-slate-100">FROM</code> 句の中にサブクエリを入れ子にしていくと、段階が増えるほど<strong>カッコの中にカッコがある</strong>状態になり、どこからどこまでが1つのまとまりか読み取りにくくなります。この問題を解決するのが <code class="bg-slate-100">WITH</code> 句、通称 <strong>CTE（共通テーブル式）</strong>です。基本の書き方は次の通りです。
+                        12.5 のように <code class="bg-slate-100">FROM</code> 句の中にサブクエリを入れ子にしていくと、段階が増えるほど<strong>カッコの中にカッコがある</strong>状態になり、どこからどこまでが1つのまとまりか読み取りにくくなります。この問題を解決するのが <code class="bg-slate-100">WITH</code> 句、通称 <strong>CTE（共通テーブル式）</strong>です。<code class="bg-slate-100">WITH</code> 句は PostgreSQL 独自の機能ではなく<strong>標準SQLの一部</strong>で、他の主要なデータベース製品でもほぼ同じ書き方が使えます。基本の書き方は次の通りです。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -452,7 +507,7 @@ FROM customer_totals;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        処理内容も結果もまったく同じですが、<code class="bg-slate-100">customer_totals</code> という名前が先に宣言されるぶん、「顧客ごとの合計を作る → その平均を求める」という2段構えの意図が一目で伝わります。<code class="bg-slate-100">WITH</code> 句はカンマで区切ることで<strong>複数</strong>並べることもでき、3段階・4段階の集計でも入れ子を深くせずに書き進められます。
+                        得られる結果は同じですが、<code class="bg-slate-100">customer_totals</code> という名前が先に宣言されるぶん、「顧客ごとの合計を作る → その平均を求める」という2段構えの意図が一目で伝わります。<code class="bg-slate-100">WITH</code> 句はカンマで区切ることで<strong>複数</strong>並べることもでき、3段階・4段階の集計でも入れ子を深くせずに書き進められます。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -495,6 +550,7 @@ ORDER BY h.total_amount DESC;</code></pre>
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         12.7 ビュー（VIEW）
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-star"></i>必須</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">WITH</code> 句は1回のクエリの中だけで使える「その場限りの名前」でした。もし同じ複雑な <code class="bg-slate-100">SELECT</code> を<strong>何度も繰り返し使う</strong>のであれば、データベースに恒久的な名前として登録してしまう方法があります。それが<strong>ビュー</strong>です。
@@ -515,7 +571,7 @@ JOIN order_items AS oi ON oi.order_id = o.order_id
 GROUP BY o.customer_id;
 
 -- 以降は、テーブルと同じ感覚でSELECTできる
-SELECT * FROM customer_totals_view WHERE total_amount &gt; 50000;</code></pre>
+SELECT * FROM customer_totals_view WHERE total_amount &gt; 5000;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -562,13 +618,14 @@ DROP VIEW customer_totals_view;</code></pre>
                 <section class="prose prose-slate max-w-none mb-8">
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
-                        12.8 発展: ウィンドウ関数の入口
+                        12.8 ウィンドウ関数の入口
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle"><i class="fas fa-rocket"></i>発展</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         ここからは<strong>発展</strong>の内容です。第9章の <code class="bg-slate-100">GROUP BY</code> による集計には、1つの弱点がありました。グループ化すると、元の行が集約されて<strong>行数が減ってしまう</strong>のです。「各顧客の注文を1件ずつ見せながら、その隣に顧客の合計金額も表示したい」といった要求には応えられません。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        この「集計しても行が消えない集計」を実現するのが<strong>ウィンドウ関数</strong>です。<code class="bg-slate-100">OVER</code> というキーワードが目印です。
+                        この「集計しても行が消えない集計」を実現するのが<strong>ウィンドウ関数</strong>です。<code class="bg-slate-100">OVER</code> というキーワードが目印です。ウィンドウ関数も <code class="bg-slate-100">WITH</code> 句と同じく<strong>標準SQLの機能</strong>で、PostgreSQL 独自のものではありません。
                     </p>
 
                     <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-dashed border-indigo-300 rounded-xl p-5 my-6">
@@ -597,8 +654,12 @@ SELECT customer_id, order_id,
         PARTITION BY customer_id ORDER BY order_date
     ) AS order_no,
     sum(order_total) OVER (PARTITION BY customer_id) AS customer_total
-FROM order_totals;</code></pre>
+FROM order_totals
+ORDER BY customer_id, order_no;</code></pre>
                         </div>
+                        <p class="text-indigo-900 text-sm mb-4">
+                            <i class="fas fa-circle-info mr-1"></i>末尾の <code class="bg-indigo-100 text-indigo-900">ORDER BY</code> は表示順を揃えるためのものです。<code class="bg-indigo-100 text-indigo-900">ORDER BY</code> を付けないと、SELECT の結果の行順は保証されません。なお、この SQL は全15行を返します。下の表はその<strong>先頭4行の抜粋</strong>です。
+                        </p>
                         <div class="overflow-x-auto mb-4">
                             <table class="min-w-full divide-y divide-indigo-200">
                                 <thead class="bg-indigo-100">
@@ -620,6 +681,12 @@ FROM order_totals;</code></pre>
                                         <td class="px-4 py-3 text-indigo-900">1</td>
                                         <td class="px-4 py-3 text-indigo-900">4</td>
                                         <td class="px-4 py-3 text-indigo-900">2</td>
+                                        <td class="px-4 py-3 text-indigo-900">6880.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-indigo-900">1</td>
+                                        <td class="px-4 py-3 text-indigo-900">15</td>
+                                        <td class="px-4 py-3 text-indigo-900">3</td>
                                         <td class="px-4 py-3 text-indigo-900">6880.00</td>
                                     </tr>
                                     <tr>
@@ -666,7 +733,7 @@ FROM order_totals;</code></pre>
                                 <li class="flex items-start gap-3 text-purple-900">
                                     <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
                                                  flex items-center justify-center text-sm font-medium">3</span>
-                                    <span class="flex-1 min-w-0 break-words">同じ問題を、今度は <code class="bg-purple-100">WITH category_avg AS (...)</code> という <code class="bg-purple-100">WITH</code> 句を使って書き直す。実行結果が手順2とまったく同じであることを確認する。</span>
+                                    <span class="flex-1 min-w-0 break-words">同じ問題を、今度は <code class="bg-purple-100">WITH category_avg AS (...)</code> という <code class="bg-purple-100">WITH</code> 句を使って書き直す。実行結果が手順2と同じになることを確認する。</span>
                                 </li>
                                 <li class="flex items-start gap-3 text-purple-900">
                                     <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
@@ -694,13 +761,13 @@ FROM order_totals;</code></pre>
                             <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
                             <ol class="space-y-4">
                                 <li class="text-blue-900">
-                                    <p class="font-medium mb-2 break-words">Q1. スカラサブクエリとは何ですか。<code class="bg-blue-100">WHERE unit_price = (SELECT product_name FROM products)</code> がエラーになる理由も説明してください。</p>
+                                    <p class="font-medium mb-2 break-words">Q1. スカラサブクエリとは何ですか。<code class="bg-blue-100">WHERE unit_price = (SELECT unit_price FROM products)</code> がエラーになる理由も説明してください。</p>
                                     <details class="mt-2">
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            スカラサブクエリとは、実行結果が「1行1列＝1つの値」だけになるサブクエリです。例の <code class="bg-blue-100">SELECT product_name FROM products</code> は商品の数だけ複数行を返す可能性があるため、1つの値としか比較できない <code class="bg-blue-100">=</code> の相手には使えず、実行時にエラーになります。
+                                            スカラサブクエリとは、実行結果が「1行1列＝1つの値」だけになるサブクエリです。例の <code class="bg-blue-100">SELECT unit_price FROM products</code> は products の全件、つまり複数行を返す可能性があります。<code class="bg-blue-100">=</code> の相手には1つの値しか使えないため、実行時に「more than one row returned by a subquery used as an expression」というエラーになります。1行だけ返すよう <code class="bg-blue-100">max(unit_price)</code> のような集約関数を使うか、複数行を相手にしたいなら <code class="bg-blue-100">IN</code> を使います。
                                         </p>
                                     </details>
                                 </li>
@@ -716,13 +783,13 @@ FROM order_totals;</code></pre>
                                     </details>
                                 </li>
                                 <li class="text-blue-900">
-                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100">FROM</code> 句にサブクエリを書くとき、必ず守らなければならない決まりは何ですか。</p>
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100">FROM</code> 句にサブクエリ（導出テーブル）を書くとき、<code class="bg-blue-100">AS 別名</code> は省略できますか。省略した場合と付けた場合で何が変わりますか。</p>
                                     <details class="mt-2">
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            サブクエリ（導出テーブル）には必ず <code class="bg-blue-100">AS 別名</code> のように別名を付ける必要があります。別名がないと文法エラーになります。
+                                            PostgreSQL 16 以降では省略できます（それより前のバージョンでは省略すると文法エラーになりました）。ただし別名を付けると <code class="bg-blue-100">別名.列名</code> の形でサブクエリの列を参照でき読みやすくなり、別名が必須のデータベース製品にも移植しやすくなるため、本教材では別名を付けることを推奨しています。
                                         </p>
                                     </details>
                                 </li>
