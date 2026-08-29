@@ -122,7 +122,7 @@ flowchart TD
     A["customers テーブルの全10行"] --> B{"1行ずつ判定<br/>prefecture = '東京都' ？"}
     B -->|TRUE| C["結果に残す"]
     B -->|FALSE| D["結果から除外"]
-    B -->|UNKNOWN（NULLが絡む場合）| D
+    B -->|"UNKNOWN（NULLが絡む場合）"| D
                         </div>
                     </div>
 
@@ -283,7 +283,7 @@ WHERE prefecture = '東京都'
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-red-800 mb-1">重要な罠: AND は OR より優先される</p>
-                                <p class="text-red-900 text-sm">SQL では算数の「かけ算はたし算より先」と同じように、<strong><code class="bg-red-100">AND</code> は <code class="bg-red-100">OR</code> より先に評価</strong>されます。<code class="bg-red-100">AND</code> と <code class="bg-red-100">OR</code> を1つの条件式に混在させるときは、意図を明確にするため<strong>必ず括弧を付けてください</strong>。付け忘れると、意図とまったく違う行が返ってきます。</p>
+                                <p class="text-red-900 text-sm">SQL では算数の「かけ算はたし算より先」と同じように、<strong><code class="bg-red-100">AND</code> は <code class="bg-red-100">OR</code> より先に評価</strong>されます。<code class="bg-red-100">AND</code> と <code class="bg-red-100">OR</code> を1つの条件式に混在させるときは、意図を明確にするため<strong>括弧を付けることを強くおすすめします</strong>。付け忘れると、意図と異なる行が返ってくることがあります。</p>
                             </div>
                         </div>
                     </div>
@@ -432,7 +432,19 @@ SELECT customer_name FROM customers WHERE customer_name LIKE '%藤%';</code></pr
                             <i class="fas fa-circle-info text-blue-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-blue-800 mb-1">ヒント: 先頭に % を置くと検索が遅くなりやすい</p>
-                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">'%子'</code> や <code class="bg-blue-100">'%藤%'</code> のように<strong>先頭に <code class="bg-blue-100">%</code> を置く検索</strong>は、通常のインデックスが効きにくく、データ量が増えると遅くなりがちです。前方一致（<code class="bg-blue-100">'田%'</code>）はインデックスの恩恵を受けやすい書き方です。インデックスの仕組みは第14章で詳しく学びます。</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">'%子'</code> や <code class="bg-blue-100">'%藤%'</code> のように<strong>先頭に <code class="bg-blue-100">%</code> を置く検索（中間一致・後方一致）</strong>は、通常の B-tree インデックスが使われにくく、表全体を順に読む処理になりやすいため、データが多いと遅くなりがちです。「必ず遅い」わけではありませんが、注意が必要です。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-rocket text-violet-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-violet-900 mb-1">前方一致とインデックスの関係
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle ml-2"><i class="fas fa-rocket"></i>発展</span>
+                                </p>
+                                <p class="text-violet-900 text-sm">前方一致（<code class="bg-violet-100">'田%'</code>）は、条件によっては<strong>通常の B-tree インデックスを利用できる場合があります</strong>。ただし実際にインデックスを使うかどうかは PostgreSQL が判断するため、必ず使われるとは限りません。また、日本語などを扱うロケールでは <code class="bg-violet-100">text_pattern_ops</code> という指定を付けたインデックスが必要になる場合があります。インデックスの詳しい仕組みは第14章で扱います。</p>
                             </div>
                         </div>
                     </div>
@@ -476,7 +488,44 @@ SELECT customer_name FROM customers WHERE prefecture IS NOT NULL;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        なぜこうなるのか。標準SQLでは条件式の結果が <strong>TRUE・FALSE</strong> の2値ではなく、<strong>TRUE・FALSE・UNKNOWN</strong> の3値になる場面があります。これを<strong>3値論理</strong>と呼びます。NULL が式に絡むと、結果はほぼ UNKNOWN になります。
+                        なぜこうなるのか。標準SQLでは条件式の結果が <strong>TRUE・FALSE</strong> の2値ではなく、<strong>TRUE・FALSE・UNKNOWN</strong> の3値になる場面があります。これを<strong>3値論理</strong>と呼びます。<code class="bg-slate-100">NULL = 100</code> のように NULL を比較に使うと、結果は TRUE でも FALSE でもなく<strong>UNKNOWN（不明）</strong>になります。「不明な値」と「何か」を比べても、結論は「不明」としか言えないためです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">式</th>
+                                    <th class="px-4 py-3 text-left font-semibold">結果</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">100 = 100</code></td>
+                                    <td class="px-4 py-3 text-slate-600">TRUE</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">100 = 200</code></td>
+                                    <td class="px-4 py-3 text-slate-600">FALSE</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">100 = NULL</code></td>
+                                    <td class="px-4 py-3 text-slate-600">UNKNOWN</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">NULL = NULL</code></td>
+                                    <td class="px-4 py-3 text-slate-600">UNKNOWN</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WHERE</code> 句は、この3つの結果のうち<strong>TRUE の行だけ</strong>を残します。FALSE の行はもちろん、<strong>UNKNOWN の行も結果には含まれません</strong>（7.1節の図）。だから NULL を探したいときは <code class="bg-slate-100">= NULL</code> ではなく、TRUE／FALSEをはっきり返す <code class="bg-slate-100">IS NULL</code> を使う必要があります。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">AND</code>・<code class="bg-slate-100">OR</code> に UNKNOWN が絡んだときの結果は次のとおりです。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -513,6 +562,35 @@ SELECT customer_name FROM customers WHERE prefecture IS NOT NULL;</code></pre>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">NOT</code> についても同様で、UNKNOWN を反転させても UNKNOWN のままです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">A</th>
+                                    <th class="px-4 py-3 text-left font-semibold">NOT A</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">TRUE</td>
+                                    <td class="px-4 py-3 text-slate-600">FALSE</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">FALSE</td>
+                                    <td class="px-4 py-3 text-slate-600">TRUE</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">UNKNOWN</td>
+                                    <td class="px-4 py-3 text-slate-600">UNKNOWN</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">WHERE</code> 句は結果が TRUE の行だけを残すので、FALSE と同様に UNKNOWN の行も除外されることを思い出してください（7.1節の図）。これが「NULL が絡む式はだいたい結果に含まれない」という直感につながります。
                     </p>
 
@@ -520,7 +598,9 @@ SELECT customer_name FROM customers WHERE prefecture IS NOT NULL;</code></pre>
                         <div class="flex items-start gap-3">
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
-                                <p class="font-semibold text-red-800 mb-1">警告: NOT IN に NULL が混ざると結果が消える</p>
+                                <p class="font-semibold text-red-800 mb-1">警告: NOT IN に NULL が混ざると結果が消える
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 align-middle ml-2"><i class="fas fa-rocket"></i>発展</span>
+                                </p>
                                 <p class="text-red-900 text-sm">サブクエリなどで作った列挙リストに<strong>1件でも NULL が含まれていると、<code class="bg-red-100">NOT IN</code> はすべての行を除外し、結果が0件になります</strong>。たとえば <code class="bg-red-100">WHERE customer_id NOT IN (1, 2, NULL)</code> は「1でも2でもない」を期待して書いても、常に0件です。理由は <code class="bg-red-100">NOT IN</code> が内部的に「<code class="bg-red-100">&lt;&gt; 1 AND &lt;&gt; 2 AND &lt;&gt; NULL</code>」のように展開され、<code class="bg-red-100">&lt;&gt; NULL</code> の部分が必ず UNKNOWN になるため、AND 全体も UNKNOWN（＝除外）になってしまうからです。<strong>NULL を含む可能性がある列挙には <code class="bg-red-100">NOT IN</code> を避け、<code class="bg-red-100">NOT EXISTS</code>（第12章）を使う</strong>のが安全です。</p>
                             </div>
                         </div>
@@ -706,7 +786,7 @@ ORDER BY CASE WHEN status = 'キャンセル' THEN 1 ELSE 0 END,
                                 <li class="flex items-start gap-3 text-purple-900">
                                     <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
                                                  flex items-center justify-center text-sm font-medium">1</span>
-                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">products</code> から、単価が<strong>1000円以上3000円以下</strong>の商品の <code class="bg-purple-100">product_name</code>・<code class="bg-purple-100">unit_price</code> を取得する（<code class="bg-purple-100">BETWEEN</code> を使う）。<br><span class="text-sm text-purple-800">期待結果: 単価1000〜3000円の商品が単価順に並ぶ（両端を含む）</span></span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100">products</code> から、単価が<strong>1000円以上3000円以下</strong>の商品の <code class="bg-purple-100">product_name</code>・<code class="bg-purple-100">unit_price</code> を取得する（<code class="bg-purple-100">BETWEEN</code> を使う）。<br><span class="text-sm text-purple-800">期待結果: 単価1000〜3000円の商品が4件返る（両端の値を含む）。並び順を固定したいときは <code class="bg-purple-100">ORDER BY unit_price</code> を付ける</span></span>
                                 </li>
                                 <li class="flex items-start gap-3 text-purple-900">
                                     <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
