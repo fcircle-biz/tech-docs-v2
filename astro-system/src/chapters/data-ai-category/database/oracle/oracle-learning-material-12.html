@@ -1,0 +1,692 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Oracle</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">トランザクションとロック</h1>
+                    <p class="text-slate-600">第7章では <code class="bg-slate-100">COMMIT</code> と <code class="bg-slate-100">ROLLBACK</code> を「操作」として覚えました。本章ではその裏側にある考え方――<strong>トランザクション</strong>と <strong>ACID特性</strong>、そして Oracle 最大の特徴のひとつである<strong>読み取り一貫性</strong>――を学びます。あわせて、複数の利用者が同時にデータベースを使うときに起こる<strong>ロックの競合</strong>と<strong>デッドロック</strong>にも触れ、安全にデータを扱うための土台を固めましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>トランザクションと ACID 特性を、身近な例を使って自分の言葉で説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 text-amber-900">COMMIT</code>・<code class="bg-amber-100 text-amber-900">ROLLBACK</code>・<code class="bg-amber-100 text-amber-900">SAVEPOINT</code> を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Oracle の読み取り一貫性（読み取りは書き込みをブロックしない仕組み）を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロックの競合とデッドロックが起きる状況を理解し、実際に確認・回避できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 トランザクションとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>銀行振込</strong>を思い浮かべてください。Aさんの口座から1万円を引き、Bさんの口座に1万円を足す処理は、内部的には「引く」「足す」という2つの更新に分かれています。もし「引く」だけ成功した直後にシステムが停止したら、1万円がこの世から消えてしまいます。これでは誰も銀行を信用できません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>トランザクション</strong>とは、この「引く」と「足す」のように<strong>複数の処理をひとまとまりの作業として扱う単位</strong>のことです。トランザクションの中の処理は、<strong>全部成功したことにするか、全部なかったことにするかのどちらか</strong>しか許されません。これにより、「片方だけ成功して中途半端な状態になる」という事故を防ぎます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サンプルスキーマで同じ考え方を体験してみましょう。次の例は、社員101（佐藤一郎）の給与を5万円減らし、社員102（鈴木花子）の給与に5万円足す処理です。<strong>このコードは考え方を示す例なので、まだ実行しなくて構いません</strong>。実際に手を動かす実習は、この章の後半で行います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">transaction_basic.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 2つの更新を「まとめて成功／まとめて失敗」にする
+UPDATE employees SET salary = salary - 50000 WHERE employee_id = 101;
+UPDATE employees SET salary = salary + 50000 WHERE employee_id = 102;
+
+-- 両方成功したので確定する
+COMMIT;
+-- もし途中で異常に気づいたら、まとめて取り消す
+-- ROLLBACK;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Oracle では、トランザクションを開始する専用の命令を書く必要はありません。<strong>最初の <code class="bg-slate-100">INSERT</code>・<code class="bg-slate-100">UPDATE</code>・<code class="bg-slate-100">DELETE</code> を実行した瞬間に、トランザクションが暗黙的に開始</strong>します。そして、<code class="bg-slate-100">COMMIT</code>（確定）・<code class="bg-slate-100">ROLLBACK</code>（取り消し）・あるいは <code class="bg-slate-100">CREATE</code> などの <strong>DDL</strong>（Data Definition Language / データ定義言語。表を作る・消すなど"入れ物"を操作する命令）の実行によって終了します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["最初のDML実行<br/>（INSERT・UPDATE・DELETE）"] --> B["トランザクション開始<br/>（暗黙的）"]
+    B --> C{"どう終える？"}
+    C -->|COMMIT| D["確定<br/>変更が全員に見える状態になる"]
+    C -->|ROLLBACK| E["取り消し<br/>開始前の状態に戻る"]
+    C -->|DDLを実行| F["暗黙的にCOMMIT<br/>（第7章の注意点）"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「開始」を意識しなくてよい代わりに、「今トランザクションの中にいるのかどうか」を意識することが大切です。次の12.2〜12.3では、トランザクションが満たすべき性質と、終わらせ方の選択肢を整理します。
+                    </p>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 ACID特性
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        トランザクションが備えるべき4つの性質を、頭文字を取って <strong>ACID</strong>（エーシッド）と呼びます。まともな RDBMS（Oracle・PostgreSQL・SQL Server・MySQL など）は、いずれもこの4つを満たすように設計されています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">特性</th>
+                                    <th class="px-4 py-3 text-left font-semibold">英語</th>
+                                    <th class="px-4 py-3 text-left font-semibold">平易な言い換え</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">原子性</td>
+                                    <td class="px-4 py-3 text-slate-600">Atomicity</td>
+                                    <td class="px-4 py-3 text-slate-600">全部やるか、全部やらないか。中途半端な状態を許さない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">一貫性</td>
+                                    <td class="px-4 py-3 text-slate-600">Consistency</td>
+                                    <td class="px-4 py-3 text-slate-600">制約やルールを守った状態から、別の守った状態へ移る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">独立性</td>
+                                    <td class="px-4 py-3 text-slate-600">Isolation</td>
+                                    <td class="px-4 py-3 text-slate-600">他の人の処理の途中経過は見えない（12.4で詳しく学ぶ）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">永続性</td>
+                                    <td class="px-4 py-3 text-slate-600">Durability</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">COMMIT</code> したら、障害が起きてもそのデータは失われない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第7章で「<code class="bg-slate-100">COMMIT</code> を忘れるとデータが消える」と学んだ理由も、この4文字で説明できます。<code class="bg-slate-100">COMMIT</code> するまでは<strong>永続性</strong>の保証がまだ働いておらず、接続を切ればいつでも消えてよい「仮の状態」です。また、振込の例で片方の更新だけ実行された状態を許さないのは<strong>原子性</strong>のおかげであり、<code class="bg-slate-100">ROLLBACK</code> で「なかったこと」にできるのも原子性が保証されているからです。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">用語メモ: 一貫性と制約の関係</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    第5章で学んだ <code class="bg-blue-100 text-blue-900">NOT NULL</code>・<code class="bg-blue-100 text-blue-900">FOREIGN KEY</code>・<code class="bg-blue-100 text-blue-900">CHECK</code> といった制約は、<strong>一貫性（Consistency）</strong>を機械的に守らせる仕組みです。存在しない部署番号を社員に割り当てられないのも、給与がマイナスにならないのも、すべて一貫性を保つための工夫です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 COMMIT・ROLLBACK・SAVEPOINTの整理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第7章では、<code class="bg-slate-100">INSERT</code> や <code class="bg-slate-100">UPDATE</code> をしただけでは確定しないこと、<code class="bg-slate-100">COMMIT</code> で確定し <code class="bg-slate-100">ROLLBACK</code> で取り消せることを学びました。ここではこの2つに加えて、トランザクションの途中に「しおり」を挟んで部分的に取り消せる <strong>SAVEPOINT</strong>（セーブポイント）を学び、3つを体系的に整理します。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-check text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-slate-100">COMMIT</code></h3>
+                            <p class="text-sm text-slate-600">ここまでの変更をすべて確定する。以降、変更は他のセッションからも見えるようになる。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-rose-50 to-red-50 border border-rose-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-rose-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-rotate-left text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-slate-100">ROLLBACK</code></h3>
+                            <p class="text-sm text-slate-600">ここまでの変更をすべて取り消し、トランザクション開始前の状態に戻す。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-bookmark text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code class="bg-slate-100">SAVEPOINT</code></h3>
+                            <p class="text-sm text-slate-600">途中に「しおり」を挟み、<code class="bg-slate-100">ROLLBACK TO</code> でそこまでだけ巻き戻す。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば、長い作業の途中で「1件目は残したいが、2件目は取り消したい」という場面があります。<code class="bg-slate-100">ROLLBACK</code> は全部を巻き戻してしまうので、こういうときは <code class="bg-slate-100">SAVEPOINT</code> で途中にしおりを挟んでおきます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">savepoint_demo.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- SAVEPOINT（しおり）で部分的に取り消す例
+INSERT INTO departments VALUES (60, '企画部', '東京');
+SAVEPOINT sp1;                    -- ここにしおりを挟む
+
+INSERT INTO departments VALUES (70, '仮の部署', NULL);
+ROLLBACK TO sp1;                  -- しおりまで戻る（60だけ残る）
+
+COMMIT;                           -- 企画部（60）が確定する
+
+-- 動作を確認したので、基準状態に戻す
+DELETE FROM departments WHERE department_id = 60;
+COMMIT;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後にもう一度、第7章で学んだ重要な例外を思い出しておきましょう。<strong>DDL（<code class="bg-slate-100">CREATE</code>・<code class="bg-slate-100">ALTER</code>・<code class="bg-slate-100">DROP</code> など）は、実行の前後で暗黙的に <code class="bg-slate-100">COMMIT</code> されます。</strong>これはトランザクションの終わり方の1つとして、12.1の図にも登場した重要な例外です。今度は実験用の部署（300番）を新しく用意し、削除してからDDLを挟むとどうなるかを確認してみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ddl_commit_caution.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 実験用の部署を追加して確定する（消える前の状態）
+INSERT INTO departments VALUES (300, '実験部署', '大阪');
+COMMIT;
+
+-- この行を削除する（まだCOMMITしていない）
+DELETE FROM departments WHERE department_id = 300;
+
+-- ここでDDLを実行すると、前後で暗黙のCOMMITが行われる
+CREATE TABLE memo_check (id NUMBER);
+
+ROLLBACK;              -- 効果なし。DELETEはすでに確定済み</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ddl_commit_confirm.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 確認：ROLLBACKしたのに部署300は戻ってこない
+SELECT department_id, department_name
+  FROM departments
+ WHERE department_id = 300;
+-- → 0件（DDLの暗黙COMMITでDELETEがすでに確定していたため）
+
+-- 後片付け（実験用の表と、念のため部署行も削除）
+DROP TABLE memo_check PURGE;
+DELETE FROM departments WHERE department_id = 300;
+COMMIT;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">再確認: DDLを挟むと後戻りできない</p>
+                                <p class="text-red-900 text-sm break-words">
+                                    「あとで <code class="bg-red-100 text-red-900">ROLLBACK</code> すればいい」と思っていても、途中で <code class="bg-red-100 text-red-900">CREATE TABLE</code> などのDDLを実行した瞬間、それより前のDMLは確定済みになります。SQL*Plusでスクリプトを流すときは、DDLの位置に特に注意しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 読み取り一貫性（MVCC）— Oracleの真骨頂
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここからが本章、そしてOracleを理解するうえで最も重要な部分です。多くの人は「誰かがデータを更新している最中は、他の人はそのデータを読めない（待たされる）」と思い込みがちです。しかしOracleでは、これは<strong>誤りです</strong>。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: Oracleの読み取り一貫性</p>
+                                <p class="text-emerald-900 text-sm break-words">
+                                    <strong>読み取りは書き込みをブロックしない。書き込みは読み取りをブロックしない。</strong>ブロックし合うのは、<strong>書き込み同士だけ</strong>です。これがOracleの同時実行制御の根本にある性質です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なぜこれが可能なのでしょうか。Oracleは行を更新すると、<strong>UNDO領域</strong>（更新される前の値を一時的に保存しておく場所。ロールバックや読み取り一貫性のために使われる）に「変更前の値」を退避させます。他のセッションがその行を読もうとしたとき、更新がまだ確定（COMMIT）していなければ、OracleはUNDO領域から変更前の値を組み立てて返します。<strong>読む側は待たされることなく、コミット済みの値をすぐに受け取れる</strong>、という仕組みです。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant A as セッションA
+    participant U as Oracle（UNDO領域）
+    participant B as セッションB
+    A->>U: UPDATE employees SET salary=999999 WHERE employee_id=101
+    Note over U: 変更前の値（650000）をUNDO領域に退避
+    B->>U: SELECT salary WHERE employee_id=101
+    U-->>B: 650000を返す（待たされない）
+    A->>U: COMMIT
+    Note over U: UNDO領域の情報は不要になる
+    B->>U: SELECT salary WHERE employee_id=101（再実行）
+    U-->>B: 999999を返す（コミット後の新しい値）
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        セッションBは、セッションAが <code class="bg-slate-100">COMMIT</code> するまで一貫して「更新前の値」を見続けます。これを<strong>読み取り一貫性</strong>と呼びます。Oracleでは1つのSQL文の実行中、その文が始まった時点のデータを一貫して見るという保証が既定で常に働いており、特別な設定は不要です。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        他のRDBMS製品の中には、既定の設定のままだと読み取り（<code class="bg-slate-100">SELECT</code>）が書き込み中の行を待ってしまう<strong>ロックベース</strong>の読み取りを行うものもあります（たとえばSQL Serverは既定でロックベースであり、Oracleのような挙動にするには追加設定が必要です）。PostgreSQLはOracleと同様に常に<strong>MVCC</strong>（Multi-Version Concurrency Control / 多版型同時実行制御。1つのデータに対して複数のバージョンを保持し、読み手ごとに適切な版を見せる方式）で動作しますが、変更前の版を保持する場所が異なります（Oracleは専用のUNDO領域、PostgreSQLは表の中に残しておき後で <code class="bg-slate-100">VACUUM</code> で回収します）。<strong>「設定なしで常にこの性質が働く」のがOracleの強み</strong>だと覚えておきましょう。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">豆知識: ORA-01555（スナップショットが古すぎます）</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    非常に長い時間がかかる問い合わせでは、まれにUNDO領域の情報が別のトランザクションの都合で上書きされてしまい、<strong>ORA-01555</strong> というエラーになることがあります。原因の調査や対処は運用寄りの話になるため、本ガイドでは「そういう名前のエラーがある」という程度に覚えておけば十分です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 ロックの基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        12.4で「書き込み同士はブロックし合う」と説明しました。この仕組みを支えているのが<strong>ロック</strong>（他のセッションが同じデータを同時に変更できないようにする"鍵"）です。Oracleは <code class="bg-slate-100">UPDATE</code> や <code class="bg-slate-100">DELETE</code> をすると、<strong>対象になった行だけ</strong>にロックをかけます（行レベルロック）。表全体がロックされるわけではありません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        トイレの個室を思い浮かべてください。誰かが1つの個室を使っていても、他の個室は自由に使えます。使用中の個室（＝更新中の行）にだけ鍵がかかり、それ以外の行は他のセッションが自由に更新できます。ロック待ちが起きるのは、<strong>まったく同じ行を別のセッションが更新しようとしたとき</strong>だけです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通常の <code class="bg-slate-100">UPDATE</code> は実行した瞬間にロックがかかりますが、「更新する前に、先に行を確保しておきたい」という場面もあります。映画館の座席を仮押さえするイメージで、<code class="bg-slate-100">SELECT ... FOR UPDATE</code> を使うと、その行を"予約席"として確保し、他のセッションに横取りされない状態にしてから、安心して後続の処理を進められます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">for_update.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 行を先に確保する（他のセッションはこの行を更新できなくなる）
+SELECT salary FROM employees WHERE employee_id = 101 FOR UPDATE;
+
+-- ロックが取れないなら、待たずにエラーにする
+SELECT salary FROM employees WHERE employee_id = 101 FOR UPDATE NOWAIT;
+
+-- 最大5秒だけ待って、それでも取れなければエラーにする
+SELECT salary FROM employees WHERE employee_id = 101 FOR UPDATE WAIT 5;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        既定の <code class="bg-slate-100">FOR UPDATE</code> はロックが解放されるまで<strong>無期限に待ち続けます</strong>。「待たずに諦めて別の処理をしたい」ときは <code class="bg-slate-100">NOWAIT</code>、「一定時間だけ待って諦めたい」ときは <code class="bg-slate-100">WAIT 秒数</code> を使います。なお、ロック中の行を結果から除外したい場合の <code class="bg-slate-100">SKIP LOCKED</code> という選択肢もありますが、まずは <code class="bg-slate-100">NOWAIT</code> / <code class="bg-slate-100">WAIT</code> の2つを覚えれば十分です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロック待ちが長引くと「フリーズした」ように見えて不安になりますが、それだけでは異常ではありません。<strong>誰が誰を待たせているか</strong>は、動的パフォーマンスビュー <code class="bg-slate-100">V$SESSION</code> の <code class="bg-slate-100">BLOCKING_SESSION</code> 列で確認できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">check_blocking.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ロック待ちのセッションと、その原因になっているセッションを表示する
+SELECT sid, serial#, blocking_session, username, event
+  FROM v$session
+ WHERE blocking_session IS NOT NULL;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">注意: V$ビューの参照には管理者権限が必要</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    <code class="bg-blue-100 text-blue-900">V$</code> で始まる動的パフォーマンスビューを参照するには権限が必要です。<code class="bg-blue-100 text-blue-900">hr</code> のような一般ユーザーで実行すると <strong>ORA-00942: 表またはビューが存在しません</strong> になることが多いため、<code class="bg-blue-100 text-blue-900">system</code> などの管理者ユーザーで接続して実行してください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">ORA-00054: resource busy and acquire with NOWAIT specified</p>
+                                <p class="text-red-900 text-sm break-words">
+                                    <code class="bg-red-100 text-red-900">FOR UPDATE NOWAIT</code> でロックが取れなかったときに出るエラーです。このエラーが出たら、<strong>別のセッションが同じ行をすでに更新中で、まだCOMMITしていない</strong>可能性を疑いましょう。少し待ってから再試行するか、12.6の方法で相手のセッションを確認します。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 デッドロック
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通常のロック待ちは、相手が <code class="bg-slate-100">COMMIT</code> か <code class="bg-slate-100">ROLLBACK</code> をすればすぐに解消します。しかし、2つのセッションが<strong>互いに相手のロックしている行を待ち合う</strong>状態になると、どちらも永遠に先へ進めなくなります。これを<strong>デッドロック</strong>（相互待ち）と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次のように、セッションAとセッションBが<strong>互いに逆の順序</strong>で社員101・102を更新しようとすると、デッドロックが発生します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">セッションA</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ①社員101を更新する（Aがロックを保持する）
+UPDATE employees SET salary = salary + 1000 WHERE employee_id = 101;
+
+-- ③続けて社員102を更新しようとする → Bが保持中なので待たされる
+UPDATE employees SET salary = salary + 1000 WHERE employee_id = 102;</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">セッションB</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ②社員102を更新する（Bがロックを保持する）
+UPDATE employees SET salary = salary + 1000 WHERE employee_id = 102;
+
+-- ④続けて社員101を更新しようとする → Aと相互待ちになる
+UPDATE employees SET salary = salary + 1000 WHERE employee_id = 101;
+-- → どちらか一方に ORA-00060 が返る</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ①→②→③→④の順に実行すると、③の時点でAはBの持つ行102を待ち、④の時点でBはAの持つ行101を待つことになり、両者が完全に行き詰まります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant A as セッションA
+    participant O as Oracle
+    participant B as セッションB
+    A->>O: UPDATE employees 101（Aがロック取得）
+    B->>O: UPDATE employees 102（Bがロック取得）
+    A->>O: UPDATE employees 102を要求
+    O-->>A: Bが保持中のため待機
+    B->>O: UPDATE employees 101を要求
+    O-->>B: Aが保持中のため待機
+    Note over A,B: 互いに相手を待つ（デッドロック成立）
+    O-->>B: ORA-00060（デッドロックを検出）で強制ロールバック
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Oracleはこの相互待ちを自動的に検出</strong>し、片方のセッションに <strong>ORA-00060</strong> を返して、そのセッションが実行しようとしていた文を取り消します（12.5の <code class="bg-slate-100">V$SESSION</code> 問い合わせは、この一瞬の待ち状態を確認するのにも使えます）。ただし、それより前に同じトランザクションで行った変更は残ったままなので、エラーを受け取った側は<strong>自分で <code class="bg-slate-100">ROLLBACK</code> して処理をやり直す</strong>必要があります。デッドロックはデータベースが壊れる異常ではなく、Oracleが安全に解消してくれる想定内の出来事です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: デッドロックを避ける基本</p>
+                                <ul class="text-emerald-900 text-sm space-y-1 mt-2 list-disc list-inside">
+                                    <li>複数の行を更新するときは、<strong>常に同じ順序</strong>でアクセスする（例: 社員番号の昇順）</li>
+                                    <li>トランザクションは<strong>できるだけ短く</strong>し、不要な処理を間に挟まない</li>
+                                    <li>ORA-00060を受け取ったら、慌てず <code class="bg-emerald-100 text-emerald-900">ROLLBACK</code> してから処理をやり直す</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">エラー</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">まず疑うこと</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ORA-00054</td>
+                                    <td class="px-4 py-3 text-slate-600">resource busy（対象の行がロック中）</td>
+                                    <td class="px-4 py-3 text-slate-600">別のセッションが同じ行を更新中で、まだCOMMITしていないのでは</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ORA-00060</td>
+                                    <td class="px-4 py-3 text-slate-600">デッドロックを検出（相互待ちが発生）</td>
+                                    <td class="px-4 py-3 text-slate-600">複数のトランザクションが異なる順序で複数行を更新していないか</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この例を実際に試した場合は、両方のセッションで <code class="bg-slate-100">ROLLBACK</code> を実行し、給与を基準状態に戻してから次に進みましょう。
+                    </p>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 分離レベル
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        他のトランザクションの影響をどこまで見せるか／遮断するかの強さの設定を<strong>分離レベル</strong>と呼びます。Oracleの既定は <strong>READ COMMITTED</strong>（コミット済みのデータだけが見える）で、これまでの節で見てきた「1つのSQL文の実行中は一貫した値を見る」という性質を提供します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">分離レベル</th>
+                                    <th class="px-4 py-3 text-left font-semibold">特徴</th>
+                                    <th class="px-4 py-3 text-left font-semibold">使う場面</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">READ COMMITTED（既定）</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL文単位で一貫した読み取りができる。ほとんどの業務処理で十分</td>
+                                    <td class="px-4 py-3 text-slate-600">通常のSELECT・UPDATEなど、本ガイドのこれまでの処理すべて</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">SERIALIZABLE</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクション開始時点のスナップショットを最後まで見続ける、より厳格な設定</td>
+                                    <td class="px-4 py-3 text-slate-600">会計処理など、厳密な整合性が求められる一部の処理</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">READ ONLY</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクション内を読み取り専用にする</td>
+                                    <td class="px-4 py-3 text-slate-600">集計レポートの作成など、参照だけを行う処理</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        より厳格にしたい場合は <code class="bg-slate-100">SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;</code>、読み取り専用にしたい場合は <code class="bg-slate-100">SET TRANSACTION READ ONLY;</code> をトランザクションの最初の文として実行します。<strong>初心者のうちは既定のREAD COMMITTEDのままで問題ありません。</strong>まずは12.4で学んだ読み取り一貫性の仕組みを理解しておけば、実務のほとんどの場面に対応できます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次の第13章では、SQLの実行を高速にする<strong>インデックス</strong>について学びます。ロックが競合する時間を短くするには、対象の行をすばやく絞り込むことも有効です。「正しさ」の次は、「速さ」の基礎を学んでいきましょう。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: 読み取り一貫性とロックを2つのセッションで体験する
+                            </h3>
+                            <p class="text-purple-900 mb-3 break-words">
+                                SQL*Plus（またはSQL Developerのワークシート）を2つ開き、両方とも <code class="bg-purple-100 text-purple-900">hr</code> ユーザーで <code class="bg-purple-100 text-purple-900">FREEPDB1</code> に接続してください。以降、片方を「セッションA」、もう片方を「セッションB」と呼びます。
+                            </p>
+                            <ol class="list-decimal list-inside space-y-2 text-purple-900 mb-3">
+                                <li class="break-words"><strong>セッションA</strong>で社員101（佐藤一郎）の給与を更新する。まだ <code class="bg-purple-100 text-purple-900">COMMIT</code> しない。<br>
+                                    <code class="bg-purple-100 text-purple-900">UPDATE employees SET salary = 999999 WHERE employee_id = 101;</code></li>
+                                <li class="break-words"><strong>セッションB</strong>で同じ社員の給与を確認する。<br>
+                                    <code class="bg-purple-100 text-purple-900">SELECT salary FROM employees WHERE employee_id = 101;</code><br>
+                                    → すぐに結果が返り、値は <strong>650000</strong>（更新前の値）のままであることを確認する。</li>
+                                <li class="break-words"><strong>セッションA</strong>で <code class="bg-purple-100 text-purple-900">COMMIT;</code> を実行して確定する。</li>
+                                <li class="break-words"><strong>セッションB</strong>で手順2と同じ<code class="bg-purple-100 text-purple-900">SELECT</code>をもう一度実行する。→ 今度は <strong>999999</strong>（更新後の値）が返ることを確認する。</li>
+                                <li class="break-words">【応用】もう一度<strong>セッションA</strong>で <code class="bg-purple-100 text-purple-900">UPDATE employees SET salary = 800000 WHERE employee_id = 101;</code> を実行し、まだ<code class="bg-purple-100 text-purple-900">COMMIT</code>しない。この状態で<strong>セッションB</strong>が同じ行に <code class="bg-purple-100 text-purple-900">UPDATE employees SET salary = 700000 WHERE employee_id = 101;</code> を実行すると、今度は画面がすぐに戻ってこない（待たされる）ことを確認する。セッションAで<code class="bg-purple-100 text-purple-900">COMMIT</code>か<code class="bg-purple-100 text-purple-900">ROLLBACK</code>すると、Bの処理が動き出す。</li>
+                                <li class="break-words">【かたづけ】セッションBが待たされている場合は<code class="bg-purple-100 text-purple-900">ROLLBACK;</code>で処理を終わらせ、最後にどちらか一方で給与を基準状態に戻す。<br>
+                                    <code class="bg-purple-100 text-purple-900">UPDATE employees SET salary = 650000 WHERE employee_id = 101;</code><br>
+                                    <code class="bg-purple-100 text-purple-900">COMMIT;</code></li>
+                            </ol>
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words">
+                                    <strong>ねらい:</strong> 手順2の<code class="bg-purple-200 text-purple-900">SELECT</code>は待たされず、手順5の<code class="bg-purple-200 text-purple-900">UPDATE</code>は待たされる――この違いこそ、12.4で学んだ「読み取りは書き込みをブロックしない。ブロックし合うのは書き込み同士だけ」という性質そのものです。「更新中は誰も読めない」と思い込んでいた人ほど、手順2の結果に驚くはずです。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 銀行振込を例に、複数の <code class="bg-blue-100 text-blue-900">UPDATE</code> を1つのトランザクションとして扱う必要がある理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            途中で処理が中断すると、片方の口座だけ変更されて整合性が崩れてしまう（ACIDの原子性が破られる）からです。トランザクションとして扱うことで、「全部成功する」か「全部なかったことにする」かのどちらかにでき、中途半端な状態を防げます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. セッションAが社員の給与を <code class="bg-blue-100 text-blue-900">UPDATE</code> して <code class="bg-blue-100 text-blue-900">COMMIT</code> していない状態で、セッションBが同じ行を <code class="bg-blue-100 text-blue-900">SELECT</code> するとどうなりますか。また <code class="bg-blue-100 text-blue-900">UPDATE</code> しようとするとどうなりますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200 text-blue-900">SELECT</code>は待たされず、UNDO領域から組み立てられた更新前の値がすぐに返ります（読み取り一貫性）。一方<code class="bg-blue-200 text-blue-900">UPDATE</code>は、同じ行にロックがかかっているため待たされます。ブロックし合うのは書き込み同士だけです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 2つのセッションが互いに相手のロックしている行を更新しようとするとどうなりますか。Oracleはどのように対応しますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            デッドロック（相互待ち）が発生します。Oracleはこれを自動的に検出し、片方のセッションに<code class="bg-blue-200 text-blue-900">ORA-00060</code>を返してその文を取り消します。エラーを受け取った側は<code class="bg-blue-200 text-blue-900">ROLLBACK</code>して処理をやり直す必要があります。予防には、複数行を更新する際の順序をそろえる、トランザクションを短くする、といった対策が有効です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="oracle-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第11章: ストアドプログラムとトリガー</span>
+                        </div>
+                    </a>
+                    <a href="oracle-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: インデックスと性能の基礎</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

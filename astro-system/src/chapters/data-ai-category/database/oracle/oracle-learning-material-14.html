@@ -1,0 +1,838 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Oracle</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第14章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第14章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1.5時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ユーザー管理・バックアップと運用</h1>
+                    <p class="text-slate-600">いよいよ最終章です。第13章までで、表を作り、SQLでデータを読み書きし、PL/SQLで処理をまとめ、インデックスで検索を速くする方法を学んできました。最後に残っているのは「守る」という視点です。この章では、誰にどこまでの操作を許すかを決める<strong>ユーザー管理と権限</strong>、万一のときに備える<strong>バックアップ</strong>、そして日々の<strong>運用</strong>で何を見ればよいかを学びます。最後に全14章を振り返り、この先に進む道もご紹介します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ユーザー・権限・ロールの関係を、比喩を使って説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>システム権限とオブジェクト権限の違いを理解し、最小権限の原則にもとづいて GRANT / REVOKE できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>論理バックアップ（Data Pump）と物理バックアップ（RMAN）の違いを説明し、使い分けを判断できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>表領域の使用状況やセッションなど、日々の運用で確認すべきポイントを挙げられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>全14章の学習内容を振り返り、次に学ぶとよいテーマを描ける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション14.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.1 ユーザーを作る・変える・消す — 入館証の発行
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        会社に新しい社員が入ると、まず<strong>入館証</strong>を発行し、そのあとで「どの部屋に入れるか」を決めます。Oracle のユーザー管理もまったく同じ構造です。<strong>ユーザーを作る</strong>ことは入館証を発行することであり、そのユーザーに何ができるかを決めるのが次の14.2で学ぶ<strong>権限</strong>です。第5章で学んだとおり、Oracle では<strong>ユーザー＝スキーマ</strong>なので、「ユーザーを作る」ことは同時に「そのユーザー専用のオブジェクトの入れ物を作る」ことでもあります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実は、第3章で次のようなコマンドを何気なく実行していました。<code class="bg-slate-100">CREATE USER hr IDENTIFIED BY ...</code> でユーザーを作り、<code class="bg-slate-100">GRANT CONNECT, RESOURCE TO hr</code> で権限を与え、<code class="bg-slate-100">ALTER USER hr QUOTA UNLIMITED ON USERS</code> で表領域の割当を与える。この3行こそ、本章のテーマそのものです。ここで、その意味を一つずつきちんと理解し直しましょう。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザーを作る前に必ず確認すべきことがもう一つあります。「<strong>今どのコンテナに接続しているか</strong>」です。第2章・第3章で学んだとおり、<code class="bg-slate-100">CDB$ROOT</code>（コンテナ全体の土台）で作れるのは <code class="bg-slate-100">C##</code> から始まる<strong>共通ユーザー</strong>（すべての PDB に存在するユーザー）だけです。業務用のユーザーは <code class="bg-slate-100">FREEPDB1</code> のような PDB の中に作る<strong>ローカルユーザー</strong>（その PDB だけに存在するユーザー）にします。接続先を間違えたまま <code class="bg-slate-100">CREATE USER</code> すると、第3章で遭遇した <strong>ORA-65096</strong>（共通ユーザー名が不正です）が再び発生します。<code class="bg-slate-100">SHOW CON_NAME</code> で今の接続先を確認する習慣を、ここでも忘れないでください。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">create-user.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- FREEPDB1 に接続した状態で実行する（ローカルユーザーなのでC##は不要）
+-- DEFAULT TABLESPACE: 表を作るときの既定の置き場所
+-- TEMPORARY TABLESPACE: 並べ替えなどの作業で一時的に使う置き場所
+CREATE USER app_user IDENTIFIED BY AppPw12345
+  DEFAULT TABLESPACE users
+  TEMPORARY TABLESPACE temp;
+
+-- この時点ではまだ何もできない（権限を1つも与えていないため）
+-- ログインすらできない。権限は14.2で付与する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作ったユーザーは、あとから <code class="bg-slate-100">ALTER USER</code> で変更できます。パスワードの変更、アカウントの<strong>ロック</strong>（一時的に使えなくすること）と<strong>アンロック</strong>、次回ログイン時のパスワード変更強制などが代表的です。異動や休職で一時的にアクセスを止めたい場合にも使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">alter-user.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- パスワードを変更する
+ALTER USER app_user IDENTIFIED BY NewAppPw99;
+
+-- アカウントを一時的に使えなくする（退職・休職など）
+ALTER USER app_user ACCOUNT LOCK;
+
+-- 再び使えるようにする
+ALTER USER app_user ACCOUNT UNLOCK;
+
+-- 次回ログイン時にパスワード変更を強制する
+ALTER USER app_user PASSWORD EXPIRE;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロックされたユーザーで接続しようとすると <strong>ORA-28000</strong>（アカウントはロックされています）というエラーになります。「パスワードを何度も間違えたら自動的にロックされる」という<strong>プロファイル</strong>（パスワードの有効期限やログイン失敗回数の上限などをまとめた規則）の設定が既定で有効になっているためです。学習中にロックされてしまった場合も、上記の <code class="bg-slate-100">ACCOUNT UNLOCK</code> で解除できると覚えておくと安心です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        不要になったユーザーは <code class="bg-slate-100">DROP USER</code> で消せます。ただし、そのユーザーが表などのオブジェクトを1つでも持っていると、そのままでは削除できません。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">drop-user.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ※ 次の2つはどちらか一方だけを実行します（両方続けて実行すると2文目はORA-01918になる）
+-- 所有オブジェクトが無いユーザーは、そのまま削除できる
+DROP USER app_user;
+
+-- そのユーザーが表などのオブジェクトを持っている場合はCASCADEを使う
+-- （CASCADE無しだとORA-01922: CASCADEを指定してください、になる）
+DROP USER app_user CASCADE;</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 接続し直さずにコンテナを切り替える</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    <code class="bg-blue-100 text-blue-900">system</code> のような管理者ユーザーは、いったん接続したあとでも <code class="bg-blue-100 text-blue-900">ALTER SESSION SET CONTAINER = FREEPDB1;</code> を実行すれば、接続をやり直さずに今のセッションのまま PDB を切り替えられます。ただし <code class="bg-blue-100 text-blue-900">hr</code> のような PDB のローカルユーザーは、そもそも自分の PDB 以外に切り替える先を持っていません。この使い分けを覚えておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.2 権限の2種類 — 「できること」を許可する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        入館証（ユーザー）を発行しただけでは、まだどの部屋にも入れません。部屋ごとの入室許可にあたるのが<strong>権限（プリビレッジ）</strong>です。Oracle の権限は大きく2種類に分かれます。この違いを取り違えると、あとで紹介する確認方法もうまく使えないので、最初にはっきり区別しておきましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-key text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">システム権限</h3>
+                            <p class="text-sm text-slate-600 mb-2">「〜できる」という<strong>行為そのもの</strong>への許可。対象となる表などは指定しない。</p>
+                            <p class="text-sm text-slate-600"><code class="bg-sky-100 text-sky-900">CREATE SESSION</code>（接続できる）、<code class="bg-sky-100 text-sky-900">CREATE TABLE</code>（表を作れる）、<code class="bg-sky-100 text-sky-900">CREATE VIEW</code>（ビューを作れる）など。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-table text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">オブジェクト権限</h3>
+                            <p class="text-sm text-slate-600 mb-2">「<strong>この表</strong>に対して〜できる」という、対象付きの許可。</p>
+                            <p class="text-sm text-slate-600"><code class="bg-violet-100 text-violet-900">SELECT ON hr.employees</code>（employees表を参照できる）、<code class="bg-violet-100 text-violet-900">INSERT ON hr.employees</code>（行を追加できる）など。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        権限を与えるコマンドが <strong>GRANT</strong>、取り消すコマンドが <strong>REVOKE</strong> です。書き方はどちらの権限でもほぼ同じ形をしています。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">grant-revoke.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ログインできるようにする（システム権限）
+GRANT CREATE SESSION TO app_user;
+
+-- 自分の表を作れるようにする（システム権限）
+GRANT CREATE TABLE TO app_user;
+
+-- hrのemployees表を参照できるようにする（オブジェクト権限）
+GRANT SELECT ON hr.employees TO app_user;
+
+-- 更新も許可する場合はカンマで並べる
+GRANT SELECT, INSERT, UPDATE ON hr.employees TO app_user;
+
+-- 与えた権限を取り消す
+REVOKE INSERT, UPDATE ON hr.employees FROM app_user;</code></pre>
+                    </div>
+
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-orange-600 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-orange-800 mb-1">注意: 権限があっても ORA-01950 になることがある</p>
+                                <p class="text-orange-800 text-sm break-words">
+                                    <code class="bg-orange-100 text-orange-900">CREATE TABLE</code> 権限を与えても、実際に <code class="bg-orange-100 text-orange-900">CREATE TABLE</code> を実行した瞬間に <strong>ORA-01950</strong>（表領域に対する権限がありません）が出ることがあります。原因は、表領域にデータを書き込むための割当（<strong>クォータ</strong>）が別に必要だからです。第3章で <code class="bg-orange-100 text-orange-900">ALTER USER hr QUOTA UNLIMITED ON USERS;</code> を実行していたのは、まさにこのためでした。<strong>「権限」と「クォータ」は別の設定</strong>だと覚えておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.3 ロールで権限をまとめる — 最小権限の原則
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザーが増えてくると、1人ずつ同じ権限を何行も <code class="bg-slate-100">GRANT</code> するのは大変です。そこで使うのが <strong>ロール</strong>（権限をひとまとめにした束）です。会社にたとえるなら「人事部用の入館証セット」のようなもので、あらかじめ必要な権限をロールにまとめておき、それをユーザーに渡すだけで済みます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Oracle にはあらかじめ用意された定義済みロールが2つあります。<strong>CONNECT</strong>（実質的に <code class="bg-slate-100">CREATE SESSION</code> だけを含む、接続専用のロール）と、<strong>RESOURCE</strong>（表・シーケンス・プロシージャなど、自分のオブジェクトを作る権限をまとめたロール）です。第3章で <code class="bg-slate-100">GRANT CONNECT, RESOURCE TO hr;</code> と実行したのは、この2つのロールをまとめて渡していたのでした。ただし<strong>RESOURCE ロールを与えても、表領域のクォータは含まれません</strong>。14.2の注意点と合わせて覚えておきましょう。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        独自のロールを作ることもできます。「参照専用」のように、業務でよく使う権限のまとまりを1つのロールにしておくと、ユーザーが増えても管理が楽になります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">create-role.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 「参照専用」の権限セットを作る
+CREATE ROLE readonly_role;
+GRANT SELECT ON hr.employees   TO readonly_role;
+GRANT SELECT ON hr.departments TO readonly_role;
+
+-- ロールをユーザーに与える（1回で複数の権限が渡る）
+GRANT readonly_role TO app_user;</code></pre>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["app_user（ユーザー）"] -->|付与| B["readonly_role（ロール）"]
+    B -->|まとめて持つ| C["SELECT ON employees"]
+    B -->|まとめて持つ| D["SELECT ON departments"]
+    A -->|直接付与| E["CREATE SESSION（システム権限）"]
+    A -.->|表領域の割当・権限とは別| F["QUOTA ON USERS"]
+                        </div>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        図の点線は「権限とは別の設定」であることを表しています。ロールでどれだけ権限をまとめても、表領域のクォータだけは <code class="bg-slate-100">ALTER USER ... QUOTA</code> で別途与える必要がある、という点は本章で繰り返し出てくる重要な注意点です。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">警告: DBAロールを安易に付けない（最小権限の原則）</p>
+                                <p class="text-red-900 text-sm break-words">
+                                    「動かないから、とりあえず <code class="bg-red-100 text-red-900">GRANT DBA TO app_user;</code> すればいい」は絶対に避けるべき近道です。<strong>DBA</strong> ロールは、ユーザーの作成・削除、他人の全データの参照・変更、データベース全体の設定変更まで、ほぼすべての操作を許可してしまう非常に強力なロールです。アプリケーション用のユーザーが DBA 権限を持ったまま SQL インジェクションなどで乗っ取られると、被害はそのアプリの表だけでなく<strong>データベース全体</strong>に及びます。必要な操作を洗い出し、必要な分だけを <code class="bg-red-100 text-red-900">GRANT</code> する——これが<strong>最小権限の原則</strong>です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.4 自分の権限とユーザーを確認する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第4章では「迷子になったら <code class="bg-slate-100">DESC</code>・<code class="bg-slate-100">SHOW USER</code>・<code class="bg-slate-100">USER_TABLES</code>」と学びました。権限まわりにも同じように、確認用のビュー（データディクショナリ）が用意されています。自分に何が許されているか分からなくなったら、まずこれらを見る習慣をつけましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">check-privileges.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 自分が持っている表の一覧（第4章のUSER_TABLESの応用）
+SELECT table_name FROM user_tables ORDER BY table_name;
+
+-- 自分に付与されているロール
+SELECT granted_role, admin_option FROM user_role_privs;
+
+-- 自分に付与されているシステム権限
+SELECT privilege FROM user_sys_privs ORDER BY privilege;
+
+-- 他人の表に対して自分が持っている権限
+SELECT owner, table_name, privilege FROM user_tab_privs;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つ、<code class="bg-slate-100">ALL_USERS</code> というビューもあります。これは自分の権限とは関係なく、<strong>データベースに存在するユーザー名の一覧</strong>を表示する、比較的公開度の高いビューです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">all-users.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- データベースに存在する全ユーザーの一覧を確認する
+SELECT username, created FROM all_users ORDER BY username;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">USER_</code> で始まるビューは「自分に関係する範囲だけ」、<code class="bg-slate-100">ALL_</code> で始まるビューは「自分から見える範囲すべて」を表す、という接頭辞の違いも覚えておくと、今後さまざまなデータディクショナリに出会ったときに迷いにくくなります。
+                    </p>
+                </section>
+
+                <!-- セクション14.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.5 バックアップの考え方 — 論理と物理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        どれだけ注意していても、操作ミスやハードウェア障害でデータが失われる可能性をゼロにはできません。だからこそ<strong>バックアップ</strong>（データの複製を別に保存しておくこと）が欠かせません。Oracle のバックアップは、大きく2つの考え方に分かれます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アルバムにたとえると分かりやすいでしょう。<strong>論理バックアップ</strong>は「アルバムから必要な写真だけを選んで、別のアルバムに焼き増しする」イメージです。表やスキーマといった単位で、データと定義だけを取り出します。一方<strong>物理バックアップ</strong>は「アルバムそのものを丸ごとコピーする」イメージで、データファイルそのものを複製します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold"></th>
+                                    <th class="px-4 py-3 text-left font-semibold">論理バックアップ（Data Pump）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">物理バックアップ（RMAN）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">対象の単位</td>
+                                    <td class="px-4 py-3 text-slate-600">スキーマ・表など選べる</td>
+                                    <td class="px-4 py-3 text-slate-600">データベース全体・表領域</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">主な用途</td>
+                                    <td class="px-4 py-3 text-slate-600">別環境への移行、特定スキーマの複製・復元</td>
+                                    <td class="px-4 py-3 text-slate-600">障害からの復旧</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">出力</td>
+                                    <td class="px-4 py-3 text-slate-600">ダンプファイル（<code class="bg-slate-100">.dmp</code>）</td>
+                                    <td class="px-4 py-3 text-slate-600">データファイルのコピー</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">主な実行者</td>
+                                    <td class="px-4 py-3 text-slate-600">開発者も使う</td>
+                                    <td class="px-4 py-3 text-slate-600">主に DBA（データベース管理者）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">戻せる時点</td>
+                                    <td class="px-4 py-3 text-slate-600">エクスポートした時点</td>
+                                    <td class="px-4 py-3 text-slate-600">ARCHIVELOGモードなら直前まで</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション14.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.6 Data Pumpでバックアップと復元を体験する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Data Pump</strong> は、スキーマや表の単位でデータを取り出す論理バックアップの仕組みで、書き出し（エクスポート）に <code class="bg-slate-100">expdp</code>、読み込み（インポート）に <code class="bg-slate-100">impdp</code> というコマンドを使います。使う前に、出力先を指定する<strong>ディレクトリオブジェクト</strong>（サーバー上の実際のフォルダに Oracle が付ける「名前」）が必要です。Oracle Database Free には既定で <code class="bg-slate-100">DATA_PUMP_DIR</code> というディレクトリオブジェクトが用意されています。ただし既定では <code class="bg-slate-100">hr</code> のような一般ユーザーには公開されていないため、使う前に管理者から読み書き権限をもらう必要があります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">check-directories.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 既定で用意されているディレクトリオブジェクトを確認する
+SELECT directory_name, directory_path FROM all_directories;
+
+-- 独自の出力先を作る場合（systemなど管理者ユーザーで実行する。CREATE ANY DIRECTORY権限が必要）
+CREATE DIRECTORY dp_dir AS '/opt/oracle/dp';
+GRANT READ, WRITE ON DIRECTORY dp_dir TO hr;
+
+-- 既定のDATA_PUMP_DIRを使う場合も同様に、hrなど一般ユーザーには
+-- 既定で権限が無いため、管理者(system等)で読み書き権限を付与しておく
+GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO hr;</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">つまずきポイント: 権限付与を忘れると ORA-39002 / ORA-39087</p>
+                                <p class="text-red-900 text-sm break-words">
+                                    <code class="bg-red-100 text-red-900">DATA_PUMP_DIR</code> は既定では <code class="bg-red-100 text-red-900">hr</code> のような一般ユーザーに公開されていません。管理者で <code class="bg-red-100 text-red-900">GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO hr;</code> を実行し忘れたまま <code class="bg-red-100 text-red-900">expdp</code> / <code class="bg-red-100 text-red-900">impdp</code> を実行すると、<strong>ORA-39002</strong>（無効な処理です）に続けて <strong>ORA-39087</strong>（ディレクトリ名 DATA_PUMP_DIR が無効です）が発生して失敗します。実行前に必ず権限付与を済ませておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">hr</code> への権限付与が済んだら、<code class="bg-slate-100">hr</code> スキーマ全体をエクスポートしてみましょう。<strong>ここが最も間違えやすい点ですが、<code class="bg-slate-100">expdp</code> / <code class="bg-slate-100">impdp</code> は SQL ではなく OS のコマンドライン</strong>から実行します。SQL*Plus のプロンプトに貼っても動きません。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">export.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># hrスキーマ全体をエクスポートする（SQLではなくOSのコマンド）
+# directory はサーバー側のディレクトリオブジェクト名
+expdp hr/MyHrPw1@localhost:1521/FREEPDB1 \
+  schemas=HR \
+  directory=DATA_PUMP_DIR \
+  dumpfile=hr_backup.dmp \
+  logfile=hr_export.log</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        取得したダンプファイルは、別のスキーマ名を付けて取り込む（インポートする）こともできます。移行や、練習用に複製を作りたいときに便利です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">import.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 取得したダンプを別のスキーマ名で取り込む
+impdp system/MyOraclePw1@localhost:1521/FREEPDB1 \
+  directory=DATA_PUMP_DIR \
+  dumpfile=hr_backup.dmp \
+  remap_schema=HR:HR_COPY \
+  logfile=hr_import.log</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: コンテナ環境では docker cp でファイルを取り出す</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    <code class="bg-blue-100 text-blue-900">directory=</code> が指すのは<strong>サーバー（コンテナ）側</strong>のパスです。第3章のようにコンテナで Oracle を動かしている場合、ダンプファイルはコンテナの中に作られます。手元の PC に取り出したいときは <code class="bg-blue-100 text-blue-900">docker cp oracle-free:/opt/oracle/admin/FREE/dpdump/hr_backup.dmp .</code> のように <code class="bg-blue-100 text-blue-900">docker cp</code> コマンドを使います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション14.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.7 RMANと日々の運用
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>RMAN</strong>（Recovery Manager / Oracle 標準の物理バックアップツール）は、データベース全体を対象にした障害復旧のための仕組みです。専用のコマンドラインから <code class="bg-slate-100">rman target /</code> で起動し、<code class="bg-slate-100">BACKUP DATABASE;</code> を実行するのが基本形です。細かい操作方法は本ガイドの範囲を超えますが、「こういうものがある」ことは押さえておきましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">rman-basic.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># RMANを起動してデータベースに接続する
+rman target /
+
+# データベース全体をバックアップする
+RMAN&gt; BACKUP DATABASE;
+
+# 取得済みのバックアップの一覧を確認する
+RMAN&gt; LIST BACKUP SUMMARY;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RMAN の運用でよく出てくるのが<strong>ARCHIVELOGモード</strong>です。稼働させたまま（止めずに）バックアップを取れて、障害が起きても直前の状態まで戻せるようになる運用モードです。対して既定の<strong>NOARCHIVELOGモード</strong>では、データベースを停止してのバックアップになり、戻せるのはバックアップを取った時点までに限られます。本番運用では ARCHIVELOG モードにしておくのが基本方針だと覚えておいてください。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A{"何から守りたい？"}
+    A -->|特定のスキーマを壊した／別環境へ移したい| B["Data Pump（expdp / impdp）"]
+    A -->|データベース全体が壊れた| C["RMAN（BACKUP DATABASE）"]
+    A -->|表をうっかりDROPしただけ| D["リサイクルビンからFLASHBACK TABLE"]
+    C --> E{"直前まで戻したい？"}
+    E -->|はい| F["ARCHIVELOGモードで運用する"]
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 小さなミスにはリサイクルビン</p>
+                                <p class="text-emerald-900 text-sm break-words">
+                                    RMAN も Data Pump も大がかりな仕組みです。「表を1つうっかり <code class="bg-emerald-100 text-emerald-900">DROP TABLE</code> してしまった」程度の小さなミスなら、第5章で学んだ <code class="bg-emerald-100 text-emerald-900">FLASHBACK TABLE ... TO BEFORE DROP</code> のほうが手軽な復旧手段です。バックアップは「最後の砦」、リサイクルビンは「日常のやり直しボタン」と使い分けましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        日々の運用では、大がかりな障害対応だけでなく、次のような点を定期的に確認します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        <strong>(1) 表領域の使用率</strong> — 自分に割り当てられた表領域の使用状況は、<code class="bg-slate-100">USER_TS_QUOTAS</code> で確認できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">tablespace-usage.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 自分に割り当てられた表領域の使用状況を確認する
+SELECT tablespace_name, bytes/1024/1024 AS "使用MB", max_bytes
+  FROM user_ts_quotas;
+-- max_bytes が -1 の場合はUNLIMITED（無制限）を意味する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        <strong>(2) セッションの状況</strong> — 第12章ではロック待ちの原因調査に <code class="bg-slate-100">V$SESSION</code> の <code class="bg-slate-100">BLOCKING_SESSION</code> 列を使いました。日々の運用でも、今どんな接続があるかを一覧するために使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">check-sessions.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 管理者ユーザー（systemなど）で、接続中のセッション一覧を確認する
+SELECT username, status, program FROM v$session
+ WHERE username IS NOT NULL;
+-- hrのような一般ユーザーではORA-00942になることが多い
+-- （V$ビューの参照にはSELECT_CATALOG_ROLEなどの権限が必要）</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>(3) アラートログの存在</strong> — Oracle は起動・停止・エラーなど主要な出来事を<strong>アラートログ</strong>（データベースの"日誌"）に記録し続けています。詳しい参照方法（ADRCI などの専用ツール）は上級者向けの領域ですが、「何か調子が悪いときは、まずアラートログを見る」という存在だけは、今のうちに覚えておきましょう。
+                    </p>
+                </section>
+
+                <!-- セクション14.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.8 全14章の振り返りと次のステップ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        長い道のりでした。「データベースとは何か」も知らない状態から出発し、ここまでの14章で学んだことを、章ごとに1行で振り返ってみましょう。分からなくなったら、この表から該当の章に戻って読み返すのがおすすめです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">章</th>
+                                    <th class="px-4 py-3 text-left font-semibold">テーマ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">代表的な構文・キーワード</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第1章</td>
+                                    <td class="px-4 py-3 text-slate-600">Oracle Databaseとは</td>
+                                    <td class="px-4 py-3 text-slate-600">RDBMS、SQL、エディション（23ai Free）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第2章</td>
+                                    <td class="px-4 py-3 text-slate-600">アーキテクチャと基本用語</td>
+                                    <td class="px-4 py-3 text-slate-600">インスタンス／データベース、CDB・PDB、FREEPDB1</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第3章</td>
+                                    <td class="px-4 py-3 text-slate-600">環境構築とインストール</td>
+                                    <td class="px-4 py-3 text-slate-600">コンテナ起動、<code class="bg-slate-100">CREATE USER</code>、<code class="bg-slate-100">GRANT CONNECT, RESOURCE</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第4章</td>
+                                    <td class="px-4 py-3 text-slate-600">SQL*PlusとSQL Developerの基本操作</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">DESC</code>、<code class="bg-slate-100">SET LINESIZE</code>、<code class="bg-slate-100">SPOOL</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第5章</td>
+                                    <td class="px-4 py-3 text-slate-600">表の作成とデータ型</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">CREATE TABLE</code>、<code class="bg-slate-100">VARCHAR2(n CHAR)</code>、シーケンス／IDENTITY</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第6章</td>
+                                    <td class="px-4 py-3 text-slate-600">SELECT文でデータを取り出す</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">SELECT</code>・<code class="bg-slate-100">WHERE</code>・<code class="bg-slate-100">ORDER BY</code>、<code class="bg-slate-100">FETCH FIRST</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第7章</td>
+                                    <td class="px-4 py-3 text-slate-600">データの追加・更新・削除</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">INSERT</code>・<code class="bg-slate-100">UPDATE</code>・<code class="bg-slate-100">DELETE</code>、<code class="bg-slate-100">COMMIT</code>／<code class="bg-slate-100">ROLLBACK</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第8章</td>
+                                    <td class="px-4 py-3 text-slate-600">関数とNULL・日付の扱い</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">NVL</code>、<code class="bg-slate-100">TO_CHAR</code>、<code class="bg-slate-100">SYSDATE</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第9章</td>
+                                    <td class="px-4 py-3 text-slate-600">表の結合と集計</td>
+                                    <td class="px-4 py-3 text-slate-600">INNER／OUTER <code class="bg-slate-100">JOIN</code>、<code class="bg-slate-100">GROUP BY</code>、<code class="bg-slate-100">HAVING</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第10章</td>
+                                    <td class="px-4 py-3 text-slate-600">PL/SQL入門</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">DECLARE</code>〜<code class="bg-slate-100">BEGIN</code>〜<code class="bg-slate-100">END</code>、<code class="bg-slate-100">%TYPE</code>、例外処理</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第11章</td>
+                                    <td class="px-4 py-3 text-slate-600">ストアドプログラムとトリガー</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">PROCEDURE</code>、<code class="bg-slate-100">FUNCTION</code>、<code class="bg-slate-100">TRIGGER</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第12章</td>
+                                    <td class="px-4 py-3 text-slate-600">トランザクションとロック</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">SAVEPOINT</code>、読み取り一貫性、<code class="bg-slate-100">V$SESSION</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第13章</td>
+                                    <td class="px-4 py-3 text-slate-600">インデックスと性能の基礎</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">CREATE INDEX</code>、<code class="bg-slate-100">EXPLAIN PLAN</code>、<code class="bg-slate-100">DBMS_XPLAN</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">第14章</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー管理・バックアップと運用</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">GRANT</code>／<code class="bg-slate-100">REVOKE</code>、ロール、<code class="bg-slate-100">expdp</code>／<code class="bg-slate-100">impdp</code>、RMAN</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本ガイドで学んだのは、Oracle Database と「対話する」ための土台です。ここから先は、目的に応じて次のような方向に学習を広げていけます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["第14章までの学習<br/>お疲れさまでした"] --> B["(a) Oracle認定資格<br/>Oracle Master・OCP"]
+    A --> C["(b) より高度なチューニング<br/>AWR・待機イベント分析"]
+    A --> D["(c) アプリケーションからの接続<br/>JDBCなど"]
+    A --> E["(d) 他のRDBMSへの横展開<br/>PostgreSQL・SQL Server"]
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">方向</th>
+                                    <th class="px-4 py-3 text-left font-semibold">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(a) Oracle認定資格</td>
+                                    <td class="px-4 py-3 text-slate-600">Oracle Master や Oracle Certified Professional（OCP）といった資格に挑戦すると、体系立った知識を確認しながら学習を進められる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(b) より高度なチューニング</td>
+                                    <td class="px-4 py-3 text-slate-600">第13章で触れた実行計画の読み方をさらに深め、待機イベントの分析やAWR（性能統計のレポート）の読み方を学ぶ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(c) アプリケーションからの接続</td>
+                                    <td class="px-4 py-3 text-slate-600">Java の JDBC などを使い、アプリケーションのコードから SQL を送って結果を受け取る方法を学ぶ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">(d) 他のRDBMSへの横展開</td>
+                                    <td class="px-4 py-3 text-slate-600">第1章で比較した PostgreSQL や SQL Server にも、表・SQL・トランザクション・インデックスという共通の土台がそのまま活かせる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 14-1: 最小権限のアプリ用ユーザーを作ってみる
+                            </h3>
+                            <p class="text-purple-900 mb-3 break-words">
+                                14.2・14.3で学んだ最小権限の原則を、実際に手を動かして確かめましょう。
+                            </p>
+                            <ol class="list-decimal list-inside space-y-2 text-purple-900 mb-3">
+                                <li class="break-words"><code class="bg-purple-100">system</code> で <code class="bg-purple-100">FREEPDB1</code> に接続し、<code class="bg-purple-100">app_user</code> を作成する（パスワードは自分で決める）。</li>
+                                <li class="break-words"><code class="bg-purple-100">CREATE SESSION</code> 権限と、<code class="bg-purple-100">hr.employees</code> への <code class="bg-purple-100">SELECT</code> 権限だけを与える。<code class="bg-purple-100">DBA</code> ロールは絶対に与えない。</li>
+                                <li class="break-words"><code class="bg-purple-100">app_user</code> で接続し直し、<code class="bg-purple-100">SELECT * FROM hr.employees;</code> が成功することを確認する。</li>
+                                <li class="break-words">続けて <code class="bg-purple-100">INSERT INTO hr.employees (last_name, hire_date) VALUES ('テスト', SYSDATE);</code> を試し、<strong>ORA-01031（権限が不足しています）</strong>になることを確認する。</li>
+                                <li class="break-words">確認が終わったら <code class="bg-purple-100">system</code> に戻り、<code class="bg-purple-100">DROP USER app_user CASCADE;</code> で片づける。</li>
+                            </ol>
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words">
+                                    <strong>ポイント:</strong> 手順4のORA-01031は、むしろ<strong>正しく動いている証拠</strong>です。「エラーが出ない」ことより「意図した操作だけが通る」ことのほうが、権限設計では重要だと覚えておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 新しく作ったユーザーに <code class="bg-blue-100">GRANT CONNECT, RESOURCE</code> を与えたが、<code class="bg-blue-100">CREATE TABLE</code> を実行すると ORA-01950 が発生した。原因と対処法を答えよ。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            表領域にデータを書き込むための割当（クォータ）が与えられていないため。<code class="bg-blue-200">ALTER USER ユーザー名 QUOTA UNLIMITED ON USERS;</code>（または必要な容量を指定）を実行する。権限とクォータは別の設定である。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">hr</code> スキーマだけを別の環境にコピーしたい。Data Pump と RMAN のどちらを使うべきか、理由も含めて答えよ。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Data Pump（<code class="bg-blue-200">expdp</code> / <code class="bg-blue-200">impdp</code>）。スキーマ単位で取り出して別環境に取り込める論理バックアップだから。RMAN はデータファイル単位の物理バックアップで、データベース全体の障害復旧が主な用途であり、スキーマ単位の移行には向かない。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. アプリケーション用のユーザーに、いきなり <code class="bg-blue-100">DBA</code> ロールを付与するのは、なぜ避けるべきか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            DBAロールはユーザーの作成・削除や他人の全データへのアクセスなど、ほぼすべての操作を許可してしまう。アプリがSQLインジェクションなどで乗っ取られた場合、被害がそのアプリの表だけでなくデータベース全体に及んでしまう。最小権限の原則にもとづき、必要な操作だけを許可した専用のロールを作って与えるべきである。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. ARCHIVELOGモードで運用することの利点を、NOARCHIVELOGモードとの違いを含めて説明せよ。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ARCHIVELOGモードでは、データベースを稼働させたままバックアップを取得でき、障害が発生しても直前の状態まで復旧できる。対してNOARCHIVELOGモードでは、データベースを停止してバックアップを取る必要があり、復旧できるのはバックアップを取得した時点までに限られる。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 完走メッセージ -->
+                <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-flag-checkered text-emerald-500 mt-1 flex-shrink-0"></i>
+                        <div class="min-w-0">
+                            <p class="font-semibold text-emerald-800 mb-1">全14章、お疲れさまでした</p>
+                            <p class="text-emerald-900 text-sm break-words">
+                                「データベースとは何か」も知らない状態から出発し、<code class="bg-emerald-100 text-emerald-900">CREATE TABLE</code> で表を作り、<code class="bg-emerald-100 text-emerald-900">SELECT</code> で自在にデータを取り出し、PL/SQL で処理をまとめ、インデックスで速さを、そして今、ユーザー管理とバックアップという運用の基礎にまでたどり着きました。ここまで読み進めたあなたは、実務で書かれている Oracle の SQL の大部分を読み解ける力を、すでに身につけています。あとは実際に手を動かし、自分の題材でクエリを書き続けることが、いちばんの近道です。お疲れさまでした。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="oracle-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-500 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第13章: インデックスと性能の基礎</span>
+                        </div>
+                    </a>
+                    <span class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 opacity-60 cursor-not-allowed">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-500 block">次の章</span>
+                            <span class="text-slate-700 font-medium">最後の章です</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                    </span>
+                </nav>
