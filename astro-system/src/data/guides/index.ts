@@ -45,6 +45,7 @@ import { claude } from './data-ai-category/generative-ai/claude';
 // データ・AI — データベース
 import { sqlserver } from './data-ai-category/database/sqlserver';
 import { sql } from './data-ai-category/database/sql';
+import { oracle } from './data-ai-category/database/oracle';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
@@ -85,6 +86,7 @@ const all: TechGuide[] = [
   // データ・AI — データベース
   sqlserver,
   sql,
+  oracle,
   // クラウド・インフラ
   docker,
   gitGithub,

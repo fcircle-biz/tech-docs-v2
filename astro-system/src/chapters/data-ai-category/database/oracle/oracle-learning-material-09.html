@@ -1,0 +1,1053 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Oracle</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">表の結合と集計</h1>
+                    <p class="text-slate-600">これまでの章では、<code class="bg-slate-100">employees</code>（社員表）か <code class="bg-slate-100">departments</code>（部署表）のどちらか一方だけを見て SELECT を書いてきました。しかし実務では「社員の名前と、その人が所属する部署の名前を一緒に見たい」という要望がほぼ必ず出てきます。社員表には部署の<strong>番号</strong>しか書かれていないため、部署の<strong>名前</strong>を知るにはもう一方の表を見に行く必要があります。この「複数の表を横につないで1つの表のように扱う」操作を<strong>結合（JOIN）</strong>と呼びます。この章では、内部結合・外部結合・自己結合という3種類のつなぎ方と、つないだ後にまとめて数える<strong>集計</strong>の技術を学びます。第5章で張った外部キー（<code class="bg-slate-100">employees.department_id</code> → <code class="bg-slate-100">departments.department_id</code>）が、ここで初めて本領を発揮します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>内部結合（INNER JOIN）と外部結合（LEFT / RIGHT / FULL OUTER JOIN）の違いを、「どの行が残り、どの行が消えるか」で説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CROSS JOIN で意図せず直積になってしまう事故を避けられ、自己結合で「社員と上司」のような同じ表内の関係を取り出せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>COUNT・SUM・AVG・MAX・MIN の集計関数と GROUP BY／HAVING を使って、部署ごとの集計表を作れる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>単一行・複数行・相関副問合せや EXISTS を使い分け、段階的に問題を解ける</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>WITH句（CTE）や分析関数がどんな場面で使われるか、雰囲気をつかんでいる（発展）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 なぜ表を分けるのか、なぜ結合が必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第5章で <code class="bg-slate-100">employees</code> と <code class="bg-slate-100">departments</code> という2つの表を作ったとき、「社員の情報と部署の情報を、なぜ1つの表にまとめなかったのか」と疑問に思ったかもしれません。試しに、もし1つの表にまとめていたらどうなっていたかを見てみましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="4">もし1つの表にまとめていたら…</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">社員名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">所属部署番号</th>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">所在地</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">佐藤 一郎</td>
+                                    <td class="px-4 py-3 text-slate-600">10</td>
+                                    <td class="px-4 py-3 text-slate-600">営業部</td>
+                                    <td class="px-4 py-3 text-slate-600">東京</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">鈴木 花子</td>
+                                    <td class="px-4 py-3 text-slate-600">10</td>
+                                    <td class="px-4 py-3 text-slate-600">営業部</td>
+                                    <td class="px-4 py-3 text-slate-600">東京</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">高橋 健太</td>
+                                    <td class="px-4 py-3 text-slate-600">10</td>
+                                    <td class="px-4 py-3 text-slate-600">営業部</td>
+                                    <td class="px-4 py-3 text-slate-600">東京</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">田中 美咲</td>
+                                    <td class="px-4 py-3 text-slate-600">20</td>
+                                    <td class="px-4 py-3 text-slate-600">開発部</td>
+                                    <td class="px-4 py-3 text-slate-600">大阪</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もし営業部が東京から名古屋に引っ越したら、この設計では佐藤・鈴木・高橋の<strong>3行すべて</strong>の「所在地」を書き換えなければなりません。社員が数百人になれば数百行の書き換えが必要になり、1行でも直し忘れると「同じ部署なのに所在地の表記が違う」という矛盾したデータが生まれます。実務ではこの「重複を減らすように表を分ける」設計の考え方を<strong>正規化</strong>（データの重複や不整合を防ぐために表を分割する考え方）と呼びます。詳しい手法は本ガイドの範囲を超えるため、ここでは「表を分けるのには理由がある」という感覚だけ持ち帰ってください。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで本ガイドの設計では、部署の情報は <code class="bg-slate-100">departments</code> に1回だけ書き、<code class="bg-slate-100">employees</code> には「どの部署か」を示す<strong>案内板</strong>である <code class="bg-slate-100">department_id</code> という番号だけを持たせます。名古屋に引っ越しても直すのは <code class="bg-slate-100">departments</code> の1行だけです。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        その代わり、社員一覧に部署名も一緒に表示したいときは、2つの表を<strong>結合（JOIN）</strong>でつなぎ直す必要があります。表計算ソフトで、ある表の値をもとに別の表から情報を引いてくる <code class="bg-slate-100">VLOOKUP</code> 関数を使ったことがあれば、それと同じ発想です。この「つなぎ方」を9.2から順番に見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 INNER JOIN — 両方にあるものだけをつなぐ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最も基本の結合が<strong>内部結合（INNER JOIN）</strong>です。「両方の表に対応する行があるもの」だけをつなぎます。基準状態（社員10件・部署4件）のうち、ここで注目してほしいのは<strong>社員110（加藤 結衣）の <code class="bg-slate-100">department_id</code> がNULL（未配属）</strong>である点です。この1件がINNER JOINでどう扱われるか見てみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">inner-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 社員名と、その社員が所属する部署名を一緒に表示する
+-- e, d は表の別名（毎回長い表名を書かなくて済む）
+SELECT e.employee_id,
+       e.last_name       AS "社員名",
+       d.department_name AS "部署名"
+  FROM employees e
+  JOIN departments d ON e.department_id = d.department_id
+ ORDER BY e.employee_id;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">employees e</code>・<code class="bg-slate-100">departments d</code> の <code class="bg-slate-100">e</code> と <code class="bg-slate-100">d</code> は<strong>テーブル別名（エイリアス）</strong>です。両方の表に <code class="bg-slate-100">department_id</code> という同じ名前の列があるため、別名を付けずに <code class="bg-slate-100">department_id</code> とだけ書くと「どちらの表の列か」が決まらず <strong>ORA-00918</strong>（列の定義が曖昧です）というエラーになります。<code class="bg-slate-100">e.department_id</code> のように「別名.列名」で修飾すれば曖昧さが消えます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="2">実行結果（INNER JOIN・9件）</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">社員名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">佐藤</td><td class="px-4 py-3 text-slate-600">営業部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">鈴木</td><td class="px-4 py-3 text-slate-600">営業部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">高橋</td><td class="px-4 py-3 text-slate-600">営業部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">田中</td><td class="px-4 py-3 text-slate-600">開発部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">伊藤</td><td class="px-4 py-3 text-slate-600">開発部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">渡辺</td><td class="px-4 py-3 text-slate-600">開発部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">山本</td><td class="px-4 py-3 text-slate-600">開発部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">中村</td><td class="px-4 py-3 text-slate-600">総務部</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">小林</td><td class="px-4 py-3 text-slate-600">総務部</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">重要: 社員は10人いるのに、結果は9件しかない</p>
+                                <p class="text-red-900 text-sm break-words">
+                                    社員110（加藤 結衣）は <code class="bg-red-100 text-red-900">department_id</code> が NULL（未配属）のため、<code class="bg-red-100 text-red-900">departments</code> のどの行とも一致しません。INNER JOIN は「両方に対応する行がある」ものだけを残すため、<strong>対応先がない行はそのまま結果から消える</strong>のです。「全社員を出したはずなのに1人足りない」は実務でも頻発する事故です。件数を数える習慣（<code class="bg-red-100 text-red-900">SELECT COUNT(*)</code> を先に取る）を身につけましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 外部結合 — 対応がなくても行を残す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「部署が未定の社員も一覧に残したい」「社員が1人もいない部署も一覧に出したい」——このように<strong>片方の表を全部残したい</strong>ときに使うのが<strong>外部結合（OUTER JOIN）</strong>です。<code class="bg-slate-100">OUTER</code> は省略でき、<code class="bg-slate-100">LEFT JOIN</code> と書けば <code class="bg-slate-100">LEFT OUTER JOIN</code> と同じ意味になります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">結合の種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">残る行</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対応がない側の列</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">LEFT (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">FROM</code> に書いた<strong>左側の表は全行</strong>残る</td>
+                                    <td class="px-4 py-3 text-slate-600">右側（<code class="bg-slate-100">JOIN</code> の表）の列がすべて NULL になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">RIGHT (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">JOIN</code> に書いた<strong>右側の表は全行</strong>残る</td>
+                                    <td class="px-4 py-3 text-slate-600">左側（<code class="bg-slate-100">FROM</code> の表）の列がすべて NULL になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">FULL (OUTER) JOIN</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>両方の表の全行</strong>が残る</td>
+                                    <td class="px-4 py-3 text-slate-600">対応がない側の列が NULL になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まずは「部署未定の社員も残す」ケース、つまり <code class="bg-slate-100">employees</code> を左に置いた LEFT OUTER JOIN です。第8章で学んだ <code class="bg-slate-100">NVL</code> を組み合わせて、NULL を「（未配属）」という分かりやすい表示に変えます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">left-outer-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 部署が決まっていない社員も残して表示する
+SELECT e.employee_id,
+       e.last_name AS "社員名",
+       NVL(d.department_name, '（未配属）') AS "部署名"
+  FROM employees e
+  LEFT OUTER JOIN departments d ON e.department_id = d.department_id
+ ORDER BY e.employee_id;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="2">実行結果（LEFT OUTER JOIN・10件）</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">社員名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">佐藤〜小林（9名）</td><td class="px-4 py-3 text-slate-600">9.2と同じ（営業部／開発部／総務部）</td></tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">加藤（社員110）</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>（未配属）</strong> ← NVLがNULLを変換</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        今度は逆に、「社員が1人もいない部署（人事部）も残す」ケースです。<code class="bg-slate-100">departments</code> を全部残したいので RIGHT OUTER JOIN を使い、部署ごとの人数を <code class="bg-slate-100">COUNT</code> で数えます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">right-outer-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 社員が1人もいない部署も残して表示する
+SELECT d.department_name    AS "部署名",
+       COUNT(e.employee_id) AS "人数"
+  FROM employees e
+  RIGHT OUTER JOIN departments d ON e.department_id = d.department_id
+ GROUP BY d.department_name
+ ORDER BY "人数" DESC;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="2">実行結果（RIGHT OUTER JOIN・4件）</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">人数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">開発部</td><td class="px-4 py-3 text-slate-600">4</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">営業部</td><td class="px-4 py-3 text-slate-600">3</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">総務部</td><td class="px-4 py-3 text-slate-600">2</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">人事部</td><td class="px-4 py-3 text-slate-600"><strong>0</strong></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: COUNT(*) だったら結果は違っていた</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    もしここで <code class="bg-blue-100 text-blue-900">COUNT(e.employee_id)</code> の代わりに <code class="bg-blue-100 text-blue-900">COUNT(*)</code> を使うと、人事部の行も1行としてカウントされてしまい「人事部 1人」という誤った結果になります。RIGHT OUTER JOIN で埋められた社員側の列（<code class="bg-blue-100 text-blue-900">employee_id</code>）はNULLなので、<code class="bg-blue-100 text-blue-900">COUNT(列)</code> ならNULLを数えず正しく0になります。COUNT の使い分けは9.5で詳しく学びます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        LEFT OUTER JOIN は「左側を全部残す」、RIGHT OUTER JOIN は「右側を全部残す」結合でした。<strong>FULL OUTER JOIN</strong>はちょうどその両方を足したもので、結合条件が一致してもしなくても<strong>両方の表の全行</strong>を残します。<code class="bg-slate-100">employees</code> と <code class="bg-slate-100">departments</code> を FULL OUTER JOIN すると、部署が未定の社員110と、社員が1人もいない人事部の<strong>両方</strong>が同時に結果へ現れます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">full-outer-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 部署未定の社員110も、社員がいない人事部も両方残す
+SELECT NVL(e.last_name, '（社員なし）')      AS "社員名",
+       NVL(d.department_name, '（未配属）') AS "部署名"
+  FROM employees e
+  FULL OUTER JOIN departments d ON e.department_id = d.department_id
+ ORDER BY e.employee_id;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold" colspan="2">実行結果（FULL OUTER JOIN・11件）</th>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">社員名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">佐藤〜小林（9名）</td><td class="px-4 py-3 text-slate-600">9.2と同じ（営業部／開発部／総務部）</td></tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">加藤（社員110）</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>（未配属）</strong> ← 社員側は残るが部署名がNULL</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><strong>（社員なし）</strong> ← 部署側は残るが社員名がNULL</td>
+                                    <td class="px-4 py-3 text-slate-600">人事部</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-emerald-800 mb-1">件数の内訳: 9件 + 1件 + 1件 = 11件</p>
+                                <p class="text-emerald-900 text-sm break-words">
+                                    FULL OUTER JOIN の結果は、9.2のINNER JOINで一致した<strong>9件</strong>（配属済みの社員）に、LEFT OUTER JOINでしか残らない<strong>1件</strong>（未配属の社員110）と、RIGHT OUTER JOINでしか残らない<strong>1件</strong>（社員0人の人事部）を合わせた、<strong>9+1+1=11件</strong>になります。LEFTとRIGHTのどちらか一方だけでは拾いきれない「両側の欠け」を、まとめて確認したいときにFULL OUTER JOINを使います。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border-l-4 border-slate-400 rounded-r-lg p-3 my-4">
+                        <p class="text-slate-800 text-sm break-words">
+                            <i class="fas fa-book mr-1"></i><strong>古い記法 <code class="bg-slate-200">(+)</code> — 読めれば十分</strong>: Oracle には外部結合を表す独自の古い書き方があり、今も古いコードで見かけます。<code class="bg-slate-200">(+)</code> を付けた側が「不足を許す側」になり、下の例は LEFT OUTER JOIN と同じ結果になります。<strong>新しく書くときは標準の JOIN 構文を使ってください。</strong>
+                        </p>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">old-plus-syntax.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 古い記法（読めればよい。新しく書くときは使わない）
+-- (+) を書いた側の表が「不足があっても残す側」になる
+SELECT e.last_name, d.department_name
+  FROM employees e, departments d
+ WHERE e.department_id = d.department_id(+)
+ ORDER BY e.employee_id;
+-- ↑ 9.3のLEFT OUTER JOINと同じ結果になる</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後に、ここまでの4種類の結合と件数の関係を図でまとめます。同じ「社員10件・部署4件」というデータでも、結合の種類によって残る件数が変わることを確認してください。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    E["employees（10件）"] --> I["INNER JOIN<br/>結果: 9件<br/>（未配属の110が消える）"]
+    D["departments（4件）"] --> I
+    E --> L["LEFT OUTER JOIN<br/>結果: 10件<br/>（110は部署名がNULL）"]
+    D --> L
+    E --> R["RIGHT OUTER JOIN<br/>結果: 4部署分<br/>（社員0人の人事部も残る）"]
+    D --> R
+    E --> F["FULL OUTER JOIN<br/>結果: 11件<br/>（110も人事部も両方残る）"]
+    D --> F
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 CROSS JOIN（交差結合）と自己結合
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>交差結合（CROSS JOIN）</strong>は、結合条件を指定せず、左の表の各行と右の表の各行を<strong>すべて組み合わせる</strong>結合です。専門的には<strong>直積</strong>（デカルト積とも呼ばれる、あり得る組み合わせを総当たりで作ること）と呼ばれます。社員が10件、部署が4件なら、結果は 10 × 4 = 40件になります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">cross-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 全社員 × 全部署のすべての組み合わせを作る
+SELECT e.last_name, d.department_name
+  FROM employees e
+  CROSS JOIN departments d;
+-- 10件 × 4件 = 40件。意図した使い方をする場面はまれ</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-red-800 mb-1">警告: 書き忘れで「うっかりCROSS JOIN」になる事故</p>
+                                <p class="text-red-900 text-sm break-words mb-2">
+                                    <code class="bg-red-100 text-red-900">FROM employees e, departments d</code> のように表をカンマで並べる古い書き方をし、続く <code class="bg-red-100 text-red-900">WHERE e.department_id = d.department_id</code> を書き忘れると、それだけでCROSS JOINと同じ40件が返ってきます。表の行数が多い実務データでは、数百万件という想定外の結果が返って処理が固まることもあります。
+                                </p>
+                                <p class="text-red-900 text-sm break-words">
+                                    <strong><code class="bg-red-100 text-red-900">JOIN ... ON</code> の形をセットで書く</strong>習慣を付ければ、この事故はほぼ防げます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次は、異なる2つの表ではなく<strong>同じ表を2回登場させて自分自身とつなぐ</strong>結合です。これを<strong>自己結合（セルフジョイン）</strong>と呼びます。<code class="bg-slate-100">employees.manager_id</code>（上司の社員番号）は同じ <code class="bg-slate-100">employees</code> 表の <code class="bg-slate-100">employee_id</code> を指しているので、自己結合で「社員名」と「上司名」を並べられます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">self-join.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 同じ社員表を2回使って「社員名」と「上司名」を並べる
+SELECT e.last_name                     AS "社員名",
+       NVL(m.last_name, '（上司なし）') AS "上司名"
+  FROM employees e
+  LEFT OUTER JOIN employees m ON e.manager_id = m.employee_id
+ ORDER BY e.employee_id;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">社員名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">上司名</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">佐藤</td><td class="px-4 py-3 text-slate-600">（上司なし）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">鈴木</td><td class="px-4 py-3 text-slate-600">佐藤</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">高橋</td><td class="px-4 py-3 text-slate-600">鈴木</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">田中</td><td class="px-4 py-3 text-slate-600">（上司なし）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">伊藤</td><td class="px-4 py-3 text-slate-600">田中</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">渡辺・山本</td><td class="px-4 py-3 text-slate-600">伊藤</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">中村</td><td class="px-4 py-3 text-slate-600">（上司なし）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">小林</td><td class="px-4 py-3 text-slate-600">中村</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">加藤</td><td class="px-4 py-3 text-slate-600">（上司なし）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        ポイントは <code class="bg-slate-100">e</code> と <code class="bg-slate-100">m</code> という<strong>異なる別名</strong>を付けて、同じ表を「社員としての自分」と「上司としての自分」の2役に見立てていることです。<code class="bg-slate-100">manager_id</code> が NULL の4名（佐藤・田中・中村・加藤）には上司が登録されていないため、ここでも LEFT OUTER JOIN を使わないと4行が消えてしまいます。
+                    </p>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 集計関数 — たくさんの行を1つの値にまとめる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>集計関数</strong>（集約関数とも呼ばれる。複数の行の値をまとめて1つの値にする関数）は、表計算ソフトの <code class="bg-slate-100">SUM</code> や <code class="bg-slate-100">AVERAGE</code> をセル範囲にかける感覚に近いものです。Oracle でよく使うのは次の5つです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">関数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">やること</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">COUNT</code></td><td class="px-4 py-3 text-slate-600">件数を数える</td></tr>
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">SUM</code></td><td class="px-4 py-3 text-slate-600">合計する</td></tr>
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">AVG</code></td><td class="px-4 py-3 text-slate-600">平均する</td></tr>
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">MAX</code></td><td class="px-4 py-3 text-slate-600">最大値を求める</td></tr>
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">MIN</code></td><td class="px-4 py-3 text-slate-600">最小値を求める</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        中でも初心者がつまずきやすいのが <code class="bg-slate-100">COUNT(*)</code> と <code class="bg-slate-100">COUNT(列名)</code> の違いです。<code class="bg-slate-100">COUNT(*)</code> は<strong>行そのものの数</strong>を数えるのに対し、<code class="bg-slate-100">COUNT(列名)</code> は<strong>その列がNULLでない行だけ</strong>を数えます。第8章で見た、メールアドレスが未登録の社員109を使って確かめましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">count-star-vs-column.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- COUNT(*) は行数、COUNT(列) はNULLを除いた件数
+SELECT COUNT(*)              AS "全社員数",
+       COUNT(email)          AS "メール登録済みの人数",
+       COUNT(commission_pct) AS "歩合ありの人数"
+  FROM employees;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">全社員数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">メール登録済みの人数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">歩合ありの人数</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">10</td>
+                                    <td class="px-4 py-3 text-slate-600">9</td>
+                                    <td class="px-4 py-3 text-slate-600">2</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        メール未登録が社員109の1人いるため <code class="bg-slate-100">COUNT(email)</code> は9、歩合率（<code class="bg-slate-100">commission_pct</code>）が設定されているのは2人だけなので <code class="bg-slate-100">COUNT(commission_pct)</code> は2になります。<code class="bg-slate-100">AVG</code> も同様に、<strong>NULLを除いた行だけ</strong>で平均を計算します。「NULLを0として平均したい」場合は、第8章の <code class="bg-slate-100">NVL</code> と組み合わせて <code class="bg-slate-100">AVG(NVL(commission_pct, 0))</code> のように書きます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        集計関数は<strong>GROUP BY</strong>（続く9.6で詳しく学ぶ、行をグループに分ける句）と組み合わせると真価を発揮します。ここでは先取りして、9.2のINNER JOINに集計を重ね、部署ごとの人数・平均給与・最高給与を求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">dept-aggregate.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 部署ごとに人数・平均給与・最高給与を集計する
+SELECT d.department_name    AS "部署名",
+       COUNT(*)             AS "人数",
+       ROUND(AVG(e.salary)) AS "平均給与",
+       MAX(e.salary)        AS "最高給与"
+  FROM employees e
+  JOIN departments d ON e.department_id = d.department_id
+ GROUP BY d.department_name
+ ORDER BY "平均給与" DESC;</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">部署名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">人数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">平均給与</th>
+                                    <th class="px-4 py-3 text-left font-semibold">最高給与</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">営業部</td><td class="px-4 py-3 text-slate-600">3</td><td class="px-4 py-3 text-slate-600">503,333</td><td class="px-4 py-3 text-slate-600">650,000</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">開発部</td><td class="px-4 py-3 text-slate-600">4</td><td class="px-4 py-3 text-slate-600">467,500</td><td class="px-4 py-3 text-slate-600">620,000</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">総務部</td><td class="px-4 py-3 text-slate-600">2</td><td class="px-4 py-3 text-slate-600">430,000</td><td class="px-4 py-3 text-slate-600">560,000</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        INNER JOIN を使っているため、社員0人の人事部はこの結果に登場しません（9.2で学んだとおりです）。次の9.6では、この集計結果をさらに<strong>絞り込む</strong>方法を学びます。
+                    </p>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 GROUP BY と HAVING — 集計前か、集計後か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">GROUP BY</code> は「指定した列の値が同じ行どうしをグループにまとめる」句です。9.5の例では <code class="bg-slate-100">GROUP BY d.department_name</code> によって、社員の行が部署ごとの1行に集約されました。ここで欠かせないのが評価順序の理解です。SQL文は書いた順番どおりではなく、次の順序で処理されます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["①FROM<br/>表を用意する"] --> B["②JOIN<br/>表をつなぐ"]
+    B --> C["③WHERE<br/>行を絞る（集計前）"]
+    C --> D["④GROUP BY<br/>グループにまとめる"]
+    D --> E["⑤HAVING<br/>グループを絞る（集計後）"]
+    E --> F["⑥SELECT<br/>列を選ぶ"]
+    F --> G["⑦ORDER BY<br/>並べる"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WHERE</code> は<strong>集計前の1行1行</strong>に対する条件、<code class="bg-slate-100">HAVING</code> は<strong>GROUP BYでまとめた後のグループ</strong>に対する条件です。「社員が3人以上いる部署だけを見たい」を <code class="bg-slate-100">WHERE</code> で書こうとすると失敗します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">where-mistake.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 誤り: WHEREはまだ集計していない段階なので集計関数を条件にできない
+SELECT d.department_name, COUNT(*)
+  FROM employees e
+  JOIN departments d ON e.department_id = d.department_id
+ WHERE COUNT(*) >= 3   -- ORA-00934: グループ関数がここで許可されていません
+ GROUP BY d.department_name;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WHERE</code> が評価される時点（③）ではまだ④のグループ分けが行われていないため、集計関数の結果を条件に使えないのです。集計後の絞り込みには <code class="bg-slate-100">HAVING</code> を使います。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">having-correct.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 正しい: 集計後の絞り込みはHAVINGを使う
+SELECT d.department_name AS "部署名", COUNT(*) AS "人数"
+  FROM employees e
+  JOIN departments d ON e.department_id = d.department_id
+ GROUP BY d.department_name
+HAVING COUNT(*) >= 3
+ ORDER BY "人数" DESC;
+-- 結果: 開発部(4) と 営業部(3) の2件</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つの重要な規則があります。<code class="bg-slate-100">SELECT</code>句に書けるのは「<code class="bg-slate-100">GROUP BY</code>に書いた列」か「集計関数で包んだ列」だけです。たとえば上の例に <code class="bg-slate-100">e.last_name</code> をそのまま追加すると、1つのグループ（部署）に複数の社員名が含まれるため「値が1つに決まらない」と判断され <strong>ORA-00979</strong>（GROUP BY式ではありません）になります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">エラー</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">まず疑うこと</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ORA-00934</td>
+                                    <td class="px-4 py-3 text-slate-600">グループ関数がここで許可されていない</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">WHERE</code>に集計関数を書いていないか。<code class="bg-slate-100">HAVING</code>に書き換える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ORA-00979</td>
+                                    <td class="px-4 py-3 text-slate-600">GROUP BY式ではない</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">SELECT</code>に、<code class="bg-slate-100">GROUP BY</code>にも集計関数にも含まれない生の列がないか</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">覚え方: WHEREは「行」、HAVINGは「グループ」</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    迷ったら「集計関数（<code class="bg-blue-100 text-blue-900">COUNT</code>など）を条件にしたいか」で判断してください。したいなら <code class="bg-blue-100 text-blue-900">HAVING</code>、集計せずに1行ごとの生の値で絞りたいなら <code class="bg-blue-100 text-blue-900">WHERE</code> です。両方を同時に使うこともできます（例: 「販売中の商品のうち」を<code class="bg-blue-100 text-blue-900">WHERE</code>で、「3件以上あるカテゴリ」を<code class="bg-blue-100 text-blue-900">HAVING</code>で）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 副問合せ（サブクエリ） — SQLの中に書くSQL
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>副問合せ（サブクエリ）</strong>とは、1つのSQL文の中に別のSELECT文を埋め込む書き方です。「まず1つ問い合わせて、その結果を使ってもう1つ問い合わせる」という段階的な考え方ができるようになり、JOINだけでは書きにくい条件も表現できます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最も基本的なのが<strong>単一行副問合せ</strong>（結果が必ず1行1列になるサブクエリ）です。「全社員の平均給与より高い社員」を求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">single-row-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 全社員の平均給与より高い給与をもらっている社員を探す
+SELECT last_name, salary
+  FROM employees
+ WHERE salary > (SELECT AVG(salary) FROM employees)
+ ORDER BY salary DESC;
+-- 平均は452,000円。これより高い5人が該当する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブクエリが複数行を返す場合は、<code class="bg-slate-100">=</code> の代わりに<strong>複数行副問合せ</strong>用の演算子を使います。代表格が <code class="bg-slate-100">IN</code>（サブクエリが返す値のいずれかと一致）です。「東京にある部署に所属する社員」を求めてみます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">in-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 東京にある部署に所属する社員を探す（複数行副問合せ）
+SELECT last_name, department_id
+  FROM employees
+ WHERE department_id IN (
+         SELECT department_id FROM departments WHERE location = '東京'
+       )
+ ORDER BY department_id;
+-- 営業部(10)・総務部(30)の社員、合わせて5人が該当する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">IN</code> の仲間に <code class="bg-slate-100">ANY</code>（いずれか1つでも条件を満たせばよい）と <code class="bg-slate-100">ALL</code>（すべてを満たす必要がある、より厳しい条件）があります。開発部の給与と比較する例で違いを見てみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">any-all.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ANY: 開発部の「誰か1人にでも」勝てば条件を満たす（甘い条件）
+SELECT last_name, salary FROM employees
+ WHERE salary > ANY (SELECT salary FROM employees WHERE department_id = 20);
+
+-- ALL: 開発部の「全員より」高くないと満たさない（厳しい条件）
+SELECT last_name, salary FROM employees
+ WHERE salary > ALL (SELECT salary FROM employees WHERE department_id = 20);</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次は<strong>相関副問合せ</strong>（内側のサブクエリが、外側の行1件ごとに評価される特別なサブクエリ）です。「各部署の最高給与の社員」を、名前まで含めて求めてみます。9.5のGROUP BY＋MAXでは金額しか分かりませんでしたが、相関副問合せなら「誰か」まで一度に分かります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">correlated-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 各社員について「自分の部署の中で最高給与かどうか」を判定する
+-- 内側のe2は、外側の行(e1)ごとに評価し直される（相関副問合せ）
+SELECT e1.last_name, e1.department_id, e1.salary
+  FROM employees e1
+ WHERE e1.salary = (SELECT MAX(e2.salary)
+                       FROM employees e2
+                      WHERE e2.department_id = e1.department_id)
+ ORDER BY e1.department_id;
+-- 佐藤(営業部)・田中(開発部)・中村(総務部)の3人が該当する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後は<strong><code class="bg-slate-100">EXISTS</code></strong>（サブクエリが1行でも返せば真、1行も返さなければ偽と判定する演算子）です。値そのものではなく「該当する行があるかどうか」だけに関心があるときに使います。「社員が1人もいない部署」を、9.3のRIGHT OUTER JOINとは違う方法で求めてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">exists-subquery.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- NOT EXISTS: 一致する社員が1人も存在しない部署だけを残す
+SELECT d.department_name AS "社員がいない部署"
+  FROM departments d
+ WHERE NOT EXISTS (SELECT 1
+                      FROM employees e
+                     WHERE e.department_id = d.department_id);
+-- 結果: 人事部 の1件</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">SELECT 1</code> の <code class="bg-slate-100">1</code> に意味はなく、「値は何でもよく、行があるかどうかだけを見たい」という意図を示す慣習的な書き方です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 同じ問いに複数の答え方がある</p>
+                                <p class="text-emerald-900 text-sm break-words">
+                                    「社員がいない部署を探す」という同じ問いに、9.3では RIGHT OUTER JOIN ＋ COUNT で、9.7では NOT EXISTS で答えました。結果は同じでも考え方が異なり、どちらが読みやすいかは状況によります。結合した相手の列（部署名など）も一緒に使いたいなら JOIN、存在確認だけならEXISTS、というのが1つの目安です。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.8 【発展】WITH句と分析関数の入口
+                    </h2>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">ここから先は発展内容です</p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    このセクションは<strong>今すぐ書けるようになる必要はありません</strong>。「こういうものがあるらしい」という雰囲気だけをつかめば十分です。気軽に読み進めてください。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        9.7のように副問合せを入れ子にしていくと、括弧の中に括弧が増えて読みにくくなります。これを解消するのが<strong>WITH句</strong>（<strong>CTE</strong>／共通テーブル式とも呼ばれる、サブクエリに名前を付けて先に定義しておく書き方）です。9.5の部署別集計に名前を付け、さらにそこから絞り込んでみます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">with-clause.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 部署別集計にいったん名前(dept_summary)を付け、そこから絞り込む
+WITH dept_summary AS (
+  SELECT d.department_name    AS dept_name,
+         COUNT(*)             AS emp_count,
+         ROUND(AVG(e.salary)) AS avg_salary
+    FROM employees e
+    JOIN departments d ON e.department_id = d.department_id
+   GROUP BY d.department_name
+)
+SELECT * FROM dept_summary WHERE emp_count >= 3;</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">dept_summary</code> という名前の「その場限りの表」を先に用意し、あとの <code class="bg-slate-100">SELECT</code> ではそれを普通の表のように扱えます。上から下へ「まず何を作り、それを使って何をするか」の順に読めるのが利点です。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つの発展項目が<strong>分析関数</strong>（Oracle での呼び方。標準SQLでは<strong>ウィンドウ関数</strong>とほぼ同じ意味）です。<code class="bg-slate-100">GROUP BY</code> は行をグループごとの1行に集約してしまいますが、分析関数は<strong>行を1件も減らさずに</strong>、集計した値を各行に追加できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">analytic-rank.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 部署内で給与が高い順に順位を付ける（GROUP BYと違い行は消えない）
+SELECT last_name, department_id, salary,
+       RANK() OVER (PARTITION BY department_id
+                        ORDER BY salary DESC) AS "順位"
+  FROM employees
+ WHERE department_id IS NOT NULL
+ ORDER BY department_id, "順位";</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">PARTITION BY department_id</code> が「部署ごとに区切って」、<code class="bg-slate-100">ORDER BY salary DESC</code> が「その中で給与が高い順に」を意味します。営業部なら佐藤(650,000円)が1位、鈴木が2位、高橋が3位というように、<strong>社員の行を1件も減らさずに</strong>部署ごとの順位が列として追加され、開発部・総務部にも同様に1位から番号が振られます。代表的な分析関数を3つだけ紹介します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">関数</th>
+                                    <th class="px-4 py-3 text-left font-semibold">やること</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">ROW_NUMBER() OVER (...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">並び順に1, 2, 3…と連番を振る（同じ値でも別々の番号）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">RANK() OVER (...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">順位を振る（同じ値には同じ順位。次の順位は飛ぶ）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">SUM(列) OVER (...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">行を減らさずに、グループ内の合計を各行に表示する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        WITH句も分析関数も、実務のレポート作成では非常によく使われます。今の時点では「GROUP BYは行を集約する、分析関数は行を残したまま集計値を添える」という違いだけ覚えておけば十分です。書き方の細部は、必要になったときにあらためて調べれば大丈夫です。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: 結合と集計を組み合わせる
+                            </h3>
+                            <p class="text-purple-900 mb-3 break-words">
+                                <code class="bg-purple-100 text-purple-900">hr</code> で <code class="bg-purple-100 text-purple-900">FREEPDB1</code> に接続し、次の手順を自分の手で組み立ててみましょう。すべてSELECT文なのでデータは変わらず、何度実行しても安全です。
+                            </p>
+                            <ol class="list-decimal list-inside space-y-2 text-purple-900 mb-3">
+                                <li class="break-words"><code class="bg-purple-100 text-purple-900">employees</code> と <code class="bg-purple-100 text-purple-900">departments</code> をJOINし、部署ごとの人数と平均給与（<code class="bg-purple-100 text-purple-900">ROUND(AVG(salary))</code>）を求める。</li>
+                                <li class="break-words">結果を平均給与の高い順に <code class="bg-purple-100 text-purple-900">ORDER BY</code> で並べる。</li>
+                                <li class="break-words"><code class="bg-purple-100 text-purple-900">HAVING</code> を使って、人数が2人以上の部署だけに絞り込む。</li>
+                                <li class="break-words">発展: 9.7のNOT EXISTSを参考に、逆に「社員が1人もいない部署」だけを1文で取り出してみる。</li>
+                            </ol>
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words">
+                                    <strong>ヒント:</strong> 手順1〜3は9.5・9.6のSQLをほぼそのまま組み合わせれば作れます。エラーが出たら、まず<code class="bg-purple-200">SELECT</code>句に<code class="bg-purple-200">GROUP BY</code>にも集計関数にも含まれない生の列が無いか（ORA-00979）を確認しましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 全10名の社員のうち1名（社員110）は部署未定です。employeesとdepartmentsをINNER JOINした結果は何件になりますか。全社員を残すにはどう書き換えますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            9件です。部署未定の社員110は、departmentsのどの行とも対応しないため結果から消えます。全社員を残すには LEFT OUTER JOIN を使います（部署名の列はNULLになります）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 「社員が3人以上いる部署だけ」を表示したく、<code class="bg-blue-100">WHERE COUNT(*) >= 3</code> と書いたらエラーになりました。正しくはどう書きますか。またなぜWHEREでは書けないのですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">HAVING COUNT(*) >= 3</code> と書きます。SQLの評価順序では WHERE は GROUP BY より前に処理されるため、集計がまだ行われておらず集計関数を条件に使えません（ORA-00934）。集計後の絞り込みには HAVING を使います。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 社員が1人もいない部署（人事部）を、9.3のRIGHT OUTER JOINを使わずにEXISTSで探すとしたら、どのように書きますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">SELECT department_name FROM departments d WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.department_id);</code> のように書きます。NOT EXISTS は「一致する社員が1人も存在しない」部署だけを残すため、結果は人事部の1件になります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="oracle-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第8章: 関数とNULL・日付の扱い</span>
+                        </div>
+                    </a>
+                    <a href="oracle-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: PL/SQL入門</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
