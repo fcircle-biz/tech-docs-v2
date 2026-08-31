@@ -1,6 +1,6 @@
 # Oracle Database 学習ガイドライン
 
-このガイドラインでは、Oracle Database の基礎を**プログラミング／データベース初心者**向けに段階的に学習するためのカリキュラムを提供しています。無償版の **Oracle Database 23ai Free** を使い、「そもそもデータベースとは何か」という出発点から、SQL の読み書き・PL/SQL プログラミング・運用の入口までを、手を動かしながら学べる構成です。
+このガイドラインでは、Oracle Database の基礎を**プログラミング／データベース初心者**向けに段階的に学習するためのカリキュラムを提供しています。無償版の **Oracle AI Database 26ai Free** を使い、「そもそもデータベースとは何か」という出発点から、SQL の読み書き・PL/SQL プログラミング・運用の入口までを、手を動かしながら学べる構成です。
 
 専門用語には必ずかみ砕いた説明を添え、身近な例え（表計算ソフト・住所録・図書館の索引など）を交えて解説します。Oracle 特有のつまずきポイント（COMMIT が必要・VARCHAR2・空文字が NULL 扱いなど）は、その都度はっきり注意喚起します。
 
@@ -9,17 +9,17 @@
 ### 必要な環境
 
 - Windows 10/11、macOS、または Linux（macOS では Docker / Podman を利用）
-- Oracle Database 23ai Free（無償。開発・学習用途に加えて商用利用も可能なエディション）
+- Oracle AI Database 26ai Free（無償。開発・学習用途に加えて商用利用も可能なエディション）
 - Oracle SQL Developer（無償の GUI ツール）または SQL Developer for VS Code
 - ディスク空き容量 15GB 以上、メモリ 4GB 以上（8GB 推奨）
 
 ### 参考リソース
 
-- [Oracle Database 23ai ドキュメント](https://docs.oracle.com/en/database/oracle/oracle-database/23/index.html)
+- [Oracle AI Database 26ai ドキュメント](https://docs.oracle.com/en/database/oracle/oracle-database/26/index.html)
 - [Oracle Database Free ダウンロード](https://www.oracle.com/jp/database/free/)
 - [Oracle SQL Developer ダウンロード](https://www.oracle.com/jp/database/sqldeveloper/)
-- [Oracle SQL言語リファレンス](https://docs.oracle.com/en/database/oracle/oracle-database/23/sqlrf/index.html)
-- [Oracle PL/SQL言語リファレンス](https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/index.html)
+- [Oracle SQL言語リファレンス](https://docs.oracle.com/en/database/oracle/oracle-database/26/sqlrf/index.html)
+- [Oracle PL/SQL言語リファレンス](https://docs.oracle.com/en/database/oracle/oracle-database/26/lnpls/index.html)
 - [Oracle Live SQL（ブラウザだけで SQL を試せる無償サービス）](https://livesql.oracle.com/)
 
 ### 前提知識
@@ -30,13 +30,13 @@
 ## 学習コンテンツ
 
 ### [1. Oracle Databaseとは](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/oracle/oracle-learning-material-01.html)
-データベースと RDBMS が何をするものかという基礎から出発し、Oracle Database の歴史・エディション（Free / Standard Edition 2 / Enterprise Edition / Autonomous Database）・企業システムで選ばれてきた理由を学びます。SQL Server・PostgreSQL・MySQL との立ち位置の違いを俯瞰し、本ガイド全14章の学び方を確認します。
+データベースと RDBMS が何をするものかという基礎から出発し、Oracle Database の歴史、製品エディション（Free / Standard Edition 2 / Enterprise Edition）とクラウドのマネージドサービス（Oracle Autonomous AI Database）の違い、企業システムで選ばれてきた理由を学びます。SQL Server・PostgreSQL・MySQL との立ち位置の違いを俯瞰し、本ガイド全14章の学び方を確認します。
 
 ### [2. アーキテクチャと基本用語](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/oracle/oracle-learning-material-02.html)
 「インスタンス」と「データベース」の違いという Oracle 理解の要から始め、SGA・PGA・バックグラウンドプロセス、表領域／データファイル／スキーマの関係を図で押さえます。あわせて 12c 以降の標準構成である **CDB / PDB（マルチテナント）** を理解し、接続先が `FREEPDB1` になる理由を納得したうえで第3章へ進みます。
 
 ### [3. 環境構築とインストール](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/oracle/oracle-learning-material-03.html)
-Windows への Oracle Database 23ai Free のインストール、macOS / Linux でのコンテナ起動、SQL Developer の導入までを手順どおりに実施します。管理者パスワードの設定、リスナーとポート 1521、接続文字列の書き方、`ORA-12541` などつまずきやすいエラーの対処法まで丁寧に解説します。
+Windows への Oracle AI Database 26ai Free の直接インストールと、Container（Docker / Podman）環境での起動という2通りの方法の違いを理解しながら、SQL Developer の導入までを手順どおりに実施します。管理者パスワードはプロンプト入力方式に統一して設定し、リスナーとポート 1521、接続文字列の書き方、`ORA-12541` などつまずきやすいエラーの対処法まで丁寧に解説します。
 
 ### [4. SQL*PlusとSQL Developerの基本操作](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/database/oracle/oracle-learning-material-04.html)
 コマンドライン版の SQL*Plus と GUI の SQL Developer、両方の基本操作を身につけます。接続と切断、セミコロンとスラッシュの使い分け、`DESCRIBE`・`SET LINESIZE` などの表示整形、スクリプトファイルの実行、結果の読み方を学び、以降の章の作業土台を作ります。
@@ -96,7 +96,7 @@ ACID 特性、`COMMIT` / `ROLLBACK` / `SAVEPOINT` を改めて体系的に学び
 このガイドを完了すると、以下のスキルを身につけることができます：
 
 - Oracle Database の全体像（インスタンス・データベース・CDB/PDB・表領域・スキーマ）を自分の言葉で説明できる
-- Oracle Database 23ai Free の環境を自力で構築し、SQL*Plus と SQL Developer で接続・操作できる
+- Oracle AI Database 26ai Free の環境を自力で構築し、SQL*Plus と SQL Developer で接続・操作できる
 - 表と制約を設計・作成し、Oracle のデータ型を適切に選べる
 - SELECT・INSERT・UPDATE・DELETE を書いてデータを自在に操作でき、COMMIT / ROLLBACK を正しく使い分けられる
 - 結合・集計・サブクエリを使って、複数の表にまたがる集計や分析ができる

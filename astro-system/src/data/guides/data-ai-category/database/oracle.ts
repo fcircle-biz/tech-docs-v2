@@ -1,7 +1,7 @@
 import type { TechGuide } from '../../types';
 
 // 初心者向け Oracle Database 入門学習ガイド（全14章）。
-// Oracle Database 23ai Free を前提に、SQL の基礎から PL/SQL・運用の入口までを段階的に扱う。
+// Oracle AI Database 26ai Free を前提に、SQL の基礎から PL/SQL・運用の入口までを段階的に扱う。
 // 技術色 = レッド（Oracle Database。PostgreSQL のブルー・汎用SQLのスカイと区別できる色）。
 export const oracle: TechGuide = {
   category: 'data-ai-category/database',
