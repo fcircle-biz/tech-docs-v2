@@ -19,7 +19,7 @@
                         </span>
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">表の結合と集計</h1>
-                    <p class="text-slate-600">これまでの章では、<code class="bg-slate-100">employees</code>（社員表）か <code class="bg-slate-100">departments</code>（部署表）のどちらか一方だけを見て SELECT を書いてきました。しかし実務では「社員の名前と、その人が所属する部署の名前を一緒に見たい」という要望がほぼ必ず出てきます。社員表には部署の<strong>番号</strong>しか書かれていないため、部署の<strong>名前</strong>を知るにはもう一方の表を見に行く必要があります。この「複数の表を横につないで1つの表のように扱う」操作を<strong>結合（JOIN）</strong>と呼びます。この章では、内部結合・外部結合・自己結合という3種類のつなぎ方と、つないだ後にまとめて数える<strong>集計</strong>の技術を学びます。第5章で張った外部キー（<code class="bg-slate-100">employees.department_id</code> → <code class="bg-slate-100">departments.department_id</code>）が、ここで初めて本領を発揮します。</p>
+                    <p class="text-slate-600">これまでの章では、<code class="bg-slate-100">employees</code>（社員表）か <code class="bg-slate-100">departments</code>（部署表）のどちらか一方だけを見て SELECT を書いてきました。しかし実務では「社員の名前と、その人が所属する部署の名前を一緒に見たい」という要望がほぼ必ず出てきます。社員表には部署の<strong>番号</strong>しか書かれていないため、部署の<strong>名前</strong>を知るにはもう一方の表を見に行く必要があります。この「複数の表を横につないで1つの表のように扱う」操作を<strong>結合（JOIN）</strong>と呼びます。この章では、内部結合・外部結合・自己結合という3種類のつなぎ方と、つないだ後にまとめて数える<strong>集計</strong>の技術を学びます。JOINは<code class="bg-slate-100">employees.department_id</code> と <code class="bg-slate-100">departments.department_id</code> のように「値が一致する列」を条件に指定して行いますが、これは第5章で設定した外部キー制約があるからできることではありません（外部キーとJOINの関係は9.2で詳しく説明します）。</p>
                 </header>
 
                 <!-- 学習目標カード -->
@@ -35,11 +35,11 @@
                             <ul class="space-y-2">
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>内部結合（INNER JOIN）と外部結合（LEFT / RIGHT / FULL OUTER JOIN）の違いを、「どの行が残り、どの行が消えるか」で説明できる</span>
+                                    <span>内部結合（INNER JOIN）と外部結合（LEFT OUTER JOIN を中心に、RIGHT / FULL OUTER JOINも参考として）の違いを、「どの行が残り、どの行が消えるか」で説明できる</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>CROSS JOIN で意図せず直積になってしまう事故を避けられ、自己結合で「社員と上司」のような同じ表内の関係を取り出せる</span>
+                                    <span>CROSS JOIN で意図せず直積になってしまう事故を避けられ、自己結合で「社員と上司」のような同じ表内の関係を取り出せる（発展）</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -47,7 +47,7 @@
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>単一行・複数行・相関副問合せや EXISTS を使い分け、段階的に問題を解ける</span>
+                                    <span>単一行・複数行の副問合せの基本を理解し、相関副問合せや EXISTS がどんな場面で使われるか説明できる（参考）</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -128,7 +128,25 @@
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         9.2 INNER JOIN — 両方にあるものだけをつなぐ
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-circle-check"></i>必須</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
                     </h2>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-blue-800 mb-1">重要: JOINと外部キー（FOREIGN KEY）は別の話</p>
+                                <p class="text-blue-900 text-sm break-words mb-2">
+                                    <strong>JOIN は列の値を条件として表を結合する仕組みであり、外部キー（FOREIGN KEY）がなくても実行できます。</strong>外部キーは「JOINするための設定」ではなく、<strong>表同士のデータの整合性を保証するための制約</strong>（存在しない部署番号を社員に入力できないようにする、といった仕組み）です。
+                                </p>
+                                <p class="text-blue-900 text-sm break-words">
+                                    実際、外部キー制約が無い表同士でも、値が一致する列さえあればJOINできます。ただし外部キーがあると、結合先に存在しない値が入り込むのを防げるため、データの正しさを保ちやすくなります。第5章で <code class="bg-blue-100 text-blue-900">employees.department_id</code> に外部キーを設定したのは「JOINできるようにするため」ではなく「存在しない部署番号を社員データに入力させないため」だった、と理解しておきましょう。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-slate-600 leading-relaxed mb-4">
                         最も基本の結合が<strong>内部結合（INNER JOIN）</strong>です。「両方の表に対応する行があるもの」だけをつなぎます。基準状態（社員10件・部署4件）のうち、ここで注目してほしいのは<strong>社員110（加藤 結衣）の <code class="bg-slate-100">department_id</code> がNULL（未配属）</strong>である点です。この1件がINNER JOINでどう扱われるか見てみましょう。
                     </p>
@@ -152,6 +170,10 @@ SELECT e.employee_id,
 
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">employees e</code>・<code class="bg-slate-100">departments d</code> の <code class="bg-slate-100">e</code> と <code class="bg-slate-100">d</code> は<strong>テーブル別名（エイリアス）</strong>です。両方の表に <code class="bg-slate-100">department_id</code> という同じ名前の列があるため、別名を付けずに <code class="bg-slate-100">department_id</code> とだけ書くと「どちらの表の列か」が決まらず <strong>ORA-00918</strong>（列の定義が曖昧です）というエラーになります。<code class="bg-slate-100">e.department_id</code> のように「別名.列名」で修飾すれば曖昧さが消えます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なお、<code class="bg-slate-100">ORDER BY</code> を指定しない場合、SELECTの結果が返ってくる行の並び順は保証されません。環境や実行のたびに順番が変わることもあるため、この章のサンプルのように結果の並びを確認したい場合は <code class="bg-slate-100">ORDER BY</code> を付ける習慣にしましょう。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -231,8 +253,12 @@ SELECT e.employee_id,
                         </table>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-circle-check"></i>必須</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        まずは「部署未定の社員も残す」ケース、つまり <code class="bg-slate-100">employees</code> を左に置いた LEFT OUTER JOIN です。第8章で学んだ <code class="bg-slate-100">NVL</code> を組み合わせて、NULL を「（未配属）」という分かりやすい表示に変えます。
+                        まずは「部署未定の社員も残す」ケース、つまり <code class="bg-slate-100">employees</code> を左に置いた LEFT OUTER JOIN です。第8章で学んだ <code class="bg-slate-100">NVL</code> を組み合わせて、NULL を「（未配属）」という分かりやすい表示に変えます。<strong>まずはこのLEFT OUTER JOINをしっかり使えるようになれば十分です。</strong>
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -272,6 +298,10 @@ SELECT e.employee_id,
                         </table>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 align-middle"><i class="fas fa-circle-info"></i>参考</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         今度は逆に、「社員が1人もいない部署（人事部）も残す」ケースです。<code class="bg-slate-100">departments</code> を全部残したいので RIGHT OUTER JOIN を使い、部署ごとの人数を <code class="bg-slate-100">COUNT</code> で数えます。
                     </p>
@@ -312,6 +342,18 @@ SELECT d.department_name    AS "部署名",
                         </table>
                     </div>
 
+                    <div class="bg-sky-50 border-l-4 border-sky-500 p-4 my-4 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-sky-500 mt-1 flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-sky-800 mb-1">参考: RIGHT OUTER JOINは覚えなくても困らない</p>
+                                <p class="text-sky-900 text-sm break-words">
+                                    RIGHT OUTER JOINは、<code class="bg-sky-100 text-sky-900">FROM</code>と<code class="bg-sky-100 text-sky-900">JOIN</code>に書く<strong>表の順番を入れ替えれば、LEFT OUTER JOINで同じ結果を得られます</strong>。実際、上のSQLは <code class="bg-sky-100 text-sky-900">FROM departments d LEFT OUTER JOIN employees e ON e.department_id = d.department_id</code> と書いても同じ結果になります。まずはLEFT OUTER JOINの使い方を確実に覚えれば十分で、RIGHT OUTER JOINは「そういう書き方もある」と知っておく程度で構いません。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
                         <div class="flex items-start gap-3">
                             <i class="fas fa-circle-info text-blue-500 mt-1 flex-shrink-0"></i>
@@ -324,6 +366,10 @@ SELECT d.department_name    AS "部署名",
                         </div>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 align-middle"><i class="fas fa-circle-info"></i>参考</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         LEFT OUTER JOIN は「左側を全部残す」、RIGHT OUTER JOIN は「右側を全部残す」結合でした。<strong>FULL OUTER JOIN</strong>はちょうどその両方を足したもので、結合条件が一致してもしなくても<strong>両方の表の全行</strong>を残します。<code class="bg-slate-100">employees</code> と <code class="bg-slate-100">departments</code> を FULL OUTER JOIN すると、部署が未定の社員110と、社員が1人もいない人事部の<strong>両方</strong>が同時に結果へ現れます。
                     </p>
@@ -381,8 +427,12 @@ SELECT NVL(e.last_name, '（社員なし）')      AS "社員名",
                     </div>
 
                     <div class="bg-slate-100 border-l-4 border-slate-400 rounded-r-lg p-3 my-4">
+                        <p class="mb-2">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 align-middle"><i class="fas fa-database"></i>Oracle固有</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展（既存システム読解用）</span>
+                        </p>
                         <p class="text-slate-800 text-sm break-words">
-                            <i class="fas fa-book mr-1"></i><strong>古い記法 <code class="bg-slate-200">(+)</code> — 読めれば十分</strong>: Oracle には外部結合を表す独自の古い書き方があり、今も古いコードで見かけます。<code class="bg-slate-200">(+)</code> を付けた側が「不足を許す側」になり、下の例は LEFT OUTER JOIN と同じ結果になります。<strong>新しく書くときは標準の JOIN 構文を使ってください。</strong>
+                            <i class="fas fa-book mr-1"></i><strong>古い記法 <code class="bg-slate-200">(+)</code> — 読めれば十分</strong>: Oracle には外部結合を表す独自の古い書き方があり、今も保守対象の古いコードで見かけることがあります。<code class="bg-slate-200">(+)</code> を付けた側が「不足を許す側」になり、下の例は LEFT OUTER JOIN と同じ結果になります。これは<strong>既存システムのSQLを読むための知識</strong>であり、<strong>新しく書くときは標準の <code class="bg-slate-200">LEFT OUTER JOIN</code> 構文を使ってください。</strong>
                         </p>
                     </div>
 
@@ -426,7 +476,11 @@ flowchart LR
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         9.4 CROSS JOIN（交差結合）と自己結合
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
                     </h2>
+                    <p class="text-slate-500 text-sm leading-relaxed mb-4">
+                        このセクションで扱うCROSS JOINと自己結合は、9.2・9.3のINNER JOIN／LEFT OUTER JOINほど頻繁には使いません。初心者のうちは「こういう結合もある」と知っておく程度でよく、無理に暗記しなくても先に進めます。
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <strong>交差結合（CROSS JOIN）</strong>は、結合条件を指定せず、左の表の各行と右の表の各行を<strong>すべて組み合わせる</strong>結合です。専門的には<strong>直積</strong>（デカルト積とも呼ばれる、あり得る組み合わせを総当たりで作ること）と呼ばれます。社員が10件、部署が4件なら、結果は 10 × 4 = 40件になります。
                     </p>
@@ -460,6 +514,10 @@ SELECT e.last_name, d.department_name
                         </div>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         次は、異なる2つの表ではなく<strong>同じ表を2回登場させて自分自身とつなぐ</strong>結合です。これを<strong>自己結合（セルフジョイン）</strong>と呼びます。<code class="bg-slate-100">employees.manager_id</code>（上司の社員番号）は同じ <code class="bg-slate-100">employees</code> 表の <code class="bg-slate-100">employee_id</code> を指しているので、自己結合で「社員名」と「上司名」を並べられます。
                     </p>
@@ -511,6 +569,8 @@ SELECT e.last_name                     AS "社員名",
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         9.5 集計関数 — たくさんの行を1つの値にまとめる
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-circle-check"></i>必須</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <strong>集計関数</strong>（集約関数とも呼ばれる。複数の行の値をまとめて1つの値にする関数）は、表計算ソフトの <code class="bg-slate-100">SUM</code> や <code class="bg-slate-100">AVERAGE</code> をセル範囲にかける感覚に近いものです。Oracle でよく使うのは次の5つです。
@@ -625,6 +685,8 @@ SELECT d.department_name    AS "部署名",
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         9.6 GROUP BY と HAVING — 集計前か、集計後か
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 align-middle"><i class="fas fa-circle-check"></i>必須</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">GROUP BY</code> は「指定した列の値が同じ行どうしをグループにまとめる」句です。9.5の例では <code class="bg-slate-100">GROUP BY d.department_name</code> によって、社員の行が部署ごとの1行に集約されました。ここで欠かせないのが評価順序の理解です。SQL文は書いた順番どおりではなく、次の順序で処理されます。
@@ -728,9 +790,14 @@ HAVING COUNT(*) >= 3
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
                         9.7 副問合せ（サブクエリ） — SQLの中に書くSQL
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 align-middle"><i class="fas fa-circle-info"></i>参考</span>
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <strong>副問合せ（サブクエリ）</strong>とは、1つのSQL文の中に別のSELECT文を埋め込む書き方です。「まず1つ問い合わせて、その結果を使ってもう1つ問い合わせる」という段階的な考え方ができるようになり、JOINだけでは書きにくい条件も表現できます。
+                        <strong>副問合せ（サブクエリ）</strong>とは、1つのSQL文の中に別のSELECT文を埋め込む書き方です。「まず1つ問い合わせて、その結果を使ってもう1つ問い合わせる」という段階的な考え方ができるようになり、JOINだけでは書きにくい条件も表現できます。この章の主役はJOINと集計なので、副問合せは<strong>「こういう書き方もある」と知っておく参考項目</strong>として読み進めてください。
+                    </p>
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 align-middle"><i class="fas fa-circle-info"></i>参考</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         最も基本的なのが<strong>単一行副問合せ</strong>（結果が必ず1行1列になるサブクエリ）です。「全社員の平均給与より高い社員」を求めてみましょう。
@@ -751,6 +818,10 @@ SELECT last_name, salary
 -- 平均は452,000円。これより高い5人が該当する</code></pre>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 align-middle"><i class="fas fa-circle-info"></i>参考</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         サブクエリが複数行を返す場合は、<code class="bg-slate-100">=</code> の代わりに<strong>複数行副問合せ</strong>用の演算子を使います。代表格が <code class="bg-slate-100">IN</code>（サブクエリが返す値のいずれかと一致）です。「東京にある部署に所属する社員」を求めてみます。
                     </p>
@@ -772,6 +843,10 @@ SELECT last_name, department_id
 -- 営業部(10)・総務部(30)の社員、合わせて5人が該当する</code></pre>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         <code class="bg-slate-100">IN</code> の仲間に <code class="bg-slate-100">ANY</code>（いずれか1つでも条件を満たせばよい）と <code class="bg-slate-100">ALL</code>（すべてを満たす必要がある、より厳しい条件）があります。開発部の給与と比較する例で違いを見てみましょう。
                     </p>
@@ -792,6 +867,10 @@ SELECT last_name, salary FROM employees
  WHERE salary > ALL (SELECT salary FROM employees WHERE department_id = 20);</code></pre>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         次は<strong>相関副問合せ</strong>（内側のサブクエリが、外側の行1件ごとに評価される特別なサブクエリ）です。「各部署の最高給与の社員」を、名前まで含めて求めてみます。9.5のGROUP BY＋MAXでは金額しか分かりませんでしたが、相関副問合せなら「誰か」まで一度に分かります。
                     </p>
@@ -814,6 +893,10 @@ SELECT e1.last_name, e1.department_id, e1.salary
 -- 佐藤(営業部)・田中(開発部)・中村(総務部)の3人が該当する</code></pre>
                     </div>
 
+                    <p class="mb-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 align-middle"><i class="fas fa-globe"></i>一般的なSQL/RDBMS</span>
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         最後は<strong><code class="bg-slate-100">EXISTS</code></strong>（サブクエリが1行でも返せば真、1行も返さなければ偽と判定する演算子）です。値そのものではなく「該当する行があるかどうか」だけに関心があるときに使います。「社員が1人もいない部署」を、9.3のRIGHT OUTER JOINとは違う方法で求めてみましょう。
                     </p>
@@ -855,7 +938,8 @@ SELECT d.department_name AS "社員がいない部署"
                 <section class="prose prose-slate max-w-none mb-8">
                     <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
                                border-l-4 border-primary-500 pl-4 mb-4">
-                        9.8 【発展】WITH句と分析関数の入口
+                        9.8 WITH句と分析関数の入口
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 align-middle"><i class="fas fa-arrow-trend-up"></i>発展</span>
                     </h2>
 
                     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r-lg overflow-hidden">
