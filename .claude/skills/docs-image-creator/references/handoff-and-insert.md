@@ -14,16 +14,13 @@
 
 ```
 work/<slug>/
-├── _raw/                         ← クロマキー原版（codex が生成・中間物／差し込み対象外）
-│   ├── <slug>-<NN>-<topic1>.png
-│   └── <slug>-<NN>-<topic2>.png
-├── <slug>-<NN>-<topic1>.png      ← 透過PNG（Step 4 で変換・差し込み対象）
+├── <slug>-<NN>-<topic1>.png      ← 透過PNG（codex が直接生成・差し込み対象）
 ├── <slug>-<NN>-<topic2>.png
 ├── _check-dark-*.png             ← ダーク可読性の確認用（中間物／差し込み対象外）
 └── 差し込み箇所.md                ← 本スキルが Step 5 で作成
 ```
 
-**`public/` へコピーするのは `work/<slug>/` 直下の透過PNGだけ**。`_raw/` と `_check-dark-*.png` は取り込まない。
+**`public/` へコピーするのは `work/<slug>/` 直下の透過PNGだけ**。`_check-dark-*.png`（と、フォールバックの方式②を使った場合の `_raw/`）は取り込まない。
 
 `work/` は `.gitignore` 対象（`/work/`）。素材は work/ に温存し、公開アセットは `public/` へ**コピー**で取り込む（移動しない）。
 
