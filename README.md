@@ -73,6 +73,8 @@
 
 #### データベース
 
+- [**SQL入門学習ガイド**](docs/guide/data-ai-category/database/sql/README.md) - プログラミングがまったく初めての方向けSQL入門14章構成カリキュラム。データベースとSQLの世界、リレーショナルデータベースの構造（テーブル・行・列・主キー／外部キー）から、PostgreSQL 17・pgAdmin 4・A5:SQL Mk-2による環境構築とツールの基本操作、CREATE TABLEによるデータベースとテーブルの作成、SELECT文によるデータ取得、WHEREによる絞り込み、関数によるデータ加工、GROUP BYによる集計、INSERT／UPDATE／DELETEによるデータの追加・更新・削除、JOINによるテーブル結合、サブクエリとビュー、トランザクションと同時実行制御、インデックス・権限・運用の基礎まで、1つのツールに依存せず「どのツールでも同じSQLが書ける」感覚を養いながら段階的に学習（全14章・約15時間）
+
 - [**Oracle入門学習ガイド**](docs/guide/data-ai-category/database/oracle/README.md) - データベース未経験者向けOracle Database入門14章構成カリキュラム。データベースとRDBMSの基礎、Oracleの製品エディション（Free / SE2 / EE）とクラウドのマネージドサービス（Oracle Autonomous AI Database）の違いから、インスタンスとデータベースの違い・SGA/PGA・表領域・スキーマ・CDB/PDBマルチテナントといったアーキテクチャ、Oracle AI Database 26ai Freeの環境構築（Windows／Docker）とSQL*Plus・SQL Developerの操作、CREATE TABLEとVARCHAR2/NUMBER/DATE・制約・シーケンス／IDENTITY列、SELECT・WHERE・ORDER BY・DUAL表・FETCH FIRST、INSERT/UPDATE/DELETEとCOMMIT／ROLLBACK、文字列・数値・日付関数とNULLの扱い（空文字＝NULL）、JOIN・集計・サブクエリ、PL/SQL（ブロック・変数・制御構文・カーソル・例外処理）、ストアドプロシージャ／ファンクション／パッケージ／トリガー、トランザクションと読み取り一貫性（MVCC）・ロック、インデックスと実行計画、ユーザー・権限・ロール管理とData Pump／RMANによるバックアップ運用まで、社員表・部署表のサンプルスキーマを作りながら段階的に学習。Oracle特有のつまずき（COMMITするまで確定しない・VARCHAR2・空文字がNULL扱い）を随所で明示（全14章・約20時間）
 
 - [**SQL Server入門学習ガイド**](docs/guide/data-ai-category/database/sqlserver/README.md) - データベース未経験者向けSQL Server入門14章構成カリキュラム。データベースとRDBMSの基礎、SQL Serverのエディションとアーキテクチャ（インスタンス・データベース・スキーマ・システムDB）から、Windows/Dockerでの環境構築とSSMSの基本操作、CREATE TABLEとデータ型・制約・IDENTITY、SELECT・WHERE・ORDER BY・TOP、INSERT/UPDATE/DELETEとOUTPUT句、JOIN・集計・サブクエリ・CTE・ウィンドウ関数、T-SQLプログラミング（変数・制御構文・TRY...CATCH・ストアドプロシージャ）、トランザクションとロック・分離レベル、インデックスと実行プラン、ログインとユーザー・ロールによる権限管理、復旧モデルとバックアップ／復元・運用まで、学習用DB「SampleShop」を作りながら段階的に学習。全章に**PostgreSQLとの違い**の比較コーナーを設け、最終章で総まとめと移行時の注意点を整理（全14章・約16時間）
@@ -84,6 +86,8 @@
 ### ビジネスSaaS
 
 - [**新人SE向け Power BI入門学習ガイド**](docs/guide/business-saas/power-bi/README.md) - BIツールもSQLも初めての新人SE向けPower BI入門12章構成カリキュラム。BIとは何かとPower BI Desktop／Serviceの役割から、Desktopの画面構成と3つのビュー、データ取得（Excel・CSV・SQL Server・Web／Import・DirectQuery）、Power Query（列と行の整形・データ型・null・マージ／追加・ピボット解除・M言語）、データモデリング（主キー／外部キー・リレーション・カーディナリティ・フィルター方向）、スタースキーマ（ファクト／ディメンション・日付テーブル）、DAX入門（計算列とメジャーの違い・SUM／COUNTROWS／DISTINCTCOUNT／DIVIDE／IF／CALCULATE）、レポート作成（ビジュアル選択・スライサー・フィルター階層・相互作用）、分かりやすいレポート設計（レイアウト・ドリルダウン／ドリルスルー・ブックマーク・モバイル対応）、Power BI Service（発行・ワークスペース・セマンティックモデル・アプリ配布・更新）、セキュリティと運用（アクセス制御・RLS・ゲートウェイ・スケジュール更新）、そしてAI時代のPower BI（Copilot・DAX作成支援・PBIP・Skills for Fabric・MCP）まで、架空企業の売上分析を題材に一連の流れで段階的に学習（全12章・約13時間）
+
+- [**Excel VBA入門学習ガイド**](docs/guide/business-saas/vba/README.md) - プログラミング未経験の社会人向けExcel VBA入門14章構成カリキュラム。マクロとVBAの関係と自動化できる業務の見極め方から、「開発」タブ・VBE・マクロ有効ブック（.xlsm）とマクロセキュリティの準備、マクロの記録と生成コードの読み解き、Subプロシージャ・コメント・イミディエイトウィンドウといった基本文法、変数とデータ型（Option Explicit・Const）、RangeとCellsによるセル操作とSelectを使わない書き方、If／Select Caseによる条件分岐、For／For Each／Do Loopによる繰り返し、ブックとワークシートの操作、SubとFunctionによる処理の部品化（引数・戻り値・スコープ）、配列とDictionaryによる高速な集計、On Errorとブレークポイント・ステップ実行によるエラー処理とデバッグ、MsgBox／InputBox・ボタン・イベントプロシージャ・UserForm、そして総仕上げとして売上明細から支店別帳票をボタン1つで出力するミニアプリ制作まで、架空の文具卸売会社の売上管理業務を題材に一貫した流れで段階的に学習（全14章・約20時間）
 
 ### 業務ドメイン知識
 

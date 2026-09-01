@@ -1,0 +1,43 @@
+import type { TechGuide } from '../types';
+
+// プログラミング未経験者向け Excel VBA 入門学習ガイド（全14章）。技術色 = エメラルド（Excel のブランドカラー）。
+export const vba: TechGuide = {
+  category: 'business-saas',
+  slug: 'vba',
+  techTitle: 'Excel VBA学習教材',
+  icon: 'fa-file-excel',
+  level: '初級',
+  categoryLabel: 'ビジネスSaaS',
+  totalTime: '約20時間',
+  splashStop0: '#10b981',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#ecfdf5',
+    100: '#d1fae5',
+    200: '#a7f3d0',
+    300: '#6ee7b7',
+    400: '#34d399',
+    500: '#10b981',
+    600: '#059669',
+    700: '#047857',
+    800: '#065f46',
+    900: '#064e3b',
+  },
+  chapters: [
+    { number: 1, name: 'VBAとは何か', file: 'vba-learning-material-01.html' },
+    { number: 2, name: '開発環境の準備', file: 'vba-learning-material-02.html' },
+    { number: 3, name: 'マクロの記録と実行', file: 'vba-learning-material-03.html' },
+    { number: 4, name: 'VBAの基本文法', file: 'vba-learning-material-04.html' },
+    { number: 5, name: '変数とデータ型', file: 'vba-learning-material-05.html' },
+    { number: 6, name: 'セルとセル範囲の操作', file: 'vba-learning-material-06.html' },
+    { number: 7, name: '条件分岐', file: 'vba-learning-material-07.html' },
+    { number: 8, name: '繰り返し処理', file: 'vba-learning-material-08.html' },
+    { number: 9, name: 'ブックとワークシートの操作', file: 'vba-learning-material-09.html' },
+    { number: 10, name: 'プロシージャと関数', file: 'vba-learning-material-10.html' },
+    { number: 11, name: '配列とコレクション', file: 'vba-learning-material-11.html' },
+    { number: 12, name: 'エラー処理とデバッグ', file: 'vba-learning-material-12.html' },
+    { number: 13, name: 'ユーザーとのやり取り', file: 'vba-learning-material-13.html' },
+    { number: 14, name: '実践：業務自動化ミニアプリ', file: 'vba-learning-material-14.html' },
+  ],
+};

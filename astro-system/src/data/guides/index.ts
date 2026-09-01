@@ -52,6 +52,7 @@ import { docker } from './cloud-infrastructure/docker';
 
 // ビジネスSaaS
 import { powerBi } from './business-saas/power-bi';
+import { vba } from './business-saas/vba';
 
 // 業務ドメイン知識
 import { businessKnowledgeBasics } from './business-domain-knowledge/business-knowledge-basics';
@@ -92,6 +93,7 @@ const all: TechGuide[] = [
   gitGithub,
   // ビジネスSaaS
   powerBi,
+  vba,
   // 業務ドメイン知識
   businessKnowledgeBasics,
 ];
