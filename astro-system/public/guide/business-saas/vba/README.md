@@ -8,7 +8,7 @@
 
 ### 必要な環境
 
-- **Windows PC**（Excel VBA の学習には Windows 版 Excel を推奨します）
+- **Windows PC**（本ガイドは **Windows 版 Excel** を実習環境として画面例・操作手順を記述しています。Mac 版・Web 版との違いは必要な箇所で補足します）
 - **Microsoft Excel**（Microsoft 365 または Excel 2021／2019）
   - VBE（Visual Basic Editor）は Excel に標準で付属しているため、追加のインストールは不要です
 - 練習用に自由に編集できる Excel ファイル（本ガイドの中で一から作成します）
@@ -32,7 +32,7 @@
 
 ### [2. 開発環境の準備](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-02.html)
 
-Excelに「開発」タブを表示し、VBE（Visual Basic Editor）を開くところまでを実際に操作します。マクロ有効ブック（.xlsm）という保存形式と、マクロのセキュリティ設定の意味も押さえます。
+Excelに「開発」タブを表示し、VBE（Visual Basic Editor）を開くところまでを実際に操作します。マクロ有効ブック（.xlsm）という保存形式、警告バーと保護ビューの意味、そして出所の分からないマクロを安易に有効化しないための考え方も押さえます。全章で使う「売上明細」10件のサンプルデータもここで作成します。
 
 ### [3. マクロの記録と実行](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-03.html)
 
@@ -66,9 +66,9 @@ VBAの中心となるセル操作です。Range と Cells の使い分け、値�
 
 処理を意味のある単位に分ける方法です。Sub と Function の違い、引数と戻り値、変数が有効な範囲（スコープ）、モジュールの分け方を学び、長いコードを読みやすく保ちます。
 
-### [11. 配列とコレクション](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-11.html)
+### [11. 配列とDictionary](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-11.html)
 
-たくさんの値をまとめて扱う配列と動的配列、キーで値を引ける Dictionary を学びます。セルに1つずつ書き込むのではなく、まとめて処理して速くする考え方も紹介します。
+たくさんの値をまとめて扱う配列と動的配列、キーで値を引ける Dictionary を学びます。セルに1つずつ書き込むのではなく、まとめて処理する書き方と、Timer 関数で自分の環境の処理時間を測って比べる方法も紹介します。
 
 ### [12. エラー処理とデバッグ](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-12.html)
 
@@ -80,7 +80,7 @@ MsgBox・InputBox による対話、シート上のボタンからマクロを�
 
 ### [14. 実践：業務自動化ミニアプリ](https://fcircle-biz.github.io/tech-docs-v2/guide/business-saas/vba/vba-learning-material-14.html)
 
-総仕上げとして、複数シートの売上データを集計し、帳票シートに出力する自動化ツールを一から作ります。これまでの全章の知識を組み合わせ、学習後の進み方も示します。
+総仕上げとして、対象年月を指定して売上データを集計し、帳票シートに出力する月次レポートツールを一から作ります。不正データのチェック、シートの自動作成、エラー時の設定復元まで、これまでの全章で学んだ作法を統合した見本コードとして仕上げます。
 
 ## 推奨所要時間
 
@@ -96,7 +96,7 @@ MsgBox・InputBox による対話、シート上のボタンからマクロを�
 | 第8章 | 繰り返し処理 | 1.5時間 |
 | 第9章 | ブックとワークシートの操作 | 1.5時間 |
 | 第10章 | プロシージャと関数 | 1.5時間 |
-| 第11章 | 配列とコレクション | 1.5時間 |
+| 第11章 | 配列とDictionary | 1.5時間 |
 | 第12章 | エラー処理とデバッグ | 1.5時間 |
 | 第13章 | ユーザーとのやり取り | 1.5時間 |
 | 第14章 | 実践：業務自動化ミニアプリ | 2時間 |

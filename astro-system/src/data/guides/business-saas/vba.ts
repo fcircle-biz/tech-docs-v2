@@ -35,7 +35,7 @@ export const vba: TechGuide = {
     { number: 8, name: '繰り返し処理', file: 'vba-learning-material-08.html' },
     { number: 9, name: 'ブックとワークシートの操作', file: 'vba-learning-material-09.html' },
     { number: 10, name: 'プロシージャと関数', file: 'vba-learning-material-10.html' },
-    { number: 11, name: '配列とコレクション', file: 'vba-learning-material-11.html' },
+    { number: 11, name: '配列とDictionary', file: 'vba-learning-material-11.html' },
     { number: 12, name: 'エラー処理とデバッグ', file: 'vba-learning-material-12.html' },
     { number: 13, name: 'ユーザーとのやり取り', file: 'vba-learning-material-13.html' },
     { number: 14, name: '実践：業務自動化ミニアプリ', file: 'vba-learning-material-14.html' },
