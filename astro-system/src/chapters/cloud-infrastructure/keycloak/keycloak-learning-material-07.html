@@ -1,0 +1,602 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Keycloak</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約50分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ロールとグループで権限を管理する</h1>
+                    <p class="text-slate-600">第6章では、ユーザーという「人」を作りました。この章では、その人に「何をしてよいか」を割り当てる方法を学びます。1人ずつ個別に権限を設定するのではなく、<strong>ロール（役割）</strong>という単位にまとめて、人にはロールを割り当てる——この考え方（RBAC）を身につけると、ユーザーが何百人・何千人に増えても管理が破綻しません。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールベースアクセス制御（RBAC）の考え方を、身近なたとえで説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>レルムロールとクライアントロールを使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールを作成し、ユーザーに割り当てられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>複合ロールとグループの仕組みを理解し、設計に活かせる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールがアクセストークンのどこに載るのかを知る</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 認可の基本的な考え方 — ロールベースアクセス制御（RBAC）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「山田さんには経費精算の承認を許可、佐藤さんには許可しない」というように、<strong>人ごと</strong>に権限を1つずつ設定していくとどうなるでしょうか。最初は10人程度なら管理できても、人数が増え、異動や退職が発生するたびに「誰にどの権限を与えていたか」を1人ずつ確認して直す必要が出てきます。これは第1章で見た「ログイン機能の自作」と同じ構造の問題です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこでKeycloakは、権限を人に直接付けるのではなく、<strong>ロール（役割）</strong>という中間の単位にまとめます。第1章の「ビルの共用受付」のたとえで続けると、ロールは<strong>「入れる階の指定」</strong>にあたります。「3階までの入館証」「全フロア入館証」のように、まず<strong>役割の種類</strong>を決めておき、個々の訪問者にはその役割を1つ（または複数）割り当てるだけにします。これが<strong>ロールベースアクセス制御（RBAC: Role-Based Access Control）</strong>という考え方です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図1: 人・ロール・できることの関係</p>
+                        <div class="mermaid">
+flowchart LR
+    U1["ユーザー: 山田"] --> R1["ロール: app-admin"]
+    U2["ユーザー: 佐藤"] --> R2["ロール: app-user"]
+    U3["ユーザー: 鈴木"] --> R2
+    R1 --> P1["ユーザー一覧の閲覧"]
+    R1 --> P2["ユーザーの追加・削除"]
+    R2 --> P3["自分のデータの閲覧・編集"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この形にしておくと、<strong>「誰が何をできるか」を変えたいときは、人ではなくロール側の割り当てを変えるだけ</strong>で済みます。山田さんが異動して権限を落としたければ、`app-admin` ロールを外して `app-user` ロールを付け替えるだけです。個々の権限設定を1つずつ探して直す必要がありません。
+                    </p>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">認可の設計は「<strong>人に権限を付ける</strong>」のではなく「<strong>ロールに権限の意味を持たせ、人にはロールを割り当てる</strong>」のが基本です。この章の残りは、Keycloakでこの考え方をどう実現するかを見ていきます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 レルムロールとクライアントロールの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Keycloakのロールには2種類あります。この違いを最初に押さえておかないと、後で「どちらに作ればよかったのか」で迷うことになります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-purple-800 mb-2 flex items-center gap-2"><i class="fas fa-globe"></i> レルムロール</h3>
+                            <p class="text-purple-900 text-sm leading-relaxed">レルム全体で共通に使える役割です。例えば `admin`（管理者）や `user`（一般利用者）のように、<strong>どのアプリからも同じ意味で使いたい</strong>役割を作るときに選びます。第4章で作った学習用レルムに1つだけ存在します。</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-blue-800 mb-2 flex items-center gap-2"><i class="fas fa-cube"></i> クライアントロール</h3>
+                            <p class="text-blue-900 text-sm leading-relaxed">特定のクライアント（アプリ）の中だけで意味を持つ役割です。例えば第5章で登録した `demo-app` の中だけで通用する `order-manager`（注文管理者）のように、<strong>そのアプリ固有の業務上の役割</strong>を表すときに選びます。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        判断に迷ったときは、次の表を目安にしてください。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">レルムロール</th>
+                                    <th class="px-4 py-3 text-left font-semibold">クライアントロール</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">通用する範囲</td>
+                                    <td class="px-4 py-3 text-slate-600">レルム内のすべてのアプリ</td>
+                                    <td class="px-4 py-3 text-slate-600">そのクライアント（アプリ）の中だけ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">作成場所</td>
+                                    <td class="px-4 py-3 text-slate-600">左メニュー Realm roles</td>
+                                    <td class="px-4 py-3 text-slate-600">Clients → 対象クライアント → Roles タブ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">典型的な例</td>
+                                    <td class="px-4 py-3 text-slate-600">admin、user、app-admin</td>
+                                    <td class="px-4 py-3 text-slate-600">order-manager（demo-app専用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">向いている場面</td>
+                                    <td class="px-4 py-3 text-slate-600">複数アプリ共通の「立場」を表したいとき</td>
+                                    <td class="px-4 py-3 text-slate-600">そのアプリだけの業務機能を表したいとき</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション7.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 レルムロールを作る手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際にレルムロールを1つ作ってみましょう。ここでは `app-admin` というロールを例にします。
+                    </p>
+                    <ol class="space-y-3 text-slate-600 mb-6">
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">①</span>
+                            <span>管理コンソール左メニューの<strong>Realm roles</strong>をクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">②</span>
+                            <span>右上の<strong>Create role</strong>ボタンをクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">③</span>
+                            <span><strong>Role name</strong>欄に `app-admin` と入力する（Descriptionには「アプリの管理者」のような説明を書いておくと後で分かりやすい）。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">④</span>
+                            <span><strong>Save</strong>をクリックする。</span>
+                        </li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じ手順で `app-user` というレルムロールも作っておきましょう（やってみよう 7-1 で実際に手を動かします）。
+                    </p>
+                </section>
+
+                <!-- セクション7.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 クライアントロールを作る手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        続いて、`demo-app` というクライアントの中だけで通用するクライアントロールを作る手順です。
+                    </p>
+                    <ol class="space-y-3 text-slate-600 mb-6">
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">①</span>
+                            <span>左メニューの<strong>Clients</strong>をクリックし、一覧から<strong>demo-app</strong>を選ぶ。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">②</span>
+                            <span>クライアント詳細画面上部のタブから<strong>Roles</strong>を選ぶ。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">③</span>
+                            <span><strong>Create role</strong>をクリックし、Role nameに `order-manager` と入力して<strong>Save</strong>する。</span>
+                        </li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        画面上の操作はレルムロールとほぼ同じですが、<strong>どこから作業を始めたか</strong>（Realm roles か、特定のクライアントの中か）で、通用する範囲が変わる点を意識してください。
+                    </p>
+                </section>
+
+                <!-- セクション7.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 ユーザーにロールを割り当てる手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロールを作っただけでは、誰にも権限は付きません。第6章で作成したユーザーに、実際にロールを割り当てましょう。
+                    </p>
+                    <ol class="space-y-3 text-slate-600 mb-6">
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">①</span>
+                            <span>左メニューの<strong>Users</strong>から、対象のユーザーをクリックして詳細画面を開く。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">②</span>
+                            <span>上部タブの<strong>Role mapping</strong>を選ぶ。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">③</span>
+                            <span><strong>Assign role</strong>ボタンをクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">④</span>
+                            <span>一覧上部の絞り込みで<strong>Filter by realm roles</strong>（レルムロールを探す場合）または<strong>Filter by clients</strong>（クライアントロールを探す場合）を選び、目的のロールを見つける。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">⑤</span>
+                            <span>付けたいロールにチェックを入れ、<strong>Assign</strong>をクリックする。</span>
+                        </li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Role mapping タブの一覧に、割り当てたロールが表示されれば成功です。同じ画面から<strong>Unassign</strong>で外すこともできます。
+                    </p>
+                </section>
+
+                <!-- セクション7.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 既定ロール（default-roles-&lt;レルム名&gt;）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Role mapping タブを開くと、自分で割り当てた覚えのないロールが最初から付いていることに気づくはずです。これは <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">default-roles-&lt;レルム名&gt;</code> という<strong>既定ロール</strong>で、新規ユーザーを作成すると自動的に付与されます。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">既定ロールの中身も確認・調整できる</p>
+                                <p class="text-blue-900 text-sm">Realm roles の一覧から <code class="bg-blue-100 px-1 rounded font-mono">default-roles-&lt;レルム名&gt;</code> を開くと、それ自体が<strong>複合ロール</strong>（7.7参照）であることが分かります。中には `offline_access` や `uma_authorization` といった、Keycloakの基本機能に必要なロールが含まれています。ここに自分たちの `app-user` を追加すれば、「新規ユーザーには自動で app-user を付ける」という運用にできます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 複合ロール（Composite role） — ロールの中にロールを含める
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「管理者は、一般利用者ができることは全部できて、それに加えて管理機能も使える」というのはよくある要件です。このとき `app-admin` に一般利用者の権限を1つずつ複製するのではなく、<strong>`app-admin` の中に `app-user` を含める</strong>ことができます。これが<strong>複合ロール（Composite role）</strong>です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作り方は次のとおりです。
+                    </p>
+                    <ol class="space-y-3 text-slate-600 mb-6">
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">①</span>
+                            <span>Realm roles から複合ロールにしたいロール（例: `app-admin`）を開く。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">②</span>
+                            <span>右上の<strong>Action</strong>メニューから<strong>Add associated roles</strong>を選ぶ。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">③</span>
+                            <span>含めたいロール（例: `app-user`）を選んで<strong>Add</strong>する。</span>
+                        </li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これで `app-admin` を割り当てられたユーザーは、`app-user` の権限も自動的に持つことになります。組織の役職の階層（一般 → リーダー → 管理者）を表現するのに便利な仕組みです。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">入れ子にしすぎない</p>
+                                <p class="text-red-900 text-sm">複合ロールは、さらに別の複合ロールを含めることもできます。しかし何段階にも入れ子にすると、「結局このユーザーは何ができるのか」を追うのが非常に難しくなります。実務では<strong>1〜2段階まで</strong>に留め、複雑な条件分岐が必要な場合はロール構成ではなく別の仕組み（Authorization Servicesなど、本教材の範囲外）を検討しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.8 グループ — 組織構造をまとめる入れ物
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ロールが「何ができるか」を表すのに対して、<strong>グループ</strong>は「営業部」「開発部」のような<strong>組織構造</strong>を表す入れ物です。グループにロールを割り当てておき、ユーザーをそのグループに入れるだけで、そのグループが持つロールがまとめて付与されます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図2: グループ・ロール・ユーザーの関係</p>
+                        <div class="mermaid">
+flowchart LR
+    G["グループ: 開発部"] -->|ロールを割り当て| R["ロール: app-admin"]
+    U1["ユーザー: 山田"] -->|グループに参加| G
+    U2["ユーザー: 佐藤"] -->|グループに参加| G
+    G -.->|権限が自動的に付与される| U1
+    G -.->|権限が自動的に付与される| U2
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作成の流れは次のとおりです。
+                    </p>
+                    <ol class="space-y-3 text-slate-600 mb-6">
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">①</span>
+                            <span>左メニューの<strong>Groups</strong>から<strong>Create group</strong>をクリックし、「開発部」のようなグループ名を付ける（必要であればグループの中にサブグループも作れる）。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">②</span>
+                            <span>作成したグループを開き、<strong>Role mapping</strong>タブから、そのグループに持たせたいロールを Assign role で割り当てる。</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">③</span>
+                            <span>ユーザー詳細画面の<strong>Groups</strong>タブから<strong>Join Group</strong>を選び、対象のグループを選んで参加させる。</span>
+                        </li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        グループに参加したユーザーは、そのグループに割り当てられたロールを（自分に直接ロールを付けなくても）持つことになります。人事異動でグループを移動させるだけで、権限もまとめて切り替わります。
+                    </p>
+                </section>
+
+                <!-- セクション7.9 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.9 ロールとグループの使い分け
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでを整理すると、原則はシンプルです。<strong>ロールは「何ができるか（役割）」、グループは「どこに所属するか（組織）」</strong>を表します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ロール</th>
+                                    <th class="px-4 py-3 text-left font-semibold">グループ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">表すもの</td>
+                                    <td class="px-4 py-3 text-slate-600">何ができるか（役割・権限の種類）</td>
+                                    <td class="px-4 py-3 text-slate-600">どこに所属するか（組織構造）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">アプリが見るもの</td>
+                                    <td class="px-4 py-3 text-slate-600">トークンに載ったロールを見て判定する</td>
+                                    <td class="px-4 py-3 text-slate-600">通常はグループを直接見ない（ロール経由で効く）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">人事異動時に動かすもの</td>
+                                    <td class="px-4 py-3 text-slate-600">基本的には動かさない（役割の定義自体は変わらない）</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーの所属グループを付け替える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">設計のコツ</td>
+                                    <td class="px-4 py-3 text-slate-600">アプリの機能単位で細かく定義する</td>
+                                    <td class="px-4 py-3 text-slate-600">組織図に沿って作り、ロールをまとめて付与する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        つまり、<strong>アプリのコード側が判断材料にするのは常にロール</strong>です。グループは、管理者が「大勢のユーザーに同じロールをまとめて付けるための便利な入れ物」と考えると整理しやすくなります。
+                    </p>
+                </section>
+
+                <!-- セクション7.10 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.10 ロールはトークンにどう現れるか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        割り当てたロールは、ログイン後にKeycloakが発行する<strong>アクセストークン</strong>の中に書き込まれます。アプリはこのトークンを読み取って、「このユーザーは何をしてよいか」を判断します。レルムロールとクライアントロールは、トークンの中でも別々の場所に載ります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">access_token（抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "realm_access": {
+    "roles": ["app-user", "app-admin"]
+  },
+  "resource_access": {
+    "demo-app": {
+      "roles": ["order-manager"]
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        レルムロールは <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">realm_access.roles</code> に、クライアントロールは <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm">resource_access.&lt;クライアントID&gt;.roles</code> に、それぞれ配列として並びます。アプリはこの配列に目的のロール名が含まれているかどうかで、機能を出し分けます。実際にトークンをデコードして中身を確認する作業は、次の第8章で行います。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-1: app-user / app-admin ロールを作り、複合ロールにする
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">この章で学んだレルムロールの作成・割り当て・複合ロールを、実際に手を動かして体験しましょう。第6章で作成したユーザーを使います。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">7.3節の手順で、レルムロール `app-user` を作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">同じ手順で、もう1つレルムロール `app-admin` を作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">7.5節の手順で、第6章で作成したユーザーの Role mapping から `app-user` を Assign する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">7.7節の手順で `app-admin` を開き、Action → Add associated roles から `app-user` を追加して複合ロールにする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">同じユーザーに `app-admin` も Assign し、Role mapping の一覧に両方のロールが表示されることを確認する（`app-user` は複合ロール経由でも持っていることになる）。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- この章のまとめ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-clipboard-check text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">この章のまとめ</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>権限は人に直接付けず、<strong>ロール（役割）</strong>にまとめて人へ割り当てる（RBAC）と管理が破綻しにくい。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>レルムロール</strong>はレルム全体で共通、<strong>クライアントロール</strong>は特定のアプリの中だけで意味を持つ。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>複合ロール</strong>で他のロールを含められ、<strong>グループ</strong>で組織構造にロールをまとめ付けできる。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>ロールは「何ができるか」、グループは「どこに所属するか」——アプリが判断に使うのは常にロール。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>割り当てたロールは、アクセストークンの <code class="bg-emerald-100 px-1 rounded font-mono text-xs">realm_access.roles</code> / <code class="bg-emerald-100 px-1 rounded font-mono text-xs">resource_access</code> に載る。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 確認問題 -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">確認問題</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ユーザー1人ずつに直接権限を設定する方式ではなく、ロールを介して権限を付ける方式（RBAC）を使う利点は何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            権限をロールという単位にまとめておくことで、人数が増えても「誰にどのロールを割り当てるか」だけを管理すればよくなる。役割の変更（異動など）があっても、ロールの割り当てを変えるだけで済み、権限設定を1つずつ探して直す必要がない。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. レルムロールとクライアントロールの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            レルムロールはレルム全体で共通に使える役割（例: admin、user）。クライアントロールは特定のクライアント（アプリ）の中だけで意味を持つ役割（例: demo-appの order-manager）。複数アプリ共通の立場を表したいならレルムロール、そのアプリ固有の業務機能を表したいならクライアントロールを選ぶ。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. ロールとグループの役割の違いを一言ずつで説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ロールは「何ができるか（役割・権限の種類）」を表す。グループは「どこに所属するか（組織構造）」を表す入れ物で、グループにロールを割り当ててユーザーを参加させると権限がまとめて付く。アプリのコード側が判断に使うのは常にロールで、グループはロールを配るための管理上の仕組み。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="keycloak-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: ユーザー管理の基本</span>
+                        </div>
+                    </a>
+                    <a href="keycloak-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: ログインを体験する — 認可コードフローとトークン</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

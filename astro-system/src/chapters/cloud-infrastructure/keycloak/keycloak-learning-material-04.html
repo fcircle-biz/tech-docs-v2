@@ -1,0 +1,477 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Keycloak</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第4章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第4章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約40分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">レルム — アプリの世界を分ける</h1>
+                    <p class="text-slate-600">前章で管理コンソールに入りました。ここからいよいよ設定を始めますが、その前にKeycloakで最も重要な概念である<strong>レルム（realm）</strong>を理解しておく必要があります。レルムは、Keycloakの中に作る「独立した世界」です。この章では、レルムとは何か、なぜ管理用のレルムをそのまま使ってはいけないのか、そして学習用の新しいレルムをどう作るのかを学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>レルム（realm）が何を区切る単位なのかを、ビルの区画にたとえて説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>master レルムにアプリ用のユーザーを入れてはいけない理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>学習用レルム `demo-realm` を実際に作成できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>レルムのOIDC設定エンドポイント（`.well-known/openid-configuration`）を確認できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション4.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.1 レルム（realm）とは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第1章で、Keycloakを「ビルの共用受付」にたとえました。この受付が入っているビルには、実は<strong>複数の独立した区画（フロア）</strong>があります。この区画にあたるのが<strong>レルム（realm）</strong>です。1つのレルムの中には、利用者・ロール（役割）・クライアント（登録したアプリ）・ログイン画面の設定などがひとまとめに入っており、<strong>別のレルムからは中身が一切見えません</strong>。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば「営業部フロア」の入館証を持っていても、「開発部フロア」には入れません。同じビル（Keycloakサーバー）の中にいても、フロア（レルム）が違えば別世界として扱われます。同じユーザー名の人が、別々のレルムにそれぞれ存在していても、Keycloakはまったく別人として扱います。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図1: 1つのKeycloakサーバーの中にある複数のレルム</p>
+                        <div class="mermaid">
+flowchart TD
+    K["Keycloakサーバー"] --> M["masterレルム<br/>（管理専用）"]
+    K --> D["demo-realmレルム<br/>（学習用）"]
+    M --> MU["管理者ユーザー"]
+    D --> DU["利用者ユーザー"]
+    D --> DC["クライアント（登録アプリ）"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        管理コンソールを起動した直後、Keycloakにはすでに<strong>master</strong>という名前のレルムが1つ用意されています。次の4.2で、このmasterレルムをどう扱うべきかを見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション4.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.2 master レルムの役割と注意
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>master レルム</strong>は、Keycloakをインストールした直後から存在する特別なレルムです。第3章でログインした管理者アカウント（`admin`）は、このmasterレルムの中に作られています。master レルムの役割は、<strong>Keycloakサーバー全体（＝すべてのレルム）を管理すること</strong>に限定されています。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">master レルムにアプリ用ユーザーを入れてはいけない</p>
+                                <p class="text-red-900 text-sm">master レルムは<strong>Keycloak自身を管理するための特別な区画</strong>であり、業務アプリの利用者を登録する場所ではありません。もし勤怠アプリの利用者を master レルムに混在させてしまうと、「Keycloakを管理できる権限」と「単なるアプリ利用者」の境界があいまいになり、設定ミス1つでアプリの一般利用者にKeycloak全体の管理権限を与えてしまう事故につながりかねません。<strong>master レルムは管理専用に保ち、アプリの利用者は必ず別のレルムに作る</strong>——これがKeycloakを扱ううえで最初に守るべき鉄則です。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで次の4.3では、業務アプリの利用者やクライアントを入れるための、master とは別の学習用レルム <code>demo-realm</code> を新しく作成します。本教材では、第5章以降このレルムをずっと使い続けます。
+                    </p>
+                </section>
+
+                <!-- セクション4.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.3 レルムを作る手順
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        管理コンソールから、新しいレルム <code>demo-realm</code> を作成します。画面のスクリーンショットは省略しますが、次の手順どおりに進めれば迷うことはありません。
+                    </p>
+
+                    <ol class="space-y-3 mb-6">
+                        <li class="flex items-start gap-3 text-slate-700">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                         flex items-center justify-center text-sm font-medium">1</span>
+                            <span class="flex-1">管理コンソール<strong>左上のレルム選択</strong>（現在は「master」と表示されている部分）をクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-700">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                         flex items-center justify-center text-sm font-medium">2</span>
+                            <span class="flex-1">開いたメニューの下部にある<strong>「Create realm」</strong>ボタンをクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-700">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                         flex items-center justify-center text-sm font-medium">3</span>
+                            <span class="flex-1">「Realm name」欄に <code>demo-realm</code> と入力する（大文字・小文字やハイフンの位置を正確に）。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-700">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                         flex items-center justify-center text-sm font-medium">4</span>
+                            <span class="flex-1">画面右下の<strong>「Create」</strong>ボタンをクリックする。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-700">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                         flex items-center justify-center text-sm font-medium">5</span>
+                            <span class="flex-1">作成が完了すると、左上のレルム選択が自動的に<strong>「demo-realm」</strong>に切り替わる。以降の画面操作は、すべてこの demo-realm の中で行われる。</span>
+                        </li>
+                    </ol>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">今どのレルムを操作しているかは、常に左上を見る</p>
+                                <p class="text-blue-900 text-sm">Keycloakの管理コンソールでは、<strong>左上のレルム選択に表示されている名前が、今から行う操作の対象レルム</strong>です。ユーザーを作ったつもりが実は master レルムに作っていた、という勘違いを防ぐために、設定を変更する前に必ず左上を確認する習慣をつけましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.4 レルム設定（Realm settings）の主なタブ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        レルムを選択した状態で左メニューの「Realm settings」を開くと、そのレルムに関するさまざまな設定がタブで分かれています。今すぐすべてを理解する必要はありません。「どこに何があるか」の地図として、ここで一覧しておきましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">タブ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">主な内容</th>
+                                    <th class="px-4 py-3 text-left font-semibold">詳しく扱う章</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">General</td>
+                                    <td class="px-4 py-3 text-slate-600">レルムの表示名、有効／無効の切り替え、エンドポイント情報（4.5で扱う）</td>
+                                    <td class="px-4 py-3 text-slate-600">本章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Login</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー自己登録の許可、パスワードを忘れた場合の再設定、メールアドレス確認の要否</td>
+                                    <td class="px-4 py-3 text-slate-600">第6・8章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Email</td>
+                                    <td class="px-4 py-3 text-slate-600">パスワード再設定メールなどを送るためのSMTPサーバー設定</td>
+                                    <td class="px-4 py-3 text-slate-600">第6章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Themes</td>
+                                    <td class="px-4 py-3 text-slate-600">ログイン画面・アカウントコンソールなどの見た目（テーマ）の切り替え</td>
+                                    <td class="px-4 py-3 text-slate-600">第11章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Sessions</td>
+                                    <td class="px-4 py-3 text-slate-600">ログイン状態をどれくらいの時間保持するか（SSOセッションの有効時間など）</td>
+                                    <td class="px-4 py-3 text-slate-600">第10章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Tokens</td>
+                                    <td class="px-4 py-3 text-slate-600">アクセストークン・リフレッシュトークンなどの有効期限</td>
+                                    <td class="px-4 py-3 text-slate-600">第10章</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Security defenses</td>
+                                    <td class="px-4 py-3 text-slate-600">ブルートフォース攻撃（パスワード総当たり）の検知・アカウントロックの設定</td>
+                                    <td class="px-4 py-3 text-slate-600">第11章</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション4.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.5 レルムの重要なURL（エンドポイント）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        レルムには、それぞれ専用の<strong>URL（エンドポイント）</strong>が割り当てられています。中でも重要なのが、次の <code>.well-known/openid-configuration</code> というURLです。ブラウザでこのURLを開くだけで、そのレルムの OpenID Connect の設定一覧をJSON形式で確認できます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># demo-realm のOIDC設定一覧を取得する
+curl http://localhost:8080/realms/demo-realm/.well-known/openid-configuration</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        返ってくるJSONにはかなりの数の項目がありますが、まずは次の5つだけ覚えておけば十分です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">issuer</td>
+                                    <td class="px-4 py-3 text-slate-600">「このトークンはどのレルムが発行したか」を表すURL。アプリ側の設定で必ず指定する（第9章で使用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">authorization_endpoint</td>
+                                    <td class="px-4 py-3 text-slate-600">利用者がログイン画面を開くためのURL（第8章で使用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">token_endpoint</td>
+                                    <td class="px-4 py-3 text-slate-600">アプリがトークンを受け取るためのURL（第8章で使用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">end_session_endpoint</td>
+                                    <td class="px-4 py-3 text-slate-600">ログアウトを行うためのURL（第10章で使用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">jwks_uri</td>
+                                    <td class="px-4 py-3 text-slate-600">トークンの署名が本物かを検証するための公開鍵の置き場所（第8章で使用）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">アプリ側の設定でKeycloakと連携するときは、<strong>ここで見た issuer のURLを1つ指定するだけ</strong>で、他のエンドポイントはアプリが自動的に読みに行ってくれます。「レルムごとにこのURLが1つ決まっている」ということを覚えておけば、第9章の設定でつまずきません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.6 レルムの分け方の考え方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        1つのKeycloakサーバーの中には、レルムをいくつでも作成できます。実際の現場では、次のような理由でレルムを分けることがよくあります。
+                    </p>
+                    <ul class="space-y-2 text-slate-600 mb-4">
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>本番用と検証用を分ける</strong> — 検証中の設定変更が、本番の利用者に影響しないようにする</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>顧客テナントごとに分ける</strong> — 複数の顧客企業にサービスを提供する場合、顧客Aの利用者一覧が顧客Bから絶対に見えないようにする</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>社内システムと社外向けサービスを分ける</strong> — ログイン画面のデザインやパスワードポリシーの要件が大きく異なる場合</span></li>
+                    </ul>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">分けすぎにも注意</p>
+                                <p class="text-blue-900 text-sm">レルムを分けるほど、利用者・ロール・ログイン設定を<strong>レルムの数だけ個別に管理</strong>することになります。分けすぎると、同じような設定をレルムごとに繰り返し行う手間が増え、「どのレルムに何を設定したか」を把握しづらくなります。<strong>本当に独立させる必要がある単位</strong>（本番／検証、顧客ごとの完全な分離など）でだけレルムを分け、それ以外は同じレルムの中でロールやグループ（第7章）を使って権限を分ける、という発想が基本です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション4.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        4.7 レルムの持ち出し（エクスポート）予告
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「Realm settings」画面の右上にある<strong>「Action」メニュー</strong>から「Partial export」を選ぶと、そのレルムの設定内容をJSONファイルとして書き出せます。これを使えば、開発環境で作ったレルムの設定を、別の環境にそのまま持っていくことができます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本格的なバックアップ・リストア（本番環境での運用を見据えたエクスポート／インポート）については、第13章でまとめて扱います。ここでは「そういう機能がある」ということだけ覚えておいてください。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 4-1: demo-realm を作成してエンドポイントを確認する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">4.3の手順にしたがって、実際に <code>demo-realm</code> を作成してみましょう。このレルムは、第5章以降の演習でずっと使い続けます。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">4.3の手順どおりに、管理コンソールから <code>demo-realm</code> という名前のレルムを作成する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">左上のレルム選択が「demo-realm」に切り替わっていることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ブラウザで <code>http://localhost:8080/realms/demo-realm/.well-known/openid-configuration</code> を開く。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">表示されたJSONの中から <code>issuer</code> の値を探し、末尾が <code>/realms/demo-realm</code> になっていることを確認する。これが、第9章でアプリの設定に使う値です。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- この章のまとめ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-clipboard-check text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">この章のまとめ</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>レルム（realm）</strong>は、利用者・ロール・クライアント・ログイン設定を区切る「独立した世界」。別レルムの中身は互いに見えない。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>master レルム</strong>は管理専用。アプリの利用者は入れず、業務用には別のレルムを作る。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>管理コンソール左上のレルム選択 → 「Create realm」から、新しいレルム（本教材では <code>demo-realm</code>）を作成できる。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>各レルムには <code>.well-known/openid-configuration</code> というURLがあり、issuer や各種エンドポイントを確認できる。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 確認問題 -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">確認問題</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. レルム（realm）とは何ですか。ビルのたとえを使って説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            レルムは、Keycloakの中に作る<strong>独立した世界（区画）</strong>で、ビルの中の独立したフロアにたとえられます。1つのレルムには利用者・ロール・クライアント・ログイン設定がひとまとめに入っており、別のフロア（別のレルム）からは中身が見えません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. master レルムにアプリ用のユーザーを登録してはいけないのはなぜですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            master レルムは<strong>Keycloakサーバー全体を管理するための特別なレルム</strong>だからです。ここにアプリの利用者を混在させると、「Keycloakを管理できる権限」と「単なるアプリ利用者」の境界があいまいになり、設定ミスで一般利用者にKeycloak全体の管理権限を与えてしまう危険があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. あるレルムの <code>.well-known/openid-configuration</code> を開くと何がわかりますか。第9章とどう関係しますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            そのレルムの<strong>OpenID Connect 設定一覧</strong>（issuer・認可エンドポイント・トークンエンドポイント・公開鍵の場所など）がJSON形式でわかります。特に <code>issuer</code> のURLは、第9章でアプリをKeycloakと連携させる際の設定値としてそのまま使います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="keycloak-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第3章: Keycloakを起動して管理コンソールに入る</span>
+                        </div>
+                    </a>
+                    <a href="keycloak-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第5章: クライアント登録 — アプリをつなぐ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
