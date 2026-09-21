@@ -1,0 +1,656 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Keycloak</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">アプリをKeycloakで保護する</h1>
+                    <p class="text-slate-600">第8章までで、ブラウザから実際にKeycloakのログイン画面を通り、発行されたトークンの中身を確認しました。この章では、その続きとして「アプリ側は何を設定しているのか」を、Spring Bootのサンプルアプリを例に読み解きます。Javaに詳しくなくても心配ありません。コードは短くまとめ、1行ずつ日本語で意味を説明します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>アプリ側がやるべき「たった2つのこと」を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>OAuth2 Client</strong>（ログインさせる側）と<strong>Resource Server</strong>（トークンを検証する側）の役割の違いを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>issuer-uri</strong>を1つ設定するだけで、アプリが何を自動的に把握するのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Spring Bootの設定ファイルを読んで、各項目が何を指しているか説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Javaが苦手な人向けのヒント -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                        <div>
+                            <p class="font-semibold text-blue-800 mb-1">Javaのコードが読めなくても大丈夫</p>
+                            <p class="text-blue-900 text-sm">この章のゴールは「Javaのコードを書けるようになる」ことではありません。<strong>設定ファイルの各項目が何を意味しているか</strong>を説明できるようになることが目標です。コード例はすべて15行以内に収め、1行ずつ日本語コメントを添えています。実際に環境が無くても、読むだけで十分に学べます。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 アプリ側がやるべきことは、たった2つだけ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの章で、Keycloak側の設定（レルム・クライアント・ユーザー・ロール）はひととおり済んでいます。では、Keycloakと連携する<strong>アプリ側</strong>は何をすればよいのでしょうか。実は、アプリがやるべきことは次の2つだけです。
+                    </p>
+                    <ul class="space-y-2 text-slate-600 mb-4">
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>(1) 未ログインの人をKeycloakのログイン画面へ送る</strong> — 保護されたページに未ログインでアクセスされたら、Keycloakへリダイレクトする</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>(2) 戻ってきたトークンが本物か確かめる</strong> — Keycloakが発行したトークンの署名を検証し、なりすましや改ざんが無いことを確認する</span></li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        パスワードの受け取りも、ログイン画面の作成も、アプリ側は一切行いません。第1章で学んだ「共用受付」のたとえのとおり、アプリは<strong>入館証（トークン）が本物かどうかだけ</strong>を見ればよいのです。全体の流れを図で確認しましょう。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-500 mb-3">図1: アプリを保護する流れ</p>
+                        <div class="mermaid">
+flowchart TD
+    A["① ブラウザ<br/>保護ページへアクセス"] --> B["② アプリ<br/>未ログインを検知"]
+    B -->|Keycloakへリダイレクト| C["③ Keycloak<br/>ログイン画面を表示"]
+    C -->|"ログイン成功<br/>トークンを発行"| D["④ アプリ<br/>トークンの署名を検証"]
+    D -->|検証OK| E["⑤ 保護ページを表示"]
+    D -->|検証NG| F["エラー・再ログインへ"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 2つの役割 — OAuth2 Client と Resource Server
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アプリの種類によって、先ほどの「2つのこと」のどちらを担当するかが変わります。画面を持つWebアプリと、画面を持たないAPIでは役割が異なるためです。この違いを表で整理します。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">OAuth2 Client<br/>（ログインさせる側）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Resource Server<br/>（トークンを検証する側）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">典型的なアプリ</td>
+                                    <td class="px-4 py-3 text-slate-600">画面のあるWebアプリ（社内ポータルなど）</td>
+                                    <td class="px-4 py-3 text-slate-600">画面を持たないAPI（バックエンドサービス）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">担当する仕事</td>
+                                    <td class="px-4 py-3 text-slate-600">未ログインの人をKeycloakのログイン画面へ送る</td>
+                                    <td class="px-4 py-3 text-slate-600">送られてきたトークンが本物か検証する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">受け取るもの</td>
+                                    <td class="px-4 py-3 text-slate-600">ログイン後にKeycloakから渡される認可コード</td>
+                                    <td class="px-4 py-3 text-slate-600">リクエストヘッダーに乗ったアクセストークン</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">起点となる設定</td>
+                                    <td class="px-4 py-3 text-slate-600">issuer-uri（Keycloakの場所）</td>
+                                    <td class="px-4 py-3 text-slate-600">issuer-uri（Keycloakの場所）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        どちらの役割も、<strong>issuer-uri（発行元のURL）</strong>を起点にしている点は共通です。9.3ではこのissuer-uriが何をしてくれるのかを見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 issuer-uri のしくみ — 1行の設定で自動的にわかること
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アプリ側の設定でもっとも重要なのが<strong>issuer-uri</strong>です。値は次の1行だけです。
+                    </p>
+                    <div class="bg-slate-100 rounded-lg p-4 my-4 font-mono text-sm text-slate-700">
+                        http://localhost:8080/realms/demo-realm
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これは第4章で作成したレルム「demo-realm」を指すURLです。アプリはこのURLの末尾に<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">/.well-known/openid-configuration</code>を付けて自動的に読みに行きます。第4章で実際にブラウザで開いたことのあるURLと同じ場所です。このJSONファイルには、次の情報がまとめて書かれています。
+                    </p>
+                    <ul class="space-y-2 text-slate-600 mb-4">
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>認可エンドポイント</strong> — ログイン画面がどこにあるか</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>トークンエンドポイント</strong> — トークンをどこで受け取るか</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>jwks_uri（公開鍵の場所）</strong> — トークンの署名を確認するための鍵をどこから取得するか</span></li>
+                    </ul>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">1行で済む理由</p>
+                                <p class="text-blue-900 text-sm">つまり、開発者が「ログイン画面のURLはここ」「鍵はここから取る」と1つずつ設定する必要はありません。<strong>issuer-uriさえ正しければ、残りは自動的に解決される</strong>というのが、OpenID Connectの便利な点です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 Keycloak側の準備 — demo-appクライアントを整える
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アプリ側の設定を書く前に、第5章で作成した<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">demo-app</code>クライアントの設定を、今回のサンプルアプリに合わせて確認しておきます。
+                    </p>
+                    <ul class="space-y-2 text-slate-600 mb-4">
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>Client authentication</strong>を<strong>ON</strong>にする — アプリがシークレット（合言葉）を持つ「機密クライアント」として扱う</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>Credentials</strong>タブに表示される<strong>Client secret</strong>を控える — 後で設定ファイルに使う</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>Valid redirect URIs</strong>に<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">http://localhost:8081/login/oauth2/code/keycloak</code>を追加する — Spring Securityが既定で使うコールバックURL</span></li>
+                        <li class="flex items-start gap-2"><i class="fas fa-angle-right text-primary-500 mt-1.5"></i><span><strong>Web origins</strong>に<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">http://localhost:8081</code>を追加する — このアプリからのアクセスを許可する</span></li>
+                    </ul>
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">Valid redirect URIsは1文字も間違えられない</p>
+                                <p class="text-red-900 text-sm">ここに登録したURLと、アプリが実際に使うコールバックURLが完全に一致しないと、ログイン後にエラーになります。ポート番号や末尾のパスまで正確に確認しましょう（9.11でエラー例を扱います）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 Spring Bootの依存関係 — 2つのスターターの違い
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Spring Bootには、9.2で整理した2つの役割に対応する「スターター」（機能をまとめて追加する部品）が用意されています。プロジェクトに追加する依存関係の名前を見れば、そのアプリがどちらの役割かがわかります。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">依存関係の名前</th>
+                                    <th class="px-4 py-3 text-left font-semibold">役割</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">spring-boot-starter-oauth2-client</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>ログインさせる側</strong>。画面のあるWebアプリに追加する。未ログインの人をKeycloakへ誘導する機能を持つ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">spring-boot-starter-oauth2-resource-server</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>APIを守る側</strong>。画面を持たないAPIに追加する。送られてきたトークンを検証する機能を持つ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        名前に「client」と付く方がログインを担当し、「resource-server」と付く方がAPIの防御を担当する——名前どおりの役割分担だと覚えておけば十分です。
+                    </p>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 設定ファイル application.yml（ログインさせる側）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        画面のあるWebアプリでは、次のような<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">application.yml</code>を用意します。難しそうに見えますが、9.4で確認した内容をそのまま書き写しているだけです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">application.yml</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-yaml">spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: demo-app
+            client-secret: ここにクライアントシークレット
+            authorization-grant-type: authorization_code
+            scope: openid, profile, email
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8080/realms/demo-realm</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">client-id</td>
+                                    <td class="px-4 py-3 text-slate-600">Keycloakに登録したクライアントID。第5章で作成した「demo-app」</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">client-secret</td>
+                                    <td class="px-4 py-3 text-slate-600">9.4で控えたシークレット。アプリ自身が「本物のdemo-appです」と証明する合言葉</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">authorization-grant-type</td>
+                                    <td class="px-4 py-3 text-slate-600">第8章で体験した「認可コードフロー」を使うという指定</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">scope</td>
+                                    <td class="px-4 py-3 text-slate-600">どの情報をトークンに含めてほしいかの要求（プロフィール・メールアドレスなど）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">issuer-uri</td>
+                                    <td class="px-4 py-3 text-slate-600">9.3で説明した、Keycloakのレルムを指すURL</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">シークレットを直接書かない</p>
+                                <p class="text-red-900 text-sm">サンプルでは分かりやすさのため<code class="bg-red-100 px-1.5 py-0.5 rounded text-red-900">client-secret</code>を直接書いていますが、これをそのままGitに登録してはいけません。実際の開発では、環境変数（例: <code class="bg-red-100 px-1.5 py-0.5 rounded text-red-900">${KEYCLOAK_CLIENT_SECRET}</code>）や、専用のシークレット管理サービスを使って、設定ファイルの外に出すのが基本です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 最小限のセキュリティ設定を読んでみる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設定ファイルに加えて、「どのページをログイン必須にするか」を決めるコードが1つ必要です。次のコードは「トップページは誰でも見られる」「/secureはログインが必要」「それ以外もログインが必要」というルールを表しています。1行ずつ日本語コメントを付けています。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SecurityConfig.java</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-java">@Bean
+SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+        // "/" は誰でも見られるようにする
+        .authorizeHttpRequests(auth -&gt; auth
+            .requestMatchers("/").permitAll()
+            // "/secure" はログインしていないと入れない
+            .requestMatchers("/secure").authenticated()
+            // それ以外のパスもログイン必須にする
+            .anyRequest().authenticated()
+        )
+        // Keycloakへのログイン画面遷移を有効にする
+        .oauth2Login(Customizer.withDefaults());
+    return http.build();
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後の1行<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">.oauth2Login(...)</code>が、9.1で説明した「(1) 未ログインの人をKeycloakのログイン画面へ送る」を実現している部分です。ここを有効にするだけで、Keycloakへのリダイレクトも、戻ってきたトークンの検証も、フレームワークが自動で行ってくれます。
+                    </p>
+                </section>
+
+                <!-- セクション9.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.8 APIを守る側（Resource Server）の設定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        一方、画面を持たないAPIの場合は、ログイン画面へ誘導する必要がありません。すでにトークンを持っている前提で、そのトークンが本物かどうかだけを確認します。設定はさらに短くなります。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">application.yml（API側）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-yaml"># APIを守る側（画面を持たない）の設定
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/demo-realm</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        こちらのアプリは、リクエストの<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">Authorization</code>ヘッダーに乗ってきたアクセストークンを検証するだけです。呼び出し側は、次のように<code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">Bearer</code>という単語に続けてトークンを添えてアクセスします。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <button onclick="copyCode(this)" class="copy-btn px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+                            <i class="fas fa-copy mr-1"></i>コピー
+                        </button>
+                        <pre class="!bg-slate-800 !rounded-lg overflow-x-auto"><code class="language-bash"># アクセストークンを添えてAPIを呼び出す
+curl -H "Authorization: Bearer &lt;アクセストークン&gt;" \
+     http://localhost:8081/api/hello</code></pre>
+                    </div>
+                </section>
+
+                <!-- 動作確認カード -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-circle-check text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">9.9 動作確認の流れ</h3>
+                            <p class="text-emerald-900 mb-3">環境がある場合、実際の動きは次の順で確認できます。</p>
+                            <ol class="space-y-2 text-emerald-900 list-decimal list-inside">
+                                <li>サンプルアプリを起動する</li>
+                                <li>ブラウザで <code class="bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-900">http://localhost:8081/secure</code> を開く</li>
+                                <li>未ログインなので、自動的にKeycloakのログイン画面に切り替わる</li>
+                                <li>第8章で使ったユーザーでログインする</li>
+                                <li>Keycloakからアプリへ戻り、保護ページ「/secure」が表示される</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.10 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.10 Java以外の選択肢
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまではSpring Boot（Java）を例にしましたが、考え方はどの言語・技術でも同じです。代表的な選択肢を紹介します。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">分野</th>
+                                    <th class="px-4 py-3 text-left font-semibold">代表的なライブラリ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">特徴</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">フロントエンド（画面側）</td>
+                                    <td class="px-4 py-3 text-slate-600">keycloak-js／oidc-client-ts</td>
+                                    <td class="px-4 py-3 text-slate-600">ブラウザのJavaScriptから直接Keycloakと連携する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Node.js</td>
+                                    <td class="px-4 py-3 text-slate-600">openid-client</td>
+                                    <td class="px-4 py-3 text-slate-600">OpenID Connectの標準的な処理をひととおり提供するライブラリ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">リバースプロキシ方式</td>
+                                    <td class="px-4 py-3 text-slate-600">oauth2-proxy</td>
+                                    <td class="px-4 py-3 text-slate-600">アプリの手前にプロキシを置き、アプリ自体にはログイン処理を持たせない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">言語が違っても骨格は同じ</p>
+                                <p class="text-emerald-900 text-sm">どの技術を選んでも、設定するのは「<strong>issuer URL</strong>」「<strong>クライアントID</strong>」「<strong>リダイレクトURI</strong>」の3点という骨格は変わりません。この章でSpring Bootの例を通じて学んだ考え方は、そのまま他の言語にも応用できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.11 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.11 よくあるエラーと対処
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        連携がうまくいかないとき、原因は限られたパターンに集約されます。よくある4つを押さえておきましょう。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">エラー・症状</th>
+                                    <th class="px-4 py-3 text-left font-semibold">原因</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対処</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">redirect_uri が一致しません</td>
+                                    <td class="px-4 py-3 text-slate-600">Keycloakの「Valid redirect URIs」と、アプリが実際に使うURLが不一致</td>
+                                    <td class="px-4 py-3 text-slate-600">ポート番号・パスまで含めて9.4の設定を再確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">invalid_client</td>
+                                    <td class="px-4 py-3 text-slate-600">client-secretが間違っている、または再発行されている</td>
+                                    <td class="px-4 py-3 text-slate-600">Keycloakの管理コンソールでCredentialsタブのシークレットを再度控える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">issuer-uriに届かない</td>
+                                    <td class="px-4 py-3 text-slate-600">アプリがDockerコンテナ内で動いていて「localhost」が自分自身を指してしまう</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700">host.docker.internal</code>などコンテナ間で到達できるホスト名に変更する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">トークンの署名検証エラー</td>
+                                    <td class="px-4 py-3 text-slate-600">issuer-uriが指すレルムと、実際にログインしたレルムが違う</td>
+                                    <td class="px-4 py-3 text-slate-600">issuer-uriのレルム名（demo-realmなど）が正しいか確認する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: サンプルアプリをKeycloakにつないでみる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">Javaの実行環境がある場合は実際に手を動かしましょう。無い場合は、下の代替課題で理解度を確認してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">demo-appクライアントの<strong>Client authentication</strong>をONにし、Credentialsタブからシークレットを控える。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">Valid redirect URIsに<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">http://localhost:8081/login/oauth2/code/keycloak</code>、Web originsに<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">http://localhost:8081</code>を追加して保存する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">9.6の<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">application.yml</code>を写経し、控えたシークレットを反映する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">アプリを起動し、<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">http://localhost:8081/secure</code>にアクセスする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">Keycloakのログイン画面が表示されることを確認し、ログインして保護ページが表示されるか確かめる。</span>
+                                </li>
+                            </ol>
+
+                            <h4 class="font-medium text-purple-800 mb-2">代替課題（Java環境が無い場合）</h4>
+                            <p class="text-purple-900 break-words">9.6の<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">application.yml</code>を見ながら、<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">client-id</code>・<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">client-secret</code>・<code class="bg-purple-100 px-1.5 py-0.5 rounded text-purple-900">issuer-uri</code>の3つについて、それぞれ何を表しているかを自分の言葉で1文ずつ書き出してみましょう。人に説明できれば、この章の内容は理解できています。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- この章のまとめ -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-clipboard-check text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-emerald-800 mb-3">この章のまとめ</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>アプリ側がやるべきことは、<strong>(1) 未ログインの人をKeycloakへ送る</strong>、<strong>(2) 戻ってきたトークンを検証する</strong>の2つだけ。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>OAuth2 Client</strong>（ログインさせる側）と<strong>Resource Server</strong>（トークンを検証する側）は役割が異なり、Spring Bootでは別々のスターターとして提供される。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>issuer-uri</strong>を1行設定するだけで、認可エンドポイント・トークンエンドポイント・公開鍵の場所が自動的にわかる。</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-emerald-900">
+                                    <i class="fas fa-check text-emerald-500 mt-1 flex-shrink-0"></i>
+                                    <span>言語やフレームワークが変わっても、設定する骨格（issuer URL・クライアントID・リダイレクトURI）は同じ。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 確認問題 -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">確認問題</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. アプリ側がやるべきことを2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            (1) 未ログインの人をKeycloakのログイン画面へ送ること。(2) 戻ってきたトークンが本物か（署名が正しいか）を検証すること。この2つ以外、パスワードの受け取りやログイン画面の作成はアプリ側では行いません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. issuer-uriを1行設定するだけで、アプリが自動的に把握できることを3つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            認可エンドポイント（ログイン画面の場所）、トークンエンドポイント（トークンを受け取る場所）、jwks_uri（署名検証に使う公開鍵の場所）の3つです。アプリは<code class="bg-blue-100 px-1 rounded">/.well-known/openid-configuration</code>を自動的に読みに行き、これらを把握します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. spring-boot-starter-oauth2-clientとspring-boot-starter-oauth2-resource-serverの違いを説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            oauth2-clientは「ログインさせる側」で、画面のあるWebアプリに追加し、未ログインの人をKeycloakのログイン画面へ誘導する機能を持ちます。oauth2-resource-serverは「APIを守る側」で、画面を持たないAPIに追加し、送られてきたアクセストークンの検証だけを行います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="keycloak-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600
+                                  transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第8章: ログインを体験する — 認可コードフローとトークン</span>
+                        </div>
+                    </a>
+                    <a href="keycloak-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: セッション・トークン・ログアウトの管理</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

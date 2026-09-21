@@ -49,6 +49,7 @@ import { oracle } from './data-ai-category/database/oracle';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
+import { keycloak } from './cloud-infrastructure/keycloak';
 
 // ビジネスSaaS
 import { powerBi } from './business-saas/power-bi';
@@ -90,6 +91,7 @@ const all: TechGuide[] = [
   oracle,
   // クラウド・インフラ
   docker,
+  keycloak,
   gitGithub,
   // ビジネスSaaS
   powerBi,
