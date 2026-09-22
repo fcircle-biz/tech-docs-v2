@@ -1,0 +1,590 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Jev</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約2時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Jev デザインパターン</h1>
+                    <p class="text-slate-600">公式の Patterns ガイドが紹介する代表的な設計パターンを学びます。<strong>Confidence-Gated Routing</strong>・<strong>Composite Scoring</strong>・<strong>Intent Routing</strong>・<strong>Speculative Fan-out</strong> の4つは、これまでの章で学んだ State・Question・Confidence・並列評価を、実際のアプリケーション設計に落とし込むための「型」です。本章はこれまでの学習の集大成にあたる重要章のため、他の章より内容を厚めに扱います。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Confidence-Gated Routing で自動処理・確認・人間レビューを振り分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Composite Scoring で複数の Score をコードで重み付けできる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Intent Routing で入力を分類して処理先を振り分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Speculative Fan-out の考え方を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>要件に応じて使うパターンを選べる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 Confidence-Gated Routing（信頼度によるゲート）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドは Confidence-Gated Routing を <strong>「confidence を第二の軸として使う」</strong>パターンだと説明しています。原文では次のように表現されています。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-quote-left text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">公式ドキュメントより</p>
+                                <p class="text-blue-900 text-sm">"Use confidence as a second axis. The answer tells you what; confidence tells you whether to act."（confidence を第二の軸として使う。答えは「何であるか」を教え、confidence は「行動してよいか」を教える。）</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第9章で学んだとおり、Jev の回答には <code class="bg-slate-100">confidence</code> が付随します。Confidence-Gated Routing は、この confidence を<strong>「実行してよいかどうかの関所（ゲート）」</strong>として使う設計です。ポイントは1つだけです。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm"><strong>重要度の高い操作ほど、高い confidence を要求する。</strong>すべての判断に同じ閾値を使うのではなく、「間違えたときの被害が大きい操作」ほど閾値を引き上げます。逆に被害が小さい操作は、多少 confidence が低くても自動実行してよい場合があります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドの音声バンキングの例では、「残高照会」（間違えても被害が小さい）と「送金承認」（間違えると被害が大きい）で、要求する confidence の水準を変えています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">confidence の範囲</th>
+                                    <th class="px-4 py-3 text-left font-semibold">残高照会（低リスク）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">送金承認（高リスク）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">0.6 未満</td>
+                                    <td class="px-4 py-3 text-slate-600">人間（サポート担当）へ</td>
+                                    <td class="px-4 py-3 text-slate-600">人間（サポート担当）へ</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">0.6 以上 0.85 以下</td>
+                                    <td class="px-4 py-3 text-slate-600">自動実行</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーに確認を求める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">0.85 超</td>
+                                    <td class="px-4 py-3 text-slate-600">自動実行</td>
+                                    <td class="px-4 py-3 text-slate-600">自動承認</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じ「送金承認」という Choice でも、confidence の水準によって振る舞いが3段階に分かれる点に注目してください。これをフローチャートに整理すると次のようになります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["Jevの回答＋confidence"] --> B{"confidenceが0.6未満か"}
+    B -->|はい| C["人間（サポート担当）へ"]
+    B -->|いいえ| D{"どの操作か"}
+    D -->|"残高照会（低リスク）"| E["自動実行"]
+    D -->|"送金承認（高リスク）"| F{"confidenceが0.85超か"}
+    F -->|はい| G["自動承認"]
+    F -->|いいえ| H["ユーザーに確認を求める"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">これをコードに落とすと、次のようにシンプルな条件分岐になります。</p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">confidence_routing.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">action = response.answers["intent"]
+
+# confidenceが低い場合は無条件に人間（サポート担当）へ
+if action.confidence < 0.6:
+    route_to_support_agent(account_id)
+elif action.choice == "check_balance":
+    show_balance(account_id)                 # 低リスクなのでそのまま自動実行
+elif action.choice == "approve_transfer":
+    if action.confidence > 0.85:
+        approve_transfer(account_id)         # 高リスクだが確信度が十分高い
+    else:
+        ask_user_to_confirm(account_id)      # 中間はユーザーに確認を求める
+else:
+    route_to_support_agent(account_id)</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 「完全自動化」を目指さない</p>
+                                <p class="text-blue-900 text-sm">Confidence-Gated Routing のねらいは、すべてを自動化することではありません。<strong>「自動化してよい範囲」と「人間に戻すべき範囲」の境界線を、被害の大きさに応じて意図的に引く</strong>ことです。閾値（0.6・0.85 など）は固定の正解ではなく、業務のリスク許容度に合わせてチームが決める設計パラメータです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 Composite Scoring（複合スコアリング）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Composite Scoring は、公式ガイドの言葉を借りれば<strong>「複数の分析軸を1つのスコアへ統合する」</strong>パターンです。1つの複雑な評価を Jev に丸ごと判断させるのではなく、<strong>独立した複数の Score Question に分解して並列評価</strong>し、その結果を<strong>コード側で重み付けして合成</strong>します。第11章で学んだ「複数 Question の並列評価」を、評価・採点という文脈で活用する形とも言えます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドでは、エンジニア候補者の履歴書スクリーニングを例に、<code class="bg-slate-100">python_depth</code>・<code class="bg-slate-100">team_leadership</code>・<code class="bg-slate-100">system_design</code>・<code class="bg-slate-100">generalist</code> の4つを 0〜4 のルーブリックで独立に評価し、それぞれを4で割って 0〜1 に正規化してから重み付け合成する方法が紹介されています。ここでは同じ考え方を、より一般的な採用候補者評価の場面に置き換えて説明します。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-laptop-code text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">技術スキル</h3>
+                            <p class="text-sm text-slate-600">重み 40%</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-users text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">リーダーシップ</h3>
+                            <p class="text-sm text-slate-600">重み 20%</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-sitemap text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">設計力</h3>
+                            <p class="text-sm text-slate-600">重み 30%</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-comments text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">コミュニケーション</h3>
+                            <p class="text-sm text-slate-600">重み 10%</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">4つの Score Question（各 0〜4 段階のルーブリック）を1リクエストで取得したら、コード側で正規化し、重みを掛けて合成します。</p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">composite_scoring.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 各Scoreを0〜1に正規化する（ルーブリックが0〜4段階の場合）
+tech   = response.answers["technical_skill"].score / 4
+lead   = response.answers["leadership"].score / 4
+design = response.answers["system_design"].score / 4
+comm   = response.answers["communication"].score / 4
+
+# 重みはJevに決めさせず、コードの定数として管理する
+WEIGHTS = {"tech": 0.40, "lead": 0.20, "design": 0.30, "comm": 0.10}
+
+final_score = (
+    tech * WEIGHTS["tech"] + lead * WEIGHTS["lead"]
+    + design * WEIGHTS["design"] + comm * WEIGHTS["comm"]
+)</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドの例でも、同じ4つの評価軸に対して「個人貢献者（IC）向け」と「エンジニアリングマネージャー（EM）向け」で異なる重みのセットを用意する例が示されています。役割によって重視したい軸が変わるなら、<code class="bg-slate-100">WEIGHTS</code> を役割ごとに複数用意し、使い分けるだけで対応できます。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 責務分担</p>
+                                <p class="text-emerald-900 text-sm"><strong>Jev = 個々の判断／コード = 最終判断</strong>という原則が、ここでも一貫しています。Jev は「技術スキルは3」「リーダーシップは2」のように<strong>各軸を独立に評価するだけ</strong>です。「技術スキルを40%、設計力を30%として重視する」という<strong>重みの決定はコードの責務</strong>であり、Jev に決めさせてはいけません。重みをコードの定数として持つことで、採用基準が変わったときも<strong>Jev への問い合わせをやり直さずに重みだけ調整して再計算</strong>できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 Intent Routing（意図による振り分け）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Intent Routing は、公式ガイドの言葉では<strong>「受信したリクエストを分類し、それぞれを最適なハンドラーへ振り分ける」</strong>パターンです。ユーザーの入力をまず Jev に通し、<code class="bg-slate-100">Choice</code> で意図（intent）を分類してから、決定論的なコード・専門特化した LLM・人間のいずれかへ処理を渡します。<strong>Jev を LLM の前段に置く</strong>という構成が最大の特徴です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドのカスタマーサポートの例では、<code class="bg-slate-100">intent</code>（Choice: 注文状況／製品に関する質問／返品交換／クレーム）と <code class="bg-slate-100">complexity</code>（Score: 複雑度）の2つの Question を1リクエストにまとめて評価します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["ユーザーからの問い合わせ"] --> B["Jev（intentをChoiceで分類＋complexityをScoreで評価）"]
+    B --> C{"intentのconfidenceが0.5未満か"}
+    C -->|はい| H1["人間エージェントへ"]
+    C -->|いいえ| D{"intentの分類結果"}
+    D -->|"order_status"| E["データベース照会（決定論的コード）"]
+    D -->|"product_question"| F["製品専門LLMへ"]
+    D -->|"return_exchange"| G["返品専門LLMへ"]
+    D -->|"complaint"| I{"complexityが高い または confidenceが低いか"}
+    I -->|はい| H2["人間エージェントへ"]
+    I -->|いいえ| J["クレーム対応LLMへ"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここでも Confidence-Gated Routing と同じ考え方が使われています。<code class="bg-slate-100">intent.confidence</code> が低い時点で早期に人間へ回し、<code class="bg-slate-100">complaint</code>（クレーム）に分類された場合はさらに <code class="bg-slate-100">complexity</code> を見て、複雑度が高いか確信度が低ければ人間へエスカレーションします。パターンは単独で使うだけでなく、<strong>組み合わせて多段のゲートを作れる</strong>ことがわかります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">intent_routing.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def route_ticket(ticket_id, response):
+    intent = response.answers["intent"]
+    complexity = response.answers["complexity"]
+
+    if intent.confidence < 0.5:
+        return route_to_human(ticket_id)          # 分類の確信度が低い
+
+    if intent.choice == "order_status":
+        return query_database(ticket_id)          # 決定論的コードで処理
+    if intent.choice == "complaint":
+        if complexity.score > 1 or complexity.confidence < 0.5:
+            return route_to_human(ticket_id)      # 複雑なクレームは人間へ
+        return handle_with_llm(ticket_id, "complaint")
+    return handle_with_llm(ticket_id, intent.choice)  # その他は専門LLMへ</code></pre>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 「振り分け先」はLLMだけではない</p>
+                                <p class="text-red-900 text-sm">Intent Routing の目的は「安いリクエストは安い手段で処理し、難しいリクエストだけ高コストな手段に回す」ことです。上の例のように<code class="bg-red-100">order_status</code> はデータベース照会という<strong>決定論的なコード</strong>で完結し、LLM をまったく呼び出しません。すべての意図を LLM に投げるのではなく、<strong>コードで確定的に処理できるものはコードで済ませる</strong>のが Intent Routing の要点です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 Speculative Fan-out（投機的ファンアウト）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドは Speculative Fan-out を次のように説明しています。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-quote-left text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">公式ドキュメントより</p>
+                                <p class="text-blue-900 text-sm">"Send many questions in a single call, including speculative ones, and let your code decide what's relevant."（投機的なものも含め、多くの Question を1回の呼び出しでまとめて送り、何が関係あるかはコード側で判断させる。）</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第11章で学んだように、Jev は1リクエストに含めた複数の Question を並列に評価するため、<strong>Question を追加してもレスポンス時間はほとんど変わりません</strong>。この特性を利用し、「使うかどうかまだ分からない Question」も<strong>投機的に</strong>まとめて送ってしまい、結果を見てからコード側で使う／使わないを決めるのが Speculative Fan-out です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph A["逐次リクエスト（往復が多い）"]
+        A1["Question1を送信"] --> A2["結果を待つ"]
+        A2 --> A3["分岐に応じてQuestion2を送信"]
+        A3 --> A4["さらに結果を待つ"]
+    end
+    subgraph B["Speculative Fan-out"]
+        B1["5つのQuestionを1回でまとめて送信"] --> B2["Jevが並列に評価"]
+        B2 --> B3["コードが必要な結果だけを使う"]
+    end
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドのサポートチケット仕分けの例では、<code class="bg-slate-100">category</code>・<code class="bg-slate-100">bug_severity</code>・<code class="bg-slate-100">has_reproducible_steps</code>・<code class="bg-slate-100">refund_requested</code>・<code class="bg-slate-100">frustration</code> の5つの Question を1リクエストにまとめて送ります。実際に使うのは <code class="bg-slate-100">category</code> の分類結果次第で、残りの結果は状況によって使われないこともあります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">speculative_fanout.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 1回のリクエストで5つのQuestionを投機的にまとめて送る
+response = client.system_one(
+    state={"ticket": ticket_text},
+    questions={
+        "category": category_q, "bug_severity": severity_q,
+        "has_reproducible_steps": repro_q, "refund_requested": refund_q,
+        "frustration": frustration_q,
+    },
+)
+category = response.answers["category"].choice
+# 使うのはcategory次第。残り4つは無視されることもある
+if category == "bug_report":
+    handle_bug(response.answers["bug_severity"])
+elif category == "billing":
+    handle_billing(response.answers["refund_requested"])</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ガイドが挙げる使いどころは、<strong>サポートチケットの自動仕分けのように、条件によって一部の分析結果が不要になる意思決定プロセス</strong>です。往復通信（レイテンシ）を減らせる点が主な利点であり、「念のため聞いておく」ことのコストがほぼゼロに近いという Jev の並列評価の特性を、設計として積極的に使うパターンだと言えます。
+                    </p>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 パターンの選び方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        4つのパターンは互いに排他的ではなく、<strong>組み合わせて使う</strong>ことも珍しくありません（12.3 の例では Intent Routing の中に Confidence-Gated Routing が組み込まれていました）。迷ったときは「やりたいこと」から逆引きしてください。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">やりたいこと</th>
+                                    <th class="px-4 py-3 text-left font-semibold">使うパターン</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Jev の役割</th>
+                                    <th class="px-4 py-3 text-left font-semibold">コードの役割</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">自動化してよい範囲を線引きしたい</td>
+                                    <td class="px-4 py-3 text-slate-600">Confidence-Gated Routing</td>
+                                    <td class="px-4 py-3 text-slate-600">判断＋confidenceを返す</td>
+                                    <td class="px-4 py-3 text-slate-600">confidenceに応じて自動実行／確認／人間へ振り分け</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">複数の評価軸から総合点を出したい</td>
+                                    <td class="px-4 py-3 text-slate-600">Composite Scoring</td>
+                                    <td class="px-4 py-3 text-slate-600">各軸を独立にScoreで評価</td>
+                                    <td class="px-4 py-3 text-slate-600">正規化して重み付け合成し最終スコアを算出</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">入力の内容によって行き先を変えたい</td>
+                                    <td class="px-4 py-3 text-slate-600">Intent Routing</td>
+                                    <td class="px-4 py-3 text-slate-600">意図をChoiceで分類</td>
+                                    <td class="px-4 py-3 text-slate-600">分類結果に応じてDB／専門LLM／人間へ振り分け</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">後で使うかもしれない情報も先読みしたい</td>
+                                    <td class="px-4 py-3 text-slate-600">Speculative Fan-out</td>
+                                    <td class="px-4 py-3 text-slate-600">複数Questionを1回で並列評価</td>
+                                    <td class="px-4 py-3 text-slate-600">必要になった結果だけを選んで使う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">分類しつつ、怪しいものだけ人間で二重チェックしたい</td>
+                                    <td class="px-4 py-3 text-slate-600">Intent Routing ＋ Confidence-Gated Routing</td>
+                                    <td class="px-4 py-3 text-slate-600">分類＋各段階のconfidenceを返す</td>
+                                    <td class="px-4 py-3 text-slate-600">分類結果とconfidenceの両方を見て多段に振り分け</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        どのパターンを選んでも共通しているのは、<strong>Jev には「個々の判断」だけを担わせ、それをどう使うか（重み・閾値・振り分け先）はコードが決める</strong>という第8章以来の原則です。デザインパターンとは、この原則を具体的な形に落とし込むための「型」に過ぎません。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: 社内ヘルプデスクの一次対応自動化を設計する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">社内ヘルプデスクには「PCの不調」「アカウントロック」「経費精算の質問」「その他の一般的な質問」など、さまざまな問い合わせが届きます。これらの一次対応を自動化するシステムを、本章で学んだパターンを使って設計してみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">どのパターンを組み合わせるか選ぶ。「問い合わせの種類によって行き先を変えたい」「怪しい分類は人間に確認させたい」という2つの要求から、必要なパターンを逆引きしてみる。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">Jev に投げる State と Question を設計する。問い合わせ本文をStateとし、少なくとも「カテゴリ」を判定するChoice Questionを1つ用意する。緊急度を判定するScore Questionを加えてもよい。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">コード側の合成ロジックを設計する。confidenceが低いときに人間へ回す条件、カテゴリごとの振り分け先（決定論的コードかLLMか）を書き出す。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-sm font-medium text-purple-900 mb-1">解答の目安</p>
+                                <p class="text-sm text-purple-900 break-words mb-2"><strong>使うパターン</strong>: Intent Routing（category の分類）＋ Confidence-Gated Routing（confidence による人間へのエスカレーション）を組み合わせる。</p>
+                                <p class="text-sm text-purple-900 break-words mb-2"><strong>Question設計</strong>: State ＝ 問い合わせ本文。Question は category（Choice: pc_trouble／account_lock／expense／general）と urgency（Score 0〜3）の2つ。</p>
+                                <p class="text-sm text-purple-900 break-words">
+                                    <strong>合成ロジック</strong>: category.confidence が 0.6 未満なら無条件で人間へ。account_lock は決定論的コードでパスワード再設定用URLを発行。pc_trouble は社内ナレッジベース検索LLMへ、expense は経費規程FAQ LLMへ。generalはそのまま一般問い合わせLLMへ。いずれの分岐でも urgency.score が2以上なら優先度「高」を付けてキューの先頭に回す。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. Confidence-Gated Routing で「重要度の高い操作ほど高い confidence を要求する」とはどういうことですか？公式ガイドの音声バンキングの例で説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            間違えたときの被害が小さい「残高照会」は confidence が 0.6 以上あれば自動実行してよい一方、間違えると被害が大きい「送金承認」は confidence が 0.85 を超えて初めて自動承認とし、0.6〜0.85 の間はユーザーへの確認を挟みます。<strong>操作のリスクに応じて閾値を変える</strong>のがこのパターンの要点です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Composite Scoring で、重みを Jev に決めさせず、コードの定数として管理するのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Jev の役割は各評価軸を<strong>独立に判断すること</strong>であり、それらをどう組み合わせて最終判断にするかは<strong>コードの責務</strong>だからです。重みをコード側に置けば、評価基準が変わったときも Jev へ問い合わせをやり直さずに<strong>重みだけを調整して再計算</strong>でき、基準の透明性も保てます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. Intent Routing では Jev をシステムのどこに置きますか？また、その理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>LLM の前段</strong>に置きます。ユーザー入力をまず Jev で意図分類し、注文状況照会のように<strong>決定論的なコードだけで解決できるものはLLMを呼ばずに処理し</strong>、専門的な回答が必要なものだけを該当分野の専門LLMへ振り分けます。これにより、コストの高いLLM呼び出しを本当に必要な場合だけに絞れます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. Speculative Fan-out が成立するのは、Jev のどんな特性のおかげですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            1リクエストに含めた複数の Question が<strong>並列に評価される</strong>ため、Question を追加してもレスポンス時間がほとんど変わらないという特性です。この「追加コストがほぼゼロ」という性質を利用し、使うかどうか未確定な Question も投機的にまとめて送り、コード側で後から取捨選択します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jev-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第11章: 複数Questionと並列評価</span>
+                        </div>
+                    </a>
+                    <a href="jev-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: jev-1.13の弱点と注意点</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
