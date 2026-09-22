@@ -1,0 +1,566 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Apache Superset</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第2章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第2章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約60分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">環境構築 — Dockerで動かす</h1>
+                    <p class="text-slate-600">この章では、Docker Compose を使って学習用の Apache Superset 環境を実際に起動します。用意するもの、起動コマンド、初期ログイン、起動している各コンテナの役割、サンプルデータの読み込み、そしてうまく起動しないときの確認ポイントまでを、手を動かしながら学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Docker Compose を使って Superset を起動できる（用意するものと起動手順を理解する）</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>初期管理者アカウントでログインし、既定パスワードを直ちに変更すべき理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>起動している各コンテナ（Superset本体・メタデータDB・キャッシュ・Celeryワーカー）の役割を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サンプルデータを読み込み、起動トラブル時に確認すべきポイントを把握している</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション2.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.1 用意するもの
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Superset を実際に動かすには、画面を表示する Web アプリ本体だけでなく、設定を保存する場所や非同期処理の仕組みなど、いくつかの部品が同時に必要です。まずは何を用意すればよいか、そしてそれらを個別にインストールせず Docker でまとめて用意する理由を確認しましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">目安・条件</th>
+                                    <th class="px-4 py-3 text-left font-semibold">理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Docker Desktop（または Docker Engine ＋ Docker Compose v2）</td>
+                                    <td class="px-4 py-3 text-slate-600">最新の安定版がインストール済み</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">docker compose</code> コマンドを使うため</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">メモリ</td>
+                                    <td class="px-4 py-3 text-slate-600">8GB以上をDockerに割り当て</td>
+                                    <td class="px-4 py-3 text-slate-600">Superset本体・メタデータDB・Redis・Celeryワーカーを同時に動かすため</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">空きポート</td>
+                                    <td class="px-4 py-3 text-slate-600">8088番</td>
+                                    <td class="px-4 py-3 text-slate-600">ブラウザからSupersetの画面にアクセスするため（使用中なら変更も可能）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">git</td>
+                                    <td class="px-4 py-3 text-slate-600">インストール済み</td>
+                                    <td class="px-4 py-3 text-slate-600">公式リポジトリを <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">clone</code> するため</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        上の4つさえあれば、Python のインストールやライブラリのバージョン調整を自分で行うことなく学習を始められます。理由は、Superset が単体のアプリではなく<strong>複数のコンポーネントが連携して動くシステム</strong>だからです。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-orange-800 mb-3"><i class="fas fa-circle-xmark mr-2"></i>Dockerを使わずに個別構築する場合</h3>
+                            <ul class="space-y-2 text-sm text-orange-900">
+                                <li>Python本体と、バージョンを合わせた依存ライブラリを用意する</li>
+                                <li>設定保存用にPostgreSQLを別途構築する</li>
+                                <li>キャッシュ・非同期処理用にRedisとCeleryを構築し連携させる</li>
+                                <li>どれか1つでも壊れると、1つずつ切り分けて調べる必要がある</li>
+                            </ul>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                            <h3 class="font-semibold text-emerald-800 mb-3"><i class="fas fa-circle-check mr-2"></i>Docker Composeを使う場合</h3>
+                            <ul class="space-y-2 text-sm text-emerald-900">
+                                <li>1つのコマンドで全コンポーネントがまとめて起動する</li>
+                                <li>組み合わせるバージョンは公式が検証済みの構成を使える</li>
+                                <li>環境がおかしくなっても、作り直して最初からやり直せる</li>
+                                <li>学習が終われば、PCを汚さず丸ごと削除できる</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: Docker Compose とは</p>
+                                <p class="text-blue-900 text-sm">複数のコンテナ（Webアプリ・データベース・キャッシュなど）をまとめて定義し、<strong>1つのコマンドで起動・停止できるようにするツール</strong>です。Superset のように多くの部品で構成されるアプリケーションの学習環境を用意するのに向いています。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.2 Docker Compose で起動する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式リポジトリを取得し、付属の Compose ファイルで起動します。<strong>タグを指定せずに起動すると、その時点の最新（開発中のコード）が起動してしまう</strong>ため、公式が案内するリリースタグへ切り替えてから起動します。ターミナル（macOS / Linux）または PowerShell（Windows）で、次のコマンドを順に実行してください。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">セットアップ</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 公式リポジトリを取得する（タグを後で切り替えるため--depth=1は付けない）
+git clone https://github.com/apache/superset.git
+cd superset
+
+# 公式が案内する最新リリースのタグに切り替える（6.0.0は例。番号は公式手順で確認する）
+git checkout tags/6.0.0
+
+# Docker Composeで起動する（-dはバックグラウンド実行の意味）
+docker compose -f docker-compose-image-tag.yml up -d</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        初回はSuperset本体やPostgreSQL、Redisなどの<strong>イメージのダウンロード</strong>と、<strong>メタデータDBの初期化</strong>（テーブル作成・管理者ユーザーの作成など）が走るため、環境やネットワーク回線によっては<strong>数分〜十数分</strong>かかります。ターミナルの入力待ちが戻ってきても、内部の初期化がまだ終わっていないことがあります。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">タグ番号・compose ファイル名は公式ドキュメントで確認する</p>
+                                <p class="text-blue-900 text-sm">上記の <code class="bg-blue-100 text-blue-900 px-1 rounded">6.0.0</code> は本教材の作成時点における例のタグ番号です。実際にどのタグを使うべきかは<strong>都度、公式クイックスタートで確認</strong>してください。Compose ファイルの名前やイメージタグの指定方法も、Superset のバージョンによって変わることがあります。上記のコマンドでエラーになる場合や、より新しい手順を使いたい場合は、<a href="https://superset.apache.org/docs/quickstart" class="text-primary-600 hover:text-primary-700 underline" target="_blank" rel="noopener noreferrer">公式ドキュメント（Quickstart）</a>を必ず確認してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        起動コマンドを実行したら、<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">docker compose -f docker-compose-image-tag.yml ps</code> でコンテナの状態を確認します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">状態確認</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 起動しているコンテナの一覧と状態を確認する
+docker compose -f docker-compose-image-tag.yml ps</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        各コンテナの状態が <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">Up</code>（起動中）になっていれば正常です。一部のコンテナは初期化作業だけを行い、完了すると <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">Exited (0)</code> のように終了する設計になっていますが、これは異常ではありません。詳しくは 2.4 で解説します。
+                    </p>
+                </section>
+
+                <!-- セクション2.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.3 ログインして初期状態を確認
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ブラウザで <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">http://localhost:8088</code> を開きます。ログイン画面が表示されたら、初期管理者アカウントでログインしましょう。多くの構成では、既定のユーザー名・パスワードは<strong>いずれも <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">admin</code></strong> です（利用する compose ファイルやバージョンによって異なる場合があります）。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">既定パスワードのまま使わない</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 px-1 rounded">admin / admin</code> は学習用に最初から設定されている、誰でも知っているパスワードです。<strong>ローカルで自分だけが触る学習環境であっても、早めに変更する習慣</strong>をつけてください。社内サーバやクラウド上など、他の人からアクセスできる環境では<strong>絶対にこのままのパスワードで運用してはいけません</strong>。変更は管理画面のユーザー編集から行えます（ロールと権限は第13章で詳しく扱います）。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログインに成功すると、上部に Dashboards・Charts・Datasets・SQL Lab などのメニューが並んだ画面が表示されます。この章では「ログインできること」の確認までとし、画面の細かい見方は第3章でじっくり扱います。
+                    </p>
+                </section>
+
+                <!-- セクション2.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.4 起動しているコンテナの役割
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">docker compose -f docker-compose-image-tag.yml ps</code> に並んでいたコンテナは、それぞれ別の役割を持っています。第1章で確認した「Superset は分析対象のデータを持たない」という性質を思い出しながら、自分が起動したものが何なのかを整理しましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">コンテナ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">何をしているか</th>
+                                    <th class="px-4 py-3 text-left font-semibold">分析対象DBとの関係</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">superset<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_app）Webアプリ本体</span></td>
+                                    <td class="px-4 py-3 text-slate-600">画面を表示し、ブラウザからの操作を受けてSQLを発行する</td>
+                                    <td class="px-4 py-3 text-slate-600">分析対象DBに<strong>接続しにいく側</strong>。データそのものは持たない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">db<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_db）メタデータDB（PostgreSQL）</span></td>
+                                    <td class="px-4 py-3 text-slate-600">チャート・ダッシュボードの定義、ユーザー、権限、保存クエリなどSuperset自身の設定を保存する</td>
+                                    <td class="px-4 py-3 text-slate-600">メタデータ用の<code class="bg-slate-100 px-1 rounded text-xs">superset</code>データベースとは<strong>別物</strong>だが、学習環境では同じPostgreSQLコンテナに<strong>同居</strong>する（詳しくは下記）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">redis<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_cache）キャッシュ</span></td>
+                                    <td class="px-4 py-3 text-slate-600">実行済みクエリ結果を一時保存して表示を高速化する。Celeryへの処理依頼の仲介もする</td>
+                                    <td class="px-4 py-3 text-slate-600">分析対象DBとは無関係。一時データのみ扱う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">superset-worker<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_worker）Celeryワーカー</span></td>
+                                    <td class="px-4 py-3 text-slate-600">重い集計や非同期のクエリ実行など、時間のかかる処理を裏側で行う</td>
+                                    <td class="px-4 py-3 text-slate-600">処理の中で分析対象DBにSQLを発行することがある</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">superset-worker-beat<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_worker_beat）Celery Beat</span></td>
+                                    <td class="px-4 py-3 text-slate-600">定期実行のスケジューラ。決まった時刻・間隔でCeleryワーカーに処理を依頼する</td>
+                                    <td class="px-4 py-3 text-slate-600">分析対象DBには直接関与しない（第14章のアラート／レポートで利用）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">superset-init<br><span class="text-xs text-slate-500 font-normal">（コンテナ名: superset_init）初期化用コンテナ</span></td>
+                                    <td class="px-4 py-3 text-slate-600">初回起動時にメタデータDBのテーブル作成・管理者ユーザー作成などを行い、完了すると終了する</td>
+                                    <td class="px-4 py-3 text-slate-600">分析対象DBには関与しない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    U["利用者のブラウザ"] --> S["Superset本体<br/>（Webアプリ）"]
+    I["初期化用コンテナ<br/>（起動時のみ動作し完了後に終了）"] -.->|初期化| D
+    S --> D[("メタデータDB<br/>PostgreSQL")]
+    S --> R[("キャッシュ＆<br/>メッセージブローカー（Redis）")]
+    W["Celeryワーカー<br/>（重い処理を非同期実行）"] --> R
+    W --> D
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        図とあわせて確認したいのは、<strong>ここまでの手順で起動したデータベース（メタデータDB）は、分析したい業務データが入るデータベースとは別物</strong>だという点です。ただし学習環境では、この同じ <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">db</code> コンテナの中に、サンプルデータ用の <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">examples</code> データベースも作られています。同じ PostgreSQL サーバに同居していても、メタデータ用の <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">superset</code> データベースとは<strong>別のデータベース</strong>です。売上や顧客データのような、あなたが本当に分析したいデータは、この後の第4章で<strong>別途用意したデータベースに接続</strong>して読み込みますが、その最初の練習として第4章ではまずこの <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">examples</code> データベースに接続します。
+                    </p>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">混同しやすいポイント</p>
+                                <p class="text-emerald-900 text-sm">docker compose で一緒に立ち上がる PostgreSQL コンテナ（<code class="bg-emerald-100 text-emerald-900 px-1 rounded">db</code>）には、Superset自身の設定を保存する<strong>メタデータDB（<code class="bg-emerald-100 text-emerald-900 px-1 rounded">superset</code>）</strong>と、サンプルデータ用の<strong>examplesデータベース</strong>が同居しています。両者は同じサーバにあっても<strong>別のデータベース</strong>であり、メタデータDBに売上データなどを直接書き込む使い方はしません。本来、分析対象のデータは既存の業務データベースやデータウェアハウスに<strong>接続</strong>して読みにいきます（第4章）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション2.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.5 サンプルデータを読み込む
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        空の状態から始めるより、動いているダッシュボードを見ながら触るほうが理解が早いため、公式が用意しているサンプルデータセットとダッシュボードを使います。既定では環境変数 <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">SUPERSET_LOAD_EXAMPLES=yes</code> が設定されており、<strong>初回起動時（superset-init コンテナの処理中）に自動でサンプルデータが読み込まれます</strong>。まずは手を動かす前に、すでに読み込まれているかどうかを確認しましょう。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ブラウザで上部メニューの <strong>Dashboards</strong> を開き、サンプルダッシュボードがすでに一覧に並んでいるか確認してください。並んでいれば、この節の作業は完了です。2.6 や第3章へそのまま進んで構いません。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">並んでいない場合は手動で読み込む</p>
+                                <p class="text-blue-900 text-sm">環境変数の設定や初期化のタイミングによっては、自動読み込みが行われないことがあります。Dashboards に何も表示されていない場合は、Superset 本体のコンテナの中で、サンプルデータを投入する管理コマンド <code class="bg-blue-100 text-blue-900 px-1 rounded">superset load_examples</code> を次の手順で手動実行してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">サンプルデータ読み込み（手動・補助手段）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># Dashboardsにサンプルが見当たらない場合のみ実行する
+# コンテナ名は環境により異なる（docker compose -f docker-compose-image-tag.yml psで確認できる）
+docker exec -it superset_app superset load_examples</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実行にはデータ量に応じて数分かかることがあります。完了すると、Dashboards の一覧に複数のサンプルダッシュボードが表示されるようになります（具体的なダッシュボード名や数はバージョンによって異なる場合があります）。すでに読み込まれている状態でもう一度このコマンドを実行しても、通常は大きな問題にはなりません。
+                    </p>
+                </section>
+
+                <!-- セクション2.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        2.6 うまく起動しないときのチェックリスト
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        初めて Docker で複数のコンテナを起動すると、何かしらでつまずくことは珍しくありません。焦らず、次の観点で順に確認しましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">症状</th>
+                                    <th class="px-4 py-3 text-left font-semibold">疑うべき原因</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対処</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ブラウザで localhost:8088 に繋がらない</td>
+                                    <td class="px-4 py-3 text-slate-600">8088番ポートを既に別のプロセスが使っている</td>
+                                    <td class="px-4 py-3 text-slate-600">使用中のプロセスを止めるか、composeファイルのポート指定を変更する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">コンテナがすぐ落ちる・動作が極端に遅い</td>
+                                    <td class="px-4 py-3 text-slate-600">Docker Desktopに割り当てているメモリが不足している</td>
+                                    <td class="px-4 py-3 text-slate-600">Docker Desktopの設定でメモリ割り当てを8GB以上に増やす</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ログイン画面が出ない・ログインできない</td>
+                                    <td class="px-4 py-3 text-slate-600">初期化用コンテナの処理（DB初期化・管理者ユーザー作成）がまだ終わっていない</td>
+                                    <td class="px-4 py-3 text-slate-600">docker compose -f docker-compose-image-tag.yml ps で初期化用コンテナの終了を確認し、数分待ってから再アクセスする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">原因がはっきりしない</td>
+                                    <td class="px-4 py-3 text-slate-600">対象コンテナのログをまだ見ていない</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">docker compose -f docker-compose-image-tag.yml logs -f</code> に続けて対象のサービス名を指定して確認する（前の<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">-f</code>はcomposeファイル指定、後の<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">-f</code>はログ追尾の意味）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        表の中でも特に有効なのが、対象のコンテナのログをその場で見る方法です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ログ確認</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># サービス名は docker compose -f docker-compose-image-tag.yml ps の表示名を指定する（例: superset）
+docker compose -f docker-compose-image-tag.yml logs -f superset</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        一旦環境を止めて作り直したいときは、次のコマンドを使います。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">停止・再開</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 停止する（コンテナは削除されるが、ボリューム＝データは保持される）
+docker compose -f docker-compose-image-tag.yml down
+
+# 再び起動する
+docker compose -f docker-compose-image-tag.yml up -d</code></pre>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1"><code class="bg-red-100 px-1 rounded">docker compose -f docker-compose-image-tag.yml down -v</code> は使い方に注意</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 px-1 rounded">-v</code> オプションを付けると、コンテナだけでなく<strong>ボリューム（データの保存領域）ごと削除</strong>します。ここには、これまでの設定、接続情報、読み込んだサンプルデータ、そして今後の章で作成するデータセットやダッシュボードもすべて保存されています。<strong>単に一時停止したいだけなら、<code class="bg-red-100 px-1 rounded">-v</code> を付けない <code class="bg-red-100 px-1 rounded">docker compose -f docker-compose-image-tag.yml down</code> を使ってください</strong>。<code class="bg-red-100 px-1 rounded">-v</code> は「学習環境を完全に作り直したいとき」だけの操作です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 2-1: Supersetを起動してサンプルダッシュボードを開く
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">実際に手を動かして、Superset を起動するところまでを体験しましょう。うまくいかない場合は 2.6 のチェックリストを見直してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">2.2の手順でまだ起動していなければ <code class="bg-purple-100 px-1 rounded">docker compose -f docker-compose-image-tag.yml up -d</code> で起動する（すでに起動済みならそのままでよい）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">ターミナルで <code class="bg-purple-100 px-1 rounded">docker compose -f docker-compose-image-tag.yml ps</code> を実行し、表示された6つのコンテナの名前と状態を書き出す。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ブラウザで <code class="bg-purple-100 px-1 rounded">http://localhost:8088</code> を開き、admin / admin でログインする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">上部メニューの Dashboards を開き、サンプルダッシュボードを1つクリックして表示する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-sm font-medium text-purple-900 mb-1">解答の目安</p>
+                                <p class="text-sm text-purple-900 break-words"><code class="bg-purple-200 px-1 rounded">docker compose -f docker-compose-image-tag.yml ps</code> の出力には、<strong>superset・db・redis・superset-worker・superset-worker-beat・superset-init</strong> の6つのサービスに相当する行が並びます（実際のコンテナ名はそれぞれ superset_app・superset_db・superset_cache・superset_worker・superset_worker_beat・superset_init です）。superset-init は処理完了後に「Exited」のような終了状態で表示されていれば正常です。2.4 の表と照らし合わせて、<strong>全行の役割を確認できれば</strong>、このステップは完了です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. なぜ、Python環境やデータベースを1つずつ手動で構築せずにDockerを使うのですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Superset を動かすには本体（Webアプリ）だけでなく、設定を保存するメタデータDB、キャッシュ、非同期処理用のCeleryワーカーなど複数のコンポーネントが連携して動く必要があります。これらを個別にインストールしてバージョンを合わせるのは手間がかかり失敗もしやすいため、<strong>Docker Composeでまとめて起動</strong>できるようにしてあります。壊れても環境を丸ごと作り直せる手軽さもメリットです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 初期管理者アカウント（admin / admin）は、どのような場面でなら使ってよいですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>自分のPC上だけで完結する学習・検証目的</strong>に限られます。誰か他の人がアクセスできるサーバやクラウド上の環境、まして本番運用では絶対に使わず、ログインできたらすぐにパスワードを変更してください。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. docker compose down と docker compose down -v の違いは何ですか？（compose ファイル指定は省略）</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200 px-1 rounded">docker compose -f docker-compose-image-tag.yml down</code> はコンテナとネットワークを停止・削除しますが、データを保存している<strong>ボリュームは残ります</strong>。<code class="bg-blue-200 px-1 rounded">-v</code> を付けると、そのボリュームごと削除するため、メタデータDBに保存されていたユーザー設定・接続情報・作成済みのチャートやダッシュボードなどが<strong>すべて消えてしまいます</strong>。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. docker compose -f docker-compose-image-tag.yml ps で一緒に起動しているデータベース（PostgreSQL、db コンテナ）に、売上などの分析したい業務データを直接書き込んでもよいですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            いいえ。それは<strong>メタデータDB</strong>であり、Superset自身の設定（チャート・ダッシュボードの定義、ユーザー、権限など）を保存するための場所です。分析したい業務データはこれとは別の「分析対象のDB」に用意し、第4章で学ぶ手順でSupersetから接続して読みにいきます。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="superset-learning-material-01.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第1章: Apache Supersetとは</span>
+                        </div>
+                    </a>
+                    <a href="superset-learning-material-03.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第3章: 画面ツアーと基本操作</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
