@@ -4,28 +4,32 @@
 
 Superset は、データベースに保存されたデータを **SQL で探索し、チャートに描き、ダッシュボードとして共有する**ためのツールです。本教材では「画面の操作手順」を覚えるだけでなく、**データベース接続 → データセット（意味づけ） → チャート → ダッシュボード → 権限・運用**という Superset の考え方の流れを理解し、自分のデータで分析基盤を立ち上げられるようになることを目指します。
 
-> 本教材は Superset 4 系以降（Docker Compose で起動する構成）を前提に説明しています。環境構築では公式クイックスタートに従い、リリースタグを指定して起動します（タグを指定しないとその時点の最新版が起動します）。Superset は更新の速いプロダクトであり、画面のラベルや設定項目名はバージョンによって変わることがあるため、詳細は必ず公式ドキュメントも併せて確認してください。
+> **本教材の検証環境: Apache Superset 6.1.0**
+>
+> 本教材は上記バージョン（Docker Compose で起動する構成）で動作確認しています。Superset はバージョンにより **UI のラベル・機能フラグの既定値・Docker Compose の構成**が変わるため、異なるバージョンを使用する場合は公式ドキュメントも併せて確認してください。環境構築では公式クイックスタートに従い、**リリースタグを指定**して起動します（タグを指定しないとその時点の開発版が起動します）。
+>
+> なお、公式の Docker Compose 構成は**開発・評価用途を主目的としており、本番用途には推奨・サポートされていません**。本教材で作る環境は学習用であり、本番運用で必要になる観点は第14章で扱います。
 
 ## 前提条件
 
 ### 必要な環境
 
 - Docker Desktop（または Docker Engine ＋ Docker Compose v2）が動作する PC
-- メモリ 8GB 以上（Superset・メタデータ DB・Redis を同時に起動するため）
+- メモリ 8GB 以上を Docker に割り当て（公式の最低要件ではなく本教材の推奨値。Superset・メタデータ DB・Redis・Celery ワーカーを同時に起動するため）
 - Web ブラウザ（Google Chrome 推奨）
-- ターミナル（macOS / Linux）または PowerShell（Windows）
+- ターミナル（macOS / Linux）。**Windows は公式サポート対象外**のため、WSL2 上の Linux で進めることを推奨
 - テキストエディタ（VS Code など。設定ファイル `superset_config.py` の編集に使用）
 
 ### 参考リソース
 
 - [Apache Superset 公式サイト](https://superset.apache.org/)
-- [公式ドキュメント（Intro）](https://superset.apache.org/docs/intro)
-- [クイックスタート](https://superset.apache.org/docs/quickstart)
-- [インストール（Docker Compose）](https://superset.apache.org/docs/installation/docker-compose)
+- [公式ドキュメント（Intro）](https://superset.apache.org/user-docs/intro)
+- [クイックスタート](https://superset.apache.org/user-docs/quickstart)
+- [インストール（Docker Compose）](https://superset.apache.org/admin-docs/installation/docker-compose)
 - [データベース接続（対応DBとドライバ）](https://superset.apache.org/user-docs/databases/)
-- [SQL Templating（Jinja）](https://superset.apache.org/docs/configuration/sql-templating)
-- [Alerts and Reports](https://superset.apache.org/docs/configuration/alerts-reports)
-- [Security（ロールと権限）](https://superset.apache.org/docs/security/)
+- [SQL Templating（Jinja）](https://superset.apache.org/admin-docs/configuration/sql-templating)
+- [Alerts and Reports](https://superset.apache.org/admin-docs/configuration/alerts-reports)
+- [Security（ロールと権限）](https://superset.apache.org/admin-docs/security/)
 - [GitHub リポジトリ](https://github.com/apache/superset)
 
 ### 前提知識
@@ -56,7 +60,7 @@ Superset から自分のデータベースへ接続します。SQLAlchemy URI �
 
 ### [5. SQL Lab入門](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-05.html)
 
-Superset に内蔵された SQL エディタ「SQL Lab」を使います。クエリの実行と結果の確認、クエリ履歴と保存クエリ、実行結果をそのままチャート作成へ渡す `Save dataset` の流れ、そして重い集計を扱うための非同期クエリ（Celery）の考え方を学びます。
+Superset に内蔵された SQL エディタ「SQL Lab」を使います。クエリの実行と結果の確認、保存クエリと「SQL Lab で実行したクエリ」を振り返るクエリ履歴、実行結果をそのままチャート作成へ渡す `Save dataset` の流れ、そして重い集計を扱うための非同期クエリ（Celery）の考え方を学びます。
 
 ### [6. データセットを作る](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-06.html)
 
@@ -76,7 +80,7 @@ Superset が備える多数のチャート種別から、目的に合うもの�
 
 ### [10. ダッシュボードを組み立てる](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-10.html)
 
-複数のチャートを1枚のダッシュボードにまとめます。ドラッグ＆ドロップによる配置、行・列・タブによるレイアウト、Markdown ヘッダーでの説明の追加、そして「結論を上、詳細を下」という読み手に伝わる構成の原則を学びます。
+複数のチャートを1枚のダッシュボードにまとめます。ドラッグ＆ドロップによる配置、行・列・タブによるレイアウト、Markdown ヘッダーでの説明の追加、「結論を上、詳細を下」という読み手に伝わる構成の原則、そして Draft / Published が共有の準備状態であってアクセス制御ではないことを学びます。
 
 ### [11. フィルタとインタラクション](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-11.html)
 
@@ -84,15 +88,15 @@ Superset が備える多数のチャート種別から、目的に合うもの�
 
 ### [12. Jinjaテンプレートで動的SQL](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-12.html)
 
-SQL の中に変数や条件を埋め込む Jinja テンプレートを学びます。`{{ filter_values() }}` でダッシュボードのフィルタ値を SQL に渡す方法、`{{ current_username() }}` によるユーザー別の出し分け、`{% if %}` による条件分岐、そして機能を有効化する設定と、動的 SQL を使いすぎない判断基準を理解します。
+SQL の中に変数や条件を埋め込む Jinja テンプレートを学びます。`{{ filter_values() }}` でダッシュボードのフィルタ値を SQL に渡す方法、`{{ get_time_filter() }}` による時間範囲の反映、`{{ current_username() }}` によるユーザー別の出し分け、`{% if %}` による条件分岐、そして機能を有効化する設定・`{{ url_param() }}` を安全に扱う原則・動的 SQL を使いすぎない判断基準を理解します。
 
 ### [13. ユーザー・ロールと行レベルセキュリティ](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-13.html)
 
-「誰に何を見せるか」を設計します。Admin / Alpha / Gamma という既定ロールの違い、Gamma ユーザーにデータアクセス権を付与する仕組み、ダッシュボード単位のアクセス制御、そして同じダッシュボードでも所属部門の行だけが見える行レベルセキュリティ（RLS）の設定方法を学びます。
+「誰に何を見せるか」を設計します。Admin / Alpha / Gamma / sql_lab という組み込みロールの違い、Gamma ユーザーにデータアクセス権を付与する仕組み、組み込みロールを直接変更せずカスタムロールで権限を足す理由、ダッシュボード単位のアクセス制御、そして同じダッシュボードでも所属部門の行だけが見える行レベルセキュリティ（RLS）の設定方法を学びます。
 
 ### [14. 運用の基礎 — キャッシュ・アラート・本番構成](https://fcircle-biz.github.io/tech-docs-v2/guide/data-ai-category/data-ai/superset/superset-learning-material-14.html)
 
-学習環境から一歩進め、チームで使い続けるための運用を学びます。メタデータ DB を PostgreSQL にする理由、`SECRET_KEY` の扱い、Redis によるキャッシュとその有効期限、定期実行のアラート＆レポート、ダッシュボードのエクスポート／インポートによる環境移行、そしてバージョンアップの進め方を整理します。
+学習環境から一歩進め、チームで使い続けるための運用を学びます。本番メタデータ DB に PostgreSQL / MySQL を使う理由（SQLite は公式に強く非推奨）、`SECRET_KEY` の扱い、Redis によるキャッシュとその有効期限、定期実行のアラート＆レポート、ダッシュボードのエクスポート／インポートによる環境移行、そしてバージョンアップの進め方を整理します。
 
 ## 推奨所要時間
 
