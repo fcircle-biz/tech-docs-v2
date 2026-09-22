@@ -217,20 +217,21 @@ html.dark{ --primary-500:#c084fc; }</style><!-- スタンドアロン展開中�
                         公式ドキュメントは confidence を、probabilities の<strong>形</strong>から導かれる1つの統計量だと説明しています。確率がすべて1つの選択肢に集中していれば confidence は 1.0 に近づき、均等にバラけているほど低くなります。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        選択肢が <code class="bg-slate-100">n</code> 個のとき、confidence は次の式で計算されます。
+                        confidence は <strong>TypeSafe 側が probabilities から算出して返す値</strong>です。アプリケーションが自分で計算する必要はありません。
                     </p>
-                    <div class="bg-slate-100 rounded-lg p-4 my-4 text-center">
-                        <code class="bg-slate-100 text-slate-800">confidence = (n × 最も高い確率 − 1) ÷ (n − 1)</code>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    P["probabilities<br/>（各選択肢・各段階の確率）"] --> C["TypeSafe 側で統計量を算出"]
+    C --> R["confidence<br/>（0.0〜1.0）"]
+                        </div>
                     </div>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        Jev の Choice でよく出てくる3択（<code class="bg-slate-100">n = 3</code>）の場合は、次のように単純化できます。
+                        公式ドキュメントが保証しているのは、<strong>0.0〜1.0 の値であること</strong>、<strong>分布が1つに集中するほど高く、平坦になるほど低いこと</strong>、そして<strong>利用者が計算しなくてよいこと</strong>までです。どの統計量を使うかは実装の詳細として扱われており、<strong>具体的な計算式は API の契約として公開されていません</strong>。したがって、アプリ側で式を再実装せず、レスポンスとして返ってきた confidence をそのまま使ってください。
                     </p>
-                    <div class="bg-slate-100 rounded-lg p-4 my-4 text-center">
-                        <code class="bg-slate-100 text-slate-800">confidence = (3 × 最も高い確率 − 1) ÷ 2</code>
-                    </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        この式に、9.2で見た2つの例の「最も高い確率」を当てはめてみましょう。
+                        9.2で見た2つの例では、confidence は次のような値になります。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -238,29 +239,26 @@ html.dark{ --primary-500:#c084fc; }</style><!-- スタンドアロン展開中�
                             <thead class="bg-slate-100">
                                 <tr>
                                     <th class="px-4 py-3 text-left font-semibold">例</th>
-                                    <th class="px-4 py-3 text-left font-semibold">最も高い確率</th>
-                                    <th class="px-4 py-3 text-left font-semibold">計算</th>
-                                    <th class="px-4 py-3 text-left font-semibold">confidence</th>
+                                    <th class="px-4 py-3 text-left font-semibold">probabilities の形</th>
+                                    <th class="px-4 py-3 text-left font-semibold">confidence（レスポンス値）</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200">
                                 <tr>
                                     <td class="px-4 py-3 font-medium">ケースA（集中）</td>
-                                    <td class="px-4 py-3 text-slate-600">0.90</td>
-                                    <td class="px-4 py-3 text-slate-600">(3 × 0.90 − 1) ÷ 2</td>
-                                    <td class="px-4 py-3 text-slate-600">0.85</td>
+                                    <td class="px-4 py-3 text-slate-600">1つの選択肢に 0.90 が集中</td>
+                                    <td class="px-4 py-3 text-slate-600">0.85（高い）</td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">ケースB（割れている）</td>
-                                    <td class="px-4 py-3 text-slate-600">0.34</td>
-                                    <td class="px-4 py-3 text-slate-600">(3 × 0.34 − 1) ÷ 2</td>
-                                    <td class="px-4 py-3 text-slate-600">0.01</td>
+                                    <td class="px-4 py-3 text-slate-600">3択にほぼ均等（0.34 / 0.33 / 0.33）</td>
+                                    <td class="px-4 py-3 text-slate-600">0.01（ほぼ 0）</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        3つの選択肢に完全に均等（33.3％ずつ）に割れた場合、confidence はちょうど 0.00 になります。ケースBはそれに近い、「ほぼ五分五分」の状態だと分かります。一方ケースAの 0.85 は「ほぼ確信している」状態です。<code class="bg-slate-100">choice</code> の文字列だけでは見分けられなかった違いが、confidence という1つの数値に表れます。
+                        確率が完全に均等に割れた場合、confidence は 0.0 に近づきます。ケースBはそれに近い「ほぼ五分五分」の状態だと分かります。一方ケースAの 0.85 は「ほぼ確信している」状態です。<code class="bg-slate-100">choice</code> の文字列だけでは見分けられなかった違いが、confidence という1つの数値に表れます。<strong>重要なのは、confidence を「自分で計算する値」ではなく「レスポンスから読み取って閾値と比べる値」として扱うこと</strong>です。内部の算出方法はモデルの更新とともに変わりうるため、式を前提にした実装は避けます。
                     </p>
 
                     <!-- ヒントカード -->
@@ -494,13 +492,13 @@ flowchart TD
                                     </details>
                                 </li>
                                 <li class="text-blue-900">
-                                    <p class="font-medium mb-2 break-words">Q2. 3つの選択肢の確率分布が [0.90, 0.06, 0.04] のとき、confidence はいくつになりますか。計算式も示してください。</p>
+                                    <p class="font-medium mb-2 break-words">Q2. 3つの選択肢の確率分布が [0.90, 0.06, 0.04] のときと [0.34, 0.33, 0.33] のときでは、confidence はどちらが高くなりますか。また、その値をアプリ側で計算してよいでしょうか。</p>
                                     <details class="mt-2">
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            confidence = (3 × 0.90 − 1) ÷ 2 = (2.7 − 1) ÷ 2 = 1.7 ÷ 2 = <strong>0.85</strong> です。最も高い確率(0.90)が選択肢に強く偏っているため、confidence も高い値になります。
+                                            <strong>[0.90, 0.06, 0.04] のほうが高くなります</strong>。確率が1つの選択肢に強く集中しているためです。逆に [0.34, 0.33, 0.33] はほぼ均等なので confidence は 0.0 に近づきます。なお、confidence は <strong>TypeSafe 側が probabilities から算出して返す値</strong>であり、計算式は API の契約として公開されていません。アプリ側で式を再実装せず、レスポンスの <code class="bg-blue-100">confidence</code> を読み取って使ってください（1位と2位の差など独自の指標が必要な場合は、返ってきた <code class="bg-blue-100">probabilities</code> から自分で計算します）。
                                         </p>
                                     </details>
                                 </li>
