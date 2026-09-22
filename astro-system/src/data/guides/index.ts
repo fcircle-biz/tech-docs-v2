@@ -45,6 +45,9 @@ import { claude } from './data-ai-category/generative-ai/claude';
 // データ・AI — AI活用基盤
 import { jev } from './data-ai-category/data-ai/jev';
 
+// データ・AI — BI・可視化
+import { superset } from './data-ai-category/data-ai/superset';
+
 // データ・AI — データベース
 import { sqlserver } from './data-ai-category/database/sqlserver';
 import { sql } from './data-ai-category/database/sql';
@@ -90,6 +93,8 @@ const all: TechGuide[] = [
   claude,
   // データ・AI — AI活用基盤
   jev,
+  // データ・AI — BI・可視化
+  superset,
   // データ・AI — データベース
   sqlserver,
   sql,
