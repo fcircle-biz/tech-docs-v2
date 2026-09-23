@@ -95,7 +95,7 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>論理設計を PostgreSQL の <code class="bg-amber-100">CREATE TABLE</code> 文に落とし込める</span>
+                                    <span>論理設計を PostgreSQL の <code class="bg-amber-100">CREATE TABLE</code> 文に落とし込み、業務ルールを制約で守れる</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -186,7 +186,7 @@ flowchart LR
                             図書館が所蔵する本には、まず「タイトル・著者・出版社・ISBN」で決まる<strong>資料（書誌）</strong>という単位がある。同じ資料を複数冊（複数コピー）購入している場合があり、1冊1冊には貸出のために<strong>蔵書番号（バーコード）</strong>を付けて管理している。同じ資料の本でも、1冊が貸出中でも別の1冊は借りられる。<br/>
                             資料は必ず1つの<strong>分類</strong>（日本十進分類法のような区分）に属する。<br/>
                             利用者が本を借りるときは、<strong>どの蔵書番号の本を、いつ借りて、いつまでに返す予定か</strong>を記録し、返却されたら返却日を記録する。貸出の受付は<strong>職員</strong>が行うので、どの職員が対応したかも残す。<br/>
-                            借りたい資料が全冊貸出中のとき、利用者は<strong>予約</strong>できる。予約は「どの資料が欲しいか」であって、「どの蔵書番号の本か」ではない（どの1冊が返ってきても構わない）。予約には申込日時と状態（予約中・取り置き中・キャンセル・完了）を記録する。
+                            借りたい資料が全冊貸出中のとき、利用者は<strong>予約</strong>できる。予約は「どの資料が欲しいか」であって、「どの蔵書番号の本か」ではない（どの1冊が返ってきても構わない）。予約には申込日時と状態（予約中・取り置き中・キャンセル・完了）を記録する。予約された資料の本が返却されたら、予約者のためにその1冊をカウンターに<strong>取り置き</strong>、どの蔵書番号の本を取り置いたかを記録する（取り置いた本は、ほかの利用者には貸し出さない）。
                         </p>
                     </div>
 
@@ -322,7 +322,7 @@ flowchart LR
                                                 <tr>
                                                     <td class="px-3 py-2 font-medium">所蔵本</td>
                                                     <td class="px-3 py-2">リソース系</td>
-                                                    <td class="px-3 py-2">蔵書番号、資料、状態（在架／貸出中／予約中／除籍）</td>
+                                                    <td class="px-3 py-2">蔵書番号、資料、状態（在架／貸出中／取り置き中／除籍）</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="px-3 py-2 font-medium">貸出</td>
@@ -332,12 +332,13 @@ flowchart LR
                                                 <tr>
                                                     <td class="px-3 py-2 font-medium">予約</td>
                                                     <td class="px-3 py-2">イベント系</td>
-                                                    <td class="px-3 py-2">資料、利用者、申込日時、状態</td>
+                                                    <td class="px-3 py-2">資料、利用者、申込日時、状態、取り置いた所蔵本（取り置き中になってから）</td>
                                                 </tr>
                                             </tbody>
                                         </table>
                                     </div>
-                                    <p class="mt-3 mb-0">「所蔵本の状態」を資料側に持たせてしまう間違いがよくあります。状態（在架・貸出中など）は<strong>1冊ごとに変わる</strong>ため、資料の属性ではなく所蔵本の属性です。</p>
+                                    <p class="mt-3 mb-3">「所蔵本の状態」を資料側に持たせてしまう間違いがよくあります。状態（在架・貸出中など）は<strong>1冊ごとに変わる</strong>ため、資料の属性ではなく所蔵本の属性です。</p>
+                                    <p class="mb-0">また、予約の「予約中」と所蔵本の「取り置き中」を混同しないようにしましょう。予約中は、資料単位で順番を待っている<strong>予約の状態</strong>で、まだどの1冊かは決まっていません。取り置き中は、特定の1冊を予約者のために確保した<strong>所蔵本の状態</strong>で、ここで初めて予約と所蔵本が結びつきます。</p>
                                 </div>
                             </details>
                         </div>
@@ -384,9 +385,11 @@ erDiagram
     users ||--o{ loans : "借りる"
     staff ||--o{ loans : "受け付ける"
     books ||--o{ loans : "貸し出される"
+    books |o--o{ reservations : "取り置かれる"
                                         </div>
                                     </div>
-                                    <p class="mb-0">予約（<code class="bg-purple-100">reservations</code>）は <code class="bg-purple-100">books</code>（所蔵本）ではなく <code class="bg-purple-100">works</code>（資料）から線が伸びている点に注目してください。貸出（<code class="bg-purple-100">loans</code>）は逆に <code class="bg-purple-100">books</code> から線が伸びます。同じ「利用者が本を求める」行為でも、貸出と予約では<strong>どの粒度のエンティティに対する行為か</strong>が異なるのが、この演習のポイントです。</p>
+                                    <p class="mb-3">予約（<code class="bg-purple-100">reservations</code>）の申込みは、<code class="bg-purple-100">books</code>（所蔵本）ではなく <code class="bg-purple-100">works</code>（資料）から線が伸びている点に注目してください。貸出（<code class="bg-purple-100">loans</code>）は逆に <code class="bg-purple-100">books</code> から線が伸びます。同じ「利用者が本を求める」行為でも、貸出と予約では<strong>どの粒度のエンティティに対する行為か</strong>が異なるのが、この演習のポイントです。</p>
+                                    <p class="mb-0"><code class="bg-purple-100">books</code> から <code class="bg-purple-100">reservations</code> へも線がありますが、これは取り置きの段階で特定の1冊が決まることを表す線です。予約中の間は相手の1冊がまだ無いため、<code class="bg-purple-100">books</code> 側の端は任意（<code class="bg-purple-100">|o</code>：0または1）になっています。</p>
                                 </div>
                             </details>
                         </div>
@@ -416,7 +419,7 @@ erDiagram
                             <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
                                 やってみよう 12-4: 各表が第3正規形か確認する
                             </h3>
-                            <p class="text-purple-900 mb-4 break-words">12.4 のER図を7つの表（<code class="bg-purple-100">users</code>・<code class="bg-purple-100">staff</code>・<code class="bg-purple-100">categories</code>・<code class="bg-purple-100">works</code>・<code class="bg-purple-100">books</code>・<code class="bg-purple-100">loans</code>・<code class="bg-purple-100">reservations</code>）に落としたと仮定し、<code class="bg-purple-100">books</code> と <code class="bg-purple-100">loans</code> について、部分関数従属・推移的関数従属が残っていないかを確認してください。</p>
+                            <p class="text-purple-900 mb-4 break-words">12.4 のER図を7つの表（<code class="bg-purple-100">users</code>・<code class="bg-purple-100">staff</code>・<code class="bg-purple-100">categories</code>・<code class="bg-purple-100">works</code>・<code class="bg-purple-100">books</code>・<code class="bg-purple-100">loans</code>・<code class="bg-purple-100">reservations</code>）に落としたと仮定し、<code class="bg-purple-100">books</code>・<code class="bg-purple-100">loans</code>・<code class="bg-purple-100">reservations</code> について、部分関数従属・推移的関数従属が残っていないかを確認してください。</p>
 
                             <details class="mt-2">
                                 <summary class="cursor-pointer text-purple-700 hover:text-purple-800 font-medium break-words">
@@ -425,6 +428,7 @@ erDiagram
                                 <div class="mt-2 pl-1 text-purple-900 bg-purple-100 rounded-lg p-4 break-words">
                                     <p class="mb-3"><strong>books（所蔵本）</strong>: 主キー <code class="bg-purple-200">book_id</code> に対し、<code class="bg-purple-200">work_id</code>・<code class="bg-purple-200">book_code</code>・<code class="bg-purple-200">status</code> はすべて1つの値に決まり、単一主キーなので部分関数従属は起きません。タイトルや著者を <code class="bg-purple-200">books</code> に直接持たせると <code class="bg-purple-200">work_id</code> 経由の推移的関数従属になるため、<code class="bg-purple-200">works</code> 側に置いたままにします。</p>
                                     <p class="mb-3"><strong>loans（貸出）</strong>: 主キー <code class="bg-purple-200">loan_id</code> に対し、<code class="bg-purple-200">book_id</code>・<code class="bg-purple-200">user_id</code>・<code class="bg-purple-200">staff_id</code>・各日付はすべて直接決まります。もし「利用者の氏名」や「本のタイトル」まで <code class="bg-purple-200">loans</code> に持たせると、<code class="bg-purple-200">user_id</code>・<code class="bg-purple-200">book_id</code> 経由の推移的関数従属となり、第3正規形に違反します。氏名やタイトルは JOIN で取得します。</p>
+                                    <p class="mb-3"><strong>reservations（予約）</strong>: 主キー <code class="bg-purple-200">reservation_id</code> に対し、<code class="bg-purple-200">work_id</code>・<code class="bg-purple-200">user_id</code>・申込日時・状態と、取り置き後に入る <code class="bg-purple-200">book_id</code> は直接決まります。取り置き後は <code class="bg-purple-200">book_id</code> からも資料が分かるため <code class="bg-purple-200">work_id</code> は冗長に見えますが、取り置くまでは <code class="bg-purple-200">book_id</code> が NULL で、何を予約したかは <code class="bg-purple-200">work_id</code> でしか表せないため省けません。その代わり、「取り置いた本が、予約した資料の1冊であること」は取り置きの処理の中で確かめる必要があります。</p>
                                     <p class="mb-0">複合主キーを持つ表が無いため部分関数従属の心配はありませんが、複合主キーがある設計（例: 受注明細の <code class="bg-purple-200">order_id + line_no</code>、第9章）では常にこの確認が必要です。</p>
                                 </div>
                             </details>
@@ -439,7 +443,7 @@ erDiagram
                         12.6 ステップ5: 物理設計（DDL）
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        最後に、論理設計を PostgreSQL 17 の <code class="bg-slate-100">CREATE TABLE</code> 文に落とします。命名規則は本ガイドの他章・「さくら文具」と同じく、<strong>小文字のスネークケース・テーブル名は複数形・主キーは <code class="bg-slate-100">GENERATED ALWAYS AS IDENTITY</code></strong> を使います。
+                        最後に、論理設計を PostgreSQL 17 の <code class="bg-slate-100">CREATE TABLE</code> 文に落とします。命名などの規則は、本ガイドで採用している規則（第9章）と「さくら文具」に合わせて、<strong>小文字のスネークケース・テーブル名は複数形・主キーは <code class="bg-slate-100">GENERATED ALWAYS AS IDENTITY</code></strong> を使います。
                     </p>
                 </section>
 
@@ -455,7 +459,7 @@ erDiagram
                             <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
                                 やってみよう 12-5: CREATE TABLE 文を書く
                             </h3>
-                            <p class="text-purple-900 mb-4 break-words">12.5 で確認した7つの表について、データ型・NOT NULL・UNIQUE・CHECK・外部キー制約を決めて <code class="bg-purple-100">CREATE TABLE</code> 文を書いてください。特に <code class="bg-purple-100">books.status</code> のように取りうる値が決まっている列は <code class="bg-purple-100">CHECK</code> 制約で守ることを検討しましょう。</p>
+                            <p class="text-purple-900 mb-4 break-words">12.5 で確認した7つの表について、データ型・NOT NULL・UNIQUE・CHECK・外部キー制約を決めて <code class="bg-purple-100">CREATE TABLE</code> 文を書いてください。特に <code class="bg-purple-100">books.status</code> のように取りうる値が決まっている列は <code class="bg-purple-100">CHECK</code> 制約で守ることを検討しましょう。また、「1冊の本を同時に2人へ貸し出さない」「返却日が貸出日より前にならない」といった業務ルールも、制約としてDBに守らせられないか考えてみましょう。</p>
 
                             <details class="mt-2">
                                 <summary class="cursor-pointer text-purple-700 hover:text-purple-800 font-medium break-words">
@@ -541,7 +545,7 @@ CREATE TABLE books (
     work_id   integer NOT NULL REFERENCES works(work_id),
     book_code varchar(20) NOT NULL UNIQUE,  -- 蔵書番号（バーコード）
     status    varchar(20) NOT NULL DEFAULT '在架'
-              CHECK (status IN ('在架', '貸出中', '予約中', '除籍'))
+              CHECK (status IN ('在架', '貸出中', '取り置き中', '除籍'))
 );</code></pre>
                                     </div>
 
@@ -552,7 +556,7 @@ CREATE TABLE books (
                                                 <i class="fas fa-copy"></i>
                                             </button>
                                         </div>
-                                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 貸出（イベント。所蔵本1冊に対して1件）
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 貸出（イベント。1件の貸出は所蔵本1冊に対応する）
 CREATE TABLE loans (
     loan_id     integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     book_id     integer NOT NULL REFERENCES books(book_id),
@@ -560,8 +564,15 @@ CREATE TABLE loans (
     staff_id    integer NOT NULL REFERENCES staff(staff_id),
     loan_date   date NOT NULL DEFAULT CURRENT_DATE,
     due_date    date NOT NULL,
-    return_date date  -- NULLのうちは未返却
-);</code></pre>
+    return_date date,  -- NULLのうちは未返却
+    CHECK (due_date >= loan_date),                           -- 返却期限は貸出日より前にならない
+    CHECK (return_date IS NULL OR return_date >= loan_date)  -- 返却日は貸出日より前にならない
+);
+
+-- 1冊の所蔵本を同時に2人へ貸し出さない（未返却の貸出は1冊につき1件まで）
+CREATE UNIQUE INDEX uq_loans_active_book
+    ON loans (book_id)
+    WHERE return_date IS NULL;</code></pre>
                                     </div>
 
                                     <div class="code-block-wrapper mb-4">
@@ -571,18 +582,26 @@ CREATE TABLE loans (
                                                 <i class="fas fa-copy"></i>
                                             </button>
                                         </div>
-                                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 予約（イベント。資料単位で予約する）
+                                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 予約（イベント。資料単位で申し込み、取り置いた時点で1冊が決まる）
 CREATE TABLE reservations (
     reservation_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     work_id     integer NOT NULL REFERENCES works(work_id),
     user_id     integer NOT NULL REFERENCES users(user_id),
-    reserved_at timestamp NOT NULL DEFAULT now(),
+    book_id     integer REFERENCES books(book_id),  -- 取り置いた1冊（取り置くまでは NULL）
+    reserved_at timestamptz NOT NULL DEFAULT now(),  -- 申し込んだ時点（第10章）
     status      varchar(20) NOT NULL DEFAULT '予約中'
-                CHECK (status IN ('予約中', '取り置き中', 'キャンセル', '完了'))
-);</code></pre>
+                CHECK (status IN ('予約中', '取り置き中', 'キャンセル', '完了')),
+    CHECK (status &lt;&gt; '取り置き中' OR book_id IS NOT NULL)  -- 取り置き中なら、どの1冊かが必ず決まっている
+);
+
+-- 1冊の所蔵本を、2件の予約のために同時に取り置かない
+CREATE UNIQUE INDEX uq_reservations_held_book
+    ON reservations (book_id)
+    WHERE status = '取り置き中';</code></pre>
                                     </div>
 
-                                    <p class="mb-0"><code class="bg-purple-200">loans.book_id</code> は所蔵本（<code class="bg-purple-200">books</code>）を参照し、<code class="bg-purple-200">reservations.work_id</code> は資料（<code class="bg-purple-200">works</code>）を参照している点が、12.4 の概念ER図と一致していることを確認してください。</p>
+                                    <p class="mb-3"><strong>制約で守る業務ルール</strong>: <code class="bg-purple-200">loans</code> の2つの <code class="bg-purple-200">CHECK</code> 制約は、返却期限や返却日が貸出日より前になる誤入力を防ぎます。さらに <code class="bg-purple-200">WHERE return_date IS NULL</code> 付きの <code class="bg-purple-200">UNIQUE</code> インデックス（部分一意インデックス、第11章）で、「未返却の貸出は1冊につき1件まで」、つまり「1冊の本を同時に2人へ貸し出さない」ことをDBに保証させます。返却済みの行は条件から外れるので、同じ本の過去の貸出履歴は何件あっても構いません。<code class="bg-purple-200">reservations</code> では、<code class="bg-purple-200">CHECK</code> 制約で「取り置き中なら <code class="bg-purple-200">book_id</code> が必ず入っている」ことを、部分一意インデックスで「1冊の本を2件の予約のために同時に取り置かない」ことを守ります。申込日時の <code class="bg-purple-200">reserved_at</code> は「申し込んだ瞬間」を記録する列なので、第10章の方針どおり <code class="bg-purple-200">timestamptz</code> にしています。</p>
+                                    <p class="mb-0"><code class="bg-purple-200">loans.book_id</code> は所蔵本（<code class="bg-purple-200">books</code>）を参照し、<code class="bg-purple-200">reservations.work_id</code> は資料（<code class="bg-purple-200">works</code>）を参照している点が、12.4 の概念ER図と一致していることを確認してください。<code class="bg-purple-200">reservations.book_id</code> は、取り置きの段階で所蔵本と結びつく任意の線に対応します。</p>
                                 </div>
                             </details>
                         </div>
@@ -594,7 +613,7 @@ CREATE TABLE reservations (
                         <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                         <div>
                             <p class="font-semibold text-red-800 mb-1">注意: 「借りられるか」を状態列だけで判定しない</p>
-                            <p class="text-red-900 text-sm"><code class="bg-red-100">books.status</code> のような区分値は便利ですが、<code class="bg-red-100">loans</code> の更新と <code class="bg-red-100">books.status</code> の更新がずれると、実際には返却済みなのに「貸出中」のままになる、といった不整合が起きます。状態列の「貸出中」は <code class="bg-red-100">loans</code> から導ける情報を検索しやすくするために重ねて持つ<strong>意図的な非正規化</strong>（第11章）であり、正の情報源は <code class="bg-red-100">loans</code>（返却日が NULL かどうか）であることを忘れないでください。</p>
+                            <p class="text-red-900 text-sm"><code class="bg-red-100">books.status</code> のような区分値は便利ですが、<code class="bg-red-100">loans</code> の更新と <code class="bg-red-100">books.status</code> の更新がずれると、実際には返却済みなのに「貸出中」のままになる、といった不整合が起きます。状態列の「貸出中」は <code class="bg-red-100">loans</code> から、「取り置き中」は <code class="bg-red-100">reservations</code> から導ける情報を、検索しやすくするために重ねて持つ<strong>意図的な非正規化</strong>（第11章）です。正の情報源は <code class="bg-red-100">loans</code>（返却日が NULL の行があるか）と <code class="bg-red-100">reservations</code>（取り置き中の予約があるか）で、どちらも部分一意インデックスによって「1冊につき1件まで」がDBで保証されていることを忘れないでください。</p>
                         </div>
                     </div>
                 </div>
@@ -627,6 +646,10 @@ CREATE TABLE reservations (
                                     <td class="px-4 py-3 text-slate-600">同じ事実（利用者の氏名、資料のタイトルなど）が2つ以上の表に書かれていないか。書かれている場合、注文時単価（第11章）のような意図的なスナップショットか。</td>
                                 </tr>
                                 <tr>
+                                    <td class="px-4 py-3 font-medium">整合性</td>
+                                    <td class="px-4 py-3 text-slate-600">「1冊を同時に2人へ貸し出さない」「返却日が貸出日より前にならない」「価格の適用期間が重ならない」のような業務ルールを、CHECK 制約・部分一意インデックス・排他制約などでDBに守らせているか（第11章・12.6）。</td>
+                                </tr>
+                                <tr>
                                     <td class="px-4 py-3 font-medium">妥当性</td>
                                     <td class="px-4 py-3 text-slate-600">「貸出は所蔵本単位、予約は資料単位」のような業務ルールが、外部キーの参照先としてそのまま表れているか。</td>
                                 </tr>
@@ -640,7 +663,7 @@ CREATE TABLE reservations (
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">性能</td>
-                                    <td class="px-4 py-3 text-slate-600">外部キー列にインデックスが付いているか（第10章）。区分値のような非正規化を入れる場合、更新のたびに正の情報源と一致させる仕組みがあるか。</td>
+                                    <td class="px-4 py-3 text-slate-600">検索・JOIN や親の削除でよく使う外部キー列に、インデックスを付けたか（第10章）。区分値のような非正規化を入れる場合、更新のたびに正の情報源と一致させる仕組みがあるか。</td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">命名</td>
@@ -766,7 +789,7 @@ CREATE TABLE reservations (
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            不要です。<code class="bg-blue-100">books.work_id</code> を経由すればどの資料かは分かるため、<code class="bg-blue-100">loans</code> に <code class="bg-blue-100">work_id</code> を追加すると <code class="bg-blue-100">book_id</code> 経由の推移的関数従属になり、第3正規形に違反します（12.5 の確認と同じ考え方）。資料名が必要な場面では <code class="bg-blue-100">books</code> と <code class="bg-blue-100">works</code> を JOIN して取得します。
+                                            不要です。<code class="bg-blue-100">books.work_id</code> を経由すればどの資料かは分かるため、<code class="bg-blue-100">loans</code> に <code class="bg-blue-100">work_id</code> を追加すると <code class="bg-blue-100">book_id</code> 経由の推移的関数従属になり、第3正規形に違反します（12.5 の確認と同じ考え方）。資料名が必要な場面では <code class="bg-blue-100">books</code> と <code class="bg-blue-100">works</code> を JOIN して取得します。なお <code class="bg-blue-100">reservations</code> は <code class="bg-blue-100">work_id</code> と <code class="bg-blue-100">book_id</code> の両方を持ちますが、<code class="bg-blue-100">book_id</code> は取り置くまで NULL で、<code class="bg-blue-100">work_id</code> が無いと何を予約したかを表せないため、両方が必要です（12.5 参照）。<code class="bg-blue-100">book_id</code> が必ず入っている <code class="bg-blue-100">loans</code> とはこの点が違います。
                                         </p>
                                     </details>
                                 </li>
@@ -777,7 +800,7 @@ CREATE TABLE reservations (
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            本来「貸出中かどうか」は <code class="bg-blue-100">loans</code>（返却日が NULL かどうか）から導ける情報であり、<code class="bg-blue-100">books.status</code> として別に持たせるのは第11章で学んだ<strong>意図的な非正規化</strong>です。検索を速くするメリットがある一方、<code class="bg-blue-100">loans</code> の更新と同期させ続けるという運用上の責任が発生します。
+                                            本来「貸出中かどうか」は <code class="bg-blue-100">loans</code>（返却日が NULL の行があるか）から、「取り置き中かどうか」は <code class="bg-blue-100">reservations</code>（取り置き中の予約があるか）から導ける情報であり、<code class="bg-blue-100">books.status</code> として別に持たせるのは第11章で学んだ<strong>意図的な非正規化</strong>です。検索を速くするメリットがある一方、<code class="bg-blue-100">loans</code>・<code class="bg-blue-100">reservations</code> の更新と同期させ続けるという運用上の責任が発生します。
                                         </p>
                                     </details>
                                 </li>

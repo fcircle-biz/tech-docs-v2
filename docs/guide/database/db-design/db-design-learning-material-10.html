@@ -83,7 +83,7 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                             <ul class="space-y-2">
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>論理設計の属性を PostgreSQL のデータ型（<code class="bg-amber-100 px-1 rounded">numeric</code>・<code class="bg-amber-100 px-1 rounded">timestamp</code>・<code class="bg-amber-100 px-1 rounded">date</code> など）に対応づけられる</span>
+                                    <span>論理設計の属性を PostgreSQL のデータ型（<code class="bg-amber-100 px-1 rounded">numeric</code>・<code class="bg-amber-100 px-1 rounded">timestamptz</code>・<code class="bg-amber-100 px-1 rounded">date</code> など）に対応づけられる</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -95,7 +95,7 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
-                                    <span>テーブル定義書を書き、外部キー列にインデックスを付ける理由を説明できる</span>
+                                    <span>テーブル定義書を書き、外部キー列にインデックスを付けるかどうかを、検索・JOIN・削除の頻度から判断できる</span>
                                 </li>
                                 <li class="flex items-start gap-2 text-amber-900">
                                     <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
@@ -114,6 +114,9 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                     </h2>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         論理設計では「顧客名は文字列」「単価は数値」という抽象的な決め方で十分でした。物理設計では、これを<strong>使う RDBMS（本ガイドは PostgreSQL 17）が実際に持つデータ型</strong>に落とし込みます。データ型を誤ると、桁あふれ・小数の誤差・検索の遅さといった問題が後から発覚し、直すのが大変になります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本ガイドでは <strong>PostgreSQL 17 を基準</strong>とします。ここで扱う DDL は、より新しいバージョンの PostgreSQL でもそのまま使えます。
                     </p>
 
                     <div class="overflow-x-auto my-6">
@@ -142,7 +145,7 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 <tr>
                                     <td class="px-4 py-3 font-medium">お金</td>
                                     <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">numeric(10,2)</code></td>
-                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">unit_price</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">current_unit_price</code>・<code class="bg-slate-100 px-1 rounded">unit_price</code></td>
                                     <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">float</code>系は誤差が出るため金額には使わない。10桁・小数2桁で十分な業務規模</td>
                                 </tr>
                                 <tr>
@@ -158,10 +161,10 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                     <td class="px-4 py-3 text-slate-600">受注日は「何月何日か」だけが業務上意味を持つ</td>
                                 </tr>
                                 <tr>
-                                    <td class="px-4 py-3 font-medium">日付＋時刻</td>
-                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">timestamp</code></td>
-                                    <td class="px-4 py-3 text-slate-600">（さくら文具では未使用。第12章の予約日時・ログ・更新履歴などで使う型）</td>
-                                    <td class="px-4 py-3 text-slate-600">「いつ起きたか」を秒単位で残す必要がある場合に使う</td>
+                                    <td class="px-4 py-3 font-medium">日時（実際に起きた時点）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 rounded">timestamptz</code></td>
+                                    <td class="px-4 py-3 text-slate-600">（さくら文具では未使用。第12章の予約の申込日時のほか、作成日時・ログなどで使う型）</td>
+                                    <td class="px-4 py-3 text-slate-600">「いつ起きたか」を時刻まで残し、後から正しく比較・集計できるようにする（下のヒント参照）</td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium">区分値（有限の選択肢）</td>
@@ -179,6 +182,16 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                             <div>
                                 <p class="font-semibold text-blue-800 mb-1">ヒント: なぜ金額に float を使ってはいけないのか</p>
                                 <p class="text-blue-900 text-sm"><code class="bg-blue-100 px-1 rounded">real</code>・<code class="bg-blue-100 px-1 rounded">double precision</code> は2進数で小数を近似するため、<code class="bg-blue-100 px-1 rounded">0.1 + 0.2</code> のような単純な計算でも誤差が出ることがあります。金額の合計がずれると業務上の信頼を失うので、10進数を正確に扱える <code class="bg-blue-100 px-1 rounded">numeric</code> を必ず使います。<code class="bg-blue-100 px-1 rounded">numeric(10,2)</code> は「整数部分と小数部分を合わせて最大10桁、うち小数点以下2桁」を意味し、最大 99999999.99 まで表現できます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 日時は timestamp より timestamptz を基本にする</p>
+                                <p class="text-blue-900 text-sm">PostgreSQL の <code class="bg-blue-100 px-1 rounded">timestamp</code> は、正式には <code class="bg-blue-100 px-1 rounded">timestamp without time zone</code> です。タイムゾーンを持たない「日付と時刻の数字」をそのまま保存するため、それが日本時間なのか協定世界時（UTC）なのかは DB からは分かりません。一方 <code class="bg-blue-100 px-1 rounded">timestamptz</code>（<code class="bg-blue-100 px-1 rounded">timestamp with time zone</code>）は、入力された日時を UTC の「時点」に換算して保存し、取り出すときに接続（セッション）のタイムゾーン設定に合わせて表示します。申込日時・作成日時・ログのように<strong>実際に起きた瞬間</strong>を記録する列は、サーバーや利用者のタイムゾーンが違っても同じ瞬間を指せる <code class="bg-blue-100 px-1 rounded">timestamptz</code> を選ぶのが基本です。なお、名前に反してタイムゾーン名そのものは保存されません。また、現在日時を返す <code class="bg-blue-100 px-1 rounded">now()</code> の型も <code class="bg-blue-100 px-1 rounded">timestamptz</code> です。</p>
                             </div>
                         </div>
                     </div>
@@ -269,7 +282,7 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 <tr>
                                     <td class="px-3 py-2 font-medium">SET NULL</td>
                                     <td class="px-3 py-2 text-slate-600">参照先が消えたら外部キー列を NULL にする</td>
-                                    <td class="px-3 py-2 text-slate-600">履歴は残したいが担当者が不明でも困らない場合（本ガイドでは未使用）</td>
+                                    <td class="px-3 py-2 text-slate-600">参照先が消えても子の行は残したく、参照が不明になっても困らない場合（第11章の注文の配送先の参照で使用）</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -382,9 +395,8 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                         <strong>インデックス</strong>は、本の索引のように「特定の値を持つ行をすばやく見つけるための道しるべ」です。索引が無いと、該当する行を探すたびに表全体を1行ずつ確認する<strong>全表スキャン</strong>が発生します。
                     </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        PostgreSQL は主キー（<code class="bg-slate-100 px-1 rounded">PRIMARY KEY</code>）と一意制約（<code class="bg-slate-100 px-1 rounded">UNIQUE</code>）の列には<strong>自動でインデックスを作成</strong>します。一方、<strong>外部キーの列には自動でインデックスが付きません</strong>。外部キー列は <code class="bg-slate-100 px-1 rounded">JOIN</code> の条件やON DELETEの参照チェックで頻繁に検索されるため、明示的にインデックスを作るのが基本です。
+                        PostgreSQL は主キー（<code class="bg-slate-100 px-1 rounded">PRIMARY KEY</code>）と一意制約（<code class="bg-slate-100 px-1 rounded">UNIQUE</code>）の列には<strong>自動でインデックスを作成</strong>します。一方、<strong>外部キーの列には自動でインデックスが付きません</strong>。外部キー列は <code class="bg-slate-100 px-1 rounded">JOIN</code> の条件になりやすく、親の行を削除・更新するときの参照チェック（その親を指す子の行が残っていないかの確認）でも検索されるため、インデックスを付けると効果が大きい場面がよくあります。
                     </p>
-
                     <div class="overflow-x-auto my-6">
                         <table class="min-w-full divide-y divide-slate-200">
                             <thead class="bg-slate-100">
@@ -408,14 +420,43 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 <tr>
                                     <td class="px-4 py-3 font-medium">外部キー（FK）の列</td>
                                     <td class="px-4 py-3 text-slate-600">付かない</td>
-                                    <td class="px-4 py-3 text-slate-600">FK制約自体は参照整合性のチェックのみで、検索用の索引は別途必要</td>
+                                    <td class="px-4 py-3 text-slate-600">FK制約は参照整合性を守るだけで、索引は作らない。必要かどうかを判断して自分で作る</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        そのため、さくら文具では次の外部キー列に <code class="bg-slate-100 px-1 rounded">CREATE INDEX</code> を追加します（<code class="bg-slate-100 px-1 rounded">order_details.order_id</code> は複合主キーの先頭列としてすでに索引化されているため対象外です）。
+                        ただし、外部キー列のインデックスは<strong>常に必要とは限りません</strong>。付けるかどうかは、次の3点を見て判断します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">判断の観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">考え方の例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">その列で検索・JOIN する頻度</td>
+                                    <td class="px-4 py-3 text-slate-600">マイページで「この顧客の注文履歴」を毎回表示するなら、<code class="bg-slate-100 px-1 rounded">orders.customer_id</code> での検索が多いので付ける</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">親の行を削除・更新する頻度</td>
+                                    <td class="px-4 py-3 text-slate-600">親の削除が日常的にあるなら、そのたびに子の表を探すので付ける。さくら文具では、顧客・担当者のように過去の注文から参照されるマスタは削除せず論理削除する（第11章）ので、この観点の効果は小さい</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">既存のインデックスで代用できないか</td>
+                                    <td class="px-4 py-3 text-slate-600">複合主キーなど、既存の複合インデックスの<strong>先頭列</strong>になっていれば、その列での検索には既存のインデックスが使えるので、新たに作る必要はない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        さくら文具では、画面や集計でよく使う検索に合わせて、次の外部キー列に <code class="bg-slate-100 px-1 rounded">CREATE INDEX</code> を追加します。<code class="bg-slate-100 px-1 rounded">order_details.order_id</code> は、複合主キー <code class="bg-slate-100 px-1 rounded">(order_id, line_no)</code> のインデックスの先頭列なので、そのインデックスで検索でき、別途作る必要はありません。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -425,11 +466,12 @@ html.dark{ --primary-500:#818cf8; }</style><!-- スタンドアロン展開中�
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
-                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 外部キー列への索引（JOINやON DELETEの検索を高速化）
-CREATE INDEX idx_products_category_id ON products (category_id);
-CREATE INDEX idx_orders_customer_id ON orders (customer_id);
-CREATE INDEX idx_orders_staff_id ON orders (staff_id);
-CREATE INDEX idx_order_details_product_id ON order_details (product_id);</code></pre>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 外部キー列への索引（よく使う検索・JOINに合わせて付ける）
+CREATE INDEX idx_orders_customer_id ON orders (customer_id);              -- 顧客ごとの注文履歴
+CREATE INDEX idx_order_details_product_id ON order_details (product_id);  -- 商品別の販売数の集計
+CREATE INDEX idx_products_category_id ON products (category_id);          -- 分類別の商品一覧
+CREATE INDEX idx_orders_staff_id ON orders (staff_id);                    -- 担当者別の受注一覧
+-- staff_id は担当者別の検索がめったに無いなら付けない判断もあり得る</code></pre>
                     </div>
 
                     <div class="bg-slate-100 border-l-4 border-slate-400 rounded-r-lg p-3 my-4">
@@ -441,7 +483,7 @@ CREATE INDEX idx_order_details_product_id ON order_details (product_id);</code><
                             <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-red-800 mb-1">注意: インデックスは無条件に増やせばよいものではない</p>
-                                <p class="text-red-900 text-sm">インデックスは検索を速くする一方、<code class="bg-red-100 px-1 rounded">INSERT</code>・<code class="bg-red-100 px-1 rounded">UPDATE</code>・<code class="bg-red-100 px-1 rounded">DELETE</code>のたびに索引自体も更新するコストと、保存領域を増やします。初心者のうちは「主キー・一意制約は自動」「外部キー列には基本的に付ける」の2点を守れば十分で、それ以上の細かなチューニングは実際の検索の遅さを計測してから検討します（性能設計は第11章の非正規化の議論にも関連します）。</p>
+                                <p class="text-red-900 text-sm">インデックスは検索を速くする一方、<code class="bg-red-100 px-1 rounded">INSERT</code>・<code class="bg-red-100 px-1 rounded">UPDATE</code>・<code class="bg-red-100 px-1 rounded">DELETE</code>のたびに索引自体も更新するコストと、保存領域を増やします。初心者のうちは「主キー・一意制約には自動で付く」「外部キー列は、検索・JOIN や親の削除・更新でよく使われるなら付ける（既存の複合インデックスの先頭列なら不要）」の2点を押さえれば十分です。それ以上の細かなチューニングは、実際の検索の遅さを計測してから検討します（性能設計は第11章の非正規化の議論にも関連します）。</p>
                             </div>
                         </div>
                     </div>
@@ -481,7 +523,7 @@ erDiagram
         varchar product_code UK
         varchar product_name
         int category_id FK
-        numeric unit_price
+        numeric current_unit_price
     }
     staff {
         int staff_id PK
@@ -549,7 +591,7 @@ CREATE TABLE categories (
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <strong>② customers（顧客）</strong> — <code class="bg-slate-100 px-1 rounded">email</code> のみ会員登録の必須項目にしていないためNULLを許可します。
+                        <strong>② customers（顧客）</strong> — <code class="bg-slate-100 px-1 rounded">email</code> のみ会員登録の必須項目にしていないためNULLを許可します。住所は、第3章で確認したとおり当面は顧客1人につき1つなので、<code class="bg-slate-100 px-1 rounded">customers</code> の列として持ちます（複数配送先への拡張は第11章）。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -565,7 +607,7 @@ CREATE TABLE customers (
     customer_code varchar(10)  NOT NULL UNIQUE,  -- 業務上の会員番号
     customer_name varchar(100) NOT NULL,
     email         varchar(255) UNIQUE,           -- 未登録の会員がいるためNULL許可
-    address       varchar(200) NOT NULL           -- 配送先として必須
+    address       varchar(200) NOT NULL           -- 配送先として必須（当面は1人1住所）
 );</code></pre>
                     </div>
 
@@ -588,7 +630,7 @@ CREATE TABLE staff (
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <strong>④ products（商品）</strong> — <code class="bg-slate-100 px-1 rounded">categories</code> を参照します。分類が使われている間は削除できないよう <code class="bg-slate-100 px-1 rounded">ON DELETE RESTRICT</code> にします。
+                        <strong>④ products（商品）</strong> — <code class="bg-slate-100 px-1 rounded">categories</code> を参照します。分類が使われている間は削除できないよう <code class="bg-slate-100 px-1 rounded">ON DELETE RESTRICT</code> にします。<code class="bg-slate-100 px-1 rounded">current_unit_price</code> は、これから受ける注文に使う現在単価です（第6〜7章）。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -600,12 +642,13 @@ CREATE TABLE staff (
                         </div>
                         <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- ④ 商品マスタ（categoriesを参照）
 CREATE TABLE products (
-    product_id   integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    product_code varchar(20)  NOT NULL UNIQUE,
-    product_name varchar(100) NOT NULL,
-    category_id  integer NOT NULL
+    product_id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_code       varchar(20)  NOT NULL UNIQUE,
+    product_name       varchar(100) NOT NULL,
+    category_id        integer NOT NULL
         REFERENCES categories (category_id) ON DELETE RESTRICT,
-    unit_price   numeric(10,2) NOT NULL CHECK (unit_price >= 0)
+    current_unit_price numeric(10,2) NOT NULL
+        CHECK (current_unit_price >= 0)  -- 現在単価（これから受ける注文に使う）
 );</code></pre>
                     </div>
 
@@ -634,7 +677,7 @@ CREATE TABLE orders (
                     </div>
 
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <strong>⑥ order_details（受注明細）</strong> — 複合主キー、そして受注が削除されたら明細も一緒に消える <code class="bg-slate-100 px-1 rounded">ON DELETE CASCADE</code> を使う、唯一のテーブルです。<code class="bg-slate-100 px-1 rounded">unit_price</code> は<strong>注文時点の単価をこの行にコピーして保存</strong>します。商品マスタの単価が後から改定されても、過去の受注明細の金額は変わりません。
+                        <strong>⑥ order_details（受注明細）</strong> — 複合主キー、そして受注が削除されたら明細も一緒に消える <code class="bg-slate-100 px-1 rounded">ON DELETE CASCADE</code> を使う、唯一のテーブルです。<code class="bg-slate-100 px-1 rounded">unit_price</code> には、注文を受け付けた時点の商品マスタの現在単価（<code class="bg-slate-100 px-1 rounded">current_unit_price</code>）を<strong>コピーして保存</strong>します（注文時単価）。商品マスタの現在単価が後から改定されても、過去の受注明細の金額は変わりません。
                     </p>
 
                     <div class="code-block-wrapper mb-4">
@@ -746,13 +789,13 @@ CREATE TABLE order_details (
                                     </details>
                                 </li>
                                 <li class="text-blue-900">
-                                    <p class="font-medium mb-2 break-words">Q3. 外部キーの列（例: <code class="bg-blue-100 px-1 rounded">orders.customer_id</code>）に、主キーや一意制約の列と同じように自動でインデックスが付かないのはなぜですか。また、なぜあえて索引を追加すべきですか。</p>
+                                    <p class="font-medium mb-2 break-words">Q3. 外部キーの列（例: <code class="bg-blue-100 px-1 rounded">orders.customer_id</code>）に、主キーや一意制約の列と同じように自動でインデックスが付かないのはなぜですか。また、索引を追加するかどうかは何を見て判断しますか。</p>
                                     <details class="mt-2">
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            主キー・一意制約は「値の重複を防ぐ」ために内部的に索引が必須ですが、外部キー制約は「参照先が存在するか」を確認するだけで索引を前提としないため、PostgreSQLは自動で作成しません。しかし外部キー列はJOINやON DELETEの検索条件として頻繁に使われるため、明示的に<code class="bg-blue-100 px-1 rounded">CREATE INDEX</code>を作って全表スキャンを避けます。
+                                            主キー・一意制約は「値の重複を防ぐ」ために内部的に索引が必須ですが、外部キー制約は「参照先に値が存在するか」を確かめる仕組みで、参照する側の列の索引を前提としません。必要かどうかは使い方次第なので、PostgreSQL は自動では作りません。判断の目安は、その列で検索・JOIN する頻度、親の行を削除・更新する頻度（そのたびに子の表を探す処理が走る）、既存の複合インデックスの先頭列で代用できないか、の3点です。<code class="bg-blue-200 px-1 rounded">orders.customer_id</code> は顧客ごとの注文履歴の検索で頻繁に使うため、<code class="bg-blue-200 px-1 rounded">CREATE INDEX</code> で索引を追加します。
                                         </p>
                                     </details>
                                 </li>
