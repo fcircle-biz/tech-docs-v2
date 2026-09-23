@@ -27,6 +27,9 @@ import { struts1 } from './programming-languages/java-ecosystem/struts1';
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
+// プログラミング言語 — Python エコシステム
+import { python } from './programming-languages/python-ecosystem/python';
+
 // プログラミング言語 — .NET エコシステム
 import { vbnet } from './programming-languages/dotnet-ecosystem/vbnet';
 
@@ -40,6 +43,7 @@ import { webBasics } from './web-technologies/web-basics';
 import { sqlserver } from './database/sqlserver';
 import { sql } from './database/sql';
 import { oracle } from './database/oracle';
+import { dbDesign } from './database/db-design';
 
 // データ分析・BI
 import { powerBi } from './data-analytics/power-bi';
@@ -61,6 +65,7 @@ import { gitGithub } from './development-processes/git-github';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
+import { linux } from './cloud-infrastructure/linux';
 
 // セキュリティ
 import { keycloak } from './security/keycloak';
@@ -87,6 +92,8 @@ const all: TechGuide[] = [
   struts1,
   // プログラミング言語 — JavaScript エコシステム
   javascript,
+  // プログラミング言語 — Python エコシステム
+  python,
   // プログラミング言語 — .NET エコシステム
   vbnet,
   // Web技術
@@ -98,6 +105,7 @@ const all: TechGuide[] = [
   sqlserver,
   sql,
   oracle,
+  dbDesign,
   // データ分析・BI
   powerBi,
   superset,
@@ -113,6 +121,7 @@ const all: TechGuide[] = [
   gitGithub,
   // クラウド・インフラ
   docker,
+  linux,
   // セキュリティ
   keycloak,
   // 業務アプリ・自動化
