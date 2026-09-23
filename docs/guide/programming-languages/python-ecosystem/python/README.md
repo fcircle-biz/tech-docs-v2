@@ -26,7 +26,7 @@
 プログラミングとは何か、Python がどんな言語で、どんな場面（業務自動化・データ分析・Web・AI）で活躍しているのかを、身近な例で説明します。プログラムが実行される仕組み（インタプリタ）の全体像もつかみます。
 
 ### [2. 開発環境を準備しよう](https://fcircle-biz.github.io/tech-docs-v2/guide/programming-languages/python-ecosystem/python/python-learning-material-02.html)
-Python 本体のインストール（Windows / macOS）、バージョン確認、VS Code と Python 拡張機能の導入を行います。ターミナルの基本操作と、つまずきやすい PATH 設定の確認方法も解説します。
+Python 本体のインストール（Windows は公式推奨の Python install manager、macOS は公式インストーラ）、バージョン確認、VS Code と Python 拡張機能の導入を行います。ターミナルの基本操作と、`python` コマンドが見つからないときの確認方法も解説します。
 
 ### [3. はじめてのプログラムを書こう](https://fcircle-biz.github.io/tech-docs-v2/guide/programming-languages/python-ecosystem/python/python-learning-material-03.html)
 `print()` で「Hello, World!」を表示する最初のプログラムを作成します。対話モード（REPL）とスクリプトファイル（.py）の2つの実行方法、コメント、インデントの意味、エラーメッセージの読み方の第一歩を学びます。
