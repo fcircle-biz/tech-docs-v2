@@ -1,0 +1,622 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">DB設計入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約75分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">非正規化・履歴・アンチパターン</h1>
+                    <p class="text-slate-600">第10章で「さくら文具」の全テーブルを DDL として完成させました。しかし実務では、正規化されたテーブルだけでは足りない場面があります。「注文時点の単価をどう残すか」「顧客が複数の配送先を持つとき注文時の宛先はどう記録するか」「商品の値段が変わった履歴をどう管理するか」。この章では、正規化と上手に付き合うための非正規化の判断基準、時間とともに変わるデータ（履歴）の設計、そして避けるべきアンチパターンを、さくら文具の題材で学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-lg font-semibold text-amber-900 mb-3">この章の学習目標</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 text-amber-900">order_details.unit_price</code> が「注文時単価」であり、正規化違反の冗長データではなく別の事実の記録であることを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>顧客の複数配送先（<code class="bg-amber-100 text-amber-900">customer_addresses</code>）と、注文時の配送先スナップショットの必要性を設計できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>商品価格の改定履歴を「適用開始日・終了日」を持つ履歴テーブルで表現できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>意図的な非正規化（合計金額の保持など）を行う判断基準と、そのリスク・維持コストを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>論理削除の是非を判断でき、カンマ区切り列・EAV・万能テーブル・意味を持つIDといった代表的アンチパターンを見分けられる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション11.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 正規化との付き合い方 — 非正規化は「知らずに崩す」ことではない
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6〜8章で学んだ正規化は、<strong>更新異常を防ぐ</strong>ための手順でした。事実ごとに表を分ければ、同じ値を何か所も直す必要がなくなります。しかし表を分けるほど、データを1つの意味ある形に戻すには <code class="bg-slate-100">JOIN</code> が必要になり、テーブル数も増えます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>非正規化</strong>とは、この「正しさを保ちやすい正規化された構造」を、<strong>理解した上で意図的に</strong>崩し、冗長なデータを許容する設計判断です。第1章で「まず整合性と妥当性を優先する」と学びましたが、それは「性能のために構造を崩してよい場面がまったく無い」という意味ではありません。判断の順序が重要で、<strong>先に正しく正規化してから、必要な箇所だけ意図的に崩す</strong>のが正しい進め方です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">正規化を保つ理由</th>
+                                    <th class="px-4 py-3 text-left font-semibold">非正規化を検討する理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">更新のしやすさ</td>
+                                    <td class="px-4 py-3 text-slate-600">1つの事実を1か所だけ直せば済み、矛盾が起きない</td>
+                                    <td class="px-4 py-3 text-slate-600">冗長な列を持つと、複数箇所を同時に直す責任が生まれる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">読み取りのしやすさ</td>
+                                    <td class="px-4 py-3 text-slate-600">表が増えるほど <code class="bg-slate-100">JOIN</code> が複雑になる</td>
+                                    <td class="px-4 py-3 text-slate-600">よく使う集計値を持たせておけば <code class="bg-slate-100">JOIN</code> や集計を省略できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">履歴の保持</td>
+                                    <td class="px-4 py-3 text-slate-600">最新の値だけを1か所に持つのが基本形</td>
+                                    <td class="px-4 py-3 text-slate-600">「あの時点でどうだったか」を残す必要がある場面がある（11.2〜11.4）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 「面倒だから正規化しない」は非正規化ではない</p>
+                                <p class="text-red-900 text-sm">正規化の手順を踏まずに最初から1つの表に詰め込むのは、非正規化ではなく単なる<strong>設計不足</strong>です。非正規化と呼べるのは、いったん正規化された構造を理解した上で、リスクと維持コストを引き受けて意図的に崩す場合だけです。この違いを区別できないと、「正規化は面倒だから最初から崩してよい」という誤解につながります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 スナップショットは正規化違反ではない — 注文時単価
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第10章で完成させた <code class="bg-slate-100">order_details</code> には <code class="bg-slate-100">unit_price</code> 列があります。一見すると「<code class="bg-slate-100">products.unit_price</code> と同じ値を2か所に持っている」ので正規化違反（冗長）に見えるかもしれません。しかし、これは<strong>まったく別の事実を記録している</strong>ため、正規化違反ではありません。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">列</th>
+                                    <th class="px-4 py-3 text-left font-semibold">表す事実</th>
+                                    <th class="px-4 py-3 text-left font-semibold">関数従属の相手</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">products.unit_price</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>現在</strong>この商品を売る定価</td>
+                                    <td class="px-4 py-3 text-slate-600">product_id（商品そのものに従属）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">order_details.unit_price</td>
+                                    <td class="px-4 py-3 text-slate-600">その注文明細1行が<strong>成立した時点</strong>で合意された単価</td>
+                                    <td class="px-4 py-3 text-slate-600">(order_id, line_no)（この注文明細1行に従属）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        商品の定価は今後も変わり続けますが、<strong>過去に成立した注文の金額は変わってはいけません</strong>。もし <code class="bg-slate-100">order_details</code> に単価を持たせず、都度 <code class="bg-slate-100">products.unit_price</code> を参照する設計にしてしまうと、商品の値上げのたびに<strong>過去の注文の合計金額まで変わってしまう</strong>という重大な不具合になります。単価を明細行に記録するのは冗長化ではなく、「この明細行は何円で成立したか」という<strong>明細行自身の事実</strong>を正しく持たせているだけです。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">order_details.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 受注明細（第10章のDDLと同じ。unit_price は「注文時点で確定した単価」）
+CREATE TABLE order_details (
+    order_id   integer NOT NULL
+        REFERENCES orders (order_id) ON DELETE CASCADE,
+    line_no    integer NOT NULL,
+    product_id integer NOT NULL
+        REFERENCES products (product_id) ON DELETE RESTRICT,
+    unit_price numeric(10,2) NOT NULL CHECK (unit_price >= 0),  -- 成立時点の単価
+    quantity   integer NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (order_id, line_no)
+);</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: 「同じ列名・同じ型」でも従属先が違えば別の事実</p>
+                                <p class="text-emerald-900 text-sm">正規化違反かどうかを見分けるコツは、「値が同じかどうか」ではなく「<strong>その値は何に従属しているか</strong>」を確認することです。<code class="bg-emerald-100 text-emerald-900">products.unit_price</code> は商品に従属する「現在の定価」、<code class="bg-emerald-100 text-emerald-900">order_details.unit_price</code> は注文明細に従属する「成立時点の単価」で、従属先（主キー）が異なる別の事実です。これから学ぶ配送先スナップショット・価格履歴も同じ考え方で理解できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 顧客の複数配送先と注文時の配送先スナップショット
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまでの設計では、顧客の住所は <code class="bg-slate-100">customers.address</code> の1つだけでした。しかし実際のさくら文具では、<strong>顧客は自宅・会社・実家など複数の配送先を登録できる</strong>ようにしたい、という要件が出てきます。これは第5章で学んだ「1対多」の関係そのもので、新しい配送先エンティティを追加します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+erDiagram
+    customers ||--o{ customer_addresses : "配送先を登録する"
+    customers ||--o{ orders : "注文する"
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">customer_addresses.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 顧客の配送先マスタ（1人の顧客が複数件登録できる）
+CREATE TABLE customer_addresses (
+    address_id   integer      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    customer_id  integer      NOT NULL REFERENCES customers(customer_id),
+    label        varchar(20)  NOT NULL,        -- 「自宅」「会社」等
+    postal_code  varchar(8)   NOT NULL,
+    address      varchar(200) NOT NULL,
+    is_default   boolean      NOT NULL DEFAULT false  -- 既定の配送先
+);</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで注意が必要なのは、<code class="bg-slate-100">orders</code> から <code class="bg-slate-100">customer_addresses</code> へ<strong>外部キーだけ</strong>を引くのでは不十分だという点です。もし注文後に顧客が配送先を編集・削除してしまうと、過去の注文が「実際にはどこへ送ったか」を失ってしまいます。そこで <code class="bg-slate-100">orders</code> 自身にも、注文時点の配送先を<strong>コピー（スナップショット）</strong>として持たせます。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">orders_shipping.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- orders に追加する配送先スナップショット列（抜粋。既存行が無い前提）
+ALTER TABLE orders
+    ADD COLUMN shipping_address_id integer   -- 配送先が削除されたら NULL にする
+        REFERENCES customer_addresses(address_id) ON DELETE SET NULL,
+    ADD COLUMN shipping_postal_code varchar(8)   NOT NULL,  -- 注文時点の郵便番号を複製
+    ADD COLUMN shipping_address     varchar(200) NOT NULL;  -- 注文時点の住所を複製</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">shipping_address_id</code> は「どの配送先を選んだか」という参照のために残し、<code class="bg-slate-100">shipping_postal_code</code>・<code class="bg-slate-100">shipping_address</code> は「実際に届けた先」を後から編集・削除の影響なしに再現するために複製します。11.2 の単価スナップショットと同じ考え方で、<strong>「注文に従属する事実（実際に届けた先）」と「配送先マスタに従属する事実（今の登録内容）」は別物</strong>だから両方を持つ、と理解してください。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 「マスタ」と「スナップショット」を混同しない</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100 text-blue-900">customer_addresses</code> は「今、顧客が使える配送先の一覧」という<strong>マスタ</strong>で、時間とともに増減・変更されます。一方 <code class="bg-blue-100 text-blue-900">orders.shipping_address</code> は「その注文が確定した瞬間の宛先」という<strong>記録</strong>で、後から変わってはいけません。マスタを更新しても、過去の注文のスナップショットは変わらないことを確認してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 時間とともに変わるデータ — 商品価格の改定履歴
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        11.2 では「注文が成立した瞬間の単価」を明細行に残しました。しかし別の要件として、「4月時点でボールペン黒は何円だったか」「来月から値上げする価格をあらかじめ登録しておきたい」のように、<strong>商品の定価そのものの変化を追跡したい</strong>場合があります。これは <code class="bg-slate-100">products.unit_price</code> を1つの値で持つだけでは表現できません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        こうした「時間軸を持つデータ」は、<strong>適用開始日・終了日を持つ履歴テーブル</strong>に分けて表現するのが定石です。さくら文具では <code class="bg-slate-100">product_prices</code> を新設します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+erDiagram
+    products ||--o{ product_prices : "価格改定履歴を持つ"
+                        </div>
+                    </div>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">product_prices.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品価格の改定履歴（valid_to が NULL の行が現在有効な価格）
+CREATE TABLE product_prices (
+    price_id   integer       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id integer       NOT NULL REFERENCES products(product_id),
+    unit_price numeric(10,2) NOT NULL,
+    valid_from date          NOT NULL,   -- この価格の適用開始日
+    valid_to   date,                     -- 適用終了日（この日は含まない）。NULL は現在も有効
+    CHECK (valid_to IS NULL OR valid_from < valid_to)
+);</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「今日時点で有効な単価」を調べるには、<code class="bg-slate-100">valid_from</code> と <code class="bg-slate-100">valid_to</code> の範囲に対象の日付が入る行を1件だけ探します。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">current_price.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- 商品 P01（product_id = 1 とする）の、本日時点で有効な単価を取得
+SELECT unit_price
+FROM product_prices
+WHERE product_id = 1
+  AND valid_from <= CURRENT_DATE
+  AND (valid_to IS NULL OR valid_to > CURRENT_DATE);</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        値上げを登録するときは、現在有効な行の <code class="bg-slate-100">valid_to</code> を新しい適用開始日に更新し、新しい単価の行を <code class="bg-slate-100">valid_to = NULL</code> で追加します。<code class="bg-slate-100">products.unit_price</code> を直接書き換えないため、過去の価格が失われません。この設計になった後、<code class="bg-slate-100">products</code> テーブル自身の <code class="bg-slate-100">unit_price</code> 列は不要になり、<code class="bg-slate-100">product_prices</code> の現在有効な行に一本化できます。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-star text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要: 履歴テーブルは正規化の延長であり非正規化ではない</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 text-emerald-900">product_prices</code> を追加するのは、「商品の単価」という1つの属性が実は<strong>時間によって複数の値を持つ</strong>ことに気づき、正しく別テーブルへ分けた結果です。これはむしろ第7章の第1正規形（繰り返しをなくす）の考え方の延長で、非正規化ではありません。次の11.5で扱う「合計金額の保持」との違いを区別してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 意図的な非正規化 — orders に合計金額を持たせる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        正規化どおりに考えれば、1件の注文の合計金額は <code class="bg-slate-100">order_details</code> の <code class="bg-slate-100">unit_price × quantity</code> を <code class="bg-slate-100">SUM</code> すれば常に求められるので、<code class="bg-slate-100">orders</code> に列を持つ必要はありません。しかし、注文一覧画面を開くたびに何千件もの注文それぞれで <code class="bg-slate-100">order_details</code> を集計するのは負荷が大きく、<code class="bg-slate-100">orders.total_amount</code> という<strong>集計済みの列を持たせたい</strong>、という判断が実務では起こります。これが本章で初めて登場する「純粋な非正規化」の例です。
+                    </p>
+
+                    <div class="code-block-wrapper mb-4">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">orders_total.sql</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-sql">-- orders に持たせる集計列（本来は order_details から常に再計算できる値）
+ALTER TABLE orders
+    ADD COLUMN total_amount numeric(12,2) NOT NULL DEFAULT 0;
+-- 明細の追加・変更時に、アプリまたはトリガーで再計算して更新する</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        非正規化してよいかどうかは、次の3点を確認して判断します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">判断基準</th>
+                                    <th class="px-4 py-3 text-left font-semibold">orders.total_amount の場合</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">読み取りの頻度・コストが十分高いか</td>
+                                    <td class="px-4 py-3 text-slate-600">注文一覧・検索で毎回集計するのは負荷が大きく、頻度も高い → 該当する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">整合性を保つ仕組みを用意できるか</td>
+                                    <td class="px-4 py-3 text-slate-600">明細の追加・変更・削除のすべての経路で再計算する処理（トリガー等）を必ず通す必要がある</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">崩れたときの検知・修復手段があるか</td>
+                                    <td class="px-4 py-3 text-slate-600">定期的に <code class="bg-slate-100">SUM</code> の結果と比較する検証バッチを用意できるか</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 非正規化には「維持コスト」という負債が伴う</p>
+                                <p class="text-red-900 text-sm">集計列を持たせた瞬間から、明細を更新するすべてのプログラムが「合計金額も忘れずに更新する」責任を負います。更新経路が1つでも漏れると、<code class="bg-red-100">total_amount</code> と実際の明細の合計が食い違う<strong>不整合</strong>が発生します。非正規化は性能を買うために整合性の維持コストを支払う取引であり、「維持できる体制があるか」を先に確認してから採用してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 論理削除の是非
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「キャンセルされた注文」や「退会した顧客」を、行ごと <code class="bg-slate-100">DELETE</code> するのではなく、<code class="bg-slate-100">is_deleted</code> や <code class="bg-slate-100">deleted_at</code> のような列を立てて「削除済みの印」を付けるだけにする方法を<strong>論理削除</strong>と呼びます。実際に行を消す<strong>物理削除</strong>と対になる考え方です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">論理削除の利点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">論理削除の欠点</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">参照整合性</td>
+                                    <td class="px-4 py-3 text-slate-600">他テーブルから外部キーで参照されていても削除できる（<code class="bg-slate-100">staff</code> が退職しても過去の <code class="bg-slate-100">orders</code> は残る）</td>
+                                    <td class="px-4 py-3 text-slate-600">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">誤削除からの復旧</td>
+                                    <td class="px-4 py-3 text-slate-600">印を外すだけで復元できる</td>
+                                    <td class="px-4 py-3 text-slate-600">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">クエリの安全性</td>
+                                    <td class="px-4 py-3 text-slate-600">—</td>
+                                    <td class="px-4 py-3 text-slate-600">すべての <code class="bg-slate-100">SELECT</code> に <code class="bg-slate-100">WHERE deleted_at IS NULL</code> を付け忘れると削除済み行が漏れて見える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">一意制約</td>
+                                    <td class="px-4 py-3 text-slate-600">—</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">customer_code</code> の <code class="bg-slate-100">UNIQUE</code> が、削除済みの値も塞いだままになり、コードの再利用ができない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        判断の目安として、「他のテーブルから参照され続ける行（顧客・商品・担当者などのマスタ）」や「法令・社内規程で一定期間の保持が求められる行」は論理削除が向いています。一方、「一時的な作業データ」や「参照されず復元の必要もない行」は物理削除で十分です。さくら文具では、<code class="bg-slate-100">staff</code>（過去の注文から参照される）や <code class="bg-slate-100">customers</code> は論理削除、下書きの一時データなどは物理削除、というように<strong>テーブルごとに使い分ける</strong>のが実務的です。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 「全テーブルに is_deleted を付ける」は目的を忘れた例</p>
+                                <p class="text-blue-900 text-sm">論理削除は「参照整合性を保ちたい」「復元したい」という具体的な理由があって選ぶ手段です。理由を確認せずに全テーブルへ機械的に <code class="bg-blue-100 text-blue-900">is_deleted</code> を付けると、クエリの付け忘れというリスクだけを増やして、得られる利点は活かされません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.7 避けるべき代表的なアンチパターン
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        非正規化は「理解した上で選ぶ」判断でしたが、ここで紹介する4つは<strong>そもそも避けるべき</strong>設計です。いずれも「一見手軽だが、後から必ず困る」という共通点があります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">アンチパターン</th>
+                                    <th class="px-4 py-3 text-left font-semibold">何が起きるか</th>
+                                    <th class="px-4 py-3 text-left font-semibold">代わりにどうするか</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">カンマ区切りの列</td>
+                                    <td class="px-4 py-3 text-slate-600">第1章の「P01, P03」のように1セルに複数値。集計・検索のたびに文字列分解が必要で、外部キー制約も効かない</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">order_details</code> のように行を分ける（第1正規形、第7章）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">EAV（何でも入る属性テーブル）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">entity_id, attr_name, attr_value</code> の3列だけの表に何でも詰め込む。型やNOT NULLの制約が効かず、単純な検索にも自己結合が必要になる</td>
+                                    <td class="px-4 py-3 text-slate-600">属性ごとに列を定義する。商品分類が増える程度なら<code class="bg-slate-100">categories</code> の行を増やせば対応できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">万能テーブル（ポリモーフィック関連）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">related_type, related_id</code> のような列で「顧客にも商品にも担当者にも」1つの表からリンクさせる。外部キー制約を張れず、参照先を型ごとに <code class="bg-slate-100">JOIN</code> で切り分ける必要がある</td>
+                                    <td class="px-4 py-3 text-slate-600">関連先ごとに専用の中間テーブルを作る（第5章の中間エンティティ）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">IDに意味を持たせる（スマートキー）</td>
+                                    <td class="px-4 py-3 text-slate-600">例: 商品コードの先頭2桁を分類コードにする。分類変更のたびにIDそのものを直す必要が生まれ、第9章で学んだ「主キーは業務の都合で変わらない値にする」という原則に反する</td>
+                                    <td class="px-4 py-3 text-slate-600">識別だけを担う連番のサロゲートキーと、意味を持つ業務コード（<code class="bg-slate-100">product_code</code> 等）を分ける（第9章）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: アンチパターンは「柔軟に見える」から選ばれてしまう</p>
+                                <p class="text-red-900 text-sm">EAV や万能テーブルは「将来どんな属性・どんな関連先が増えても、テーブルを変更せずに対応できそうだ」という理由で選ばれがちです。しかし実際には、RDBMS が保証してくれる型・NOT NULL・外部キーといった<strong>制約の力を自ら手放す</strong>ことになり、アプリ側でその責任を負う羽目になります。「柔軟性」と「制約による安全性」はトレードオフだと理解して選んでください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 実習カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 11-1: 非正規化するかどうかを判断する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">さくら文具の運営チームから、次の3つの相談が来たとします。11.5 の判断基準（読み取り頻度・整合性維持の可否・検知手段）を使って、それぞれ「非正規化してよい」「するべきではない」を判断し、理由をメモしてください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">相談内容</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">「トップページに『総顧客数』を表示したいので、<code class="bg-purple-100 text-purple-900">customers</code> の行数を数える代わりに、どこかに数値を持たせたい」</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">「注文確認メールに商品名を載せたいので、<code class="bg-purple-100 text-purple-900">order_details</code> に商品名の列も追加して <code class="bg-purple-100 text-purple-900">products</code> への <code class="bg-purple-100 text-purple-900">JOIN</code> を省きたい。ただし商品名は将来変更されることがある」</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">「担当者ごとの月間受注件数ランキングを毎朝の会議で見るので、深夜バッチで集計して専用テーブルに書き出したい」</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3">
+                                <p class="text-purple-900 text-sm break-words"><strong>ねらい:</strong> 相談1は更新頻度が低く読み取りも軽いため非正規化の必要は薄い一方、相談3はバッチで整合性を保証できるため妥当な非正規化です。相談2は要注意です。「商品名が将来変わる」ことを考えると、<code class="bg-purple-100 text-purple-900">order_details</code> にコピーした商品名は<strong>注文成立時点の名称（スナップショット）</strong>として扱うべきで、11.2・11.3 と同じ考え方が当てはまります。単純な性能目的の非正規化と、事実として残すべきスナップショットを混同しないことが大切です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「<code class="bg-blue-100">order_details.unit_price</code> は <code class="bg-blue-100">products.unit_price</code> と同じ値を2か所に持っているだけの冗長データだ」という意見に、どう反論しますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            2つの列は従属先が異なる別の事実です。<code class="bg-blue-200">products.unit_price</code> は商品に従属する「現在の定価」、<code class="bg-blue-200">order_details.unit_price</code> は注文明細に従属する「その注文が成立した時点の単価」です。商品の定価は今後も変わりますが、成立済みの注文の金額は変わってはならないため、両方を別々に持つ必要があり、正規化違反ではありません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">orders</code> に <code class="bg-blue-100">shipping_address</code>（配送先住所の複製）を持たせず、<code class="bg-blue-100">customer_addresses</code> への外部キーだけを持たせた場合、どのような問題が起きますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            顧客が後から <code class="bg-blue-200">customer_addresses</code> の住所を編集したり削除したりすると、過去の注文が参照する配送先の内容まで変わって（あるいは参照先が消えて）しまい、「実際にどこへ送ったか」という履行の事実を失います。注文時点の住所をスナップショットとして複製しておく必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100">orders.total_amount</code>（合計金額）を持たせる非正規化を採用する場合、必ず用意しなければならない仕組みは何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            明細（<code class="bg-blue-200">order_details</code>）の追加・変更・削除のすべての経路で <code class="bg-blue-200">total_amount</code> を再計算して更新する仕組み（アプリのロジックやトリガー）、および値が食い違っていないかを確認する検証手段（定期バッチなど）が必要です。これが無いと合計金額が実際の明細と食い違う不整合が発生します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 「顧客・商品・注文・在庫など、あらゆる種類のデータを <code class="bg-blue-100">entity_id, attr_name, attr_value</code> の3列だけの1つの表に格納する」という設計を提案されました。何というアンチパターンで、どんな問題がありますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            EAV（Entity-Attribute-Value）と呼ばれるアンチパターンです。列の型やNOT NULL・外部キーといったRDBMSの制約が一切効かなくなり、単純な条件検索にも自己結合を何度も重ねる必要が生じて、性能面・保守面の両方で不利になります。属性ごとに列を定義した通常のテーブル構成にするべきです。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="db-design-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第10章: 論理設計から物理設計へ</span>
+                        </div>
+                    </a>
+                    <a href="db-design-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: 総合演習 — 小さな業務システムを設計する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
