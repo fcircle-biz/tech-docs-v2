@@ -41,11 +41,11 @@ HTTP が「リクエスト（お願い）」と「レスポンス（返事）」
 
 ### [4. HTTPメソッド](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-04.html)
 
-GET・POST・PUT・PATCH・DELETE などのメソッドが「何をしてほしいか」を表すことを学びます。各メソッドの使いどころ、安全（サーバーの状態を変えない）と冪等（何回送っても結果が同じ）という2つの性質、HTMLフォームから送られる GET と POST の違いを扱います。
+GET・POST・PUT・PATCH・DELETE などのメソッドが「何をしてほしいか」を表すことを学びます。各メソッドの使いどころ、安全（サーバーに状態の変更を求めない）と冪等（何回送ってもサーバーに与える効果が同じ）という2つの性質、HTMLフォームから送られる GET と POST の典型的な違いを扱います。
 
 ### [5. ステータスコード](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-05.html)
 
-レスポンスの冒頭にある3桁の数字の読み方を学びます。1xx〜5xx の5分類の意味、200・201・204・301・302・304・400・401・403・404・409・422・429・500・502・503 など頻出コードの違い、トラブル時に「どちらの責任か」を切り分ける考え方を身につけます。
+レスポンスの冒頭にある3桁の数字の読み方を学びます。1xx〜5xx の5分類の意味、200・201・204・301・302・304・400・401・403・404・409・422・429・500・502・503 など頻出コードの違い、4xx と 5xx の意味の違いからトラブル時にまず調べる場所の見当をつける考え方を身につけます。
 
 ### [6. HTTPヘッダーとボディ](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-06.html)
 
@@ -69,15 +69,15 @@ Web API のデータ形式の主流である JSON を学びます。オブジェ
 
 ### [11. Web APIとRESTの考え方](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-11.html)
 
-プログラムからプログラムを呼び出す窓口である Web API と、その代表的な設計スタイル REST を学びます。「リソース」を URI で表し、HTTPメソッドで操作するという考え方、REST の設計原則（統一インターフェース・ステートレスなど）、RPC 形式や GraphQL との違いの概要を押さえます。
+プログラムからプログラムを呼び出す窓口である Web API と、その代表的な設計スタイル REST を学びます。「リソース」を URI で表し、HTTPメソッドで操作するという一般的な HTTP API 設計の考え方、Fielding が定義した REST の設計原則（統一インターフェース・ステートレスなど）、RPC 形式や GraphQL との違いの概要を押さえます。
 
 ### [12. REST APIを呼び出してみよう](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-12.html)
 
-練習用 API（JSONPlaceholder）を相手に、curl で一覧取得・1件取得・作成・更新・削除（CRUD）を実際に行います。クエリパラメータによる絞り込み、リクエストボディへの JSON の渡し方、APIキーによる認証の仕組み、API ドキュメント（OpenAPI）の読み方も扱います。
+練習用 API（JSONPlaceholder）を相手に、curl で一覧取得・1件取得・作成・更新・削除（CRUD）を実際に行います。クエリパラメータによる絞り込み、リクエストボディへの JSON の渡し方、APIキーや Bearer トークンといった認証情報の違いと送り方、API ドキュメント（OpenAPI Specification）の読み方も扱います。
 
 ### [13. REST APIの設計の基本](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-13.html)
 
-API を「使う側」から「作る側」の視点に切り替えます。分かりやすいエンドポイント（URI）の命名、メソッドとステータスコードの正しい使い分け、エラーレスポンスの形、ページネーション、バージョニング、冪等性への配慮など、良い API の設計指針を、悪い例との比較で学びます。
+API を「使う側」から「作る側」の視点に切り替えます。分かりやすいエンドポイント（URI）の命名でよく使われる慣習、メソッドとステータスコードの正しい使い分け、エラーレスポンスの形、ページネーション、バージョニング、冪等性への配慮など、良い API の設計指針を、悪い例との比較で学びます。
 
 ### [14. 実践：APIを使う小さなWebページを作ろう](https://fcircle-biz.github.io/tech-docs-v2/guide/web-technologies/web-basics/web-basics-learning-material-14.html)
 
