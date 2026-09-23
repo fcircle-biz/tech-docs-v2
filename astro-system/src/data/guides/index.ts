@@ -6,6 +6,8 @@
 //      に持つ（旧 sidebar-content.js は廃止。サイドバーはレイアウトがサーバーレンダリング）。
 //   2. src/chapters/<category>/<slug>/*.html に各章の「本文断片」を置く（head/ヘッダー/
 //      サイドバー/フッター/スクリプトはレイアウトが供給。断片は本文のみ）。
+//      chapters[] に定義した章の断片が1つでも欠けているとビルドエラーになる
+//      （存在しない章ページへのリンクを公開しないため。検査は src/pages/guide/[...chapter].astro）。
 //   3. （任意）public/guide/<category>/<slug>/README.md にガイド概要を置く（docs/ へパススルー）。
 //   4. src/pages/guide/[...chapter].astro が断片を glob して全章ページを自動生成する（個別ファイル不要）。
 //   <category> は分類パス（database / ai/ai-coding / programming-languages/java-ecosystem 等、2階層まで）。
