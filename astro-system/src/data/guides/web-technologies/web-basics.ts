@@ -1,0 +1,42 @@
+import type { TechGuide } from '../types';
+
+// Webの仕組み入門学習ガイド（全14章）。HTTP・JSON・REST API。技術色 = ティール（ネットワーク / 通信）。
+export const webBasics: TechGuide = {
+  category: 'web-technologies',
+  slug: 'web-basics',
+  techTitle: 'Webの仕組み学習教材',
+  icon: 'fa-globe',
+  level: '初級',
+  totalTime: '約10時間',
+  splashStop0: '#14b8a6',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#f0fdfa',
+    100: '#ccfbf1',
+    200: '#99f6e4',
+    300: '#5eead4',
+    400: '#2dd4bf',
+    500: '#14b8a6',
+    600: '#0d9488',
+    700: '#0f766e',
+    800: '#115e59',
+    900: '#134e4a',
+  },
+  chapters: [
+    { number: 1, name: 'Webの仕組みの全体像', file: 'web-basics-learning-material-01.html' },
+    { number: 2, name: 'インターネットとURL・DNS', file: 'web-basics-learning-material-02.html' },
+    { number: 3, name: 'HTTPの基本：リクエストとレスポンス', file: 'web-basics-learning-material-03.html' },
+    { number: 4, name: 'HTTPメソッド', file: 'web-basics-learning-material-04.html' },
+    { number: 5, name: 'ステータスコード', file: 'web-basics-learning-material-05.html' },
+    { number: 6, name: 'HTTPヘッダーとボディ', file: 'web-basics-learning-material-06.html' },
+    { number: 7, name: '開発者ツールとcurlで通信を観察する', file: 'web-basics-learning-material-07.html' },
+    { number: 8, name: 'Cookie・セッション・HTTPS', file: 'web-basics-learning-material-08.html' },
+    { number: 9, name: 'JSONの基本', file: 'web-basics-learning-material-09.html' },
+    { number: 10, name: 'JSONを読み書きする', file: 'web-basics-learning-material-10.html' },
+    { number: 11, name: 'Web APIとRESTの考え方', file: 'web-basics-learning-material-11.html' },
+    { number: 12, name: 'REST APIを呼び出してみよう', file: 'web-basics-learning-material-12.html' },
+    { number: 13, name: 'REST APIの設計の基本', file: 'web-basics-learning-material-13.html' },
+    { number: 14, name: '実践：APIを使う小さなWebページを作ろう', file: 'web-basics-learning-material-14.html' },
+  ],
+};

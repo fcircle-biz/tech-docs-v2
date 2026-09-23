@@ -37,6 +37,7 @@ import { vbnet } from './programming-languages/dotnet-ecosystem/vbnet';
 import { html } from './web-technologies/html';
 import { css } from './web-technologies/css';
 import { markdown } from './web-technologies/markdown';
+import { webBasics } from './web-technologies/web-basics';
 
 // データベース
 import { sqlserver } from './database/sqlserver';
@@ -99,6 +100,7 @@ const all: TechGuide[] = [
   html,
   css,
   markdown,
+  webBasics,
   // データベース
   sqlserver,
   sql,
