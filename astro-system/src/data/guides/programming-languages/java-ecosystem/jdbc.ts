@@ -7,7 +7,6 @@ export const jdbc: TechGuide = {
   techTitle: 'JDBC学習教材',
   icon: 'fa-database',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約7.5時間',
   splashStop0: '#f97316',
   splashStop1: '#06b6d4',

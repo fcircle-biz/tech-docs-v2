@@ -8,7 +8,6 @@ export const markdown: TechGuide = {
   icon: 'fa-markdown',
   iconStyle: 'fab',
   level: '初級',
-  categoryLabel: 'Web技術',
   totalTime: '約6時間30分',
   splashStop0: '#3b82f6',
   splashStop1: '#06b6d4',

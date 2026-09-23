@@ -74,7 +74,7 @@ description: ディスク上の実フォルダ構成を真実源にルートのR
 
 ### 技術分野の表示順序
 
-リポジトリ直下の `tech-knowledge-map.md` の分類順序に従う。値を丸写しせず同ファイルを参照すること。
+分類マスタ `astro-system/src/data/categories.ts` の分類・サブグループの順序と表示名に従う。値を丸写しせず同ファイルを参照すること。
 
 ### リンク形式(セクション別)
 
@@ -99,8 +99,8 @@ description: ディスク上の実フォルダ構成を真実源にルートのR
 - 並列指定(任意の調査フェーズ並列化)を行う場合は、必ず1メッセージにまとめて並列発行する。
 - **絶対パスのハードコード禁止**: `/Users/...` や `/home/<user>/...` 等の環境依存パスをコメントや説明に書かない。リポジトリルート相対(`tech_docs/README.md`, `docs/...`)で表現する。
 - 書き込み対象はルート `README.md` のみ。他の README.md は変更しない。
-- 共有データ(9分類体系・カラー・Tailwind・Mermaid・コンポーネント)は複製せず既存 repo ファイルを参照する。
-  - 9分類体系: `tech-knowledge-map.md`
+- 共有データ(分類マスタ・カラー・Tailwind・Mermaid・コンポーネント)は複製せず既存 repo ファイルを参照する。
+  - 分類マスタ(分類の表示名・順序): `astro-system/src/data/categories.ts`
   - カラー: `astro-system/templates/v1/reference/color-themes.md`
   - Tailwind: `astro-system/templates/v1/reference/css-styles.md`
   - Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md`

@@ -7,7 +7,6 @@ export const java: TechGuide = {
   techTitle: 'Java学習教材',
   icon: 'fa-mug-hot',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約21時間',
   splashStop0: '#f97316',
   splashStop1: '#06b6d4',

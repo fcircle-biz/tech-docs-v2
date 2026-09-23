@@ -7,7 +7,6 @@ export const vbnet: TechGuide = {
   techTitle: 'VB.NET学習教材',
   icon: 'fa-code',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約21時間',
   splashStop0: '#8b5cf6',
   splashStop1: '#06b6d4',

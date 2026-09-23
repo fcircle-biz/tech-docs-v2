@@ -1,0 +1,558 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Claude Code</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約45分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">サブエージェント</h1>
+                    <p class="text-slate-600">Claude Code は、コードベースの探索や調査のような作業を「サブエージェント」に任せることができます。サブエージェントはメインの会話とは別の、独立したコンテキストウィンドウの中で動作し、完了すると要約だけをメインエージェントに返します。この章では、サブエージェントの仕組みを理解し、<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">/agents</code> コマンドで自分専用のサブエージェントを作成・カスタマイズする方法を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブエージェントとは何か、メインエージェントとどう違うのかを理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブエージェントがコンテキストウィンドウの消費を抑える仕組みを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>サブエージェントの定義ファイル（YAMLフロントマター付きMarkdown）の書き方を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100 px-1 rounded">/agents</code> コマンドで自分用のサブエージェントを作成できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>永続的なメモリと <code class="bg-amber-100 px-1 rounded">skill</code> キーによるカスタマイズ方法、その注意点を知る</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章の全体像 -->
+                <figure class="my-6">
+                    <img src="/tech-docs-v2/guide/ai/ai-coding/claude-code/images/claude-code-subagent-separation.png"
+                         alt="メインエージェントの作業領域とサブエージェントの独立したコンテキストウィンドウを左右に分け、サブエージェントがファイル検索やコマンド実行などの探索を大量に行っても、メインエージェントには調査結果の要約だけが渡され、探索の途中経過はメインの記憶を圧迫しないことを示す対比図。"
+                         class="w-full max-w-3xl mx-auto rounded-lg border border-slate-200 shadow-sm"
+                         loading="lazy" decoding="async" />
+                    <figcaption class="mt-2 text-center text-sm text-slate-600">図9-1 サブエージェントが探索の「過程」と「結果」を分離する</figcaption>
+                </figure>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 サブエージェントとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Claude Code は、タスクをサブエージェントに委任し、<strong>タスクを細かく分割して並行して実行</strong>させることができます。呼び出す側の会話を<strong>メインエージェント</strong>と呼ぶと、サブエージェントはメインエージェントとは別に動作する、もう1つの Claude です。その働きは、次のようにまとめられます。
+                    </p>
+
+                    <blockquote class="border-l-4 border-primary-500 bg-primary-50 rounded-r-lg p-4 my-6">
+                        <p class="text-primary-900 leading-relaxed">
+                            サブエージェントは、タスクを細かく分割して並行して実行するために生成される。それぞれのサブエージェントは、<strong>独立したコンテキストウィンドウ</strong>の中で動作する。
+                        </p>
+                    </blockquote>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここでいう「独立したコンテキストウィンドウ」が、本章でいちばん大事なポイントです。メインエージェントが今取り組んでいる主タスクの記憶と、サブエージェントが探索のために読み込んだ大量のファイルやコマンド出力の記憶は、<strong>まったく別の場所</strong>に置かれます。次の図のように、両者は完全に切り離されています。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph MAIN["メインエージェント（主タスクのコンテキスト）"]
+        U["あなた"] -->|"依頼する"| CC["Claude Code"]
+    end
+    subgraph SUB["サブエージェント（別のコンテキストウィンドウ）"]
+        TASK["探索タスクを実行<br/>（ファイル検索・Web検索など）"]
+        RESULT["大量のツール呼び出し結果"]
+        TASK --> RESULT
+    end
+    CC -->|"タスクを委任する"| TASK
+    RESULT -->|"要約だけを返す"| CC
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブエージェントが作業を終えると、調べた内容を<strong>要約だけ</strong>メインエージェントに返します。探索の途中で読み込んだファイルの中身やコマンドの出力そのものは、サブエージェント側のコンテキストウィンドウに残ったままで、メインエージェントには渡りません。
+                    </p>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm"><strong>サブエージェント＝別のコンテキストウィンドウ＋要約だけを返す</strong>。この2点さえ押さえておけば、以降の内容はすべて「この性質をどう活用するか」の話になります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 なぜサブエージェントが必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第7章で見たとおり、コンテキストウィンドウの多くは、コードベースを探索するツール呼び出しや、調べもののための Web 検索によって消費されます。厄介なのは、<strong>そうした探索の過程で見つかった内容が、必ずしも今取り組んでいる主タスクに関係があるとは限らない</strong>という点です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば「認証のエンドポイントはどこにありますか」と尋ねたとき、Claude はいくつものファイルを開き、キーワードを検索し、関連しそうなコードを何度も読み込むかもしれません。あなたが本当に知りたいのは「どこにあるか」という一文の答えだけなのに、そこにたどり着くまでの試行錯誤がすべてメインのコンテキストウィンドウに積み上がってしまいます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">サブエージェントを使わない場合</th>
+                                    <th class="px-4 py-3 text-left font-semibold">サブエージェントを使う場合</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">探索のツール呼び出し・Web検索</td>
+                                    <td class="px-4 py-3 text-slate-600">メインのコンテキストウィンドウに直接積み上がる</td>
+                                    <td class="px-4 py-3 text-slate-600">別のコンテキストウィンドウで実行される</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">探索過程の細かいログ</td>
+                                    <td class="px-4 py-3 text-slate-600">すべてメインの記憶に残り続ける</td>
+                                    <td class="px-4 py-3 text-slate-600">要約だけが返り、メインはきれいなまま</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">向いている場面</td>
+                                    <td class="px-4 py-3 text-slate-600">探索の過程そのものも参照したい場合</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>結果さえ分かればよいタスク</strong>（第7章 節約のコツ③）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブエージェントを使えば、この探索過程をまるごとメインのコンテキストウィンドウの外に追い出せます。<strong>結果さえ分かればよいタスク</strong>であれば、サブエージェントとの相性は抜群です。
+                    </p>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 動作イメージ：ファンアウトで並行実行する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブエージェントの真価は、<strong>複数のタスクを同時に</strong>任せられるところにあります。たとえば大きな機能を実装する前に、「認証まわりの実装を調べて」「DBのスキーマを調べて」「関連するテストの有無を調べて」という3つの調査を、それぞれ別のサブエージェントに同時に投げることができます。これを<strong>ファンアウト（fan-out）</strong>と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        それぞれのサブエージェントは独立したコンテキストウィンドウで並行して動作するため、探索の量が増えても、メインエージェントのコンテキストが圧迫されることはありません。3つの調査が終わると、それぞれの要約だけがメインエージェントに集まります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    CC["メインエージェント"] -->|"タスクA"| S1["サブエージェント1<br/>認証まわりを調査"]
+    CC -->|"タスクB"| S2["サブエージェント2<br/>DB設計を調査"]
+    CC -->|"タスクC"| S3["サブエージェント3<br/>テスト状況を調査"]
+    S1 -->|"要約"| M["メインエージェント<br/>（3つの要約を統合）"]
+    S2 -->|"要約"| M
+    S3 -->|"要約"| M
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        メインエージェントは、3つの要約を踏まえて次の判断（設計・実装など）に進めます。探索そのものに使った大量のツール呼び出しは、どのサブエージェントのコンテキストウィンドウにも残ったままで、メインの記憶を煩雑にすることはありません。
+                    </p>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 定義の形式
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブエージェントは、<strong>YAML フロントマターを含む Markdown ファイル</strong>として定義されます。配置場所は、プロジェクト直下の <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">.claude/agents/</code> ディレクトリです。第8章で見た CLAUDE.md の2階層と同じく、<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">~/.claude/agents/</code> という<strong>ユーザーレベル</strong>の配置場所もあり、自分のすべてのプロジェクトで共通して使いたいサブエージェントはこちらに置けます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">配置場所</th>
+                                    <th class="px-4 py-3 text-left font-semibold">適用範囲</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">.claude/agents/</td>
+                                    <td class="px-4 py-3 text-slate-600">プロジェクトレベル。チームで共有する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">~/.claude/agents/</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーレベル。自分のすべてのプロジェクトで使える</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            サブエージェント定義ファイルの配置場所（プロジェクトレベルの例）
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>.claude/
+└── agents/
+    ├── code-reviewer.md
+    └── explore.md</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        各ファイルの先頭には、<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">---</code> で挟んだ YAML フロントマターを書きます。主なキーは次のとおりです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">キー</th>
+                                    <th class="px-4 py-3 text-left font-semibold">役割</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">name</td>
+                                    <td class="px-4 py-3 text-slate-600">サブエージェントの識別名</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">description</td>
+                                    <td class="px-4 py-3 text-slate-600">どんな時に呼び出すかの説明。Claude がこれを読んで自動的に判断する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">tools</td>
+                                    <td class="px-4 py-3 text-slate-600">利用できるツールを制限する（例: <code class="bg-slate-100 px-1 rounded">Read, Grep, Glob</code>）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-mono text-sm text-slate-900">model</td>
+                                    <td class="px-4 py-3 text-slate-600">使用するモデルを指定する（例: <code class="bg-slate-100 px-1 rounded">sonnet</code>）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        フロントマターより下の本文には、そのサブエージェント専用の<strong>システムプロンプト</strong>を書きます。役割・確認してほしい観点・出力形式などを具体的に書くほど、期待どおりに動いてくれます。実際の定義例を見てみましょう。
+                    </p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">.claude/agents/code-reviewer.md</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-markdown">---
+name: code-reviewer
+description: 実装が完了しコミット前のタイミングで、変更内容をレビューする専門サブエージェント。
+tools: Read, Grep, Glob
+model: sonnet
+---
+
+あなたは経験豊富なシニアエンジニアです。渡された変更内容を、
+まっさらな視点でレビューしてください。
+
+確認する観点:
+- 命名・可読性などのコードスタイル
+- バグや例外処理の考慮漏れ
+- 既存コードとの一貫性
+
+指摘は「重要度: 内容」の形式で簡潔にまとめてください。
+自分でファイルを編集しようとしないでください。</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この例では、<code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">tools</code> を <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">Read, Grep, Glob</code> という読み取り専用のツールだけに絞っています。レビュー担当のサブエージェントは指摘するだけで、ファイルを書き換えるべきではないからです。この考え方は第10章で改めて詳しく扱います。
+                    </p>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 /agents で作る
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        サブエージェントを一から手書きすることもできますが、まずは Claude に生成してもらうのがいちばん簡単です。ターミナルで Claude Code を起動し、次のコマンドを実行してください。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">terminal — Claude Code セッション例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">&gt; /agents
+
+● サブエージェントの一覧と管理メニューを表示しています…
+● メニューから「Create new agent」を選択してください。</code></pre>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-xl p-5 my-6">
+                        <h4 class="font-semibold text-slate-800 mb-3">/agents コマンドでサブエージェントを作る手順</h4>
+                        <ol class="space-y-3">
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">1</span>
+                                <span class="flex-1 min-w-0">ターミナルで <code class="bg-slate-100 px-1.5 py-0.5 rounded text-sm">/agents</code> を実行し、表示されたメニューから「Create new agent」を選択する</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">2</span>
+                                <span class="flex-1 min-w-0"><strong>適用範囲</strong>を選ぶ（このプロジェクトだけで使うか、すべてのプロジェクトで共通に使うか）</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">3</span>
+                                <span class="flex-1 min-w-0"><strong>目的</strong>を自分の言葉で伝える（どんな役割を担うサブエージェントかを自然文で説明する）</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">4</span>
+                                <span class="flex-1 min-w-0"><strong>利用できるツール</strong>を選択する（読み取り専用に絞るなど、目的に応じて権限を制限できる）</span>
+                            </li>
+                            <li class="flex items-start gap-3 text-slate-700">
+                                <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full
+                                             flex items-center justify-center text-sm font-medium">5</span>
+                                <span class="flex-1 min-w-0"><strong>表示色</strong>を指定する（ターミナル上でどのサブエージェントが動作しているか一目で分かるようにする）</span>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ポイント: 説明文がそのまま呼び出しの判断材料になる</p>
+                                <p class="text-blue-900 text-sm">この手順を進めると、Claude がサブエージェントの名前・説明・システムプロンプトを生成してくれます。ステップ3で伝えた目的の説明は、そのまま <code class="bg-blue-100 text-blue-900 px-1 rounded">description</code> になり、あなたが以降の会話で出す依頼の内容に応じて、Claude が<strong>いつそのサブエージェントを呼び出すべきか</strong>を自動的に判断する材料になります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 さらにカスタマイズする
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作成したサブエージェントは、次の2つの方法でさらに細かくカスタマイズできます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-brain text-blue-600"></i>
+                                <h3 class="font-semibold text-slate-800">永続的なメモリ</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">会話をまたいでサブエージェントに記憶を保持させます。同じプロジェクトで継続的にそのサブエージェントを使う場合に特に便利です。</p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-puzzle-piece text-purple-600"></i>
+                                <h3 class="font-semibold text-slate-800">skill キーによる事前読み込み</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">frontmatterに <code class="bg-purple-100 text-purple-900 px-1 rounded">skill</code> キーを追加し、スキル名を列挙することで、起動時にそのスキルを読み込ませます。</p>
+                        </div>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: skill キーはスキルの内容全体を読み込む</p>
+                                <p class="text-red-900 text-sm">メインの会話で使うスキルは、まず名前と説明だけがコンテキストに読み込まれ、必要だと判断されたときに初めて全内容が読み込まれます（詳しくは第11章）。一方、サブエージェントの <code class="bg-red-100 text-red-900 px-1 rounded">skill</code> キーで指定した場合は、これとは異なり、<strong>起動時にスキルの内容全体が最初からコンテキストに読み込まれます</strong>。多用するとサブエージェント側のコンテキストを圧迫するため、本当に必要なスキルだけを指定しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">スキル（Agent Skills）について</p>
+                                <p class="text-blue-900 text-sm">ここで登場した「スキル」自体の作り方や仕様は、本ガイドの範囲外です。詳しくは別ガイド「Claude Skills 入門」で学びます。なお、<code class="bg-blue-100 text-blue-900 px-1 rounded">skill</code> のような設定キーの名称や書き方は、今後変わる可能性があります。最新の情報は<a href="https://docs.claude.com/ja/docs/claude-code/overview" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-800">公式ドキュメント</a>で確認してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 コンテキスト管理との関係（第7章の実践）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまで見てきたサブエージェントの仕組みは、第7章「コンテキスト管理」で紹介した<strong>コンテキストの容量を節約する3つのコツ</strong>のうち、③の実践そのものです。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-link text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">第7章とのつながり</p>
+                                <p class="text-emerald-900 text-sm">第7章の節約のコツ③「サブエージェントを使う」は、まさに本章の内容です。結果さえ分かればよいタスク（例:「認証のエンドポイントはどこにあるか」）は、サブエージェントに任せることで、探索の過程を丸ごとメインのコンテキストの外に追い出せます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コンテキストウィンドウをきれいな状態に保つことは、Claude Code で生産性を維持するための最も効果的な方法のひとつです。サブエージェントは、そのための強力な道具です。次章では、この仕組みを使って、コミット前にコードレビューを行う実践的な使い方を学びます。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: 自分専用のサブエージェントを作ってみる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">実際に <code class="bg-purple-100 text-purple-900 px-1 rounded">/agents</code> を使って、自分のプロジェクト用のサブエージェントを1つ作ってみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">ターミナルで Claude Code を起動し、<code class="bg-purple-100 px-1 rounded">/agents</code> を実行して「Create new agent」を選ぶ。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">適用範囲を「このプロジェクトのみ」にし、目的として「READMEやコメントの誤字脱字だけを確認する校正担当」のように、具体的な役割を1文で伝える。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">生成された <code class="bg-purple-100 px-1 rounded">.claude/agents/</code> 配下のファイルを開き、フロントマターの <code class="bg-purple-100 px-1 rounded">name</code>・<code class="bg-purple-100 px-1 rounded">description</code>・<code class="bg-purple-100 px-1 rounded">tools</code>・<code class="bg-purple-100 px-1 rounded">model</code> と、本文のシステムプロンプトを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">メインの会話でそのサブエージェントを使う依頼をしてみて、動作している間もメインの会話が汚れないことを確認する。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. サブエージェントとメインエージェントの最大の違いは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            サブエージェントは、メインエージェントとは別の<strong>独立したコンテキストウィンドウ</strong>の中で動作します。メインエージェントと並行して探索などの作業を行い、完了すると調べた内容を<strong>要約だけ</strong>メインエージェントに返します。探索の過程で消費した大量のコンテキストはサブエージェント側に残り、メインエージェントには影響しません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. サブエージェントはどのような形式のファイルとして定義され、どこに配置しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>YAMLフロントマターを含むMarkdownファイル</strong>として定義し、<code class="bg-blue-200 px-1 rounded">.claude/agents/</code> ディレクトリに配置します。フロントマターには <code class="bg-blue-200 px-1 rounded">name</code>・<code class="bg-blue-200 px-1 rounded">description</code>・<code class="bg-blue-200 px-1 rounded">tools</code>・<code class="bg-blue-200 px-1 rounded">model</code> などのキーを書き、本文にはそのサブエージェント専用のシステムプロンプトを書きます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. サブエージェントの <code class="bg-blue-200 px-1 rounded">skill</code> キーでスキルを事前読み込みする際に、注意すべき点は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            メインの会話で使うスキルは名前と説明だけが先にコンテキストへ読み込まれ、必要になった時点で全内容が読み込まれますが、サブエージェントの <code class="bg-blue-200 px-1 rounded">skill</code> キーで指定した場合は、これとは異なり<strong>起動時にスキルの内容全体がコンテキストに読み込まれます</strong>。多用するとサブエージェント側のコンテキストを圧迫する点に注意が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="claude-code-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第8章: CLAUDE.mdでプロジェクトの記憶を作る</span>
+                        </div>
+                    </a>
+                    <a href="claude-code-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: Git連携とコードレビュー</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

@@ -8,14 +8,10 @@
 //      サイドバー/フッター/スクリプトはレイアウトが供給。断片は本文のみ）。
 //   3. （任意）public/guide/<category>/<slug>/README.md にガイド概要を置く（docs/ へパススルー）。
 //   4. src/pages/guide/[...chapter].astro が断片を glob して全章ページを自動生成する（個別ファイル不要）。
-//   <category> は分類パス（development-processes / programming-languages/python-ecosystem 等、複数セグメント可）。
+//   <category> は分類パス（database / ai/ai-coding / programming-languages/java-ecosystem 等、2階層まで）。
+//   使える分類・サブグループは src/data/categories.ts（分類マスタ）に登録済みのものだけ。
 import type { TechGuide } from './types';
-
-// 開発手法・プロセス
-import { claudeCode } from './development-processes/claude-code';
-import { claudeCodeSkills } from './development-processes/claude-code-skills';
-import { codex } from './development-processes/codex';
-import { gitGithub } from './development-processes/git-github';
+import { resolveCategory } from '../categories';
 
 // プログラミング言語 — Java エコシステム
 import { java } from './programming-languages/java-ecosystem/java';
@@ -39,33 +35,44 @@ import { html } from './web-technologies/html';
 import { css } from './web-technologies/css';
 import { markdown } from './web-technologies/markdown';
 
-// データ・AI — 生成AI
-import { claude } from './data-ai-category/generative-ai/claude';
+// データベース
+import { sqlserver } from './database/sqlserver';
+import { sql } from './database/sql';
+import { oracle } from './database/oracle';
 
-// データ・AI — AI活用基盤
-import { jev } from './data-ai-category/data-ai/jev';
+// データ分析・BI
+import { powerBi } from './data-analytics/power-bi';
+import { superset } from './data-analytics/superset';
 
-// データ・AI — BI・可視化
-import { superset } from './data-ai-category/data-ai/superset';
+// AI — 生成AI活用
+import { claude } from './ai/generative-ai/claude';
 
-// データ・AI — データベース
-import { sqlserver } from './data-ai-category/database/sqlserver';
-import { sql } from './data-ai-category/database/sql';
-import { oracle } from './data-ai-category/database/oracle';
+// AI — AIコーディング
+import { claudeCode } from './ai/ai-coding/claude-code';
+import { claudeCodeSkills } from './ai/ai-coding/claude-code-skills';
+import { codex } from './ai/ai-coding/codex';
+
+// AI — AIアプリ開発
+import { jev } from './ai/ai-apps/jev';
+
+// 開発プロセス・ツール
+import { gitGithub } from './development-processes/git-github';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
-import { keycloak } from './cloud-infrastructure/keycloak';
 
-// ビジネスSaaS
-import { powerBi } from './business-saas/power-bi';
-import { vba } from './business-saas/vba';
+// セキュリティ
+import { keycloak } from './security/keycloak';
+
+// 業務アプリ・自動化
+import { vba } from './business-apps/vba';
 
 // 業務ドメイン知識
 import { businessKnowledgeBasics } from './business-domain-knowledge/business-knowledge-basics';
 
-// 一覧の並び順 ＝ ランディングページ（src/pages/index.astro）のカード表示順。
-// 分類は初出順、分類内はこの配列順で並ぶ。
+// ランディングページ（src/pages/index.astro）での並び順。
+// 分類・サブグループの順序は分類マスタ（src/data/categories.ts）の配列順で決まり、
+// 同じ分類（サブグループ）内のカードはこの配列順で並ぶ。
 const all: TechGuide[] = [
   // プログラミング言語 — Java エコシステム
   java,
@@ -85,26 +92,28 @@ const all: TechGuide[] = [
   html,
   css,
   markdown,
-  // 開発手法・プロセス
-  claudeCode,
-  claudeCodeSkills,
-  codex,
-  // データ・AI — 生成AI
-  claude,
-  // データ・AI — AI活用基盤
-  jev,
-  // データ・AI — BI・可視化
-  superset,
-  // データ・AI — データベース
+  // データベース
   sqlserver,
   sql,
   oracle,
+  // データ分析・BI
+  powerBi,
+  superset,
+  // AI — 生成AI活用
+  claude,
+  // AI — AIコーディング
+  claudeCode,
+  claudeCodeSkills,
+  codex,
+  // AI — AIアプリ開発
+  jev,
+  // 開発プロセス・ツール
+  gitGithub,
   // クラウド・インフラ
   docker,
+  // セキュリティ
   keycloak,
-  gitGithub,
-  // ビジネスSaaS
-  powerBi,
+  // 業務アプリ・自動化
   vba,
   // 業務ドメイン知識
   businessKnowledgeBasics,
@@ -113,7 +122,11 @@ const all: TechGuide[] = [
 /** 分類 → 技術slug → TechGuide のレジストリ */
 export const guideRegistry: Record<string, Record<string, TechGuide>> = {};
 for (const g of all) {
-  (guideRegistry[g.category] ??= {})[g.slug] = g;
+  // 分類マスタに無い分類パスはここでビルドエラーにする（ランディングページ等で黙って崩れないように）。
+  resolveCategory(g.category);
+  const bySlug = (guideRegistry[g.category] ??= {});
+  if (bySlug[g.slug]) throw new Error(`ガイドが重複登録されています: ${g.category}/${g.slug}`);
+  bySlug[g.slug] = g;
 }
 
 /** 指定章の <title>（旧 HTML と同形式: "<教材名> 第N章 - <章名>"） */

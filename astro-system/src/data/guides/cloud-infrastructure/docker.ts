@@ -8,7 +8,6 @@ export const docker: TechGuide = {
   techTitle: 'Docker学習教材',
   icon: 'fa-cube',
   level: '初級',
-  categoryLabel: 'クラウド・インフラ',
   totalTime: '約6時間',
   splashStop0: '#0ea5e9',
   splashStop1: '#06b6d4',

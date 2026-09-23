@@ -10,7 +10,6 @@ export const struts1: TechGuide = {
   techTitle: 'Struts 1学習教材',
   icon: 'fa-sitemap',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約12時間',
   splashStop0: '#6366f1',
   splashStop1: '#06b6d4',

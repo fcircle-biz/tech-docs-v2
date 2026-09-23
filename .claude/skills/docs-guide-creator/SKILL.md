@@ -11,7 +11,7 @@ description: 技術名1つから初心者向け学習ガイド一式(TechGuide�
 
 ## 概要
 
-指定された技術名から、`tech-knowledge-map.md` の9分類体系に基づいて配置先（分類パス）を決定し、以下を **`astro-system/` 配下**に生成する。
+指定された技術名から、分類マスタ `astro-system/src/data/categories.ts` に登録済みの分類の中から配置先（分類パス）を決定し、以下を **`astro-system/` 配下**に生成する。
 
 1. **データ定義** `astro-system/src/data/guides/<分類パス>/<slug>.ts` — `TechGuide`（技術メタ＋技術色 primary パレット＋全章定義 chapters[]）。`src/data/guides/index.ts` に import 登録する。
 2. **本文断片** `astro-system/src/chapters/<分類パス>/<slug>/<slug>-learning-material-NN.html` — 各章の**本文のみ**（NN は2桁ゼロパディング）。`<head>`・グローバルヘッダー・サイドバー・フッター・スクリプトは含めない（レイアウトが供給）。
@@ -30,7 +30,7 @@ description: 技術名1つから初心者向け学習ガイド一式(TechGuide�
 - `/docs-guide-creator docker`
 - `/docs-guide-creator spring-boot`
 
-技術名は kebab-case（小文字とハイフン）。配置先（分類パス）は `tech-knowledge-map.md` と references/taxonomy-paths.md に従って決定する。
+技術名は kebab-case（小文字とハイフン）。配置先（分類パス）は references/taxonomy-paths.md の判断基準と `tech-knowledge-map.md` の対応表に従い、`categories.ts` に登録済みの分類から決定する。
 
 ## 実行手順
 
@@ -84,6 +84,6 @@ Glob（`v1/`/`v2/` 等の旧バージョンフォルダは除外）で生成物�
 - references/step2-foundation.md — 第1章の本文断片生成（構造テンプレ・継承元）
 - references/step3-chapter.md — 単一章の本文断片生成（並列サブエージェント用）
 - references/html-rules.md — 共通HTMLルール（断片構造・Mermaid・コンポーネント・ダーク可読性・Highlight.js）をDRY集約
-- references/taxonomy-paths.md — 9分類のディレクトリパス代表例（tech-knowledge-map.md 抜粋）
+- references/taxonomy-paths.md — 分類パスの判断基準・収録範囲・迷いやすい技術の判定例・配置例
 
-共有データは複製せず既存リポジトリファイルを参照する。9分類体系: `tech-knowledge-map.md` / カラー: `astro-system/templates/v1/reference/color-themes.md` / Tailwind: `astro-system/templates/v1/reference/css-styles.md` / Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md` / カードコンポーネント: `astro-system/templates/v1/snippets/components.html`。Astro 構成・型は `astro-system/src/data/guides/types.ts`・`astro-system/src/layouts/GuideChapterLayout.astro`・`astro-system/src/data/guides/index.ts` を参照。
+共有データは複製せず既存リポジトリファイルを参照する。分類マスタ: `astro-system/src/data/categories.ts`（技術領域ごとの配置先: `tech-knowledge-map.md`） / カラー: `astro-system/templates/v1/reference/color-themes.md` / Tailwind: `astro-system/templates/v1/reference/css-styles.md` / Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md` / カードコンポーネント: `astro-system/templates/v1/snippets/components.html`。Astro 構成・型は `astro-system/src/data/guides/types.ts`・`astro-system/src/layouts/GuideChapterLayout.astro`・`astro-system/src/data/guides/index.ts` を参照。

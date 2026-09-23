@@ -6,7 +6,7 @@
 |------|------|
 | 難易度 | 初級 |
 | 所要時間 | 約6時間 |
-| 分類 | 開発手法・プロセス |
+| 分類 | 開発プロセス・ツール |
 
 ## 前提条件
 
@@ -76,8 +76,8 @@ Pull Requestを作成・レビュー・マージする、GitHubを使った基�
 
 ## 次のステップ
 
-- [Claude Code学習教材](https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/claude-code/claude-code-learning-material-01.html) — AIエージェントとGit/GitHubを組み合わせた開発を学ぶ
-- [Codex学習教材](https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/codex/codex-learning-material-01.html) — エージェント型コーディングCLIでのGit連携を学ぶ
+- [Claude Code学習教材](https://fcircle-biz.github.io/tech-docs-v2/guide/ai/ai-coding/claude-code/claude-code-learning-material-01.html) — AIエージェントとGit/GitHubを組み合わせた開発を学ぶ
+- [Codex学習教材](https://fcircle-biz.github.io/tech-docs-v2/guide/ai/ai-coding/codex/codex-learning-material-01.html) — エージェント型コーディングCLIでのGit連携を学ぶ
 
 ## はじめに
 

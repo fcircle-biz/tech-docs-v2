@@ -8,7 +8,6 @@ export const gitGithub: TechGuide = {
   icon: 'fa-github',
   iconStyle: 'fab',
   level: '初級',
-  categoryLabel: '開発手法・プロセス',
   totalTime: '約6時間',
   splashStop0: '#64748b',
   splashStop1: '#06b6d4',

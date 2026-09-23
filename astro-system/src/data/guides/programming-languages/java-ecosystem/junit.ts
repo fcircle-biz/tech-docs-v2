@@ -7,7 +7,6 @@ export const junit: TechGuide = {
   techTitle: 'JUnit学習教材',
   icon: 'fa-vial',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約10時間',
   splashStop0: '#10b981',
   splashStop1: '#06b6d4',

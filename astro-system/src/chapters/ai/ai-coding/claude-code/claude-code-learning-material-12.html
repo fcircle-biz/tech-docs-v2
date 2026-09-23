@@ -1,0 +1,606 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Claude Code</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約50分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">フックで動作を確実にする</h1>
+                    <p class="text-slate-600">第11章では MCP を使って外部のツールやデータソースとつながる方法を学びました。本章では視点を変え、Claude Code 自身の振る舞いを「確実に」制御する仕組みである<strong>フック（Hooks）</strong>を学びます。CLAUDE.md への指示は「たいてい」実行される確率的なお願いですが、フックは「例外なく毎回」実行される決定的な仕組みです。自動フォーマットやチームで守るべき安全ルールなど、絶対に外せない処理をどう保証するのかを見ていきましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>フックが<strong>「決定的（deterministic）」</strong>であるとはどういうことか、CLAUDE.md への指示との違いを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>フックの5つのイベント（<code>PreToolUse</code>／<code>PostToolUse</code>／<code>UserPromptSubmit</code>／<code>Stop</code>／<code>Notification</code>）を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code>settings.json</code> に <code>PostToolUse</code> フックを設定し、編集後の自動フォーマットを実現できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code>PreToolUse</code> フックで危険な操作をブロックする仕組みと、終了コードの意味を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code>.claude/settings.json</code> をチームで共有し、<code>CLAUDE_PROJECT_DIR</code> を使う理由を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章の全体像 -->
+                <figure class="my-6">
+                    <img src="/tech-docs-v2/guide/ai/ai-coding/claude-code/images/claude-code-hooks-lifecycle.png"
+                         alt="プロンプト送信からClaudeの判断・ツール実行・結果確認・完了までの流れに、UserPromptSubmit・PreToolUse・PostToolUse・Stop・Notificationという5つのフックがチェックポイントとして置かれ、条件に一致すれば必ず発火する仕組みを示した図。"
+                         class="w-full max-w-3xl mx-auto rounded-lg border border-slate-200 shadow-sm"
+                         loading="lazy" decoding="async" />
+                    <figcaption class="mt-2 text-center text-sm text-slate-600">図12-1 フックが発火する5つのライフサイクルイベント</figcaption>
+                </figure>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 フックとは何か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>フック（Hooks）</strong>とは、Claude Code の<strong>ライフサイクル上の特定のタイミング（イベント）</strong>で、あらかじめ登録しておいたシェルコマンドを自動的に実行できる仕組みです。「ファイルが編集された直後」「ユーザーがプロンプトを送信したとき」など、決まったタイミングに、決まった処理を差し込めます。
+                    </p>
+
+                    <blockquote class="border-l-4 border-primary-500 bg-primary-50 rounded-r-lg p-4 my-6">
+                        <p class="text-primary-900 leading-relaxed">
+                            設定ファイルに登録しておいたコマンドを、Claude Code のライフサイクル上の特定のイベントで自動的に実行する仕組み
+                        </p>
+                    </blockquote>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの章で学んできた CLAUDE.md（第8章）やサブエージェント（第9章）、MCP（第11章）は、いずれも Claude が<strong>「自分の判断で」</strong>使うかどうかを決める仕組みでした。フックはこれらとは根本的に性質が異なります。次の節で、その違いを詳しく見ていきましょう。
+                    </p>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 なぜフックが必要か——「決定的」という性質
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば CLAUDE.md（第8章）に「ファイルを編集するたびに Prettier を実行して」と書いておいたとします。多くの場合、Claude はその指示に従ってくれるでしょう。しかし、<strong>時には実行されないこともあります</strong>。CLAUDE.md はあくまで Claude への「お願い」であり、実行するかどうかの最終判断は Claude 自身に委ねられているからです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フックはこの問題を解決します。フックとして設定した処理は、<strong>Claude の判断を介さず、条件に一致すれば例外なく毎回必ず実行されます</strong>。この性質を<strong>決定的（deterministic）</strong>と呼びます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph S1["CLAUDE.mdに書く（確率的）"]
+        A1["編集のたびにPrettierを<br/>実行してと記述する"] --> B1{"Claudeが実行するか判断"}
+        B1 -->|たいてい| C1["実行される"]
+        B1 -->|時には| D1["実行されない"]
+    end
+    subgraph S2["フックに設定する（決定的）"]
+        A2["PostToolUseフックを設定する"] --> B2["ファイル編集イベントが発生"]
+        B2 --> C2["例外なく毎回実行される"]
+    end
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">CLAUDE.md への指示は<strong>「確率的なお願い」</strong>、フックは<strong>「決定的な強制」</strong>です。「たいてい」で済ませられない処理は、プロンプトではなくフックに任せましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 フックの代表的な使い道
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フックは、次のような<strong>「毎回必ず行いたい処理」</strong>を実現するために使われます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-wand-magic-sparkles text-purple-600"></i>
+                                <h3 class="font-semibold text-slate-800">編集後の自動フォーマット</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">ファイルを編集するたびに、Prettier や gofmt などのフォーマッターを自動実行します。</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-clipboard-list text-blue-600"></i>
+                                <h3 class="font-semibold text-slate-800">コンプライアンスのための記録</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">実行されたすべてのコマンドをログに残し、あとから監査できるようにします。</p>
+                        </div>
+                        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-shield-halved text-orange-600"></i>
+                                <h3 class="font-semibold text-slate-800">危険な操作のブロック</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">本番環境のファイル変更など、絶対に避けたい操作を実行前に食い止めます。</p>
+                        </div>
+                        <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-5">
+                            <div class="flex items-center gap-3 mb-2">
+                                <i class="fas fa-bell text-cyan-600"></i>
+                                <h3 class="font-semibold text-slate-800">完了時の通知</h3>
+                            </div>
+                            <p class="text-sm text-slate-600">Claude がタスクを完了したときに、自分宛てに通知を送ります。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        共通しているのは、どれも<strong>「たまに忘れられては困る」</strong>処理だという点です。次節では、これらを実現するための土台となる5つのイベントを見ていきます。
+                    </p>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 フックの代表的な5つのイベント
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フックは、Claude Code のライフサイクル上で<strong>よく使う5種類のイベント</strong>のいずれかに対して設定します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">イベント</th>
+                                    <th class="px-4 py-3 text-left font-semibold">発火タイミング</th>
+                                    <th class="px-4 py-3 text-left font-semibold">主な用途</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium"><code>PreToolUse</code></td>
+                                    <td class="px-4 py-3 text-slate-600">ツール呼び出しの<strong>前</strong></td>
+                                    <td class="px-4 py-3 text-slate-600">危険な操作のブロック・実行前チェック</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>PostToolUse</code></td>
+                                    <td class="px-4 py-3 text-slate-600">ツール呼び出しが完了した<strong>後</strong></td>
+                                    <td class="px-4 py-3 text-slate-600">自動フォーマット・ログ記録</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>UserPromptSubmit</code></td>
+                                    <td class="px-4 py-3 text-slate-600">プロンプト送信時、Claude が処理を始める前</td>
+                                    <td class="px-4 py-3 text-slate-600">入力内容のチェック・補足情報の付与</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>Stop</code></td>
+                                    <td class="px-4 py-3 text-slate-600">Claude が応答を終えたとき</td>
+                                    <td class="px-4 py-3 text-slate-600">完了時のログ記録・後処理</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>Notification</code></td>
+                                    <td class="px-4 py-3 text-slate-600">Claude が通知を送るとき</td>
+                                    <td class="px-4 py-3 text-slate-600">通知の転送（Slack・メールなど）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">※ このほかにも、セッションの開始・終了時などに発火するイベントがあります。最新の一覧は<a href="https://docs.claude.com/ja/docs/claude-code/overview" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline hover:text-primary-700">公式ドキュメント</a>で確認してください。</p>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">この5つのイベントを時系列に並べると、次のような流れになります。</p>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["ユーザーがプロンプトを送信"] --> B["UserPromptSubmitフック"]
+    B --> C["Claudeが処理を開始"]
+    C --> D["PreToolUseフック"]
+    D --> E["ツールを実行する"]
+    E --> F["PostToolUseフック"]
+    F -->|次のツール呼び出しへ| D
+    F -->|応答が完了| G["Stopフック"]
+    C -.->|随時発火| H["Notificationフック"]
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">第2章のエージェントループとのつながり</p>
+                                <p class="text-blue-900 text-sm">第2章で学んだ<strong>エージェントループ</strong>（①プロンプト入力 → ②コンテキスト収集 → ③行動 → ④結果を検証 → ⑤終了 or ループ）を思い出してください。<code>PreToolUse</code> は③の直前、<code>PostToolUse</code> は④の直後に対応します。フックは、このループの決まった位置に「必ず割り込む」仕組みだと捉えると理解しやすくなります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 settings.json でフックを設定する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フックは、<code>.claude/settings.json</code> に設定します。設定方法は2通りあります。1つは Claude Code 内で <code>/hooks</code> コマンドを使う方法、もう1つは <code>settings.json</code> を直接編集する方法です。どちらも最終的には同じ設定ファイルに書き込まれます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設定の構造はシンプルです。トップレベルの <code>hooks</code> キーの下に<strong>イベント名</strong>（例: <code>PostToolUse</code>）をキーとする配列を置きます。配列の各要素には、どのツールに適用するかを指定する <code>matcher</code>（正規表現パターン）と、実行するコマンドを定義する <code>hooks</code> 配列（各要素は <code>type: "command"</code> と <code>command</code> を持つ）を書きます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">.claude/settings.json</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh"
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この設定は、<code>Edit</code>・<code>MultiEdit</code>・<code>Write</code> のいずれかのツールが使われて<strong>ファイル編集が完了するたび</strong>に <code>format.sh</code> というスクリプトを実行します。もっとも使われるフックが、まさにこの<strong>編集後の自動フォーマット</strong>です。呼び出し先のスクリプト側では、対象ファイルの拡張子を確認し、TypeScript なら Prettier、Go なら gofmt というように、プロジェクトに応じたフォーマッターを実行するのが一般的です。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">matcher の書き方</p>
+                                <p class="text-blue-900 text-sm"><code>matcher</code> に <code>Edit|MultiEdit|Write</code> のように複数のツール名を <code>|</code>（OR）でつなげて指定すると、いずれか1つのツールに一致した場合にフックが発火します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 PreToolUse によるブロック——絶対的なルールを強制する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        数あるフックの中でも、もっとも強力なのが <code>PreToolUse</code> によるブロックです。フックは、<strong>ツール名と入力内容を JSON として標準入力（stdin）経由で受け取ります</strong>。つまりフック側のスクリプトは、Claude が「これから何をしようとしているか」を実行前に確認し、必要であれば止めることができるのです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        フックの動作は、スクリプトが返す<strong>終了コード</strong>によって決まります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">終了コード</th>
+                                    <th class="px-4 py-3 text-left font-semibold">動作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>0</code></td>
+                                    <td class="px-4 py-3 text-slate-600">通常どおり処理を続行する。</td>
+                                </tr>
+                                <tr class="bg-red-50">
+                                    <td class="px-4 py-3 font-medium"><code>2</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>操作をブロックする。</strong>標準エラー出力（stderr）のメッセージが Claude にフィードバックとして渡されるため、なぜブロックされたのかを理解し、対応を調整できる。</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">それ以外</td>
+                                    <td class="px-4 py-3 text-slate-600">処理を止めることはないが、非ブロッキングのエラーとしてユーザーに表示される。</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["PreToolUseフックが実行される"] --> B{"終了コードは？"}
+    B -->|0| C["処理を続行する"]
+    B -->|2| D["操作をブロックする"]
+    D --> E["stderrのメッセージが<br/>Claudeにフィードバックされる"]
+    B -->|それ以外| F["処理は止めないが<br/>非ブロッキングエラーとして表示"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        終了コード2で処理を止められるという仕組みが重要なのは、<strong>絶対的なルールを強制</strong>できるからです。「提案」ではなく「保証」が必要な場面、たとえば次のような操作をブロックするのに使われます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-server text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">本番設定ディレクトリへの書き込み</h3>
+                            <p class="text-sm text-slate-600">本番環境の設定ファイルをうっかり書き換えてしまう事故を防ぎます。</p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-trash text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1"><code>rm -rf</code> を含むコマンド</h3>
+                            <p class="text-sm text-slate-600">意図しない範囲のファイルを一括削除してしまう危険なコマンドの実行をせき止めます。</p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-code-branch text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">main ブランチへの直接コミット</h3>
+                            <p class="text-sm text-slate-600">レビューを経ずに本流のブランチへ変更が入ってしまうことを防ぎます。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        実際のスクリプトはどのようなものでしょうか。<code>rm -rf</code> を含む bash コマンドをブロックする、シンプルな <code>PreToolUse</code> フックの例を見てみましょう。標準入力から受け取った JSON は、<code>jq</code>（JSON を扱うコマンドラインツール）などで実行しようとしているコマンド文字列を取り出せます。
+                    </p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">.claude/hooks/block-dangerous-bash.sh</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# PreToolUseフック: 危険なbashコマンドをブロックする
+# 標準入力からツール名と入力内容（JSON）を受け取る
+input=$(cat)
+command=$(echo "$input" | jq -r '.tool_input.command // empty')
+
+# rm -rf を含むコマンドは実行させない
+if echo "$command" | grep -qE 'rm\s+-rf'; then
+  echo "危険: rm -rf を含むコマンドはブロックされました" &gt;&amp;2
+  exit 2
+fi
+
+# 問題がなければ続行を許可する
+exit 0</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>rm -rf</code> を含むコマンドが検出されると、標準エラー出力にメッセージを書き出したうえで<strong>終了コード2</strong>を返します。このメッセージはそのまま Claude にフィードバックされるため、Claude は「なぜブロックされたか」を理解し、別の方法を提案するなど<strong>対応を調整</strong>できます。
+                    </p>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 チームでフックを共有する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>.claude/settings.json</code> はプロジェクトレベルの設定ファイルであり、<strong>CLAUDE.md（第8章）と同じようにリポジトリにチェックインできます</strong>。つまり、一度フックを整備すれば、チームの誰がクローンしても自動的に同じフックが有効になるということです。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            フック関連ファイルの配置例
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>プロジェクトルート/
+├── .claude/
+│   ├── settings.json           ← フックの設定（チェックイン対象）
+│   └── hooks/
+│       ├── format.sh           ← 自動フォーマット用スクリプト
+│       └── block-dangerous-bash.sh
+└── ...</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで注意したいのが、コマンドの中でプロジェクト内のスクリプトを参照する方法です。Claude Code の作業ディレクトリは、起動した場所やその時々の操作によって変わりうるため、<code>./hooks/format.sh</code> のような相対パスでは正しいファイルを指せないことがあります。そこで使うのが、環境変数 <code>CLAUDE_PROJECT_DIR</code> です。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: CLAUDE_PROJECT_DIR</p>
+                                <p class="text-blue-900 text-sm">コマンドの中で <code>$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh</code> のように書けば、Claude の現在の作業ディレクトリに関わらず、常にプロジェクト内に保存されたスクリプトを正しく参照できます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        ここまでの内容を、第8章で学んだ CLAUDE.md と比較して整理しましょう。
+                    </p>
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">観点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">CLAUDE.md（第8章）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">フック（本章）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">性質</td>
+                                    <td class="px-4 py-3 text-slate-600">確率的な「お願い」</td>
+                                    <td class="px-4 py-3 text-slate-600">決定的な「強制」</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">実行の保証</td>
+                                    <td class="px-4 py-3 text-slate-600">たいてい実行される</td>
+                                    <td class="px-4 py-3 text-slate-600">例外なく必ず実行される</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">設定場所</td>
+                                    <td class="px-4 py-3 text-slate-600">プロジェクトルートの Markdown ファイル</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>.claude/settings.json</code> の JSON 設定</td>
+                                </tr>
+                                <tr class="bg-primary-50">
+                                    <td class="px-4 py-3 font-medium">向いている用途</td>
+                                    <td class="px-4 py-3 text-slate-600">背景知識・規約・コーディングスタイルの伝達</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>絶対に守らせたいルール</strong>・自動化したい定型処理の強制</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">本章のまとめとして、次の一文を持ち帰ってください。</p>
+                    <blockquote class="border-l-4 border-primary-500 bg-primary-50 rounded-r-lg p-4 my-6">
+                        <p class="text-primary-900 leading-relaxed">
+                            何かを<strong>「毎回必ず」</strong>実行させたいなら、それをプロンプトに書くのではなく、<strong>フックに設定しましょう</strong>。
+                        </p>
+                    </blockquote>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: PreToolUse ブロックルールを設計してみる
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">実際に手を動かす前に、自分が関わるプロジェクトで「絶対に自動実行してほしくない操作」を洗い出し、フックとして設計してみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">自分が普段使っているプロジェクトを1つ思い浮かべ、<strong>「絶対に自動で実行されては困る操作」</strong>を1つ書き出す（例: <code>.env</code> ファイルへの書き込み、特定ディレクトリの削除、本番用ブランチへの直接コミットなど）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">その操作はどのツール（<code>Bash</code>・<code>Edit</code>・<code>Write</code> など）のどんな入力に現れるかを考え、<code>matcher</code> パターンと判定条件を書き出す。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">検証用のテスト用ディレクトリ（本番のプロジェクトではない場所）に <code>.claude/settings.json</code> を作成し、<code>PreToolUse</code> フックとして設定する。意図どおりに操作がブロックされ、終了コード2でメッセージが表示されることを確認する。</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. フックが「決定的（deterministic）」であるとはどういう意味ですか。CLAUDE.md への記述と何が違いますか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            フックは、設定したイベントが発生し条件（matcher）に一致すれば、<strong>Claude の判断を介さず例外なく毎回必ず実行される</strong>という性質を持ちます。これに対して CLAUDE.md への指示（例: 「編集のたびに Prettier を実行して」）は、実行するかどうかの最終判断が Claude に委ねられているため<strong>たいていは実行されるが時には実行されないこともある「確率的なお願い」</strong>です。絶対に外せない処理はフックで強制する必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. PreToolUse フックで操作をブロックしたいとき、終了コードは何にすべきですか。その際、Claude に理由を伝えるにはどうすればよいですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>終了コード2</strong>で終了します。ブロックした理由は<strong>標準エラー出力（stderr）</strong>にメッセージとして出力すると、そのメッセージがそのまま Claude にフィードバックとして渡され、なぜブロックされたのかを理解したうえで対応を調整できます。なお終了コード0は続行、それ以外（2以外の非0）は処理を止めない非ブロッキングのエラー表示になります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code>.claude/settings.json</code> をチームで共有する際、コマンドの中でプロジェクト内のスクリプトを確実に参照するために使うべき環境変数は何ですか。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong><code>CLAUDE_PROJECT_DIR</code></strong> です。この環境変数を使うことで、Claude の現在の作業ディレクトリに関わらず、プロジェクト内に保存されたスクリプトを正しく参照できます。<code>.claude/settings.json</code> 自体はプロジェクトレベルの設定としてリポジトリにチェックインできるため、チーム全員が自動的に同じフックを使えるようになります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="claude-code-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第11章: MCPで外部ツールとつなぐ</span>
+                        </div>
+                    </a>
+                    <a href="claude-code-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: トラブルシューティング</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

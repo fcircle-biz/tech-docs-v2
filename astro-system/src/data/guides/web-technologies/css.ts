@@ -8,7 +8,6 @@ export const css: TechGuide = {
   icon: 'fa-css3-alt',
   iconStyle: 'fab',
   level: '初級',
-  categoryLabel: 'Web技術',
   totalTime: '約9時間50分',
   splashStop0: '#f97316',
   splashStop1: '#06b6d4',

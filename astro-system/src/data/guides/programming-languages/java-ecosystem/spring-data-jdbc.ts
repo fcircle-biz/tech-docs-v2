@@ -8,7 +8,6 @@ export const springDataJdbc: TechGuide = {
   techTitle: 'Spring Data JDBC学習教材',
   icon: 'fa-leaf',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約8時間',
   splashStop0: '#10b981',
   splashStop1: '#06b6d4',

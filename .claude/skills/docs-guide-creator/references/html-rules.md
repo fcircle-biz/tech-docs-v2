@@ -6,7 +6,7 @@
 
 ## ベース・参照ファイル
 
-- 構造ベース: **第1章断片**（step3 は第1章断片を継承元にする）。既存例 `astro-system/src/chapters/development-processes/codex/codex-learning-material-01.html`。
+- 構造ベース: **第1章断片**（step3 は第1章断片を継承元にする）。既存例 `astro-system/src/chapters/ai/ai-coding/codex/codex-learning-material-01.html`。
 - レイアウト（共通シェル）: `astro-system/src/layouts/GuideChapterLayout.astro`
 - カードコンポーネント: `astro-system/templates/v1/snippets/components.html`
 - カラーテーマ: `astro-system/templates/v1/reference/color-themes.md`

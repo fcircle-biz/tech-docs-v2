@@ -7,7 +7,6 @@ export const businessKnowledgeBasics: TechGuide = {
   techTitle: '業務知識入門学習教材',
   icon: 'fa-building',
   level: '初級',
-  categoryLabel: '業務ドメイン知識',
   totalTime: '約8時間',
   splashStop0: '#14b8a6',
   splashStop1: '#06b6d4',

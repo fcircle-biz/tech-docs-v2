@@ -28,7 +28,7 @@
 
 ## 📖 学習ガイドライン
 
-各技術の基礎から応用まで段階的に学べる学習ガイドです。
+各技術の基礎から応用まで段階的に学べる学習ガイドです。分類の並びはトップページと同じです（分類マスタ `astro-system/src/data/categories.ts` 準拠）。
 
 ### プログラミング言語
 
@@ -58,36 +58,48 @@
 - [**CSS学習ガイド**](docs/guide/web-technologies/css/README.md) - HTMLの基礎を学んだ方向けCSS入門14章構成カリキュラム。CSSの役割と書き方・適用方法から、セレクタの基本、カスケード・継承・詳細度、文字とテキストのスタイル、色と背景、ボックスモデル、display と position、Flexbox と CSS Grid によるレイアウト、レスポンシブデザイン、装飾とアニメーション、CSS変数を使った保守しやすい書き方、そしてプロフィールページのデザイン実践まで、つまずきやすい概念を図解しながら段階的に学習（全14章・約9時間50分）
 - [**Markdown学習ガイド**](docs/guide/web-technologies/markdown/README.md) - ドキュメント作成が初めての方向けMarkdown入門11章構成カリキュラム。Markdownとは何かと使われる場面から、書く準備、見出しと段落、文字の装飾、リスト、リンクと画像、コードブロックと引用、表（テーブル）、その他の便利な記法、Mermaidによる作図、そして実践としてのREADME作成まで、GitHubやドキュメントツールで日常的に使う記法を段階的に学習（全11章・約6時間30分）
 
-### 開発手法・プロセス
+### データベース
+
+- [**SQL入門学習ガイド**](docs/guide/database/sql/README.md) - プログラミングがまったく初めての方向けSQL入門14章構成カリキュラム。データベースとSQLの世界、リレーショナルデータベースの構造（テーブル・行・列・主キー／外部キー）から、PostgreSQL 17・pgAdmin 4・A5:SQL Mk-2による環境構築とツールの基本操作、CREATE TABLEによるデータベースとテーブルの作成、SELECT文によるデータ取得、WHEREによる絞り込み、関数によるデータ加工、GROUP BYによる集計、INSERT／UPDATE／DELETEによるデータの追加・更新・削除、JOINによるテーブル結合、サブクエリとビュー、トランザクションと同時実行制御、インデックス・権限・運用の基礎まで、1つのツールに依存せず「どのツールでも同じSQLが書ける」感覚を養いながら段階的に学習（全14章・約15時間）
+- [**Oracle入門学習ガイド**](docs/guide/database/oracle/README.md) - データベース未経験者向けOracle Database入門14章構成カリキュラム。データベースとRDBMSの基礎、Oracleの製品エディション（Free / SE2 / EE）とクラウドのマネージドサービス（Oracle Autonomous AI Database）の違いから、インスタンスとデータベースの違い・SGA/PGA・表領域・スキーマ・CDB/PDBマルチテナントといったアーキテクチャ、Oracle AI Database 26ai Freeの環境構築（Windows／Docker）とSQL*Plus・SQL Developerの操作、CREATE TABLEとVARCHAR2/NUMBER/DATE・制約・シーケンス／IDENTITY列、SELECT・WHERE・ORDER BY・DUAL表・FETCH FIRST、INSERT/UPDATE/DELETEとCOMMIT／ROLLBACK、文字列・数値・日付関数とNULLの扱い（空文字＝NULL）、JOIN・集計・サブクエリ、PL/SQL（ブロック・変数・制御構文・カーソル・例外処理）、ストアドプロシージャ／ファンクション／パッケージ／トリガー、トランザクションと読み取り一貫性（MVCC）・ロック、インデックスと実行計画、ユーザー・権限・ロール管理とData Pump／RMANによるバックアップ運用まで、社員表・部署表のサンプルスキーマを作りながら段階的に学習。Oracle特有のつまずき（COMMITするまで確定しない・VARCHAR2・空文字がNULL扱い）を随所で明示（全14章・約20時間）
+- [**SQL Server入門学習ガイド**](docs/guide/database/sqlserver/README.md) - データベース未経験者向けSQL Server入門14章構成カリキュラム。データベースとRDBMSの基礎、SQL Serverのエディションとアーキテクチャ（インスタンス・データベース・スキーマ・システムDB）から、Windows/Dockerでの環境構築とSSMSの基本操作、CREATE TABLEとデータ型・制約・IDENTITY、SELECT・WHERE・ORDER BY・TOP、INSERT/UPDATE/DELETEとOUTPUT句、JOIN・集計・サブクエリ・CTE・ウィンドウ関数、T-SQLプログラミング（変数・制御構文・TRY...CATCH・ストアドプロシージャ）、トランザクションとロック・分離レベル、インデックスと実行プラン、ログインとユーザー・ロールによる権限管理、復旧モデルとバックアップ／復元・運用まで、学習用DB「SampleShop」を作りながら段階的に学習。全章に**PostgreSQLとの違い**の比較コーナーを設け、最終章で総まとめと移行時の注意点を整理（全14章・約16時間）
+
+### データ分析・BI
+
+- [**新人SE向け Power BI入門学習ガイド**](docs/guide/data-analytics/power-bi/README.md) - BIツールもSQLも初めての新人SE向けPower BI入門12章構成カリキュラム。BIとは何かとPower BI Desktop／Serviceの役割から、Desktopの画面構成と3つのビュー、データ取得（Excel・CSV・SQL Server・Web／Import・DirectQuery）、Power Query（列と行の整形・データ型・null・マージ／追加・ピボット解除・M言語）、データモデリング（主キー／外部キー・リレーション・カーディナリティ・フィルター方向）、スタースキーマ（ファクト／ディメンション・日付テーブル）、DAX入門（計算列とメジャーの違い・SUM／COUNTROWS／DISTINCTCOUNT／DIVIDE／IF／CALCULATE）、レポート作成（ビジュアル選択・スライサー・フィルター階層・相互作用）、分かりやすいレポート設計（レイアウト・ドリルダウン／ドリルスルー・ブックマーク・モバイル対応）、Power BI Service（発行・ワークスペース・セマンティックモデル・アプリ配布・更新）、セキュリティと運用（アクセス制御・RLS・ゲートウェイ・スケジュール更新）、そしてAI時代のPower BI（Copilot・DAX作成支援・PBIP・Skills for Fabric・MCP）まで、架空企業の売上分析を題材に一連の流れで段階的に学習（全12章・約13時間）
+- [**Apache Superset学習ガイド**](docs/guide/data-analytics/superset/README.md) - 入門者向けApache Superset（オープンソースのBIプラットフォーム）入門14章構成カリキュラム。Supersetとは何かという出発点から、Docker Composeによる環境構築、画面ツアーと基本操作、データベース接続、SQL Labによるデータ探索、データセットの作成とメトリクス・計算列、Exploreによるチャート作成とチャート種別の使い分け、ダッシュボードの組み立てとフィルタ・インタラクション、Jinjaテンプレートによる動的SQL、ユーザー・ロールと行レベルセキュリティ、キャッシュ・アラート・本番構成といった運用の基礎まで、データベース接続→データセット→チャート→ダッシュボード→権限・運用という流れで段階的に学習（全14章・約14時間）
+
+### AI
+
+#### 生成AI活用
+
+- [**Claude入門学習ガイド**](docs/guide/ai/generative-ai/claude/README.md) - 生成AIを初めて使う方向けClaude入門12章構成カリキュラム。Claudeとは何かという出発点から、最初の会話の始め方、コンテキストの与え方、より良い結果を得るための指示のコツ、AI Fluencyとevalsの考え方、デスクトップアプリの3モード、プロジェクト機能の活用、アーティファクトによる成果物作成、スキルの活用、コネクタとMCPによる外部連携、エンタープライズ検索とリサーチ、そして日々の業務への展開と次のステップまで、実際に触りながら段階的に学習（全12章・約6時間）
+
+#### AIコーディング
+
+- [**Claude Code入門学習ガイド**](docs/guide/ai/ai-coding/claude-code/README.md) - 入門者向けClaude Code（Anthropic公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作、ファイル編集とコードベース探索、スラッシュコマンド、CLAUDE.mdとメモリ・コンテキスト管理、Git・GitHub連携、権限と設定、MCP連携、サブエージェントと自動化、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16時間）
+- [**Claude Skills学習ガイド**](docs/guide/ai/ai-coding/claude-code-skills/README.md) - Claude Codeを一通り使える方向けのスキル（Skills）入門12章構成カリキュラム。スキルとは何かという整理から、スキルの置き場所と優先順位、最初のスキル作成、テストと発見の仕組み、効果的なdescriptionの書き方、メタデータとallowed-tools、段階的開示と複数ファイル構成、スクリプト・参照資料・アセットの活用、CLAUDE.mdやスラッシュコマンドとの使い分け、サブエージェント・フック・MCPとの比較、スキルの共有と配布、トラブルシューティングまで、自分の作業を自動化するスキルを作れるようになることを目標に段階的に学習（全12章・約8時間）
+- [**Codex入門学習ガイド**](docs/guide/ai/ai-coding/codex/README.md) - 入門者向けCodex（OpenAI公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作と最初のセッション、ファイルの読み書きとコード編集、コードベースの探索、承認モードとサンドボックス、AGENTS.mdとメモリ・コンテキスト管理、設定ファイル（config.toml）とプロファイル、Git・GitHub連携、MCPによる外部ツール連携、非対話実行と自動化（codex exec）、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16.5時間）
+
+#### AIアプリ開発
+
+- [**Jev入門学習ガイド**](docs/guide/ai/ai-apps/jev/README.md) - プログラミングの基礎がある方向けJev（TypeSafe AIのSystem Oneモデル）入門16章構成カリキュラム。文章を生成せず、State（判断の材料）とQuestion（判断してほしい内容）から構造化された判断を返すというJevの考え方とSystem Oneの設計思想から、Stateの設計、3つのPrimitive（Choice・Score・Noul）、curlによる最初のリクエスト、HTTP APIとPython SDKからの利用、Atomic Question、ProbabilityとConfidenceの読み方、Questionの構造化と複数Questionの並列評価、デザインパターン、jev-1.13の弱点と注意点、LLMとの組み合わせ、Coding Agentからの利用、そして問い合わせの自動振り分けを作る実践課題まで、AIの判断をソフトウェアに組み込む方法を段階的に学習（全16章・約18時間）
+
+### 開発プロセス・ツール
 
 - [**Git/GitHub学習ガイド**](docs/guide/development-processes/git-github/README.md) - まったくの初心者向けGit/GitHub入門7章構成カリキュラム。「ファイル名に日付を付けて管理する」段階から一歩進み、Git・VS Code・GitHubアカウントの環境構築とgit configによる初期設定・SSH鍵の作成と登録、git init / status / add / commit / log / diffによる変更記録の基本サイクル、push / clone / pullによるGitHubとの連携、ブランチ（branch / switch）を使った作業、Pull Requestの作成・レビュー・マージによるチーム開発の流れ、変更の取り消しやコンフリクト解決などよくあるトラブルへの対処まで、専門用語をかみ砕きながら段階的に学習（全7章・約6時間）
-- [**Claude Code入門学習ガイド**](docs/guide/development-processes/claude-code/README.md) - 入門者向けClaude Code（Anthropic公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作、ファイル編集とコードベース探索、スラッシュコマンド、CLAUDE.mdとメモリ・コンテキスト管理、Git・GitHub連携、権限と設定、MCP連携、サブエージェントと自動化、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16時間）
-- [**Claude Skills学習ガイド**](docs/guide/development-processes/claude-code-skills/README.md) - Claude Codeを一通り使える方向けのスキル（Skills）入門12章構成カリキュラム。スキルとは何かという整理から、スキルの置き場所と優先順位、最初のスキル作成、テストと発見の仕組み、効果的なdescriptionの書き方、メタデータとallowed-tools、段階的開示と複数ファイル構成、スクリプト・参照資料・アセットの活用、CLAUDE.mdやスラッシュコマンドとの使い分け、サブエージェント・フック・MCPとの比較、スキルの共有と配布、トラブルシューティングまで、自分の作業を自動化するスキルを作れるようになることを目標に段階的に学習（全12章・約8時間）
-- [**Codex入門学習ガイド**](docs/guide/development-processes/codex/README.md) - 入門者向けCodex（OpenAI公式のエージェント型コーディングCLI）入門14章構成カリキュラム。AI支援開発の基礎知識、インストールと初期設定、基本操作と最初のセッション、ファイルの読み書きとコード編集、コードベースの探索、承認モードとサンドボックス、AGENTS.mdとメモリ・コンテキスト管理、設定ファイル（config.toml）とプロファイル、Git・GitHub連携、MCPによる外部ツール連携、非対話実行と自動化（codex exec）、実践ワークフロー、トラブルシューティングまで段階的に学習（全14章・約16.5時間）
 
-### クラウド／インフラ
+### クラウド・インフラ
 
 - [**Docker学習ガイド**](docs/guide/cloud-infrastructure/docker/README.md) - 入門者向けDocker入門8章構成カリキュラム。「自分のPCでは動くのに他の人のPCでは動かない」問題をDockerがどう解決するのかという考え方から始め、Rancher Desktopでのコマンド環境構築とhello-worldによる最初のコンテナ実行、docker run / ps / stop / rm / images などの基本コマンド、NginxによるWebサーバー起動とポート公開（-p）の仕組み、Dockerfile（FROM / COPY）でのオリジナルイメージ作成、バインドマウントとボリューム、Docker Compose（compose.yml）による起動手順のまとめ、よくあるエラーの確認手順まで、コマンドの意味を1行ずつ確認しながら段階的に学習（全8章・約6時間）
 
-### データ・AI
+### セキュリティ
 
-#### データベース
+- [**Keycloak学習ガイド**](docs/guide/security/keycloak/README.md) - Keycloakを初めて学ぶ方向けKeycloak入門13章構成カリキュラム。ログイン機能を自作すると何が大変なのかという課題から始め、認証と認可の違い、OAuth 2.0／OpenID Connectの考え方、Dockerによる起動と管理コンソール、レルム・クライアント・ユーザー・ロール／グループの設定、認可コードフローによるログイン体験とトークンの読み解き、アプリをKeycloakで保護する方法、セッション・トークン・ログアウトの管理、ログイン画面のカスタマイズと二要素認証、ソーシャルログインやLDAPとの外部ID連携、本番運用の注意点まで段階的に学習（全13章・約11時間）
 
-- [**SQL入門学習ガイド**](docs/guide/data-ai-category/database/sql/README.md) - プログラミングがまったく初めての方向けSQL入門14章構成カリキュラム。データベースとSQLの世界、リレーショナルデータベースの構造（テーブル・行・列・主キー／外部キー）から、PostgreSQL 17・pgAdmin 4・A5:SQL Mk-2による環境構築とツールの基本操作、CREATE TABLEによるデータベースとテーブルの作成、SELECT文によるデータ取得、WHEREによる絞り込み、関数によるデータ加工、GROUP BYによる集計、INSERT／UPDATE／DELETEによるデータの追加・更新・削除、JOINによるテーブル結合、サブクエリとビュー、トランザクションと同時実行制御、インデックス・権限・運用の基礎まで、1つのツールに依存せず「どのツールでも同じSQLが書ける」感覚を養いながら段階的に学習（全14章・約15時間）
+### 業務アプリ・自動化
 
-- [**Oracle入門学習ガイド**](docs/guide/data-ai-category/database/oracle/README.md) - データベース未経験者向けOracle Database入門14章構成カリキュラム。データベースとRDBMSの基礎、Oracleの製品エディション（Free / SE2 / EE）とクラウドのマネージドサービス（Oracle Autonomous AI Database）の違いから、インスタンスとデータベースの違い・SGA/PGA・表領域・スキーマ・CDB/PDBマルチテナントといったアーキテクチャ、Oracle AI Database 26ai Freeの環境構築（Windows／Docker）とSQL*Plus・SQL Developerの操作、CREATE TABLEとVARCHAR2/NUMBER/DATE・制約・シーケンス／IDENTITY列、SELECT・WHERE・ORDER BY・DUAL表・FETCH FIRST、INSERT/UPDATE/DELETEとCOMMIT／ROLLBACK、文字列・数値・日付関数とNULLの扱い（空文字＝NULL）、JOIN・集計・サブクエリ、PL/SQL（ブロック・変数・制御構文・カーソル・例外処理）、ストアドプロシージャ／ファンクション／パッケージ／トリガー、トランザクションと読み取り一貫性（MVCC）・ロック、インデックスと実行計画、ユーザー・権限・ロール管理とData Pump／RMANによるバックアップ運用まで、社員表・部署表のサンプルスキーマを作りながら段階的に学習。Oracle特有のつまずき（COMMITするまで確定しない・VARCHAR2・空文字がNULL扱い）を随所で明示（全14章・約20時間）
-
-- [**SQL Server入門学習ガイド**](docs/guide/data-ai-category/database/sqlserver/README.md) - データベース未経験者向けSQL Server入門14章構成カリキュラム。データベースとRDBMSの基礎、SQL Serverのエディションとアーキテクチャ（インスタンス・データベース・スキーマ・システムDB）から、Windows/Dockerでの環境構築とSSMSの基本操作、CREATE TABLEとデータ型・制約・IDENTITY、SELECT・WHERE・ORDER BY・TOP、INSERT/UPDATE/DELETEとOUTPUT句、JOIN・集計・サブクエリ・CTE・ウィンドウ関数、T-SQLプログラミング（変数・制御構文・TRY...CATCH・ストアドプロシージャ）、トランザクションとロック・分離レベル、インデックスと実行プラン、ログインとユーザー・ロールによる権限管理、復旧モデルとバックアップ／復元・運用まで、学習用DB「SampleShop」を作りながら段階的に学習。全章に**PostgreSQLとの違い**の比較コーナーを設け、最終章で総まとめと移行時の注意点を整理（全14章・約16時間）
-
-#### 生成AI
-
-- [**Claude入門学習ガイド**](docs/guide/data-ai-category/generative-ai/claude/README.md) - 生成AIを初めて使う方向けClaude入門12章構成カリキュラム。Claudeとは何かという出発点から、最初の会話の始め方、コンテキストの与え方、より良い結果を得るための指示のコツ、AI Fluencyとevalsの考え方、デスクトップアプリの3モード、プロジェクト機能の活用、アーティファクトによる成果物作成、スキルの活用、コネクタとMCPによる外部連携、エンタープライズ検索とリサーチ、そして日々の業務への展開と次のステップまで、実際に触りながら段階的に学習（全12章・約6時間）
-
-### ビジネスSaaS
-
-- [**新人SE向け Power BI入門学習ガイド**](docs/guide/business-saas/power-bi/README.md) - BIツールもSQLも初めての新人SE向けPower BI入門12章構成カリキュラム。BIとは何かとPower BI Desktop／Serviceの役割から、Desktopの画面構成と3つのビュー、データ取得（Excel・CSV・SQL Server・Web／Import・DirectQuery）、Power Query（列と行の整形・データ型・null・マージ／追加・ピボット解除・M言語）、データモデリング（主キー／外部キー・リレーション・カーディナリティ・フィルター方向）、スタースキーマ（ファクト／ディメンション・日付テーブル）、DAX入門（計算列とメジャーの違い・SUM／COUNTROWS／DISTINCTCOUNT／DIVIDE／IF／CALCULATE）、レポート作成（ビジュアル選択・スライサー・フィルター階層・相互作用）、分かりやすいレポート設計（レイアウト・ドリルダウン／ドリルスルー・ブックマーク・モバイル対応）、Power BI Service（発行・ワークスペース・セマンティックモデル・アプリ配布・更新）、セキュリティと運用（アクセス制御・RLS・ゲートウェイ・スケジュール更新）、そしてAI時代のPower BI（Copilot・DAX作成支援・PBIP・Skills for Fabric・MCP）まで、架空企業の売上分析を題材に一連の流れで段階的に学習（全12章・約13時間）
-
-- [**Excel VBA入門学習ガイド**](docs/guide/business-saas/vba/README.md) - プログラミング未経験の社会人向けExcel VBA入門14章構成カリキュラム。マクロとVBAの関係と自動化できる業務の見極め方から、「開発」タブ・VBE・マクロ有効ブック（.xlsm）とマクロセキュリティの準備、マクロの記録と生成コードの読み解き、Subプロシージャ・コメント・イミディエイトウィンドウといった基本文法、変数とデータ型（Option Explicit・Const）、RangeとCellsによるセル操作とSelectを使わない書き方、If／Select Caseによる条件分岐、For／For Each／Do Loopによる繰り返し、ブックとワークシートの操作、SubとFunctionによる処理の部品化（引数・戻り値・スコープ）、配列とDictionaryによる高速な集計、On Errorとブレークポイント・ステップ実行によるエラー処理とデバッグ、MsgBox／InputBox・ボタン・イベントプロシージャ・UserForm、そして総仕上げとして売上明細から対象年月の支店別帳票をボタン1つで出力する月次レポートツール制作まで、架空の文具卸売会社の売上管理業務を題材に一貫した流れで段階的に学習（全14章・約20時間）
+- [**Excel VBA入門学習ガイド**](docs/guide/business-apps/vba/README.md) - プログラミング未経験の社会人向けExcel VBA入門14章構成カリキュラム。マクロとVBAの関係と自動化できる業務の見極め方から、「開発」タブ・VBE・マクロ有効ブック（.xlsm）とマクロセキュリティの準備、マクロの記録と生成コードの読み解き、Subプロシージャ・コメント・イミディエイトウィンドウといった基本文法、変数とデータ型（Option Explicit・Const）、RangeとCellsによるセル操作とSelectを使わない書き方、If／Select Caseによる条件分岐、For／For Each／Do Loopによる繰り返し、ブックとワークシートの操作、SubとFunctionによる処理の部品化（引数・戻り値・スコープ）、配列とDictionaryによる高速な集計、On Errorとブレークポイント・ステップ実行によるエラー処理とデバッグ、MsgBox／InputBox・ボタン・イベントプロシージャ・UserForm、そして総仕上げとして売上明細から対象年月の支店別帳票をボタン1つで出力する月次レポートツール制作まで、架空の文具卸売会社の売上管理業務を題材に一貫した流れで段階的に学習（全14章・約20時間）
 
 ### 業務ドメイン知識
 
