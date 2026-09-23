@@ -60,6 +60,7 @@ import { gitGithub } from './development-processes/git-github';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
+import { linux } from './cloud-infrastructure/linux';
 
 // セキュリティ
 import { keycloak } from './security/keycloak';
@@ -111,6 +112,7 @@ const all: TechGuide[] = [
   gitGithub,
   // クラウド・インフラ
   docker,
+  linux,
   // セキュリティ
   keycloak,
   // 業務アプリ・自動化
