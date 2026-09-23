@@ -27,6 +27,9 @@ import { struts1 } from './programming-languages/java-ecosystem/struts1';
 // プログラミング言語 — JavaScript エコシステム
 import { javascript } from './programming-languages/javascript-ecosystem/javascript';
 
+// プログラミング言語 — Python エコシステム
+import { python } from './programming-languages/python-ecosystem/python';
+
 // プログラミング言語 — .NET エコシステム
 import { vbnet } from './programming-languages/dotnet-ecosystem/vbnet';
 
@@ -86,6 +89,8 @@ const all: TechGuide[] = [
   struts1,
   // プログラミング言語 — JavaScript エコシステム
   javascript,
+  // プログラミング言語 — Python エコシステム
+  python,
   // プログラミング言語 — .NET エコシステム
   vbnet,
   // Web技術
