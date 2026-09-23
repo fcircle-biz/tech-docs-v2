@@ -42,6 +42,7 @@ import { markdown } from './web-technologies/markdown';
 import { sqlserver } from './database/sqlserver';
 import { sql } from './database/sql';
 import { oracle } from './database/oracle';
+import { dbDesign } from './database/db-design';
 
 // データ分析・BI
 import { powerBi } from './data-analytics/power-bi';
@@ -101,6 +102,7 @@ const all: TechGuide[] = [
   sqlserver,
   sql,
   oracle,
+  dbDesign,
   // データ分析・BI
   powerBi,
   superset,
