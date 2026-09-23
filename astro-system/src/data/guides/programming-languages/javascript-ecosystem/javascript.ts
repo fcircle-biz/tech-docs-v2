@@ -8,7 +8,6 @@ export const javascript: TechGuide = {
   icon: 'fa-js',
   iconStyle: 'fab',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約24時間',
   splashStop0: '#eab308',
   splashStop1: '#06b6d4',

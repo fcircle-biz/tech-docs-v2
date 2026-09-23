@@ -5,45 +5,25 @@
 // スタンドアロンページのため <head> で Tailwind/Fonts/Font Awesome を自己完結読込する。
 import { guideRegistry } from '../data/guides';
 import type { TechGuide } from '../data/guides';
+import { categories, categoryLabelOf } from '../data/categories';
+import type { Category } from '../data/categories';
 
 const base = import.meta.env.BASE_URL;
 
 // 全分類・全 slug を平坦化して TechGuide の配列にする。
 const guides = Object.values(guideRegistry).flatMap((bySlug) => Object.values(bySlug));
 
-// 各ガイドの先頭章（章番号 1、無ければ最初の章）へのリンクを作る。
+// 各ガイドの先頭章（章番号 1、無ければ最初の章）へのリンクと、カードに出す分類ラベルを作る。
 const cards = guides.map((g) => {
   const first = g.chapters.find((c) => c.number === 1) ?? g.chapters[0];
   const href = `${base}guide/${g.category}/${g.slug}/${first.file}`;
-  return { g, href };
+  return { g, href, label: categoryLabelOf(g.category) };
 });
 
-/** 9分類のメタ情報（順序＝表示順）。tech-knowledge-map.md 準拠 */
-const CATEGORY_META = [
-  { key: 'programming-languages',     label: 'プログラミング言語', icon: 'fa-code' },
-  { key: 'web-technologies',          label: 'Web技術',           icon: 'fa-globe' },
-  { key: 'development-processes',     label: '開発プロセス',       icon: 'fa-diagram-project' },
-  { key: 'design-modeling',           label: '設計・モデリング',   icon: 'fa-compass-drafting' },
-  { key: 'cloud-infrastructure',      label: 'クラウド・インフラ', icon: 'fa-cloud' },
-  { key: 'data-ai-category',          label: 'データ・AI',        icon: 'fa-brain' },
-  { key: 'business-saas',             label: 'ビジネスSaaS',      icon: 'fa-briefcase' },
-  { key: 'certification',             label: '資格',              icon: 'fa-certificate' },
-  { key: 'business-domain-knowledge', label: '業務ドメイン知識',   icon: 'fa-building-columns' },
-] as const;
-
-/** サブグループ（第2セグメント）表示名。未登録キーは機械的フォールバック */
-const SUBGROUP_LABELS: Record<string, string> = {
-  'java-ecosystem':       'Java エコシステム',
-  'javascript-ecosystem': 'JavaScript エコシステム',
-  'python-ecosystem':     'Python エコシステム',
-  'generative-ai':        '生成AI',
-  'data-ai':              'AI活用基盤',
-};
-const subgroupLabel = (k: string) =>
-  SUBGROUP_LABELS[k] ?? k.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-// カテゴリ別グループ分け（第1階層＝9分類、第2階層＝サブグループ）のデータ導出。
-type Card = { g: TechGuide; href: string };
+// カテゴリ別グループ分け（第1階層＝分類、第2階層＝サブグループ）のデータ導出。
+// 分類・サブグループの表示名・アイコン・並び順は分類マスタ（src/data/categories.ts）に従う。
+// 未登録の分類パスは guideRegistry の構築時にビルドエラーになるため、ここでは考慮しない。
+type Card = { g: TechGuide; href: string; label: string };
 
 const topKey = (c: Card) => c.g.category.split('/')[0];
 const subKey = (c: Card) => c.g.category.split('/')[1] ?? '';
@@ -55,30 +35,29 @@ for (const c of cards) {
   byTop.get(k)!.push(c);
 }
 
-const buildSection = (key: string, label: string, icon: string) => {
-  const list = byTop.get(key)!;
+const buildSection = (cat: Category) => {
+  const list = byTop.get(cat.key)!;
   const direct = list.filter((c) => !subKey(c));
-  const subKeys = [...new Set(list.filter((c) => subKey(c)).map(subKey))];
   return {
-    key, label, icon,
-    id: `cat-${key}`,
+    key: cat.key,
+    label: cat.label,
+    icon: cat.icon,
+    id: `cat-${cat.key}`,
     count: list.length,
     direct,
-    subgroups: subKeys.map((sk) => ({
-      key: sk,
-      label: subgroupLabel(sk),
-      id: `cat-${key}--${sk}`,
-      cards: list.filter((c) => subKey(c) === sk),
-    })),
+    subgroups: (cat.subgroups ?? [])
+      .map((sg) => ({
+        key: sg.key,
+        label: sg.label,
+        id: `cat-${cat.key}--${sg.key}`,
+        cards: list.filter((c) => subKey(c) === sg.key),
+      }))
+      .filter((sg) => sg.cards.length > 0),
   };
 };
 
-// セクション順は CATEGORY_META の配列順。ガイド0件の分類は描画しない。
-// CATEGORY_META に無い第1セグメントは末尾に「その他」としてフォールバック。
-const known = CATEGORY_META.filter((m) => byTop.has(m.key))
-  .map((m) => buildSection(m.key, m.label, m.icon));
-const unknownKeys = [...byTop.keys()].filter((k) => !CATEGORY_META.some((m) => m.key === k));
-const sections = [...known, ...unknownKeys.map((k) => buildSection(k, 'その他', 'fa-folder'))];
+// セクション順は分類マスタの配列順。ガイド0件の分類は描画しない。
+const sections = categories.filter((cat) => byTop.has(cat.key)).map(buildSection);
 
 const showNav = sections.length >= 2;
 
@@ -297,7 +276,7 @@ const description =
                       {/* 直下ガイド（サブグループ無し） */}
                       {s.direct.length > 0 && (
                         <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                          {s.direct.map(({ g, href }) => (
+                          {s.direct.map(({ g, href, label }) => (
                             <a
                               href={href}
                               class="group relative flex flex-col rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
@@ -319,7 +298,7 @@ const description =
                                     <h3 class="text-lg font-bold text-slate-900 truncate">
                                       {g.techTitle}
                                     </h3>
-                                    <p class="text-xs text-slate-500 mt-0.5">{g.categoryLabel}</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">{label}</p>
                                   </div>
                                 </div>
 
@@ -359,7 +338,7 @@ const description =
                                 <span class="font-normal normal-case text-slate-400">（{sg.cards.length}）</span>
                               </h3>
                               <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                                {sg.cards.map(({ g, href }) => (
+                                {sg.cards.map(({ g, href, label }) => (
                                   <a
                                     href={href}
                                     class="group relative flex flex-col rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
@@ -381,7 +360,7 @@ const description =
                                           <h3 class="text-lg font-bold text-slate-900 truncate">
                                             {g.techTitle}
                                           </h3>
-                                          <p class="text-xs text-slate-500 mt-0.5">{g.categoryLabel}</p>
+                                          <p class="text-xs text-slate-500 mt-0.5">{label}</p>
                                         </div>
                                       </div>
 

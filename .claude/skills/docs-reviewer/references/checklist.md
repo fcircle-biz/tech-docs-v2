@@ -134,6 +134,7 @@ grep -rn '<tr class="bg-primary-50">' <対象ディレクトリ>
 - [ ] 各章冒頭に学習目標カードがある（`astro-system/templates/v1/snippets/components.html` 参照）。
 - [ ] 技術色は `primary` クラス（`text-primary-600` 等）で参照し、生 hex を書いていない。`src/data/guides/<分類>/<slug>.ts` の `primary`(50-900) が設定され、`src/data/guides/index.ts` に import 登録されている。
 - [ ] `TechGuide.chapters[]` が全章分定義され、断片ファイル数と一致する（旧 sidebar-content.js に相当。A-10 の代替）。
+- [ ] `TechGuide.category` が分類マスタ `src/data/categories.ts` に登録済みの分類パス（2階層まで）で、配置が `.claude/skills/docs-guide-creator/references/taxonomy-paths.md` の判断基準（用途で決める）に合っている。データ定義に `categoryLabel` を手書きしていない（ラベルはマスタから導出）。
 - [ ] ダーク可読性: 生color指定（`text-[#...]`）・インライン `style` の色・半透明背景（`bg-white/70` 等）が無い（A-3）。標準シェード（背景 `-50〜300`／文字 `-600〜950`）を使用。
 - [ ] テーブル行の色分け（`<tr class="bg-primary-50">`）が既定で使われていない。使う場合は意味を説明でき、凡例があり、ガイド内で意味が1種類（A-3）。
 - [ ] ダークモードボタンが断片に手書きされていない（`main.js` が動的生成）。
@@ -215,7 +216,7 @@ GitHub Pages URL 形式: `https://fcircle-biz.github.io/tech_docs/[content-type]
 | チートシート | `cheatsheet` | `index.html` | `.../cheatsheet/[カテゴリパス]/[技術名小文字]/` |
 | スライド | `slide` | `index.html` ＋ `pdf/` | `.../slide/[カテゴリパス]/[教材名]/` |
 
-`[NN]` は2桁ゼロパディング（01〜）。分類パス（9分類体系）は `tech-knowledge-map.md` を参照。
+`[NN]` は2桁ゼロパディング（01〜）。分類パスは分類マスタ `astro-system/src/data/categories.ts` を参照。
 
 ---
 
@@ -223,7 +224,7 @@ GitHub Pages URL 形式: `https://fcircle-biz.github.io/tech_docs/[content-type]
 
 | 内容 | パス |
 |------|------|
-| 9分類体系（タクソノミー） | `tech-knowledge-map.md` |
+| 分類マスタ（タクソノミー） | `astro-system/src/data/categories.ts`（技術領域ごとの配置先: `tech-knowledge-map.md`） |
 | カラーテーマ | `astro-system/templates/v1/reference/color-themes.md` |
 | Tailwind CSS スタイルガイド | `astro-system/templates/v1/reference/css-styles.md` |
 | Mermaid 図パターン詳細 | `astro-system/templates/v1/reference/mermaid-patterns.md` |

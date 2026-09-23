@@ -8,8 +8,9 @@
 
 ### 配置先分類
 
-- **必須**: リポジトリルートの `tech-knowledge-map.md`（正典）を参照し、対象技術が9分類のどれに属するかを決定する。代表パスは references/taxonomy-paths.md。
-- 分類パス `<category>` は **複数セグメント可**（例: `development-processes`、`programming-languages/python-ecosystem`、`data-ai-category/database`）。動的ルート `src/pages/guide/[...chapter].astro` が階層を問わず解決する。
+- **必須**: references/taxonomy-paths.md の判断基準（用途で決める。提供形態・ベンダーでは決めない）と、リポジトリルートの `tech-knowledge-map.md`（技術領域ごとの配置先）を参照し、分類マスタ `astro-system/src/data/categories.ts`（正典）に登録済みの分類から配置先を決定する。
+- 分類パス `<category>` は「分類キー」または「分類キー/サブグループキー」の **2階層まで**（例: `database`、`ai/ai-coding`、`programming-languages/java-ecosystem`）。動的ルート `src/pages/guide/[...chapter].astro` が階層を問わず解決する。
+- 必要な分類・サブグループがマスタに無い場合は、先に `categories.ts` へ追加する（未登録の分類パスはビルドエラーになる）。
 - `<slug>` は技術識別子（kebab-case、例: `docker`、`django`）。
 
 生成先（すべて `astro-system/` 配下）:
@@ -38,19 +39,18 @@ astro-system/public/guide/<category>/<slug>/README.md       # 概要（任意・
 
 ## 3. TechGuide データ定義（`src/data/guides/<category>/<slug>.ts`）
 
-`astro-system/src/data/guides/types.ts` の `TechGuide` 型に従って定義する。技術色 `primary`(50-900) は `astro-system/templates/v1/reference/color-themes.md` の値を使う（**旧 `{{PRIMARY_*}}` 置換は不要**。ここで持った値からレイアウトが CSS 変数を導出する）。
+`astro-system/src/data/guides/types.ts` の `TechGuide` 型に従って定義する。技術色 `primary`(50-900) は `astro-system/templates/v1/reference/color-themes.md` の値を使う（**旧 `{{PRIMARY_*}}` 置換は不要**。ここで持った値からレイアウトが CSS 変数を導出する）。ヘッダーの分類ラベル（例: 「AI / AIコーディング」）は `category` から分類マスタ経由で自動導出されるため、データ定義には書かない。
 
 ```ts
-import type { TechGuide } from '../types';   // ネスト分類では '../../types' 等、相対階層を合わせる
+import type { TechGuide } from '../types';   // 2階層の分類パスでは '../../types' 等、相対階層を合わせる
 
 // 例: Docker 入門学習ガイド（技術色 = sky）
 export const docker: TechGuide = {
-  category: 'cloud-infrastructure',        // 分類パス（複数セグメント可）
+  category: 'cloud-infrastructure',        // 分類パス（categories.ts に登録済みのキー。2階層まで）
   slug: 'docker',
   techTitle: 'Docker学習教材',             // ヘッダー表示名
   icon: 'fa-docker',                       // Font Awesome（fab/fas のクラス名部分）
   level: '初級',
-  categoryLabel: 'クラウド・インフラ',      // ヘッダーの分類ラベル
   totalTime: '約16時間',
   splashStop0: '#0ea5e9',                  // スプラッシュ SVG グラデ開始（技術色 500 系）
   splashStop1: '#06b6d4',                  // 終了（cyan 相方）
@@ -69,12 +69,17 @@ export const docker: TechGuide = {
 
 ### index.ts への登録（必須）
 
-`astro-system/src/data/guides/index.ts` に import と `all` 配列への追加を行う（これを忘れるとビルド時に「データ未登録」で失敗する）。
+`astro-system/src/data/guides/index.ts` に import と `all` 配列への追加を行う（これを忘れるとビルド時に「データ未登録」で失敗する）。`all` 配列では同じ分類のガイドの並びにまとめて追加する（同一分類内のカード表示順になる。分類同士の順序は `categories.ts` が決める）。
 
 ```ts
 import { docker } from './cloud-infrastructure/docker';
 // ...
-const all: TechGuide[] = [claudeCode, codex, docker];   // ← 追加
+const all: TechGuide[] = [
+  // ...
+  // クラウド・インフラ
+  docker,   // ← 同じ分類のガイドの並びに追加
+  // ...
+];
 ```
 
 ## 4. 概要 README（`public/guide/<category>/<slug>/README.md`・任意・推奨）

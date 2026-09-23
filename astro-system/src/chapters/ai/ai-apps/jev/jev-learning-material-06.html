@@ -1,0 +1,632 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Jev</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第6章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第6章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">HTTP APIから利用する</h1>
+                    <p class="text-slate-600">前章では curl で Jev の挙動を体感しました。この章では <code class="bg-slate-100">POST /v1/systemone</code> のリクエスト／レスポンス構造を仕様として整理し、モデルの指定方法・エラーコード・レート制限を受けたときの再試行方針まで、アプリケーションに組み込むために必要な知識を固めます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="font-mono text-xs bg-amber-100 text-amber-900 px-1 rounded">POST /v1/systemone</code> のリクエスト／レスポンス構造を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="font-mono text-xs bg-amber-100 text-amber-900 px-1 rounded">state</code>・<code class="font-mono text-xs bg-amber-100 text-amber-900 px-1 rounded">model</code>・<code class="font-mono text-xs bg-amber-100 text-amber-900 px-1 rounded">questions</code> と <code class="font-mono text-xs bg-amber-100 text-amber-900 px-1 rounded">answers</code> の対応関係を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>使用するモデル名とエイリアスを指定できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>主なエラーコードを見分け、レート制限時の再試行方針を説明できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション6.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.1 エンドポイントと認証
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        前章で curl から叩いた宛先が、Jev の<strong>評価用エンドポイント</strong>です。Choice も Score も Noul も、すべてこの同じ入口から呼び出します（この他に、利用可能なモデル一覧を取得する <code class="bg-slate-100">GET /v1/models</code> があります。6.6 で扱います）。
+                    </p>
+
+                    <div class="bg-slate-100 rounded-lg px-4 py-3 font-mono text-sm text-slate-800 mb-4">
+                        POST https://api.typesafe.ai/v1/systemone
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        すべてのリクエストには、次の2つのヘッダーが必要です。どちらが欠けても、後述する 401 や 422 のエラーになります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">ヘッダー</th>
+                                    <th class="px-4 py-3 text-left font-semibold">値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">役割</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Authorization</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">Bearer &lt;API_KEY&gt;</code></td>
+                                    <td class="px-4 py-3 text-slate-600">APIキーによる認証</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Content-Type</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">application/json</code></td>
+                                    <td class="px-4 py-3 text-slate-600">リクエストボディの形式</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アプリケーションから呼び出すときの流れを図にすると、次のようになります。curl のときと違うのは、JSON を組み立てて送るのが人間ではなくコード自身になる点だけです。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["アプリケーション"] -->|"POST /v1/systemone"| B["Jev API"]
+    B -->|"state・model・questionsを解釈"| C["Jevモデル（jev-1.13.0）"]
+    C -->|"answers ＋ usageを生成"| B
+    B -->|"200 OK（JSON）"| A
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.2 リクエストボディ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        リクエストボディは3つのトップレベルフィールドだけで構成されます。第3・4章で学んだ State と Question が、そのまま JSON のフィールドに対応します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">フィールド</th>
+                                    <th class="px-4 py-3 text-left font-semibold">型</th>
+                                    <th class="px-4 py-3 text-left font-semibold">必須</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">state</code></td>
+                                    <td class="px-4 py-3 text-slate-600">string / object / array</td>
+                                    <td class="px-4 py-3 text-slate-600">必須</td>
+                                    <td class="px-4 py-3 text-slate-600">判断対象のコンテンツ。平文でもJSON構造でも渡せる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">model</code></td>
+                                    <td class="px-4 py-3 text-slate-600">string</td>
+                                    <td class="px-4 py-3 text-slate-600">必須</td>
+                                    <td class="px-4 py-3 text-slate-600">使用するモデル名。公式は <code class="bg-slate-100">jev-latest</code> の指定を推奨</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">questions</code></td>
+                                    <td class="px-4 py-3 text-slate-600">map（string → Question）</td>
+                                    <td class="px-4 py-3 text-slate-600">必須</td>
+                                    <td class="px-4 py-3 text-slate-600">キーは自由に決められる。判断してほしい内容をQuestionオブジェクトとして1つ以上定義する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">questions</code> の中身は、第4章で学んだ Choice／Score／Noul のいずれかです。どの型でも <code class="bg-slate-100">type</code> と <code class="bg-slate-100">instructions</code> は共通で必須、選択肢や段階を定義する <code class="bg-slate-100">criteria</code> は型ごとの形式に従います。実際のリクエストは、次のようにとても短く書けます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">リクエストボディの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "state": "Help! My payouts have been failing for 3 days.",
+  "model": "jev-latest",
+  "questions": {
+    "is_urgent": {
+      "type": "noul",
+      "instructions": "Does this convey urgency?"
+    }
+  }
+}</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション6.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.3 レスポンスボディ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        先ほどのリクエストを送ると、次のようなレスポンスが返ります。フィールドは3つだけで、構造はリクエストと対になっています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">フィールド</th>
+                                    <th class="px-4 py-3 text-left font-semibold">型</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">model</code></td>
+                                    <td class="px-4 py-3 text-slate-600">string</td>
+                                    <td class="px-4 py-3 text-slate-600">実際にリクエストを処理したモデル名（例: <code class="bg-slate-100">jev-1.13.0</code>）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">answers</code></td>
+                                    <td class="px-4 py-3 text-slate-600">map（string → Answer）</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">questions</code> と同じキーで、Question IDごとの回答が返る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">usage</code></td>
+                                    <td class="px-4 py-3 text-slate-600">object</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">input_tokens</code>・<code class="bg-slate-100">output_tokens</code> を含むトークン使用量</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">レスポンスボディの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "model": "jev-1.13.0",
+  "answers": {
+    "is_urgent": {
+      "type": "noul",
+      "noul": 0.95
+    }
+  },
+  "usage": { "input_tokens": 296, "output_tokens": 20 }
+}</code></pre>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: キーは呼び出し側が決め、そのまま返ってくる</p>
+                                <p class="text-emerald-900 text-sm">上の例では <code class="bg-emerald-100 text-emerald-900">is_urgent</code> というキーを自分で決めています。Jev はこのキーを一切変更せず、<code class="bg-emerald-100 text-emerald-900">answers.is_urgent</code> としてそのまま返します。分かりやすいキー名を付けておけば、レスポンスをパースする処理を書かずに<strong>そのまま辞書として扱える</strong>のはこの仕組みのおかげです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション6.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.4 モデルの指定
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">model</code> には、固定バージョンのIDか、それを指すエイリアスを指定します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">指定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">種別</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">jev-latest</code></td>
+                                    <td class="px-4 py-3 text-slate-600">エイリアス（推奨）</td>
+                                    <td class="px-4 py-3 text-slate-600">最新の安定版を指す。SDKの既定値でもあり、新しいバージョンが出ると自動的に追従する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">jev-preview</code></td>
+                                    <td class="px-4 py-3 text-slate-600">エイリアス</td>
+                                    <td class="px-4 py-3 text-slate-600">最新のプレビュー版を指す。現時点では <code class="bg-slate-100">jev-latest</code> と同じ版を指している</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code class="bg-slate-100">jev-1.13.0</code></td>
+                                    <td class="px-4 py-3 text-slate-600">固定バージョンID</td>
+                                    <td class="px-4 py-3 text-slate-600">現在2つのエイリアスが指している実体。バージョンを明示的に固定できる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">jev-latest</code> のようなエイリアスを使うと、TypeSafe が新しいモデルをリリースするたびに自動で追従します。運用の手間は減りますが、<strong>ある日突然、判断のクセがわずかに変わる</strong>可能性があります。逆に <code class="bg-slate-100">jev-1.13.0</code> のようにバージョンを固定すると挙動は変わりませんが、新しいモデルが出ても自分で切り替えない限りそのままです。本番環境では、このどちらの方針を取るかをチームで決めておく必要があります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アカウントで使用できるモデルとエイリアスの一覧は <code class="bg-slate-100">GET /v1/models</code> で取得できます。名前・説明・リリース日を含む一覧が、モデルまたはエイリアスごとに1件ずつ返ります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">利用可能なモデル一覧を取得</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># GET /v1/models で利用可能なモデル・エイリアスを取得する
+curl https://api.typesafe.ai/v1/models \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY"</code></pre>
+                    </div>
+                    <figure class="my-6">
+                        <img src="/tech-docs-v2/guide/ai/ai-apps/jev/images/jev-chapter06-model-alias.png"
+                             alt="jev-latest と jev-preview という2つのエイリアスから矢印が伸び、どちらも jev-1.13.0 という同じ固定バージョンを指していることを示す図。"
+                             class="w-full max-w-3xl mx-auto rounded-lg border border-slate-200 shadow-sm"
+                             loading="lazy" decoding="async" />
+                        <figcaption class="mt-2 text-center text-sm text-slate-600">jev-latest と jev-preview は、どちらも同じ実体 jev-1.13.0 を指している</figcaption>
+                    </figure>
+
+                </section>
+
+                <!-- セクション6.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.5 エラーと再試行
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        API から返る主なエラーコードは次の4種類です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">ステータス</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">主な原因</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">401 Unauthorized</td>
+                                    <td class="px-4 py-3 text-slate-600">認証エラー</td>
+                                    <td class="px-4 py-3 text-slate-600">APIキーが欠落している、または無効</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">422 Unprocessable Entity</td>
+                                    <td class="px-4 py-3 text-slate-600">リクエスト検証エラー</td>
+                                    <td class="px-4 py-3 text-slate-600">必須フィールドの欠落など、ボディの内容が不正</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">429 Too Many Requests</td>
+                                    <td class="px-4 py-3 text-slate-600">レート制限超過</td>
+                                    <td class="px-4 py-3 text-slate-600">トークン数またはリクエスト数の上限を超えた</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">529 Overloaded</td>
+                                    <td class="px-4 py-3 text-slate-600">サーバー過負荷</td>
+                                    <td class="px-4 py-3 text-slate-600">TypeSafe側が一時的に高負荷の状態にある</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        429（レート制限）と529（過負荷）は、時間を置けば成功する可能性がある一時的なエラーです。公式ドキュメントは、これらを受け取った場合に<strong>指数バックオフ</strong>で再試行するよう案内しています。SDKを使う場合は、この再試行がデフォルトで組み込まれます（第7章）。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">401・422は再試行しても直らない</p>
+                                <p class="text-red-900 text-sm">401や422は、待っても状況が変わらない<strong>恒久的なエラー</strong>です。再試行の前に、401なら <code class="bg-red-100">Authorization</code> ヘッダーの値を、422ならリクエストJSONの必須フィールドや型を見直してください。指数バックオフの対象は429と529だけです。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-2">
+                        HTTP呼び出しに指数バックオフを組み込むと、次のようになります。
+                    </p>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">retry.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import time, random, requests
+
+def call_systemone(url, headers, body, max_retries=5):
+    """429・529のときだけ指数バックオフで再試行する"""
+    for attempt in range(max_retries):
+        res = requests.post(url, headers=headers, json=body)
+        if res.status_code not in (429, 529):
+            return res  # 成功、または再試行対象外のエラー
+        wait = 2 ** attempt + random.random()  # 待機時間を倍々に＋ばらつき
+        time.sleep(wait)
+    return res  # 上限まで再試行しても改善しなかった最後の応答</code></pre>
+                    </div>
+                    <figure class="my-6">
+                        <img src="/tech-docs-v2/guide/ai/ai-apps/jev/images/jev-chapter06-retry-backoff.png"
+                             alt="401と422は再試行しない、429と529は再試行すると示したうえで、指数バックオフの待ち時間が1秒・2秒・4秒・8秒と倍々に伸びる様子を棒の高さで示した図。"
+                             class="w-full max-w-3xl mx-auto rounded-lg border border-slate-200 shadow-sm"
+                             loading="lazy" decoding="async" />
+                        <figcaption class="mt-2 text-center text-sm text-slate-600">指数バックオフの対象は 429 と 529 だけ。待ち時間は 1秒・2秒・4秒・8秒と倍になる</figcaption>
+                    </figure>
+
+                </section>
+
+                <!-- セクション6.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        6.6 制限とコスト
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本番投入の前に知っておくべき数値上の制限と、課金の仕組みを整理します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">コンテキスト長（合計）</td>
+                                    <td class="px-4 py-3 text-slate-600">1リクエストあたり64,000トークンまで</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">コンテキスト長（state＋最長Question）</td>
+                                    <td class="px-4 py-3 text-slate-600">32,000トークンまで</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">レート制限</td>
+                                    <td class="px-4 py-3 text-slate-600">250,000トークン／秒、1,200リクエスト／分</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">課金対象</td>
+                                    <td class="px-4 py-3 text-slate-600">入力トークンのみ。100万トークンあたり$0.042（出力トークンは無料）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">入力形式</td>
+                                    <td class="px-4 py-3 text-slate-600">テキストのみ（文字列・JSONオブジェクト・配列）。画像・音声・動画は非対応</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        公式ドキュメントによれば、レート制限の数値は固定ではなく動的に調整されます。上表の値は目安として捉え、実装では429応答そのものをハンドリングする前提で設計してください。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">日本語など英語以外の言語を使う場合の注意</p>
+                                <p class="text-red-900 text-sm">公式ドキュメントは、<strong>英語が主要な学習言語であり、現時点で最も精度が高い</strong>と明記しています。日本語を含むCJK言語も扱えますが、英語と同等の精度ではありません。日本語の問い合わせ文を <code class="bg-red-100 text-red-900">state</code> に渡す場合は、本番投入前に自分のユースケースで十分な精度が出るかを検証してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">コスト管理のヒント</p>
+                                <p class="text-blue-900 text-sm">課金は <code class="bg-blue-100 text-blue-900">input_tokens</code> だけで決まり、<code class="bg-blue-100 text-blue-900">output_tokens</code> は無料です。レスポンスの <code class="bg-blue-100 text-blue-900">usage</code> を毎回ログに残しておけば、機能別のコストを後から集計できます。<code class="bg-blue-100 text-blue-900">state</code> に無関係な情報を詰め込みすぎないことが、そのままコスト削減にもつながります（第3章）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 6-1: department・urgency・frustration を1リクエストで判定する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">1つの問い合わせ文から、担当部署・緊急度・不満度という3つの異なる判断を、<strong>1回のAPIリクエスト</strong>で取得してみましょう。第9・11章で扱う「複数Questionの並列評価」の最初の一歩です。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">分析したい問い合わせ文を1つ用意する（自作でよい。困っていて急いでいる内容だと判断の違いが分かりやすい）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">department</code>（Choice）・<code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">urgency</code>（NoulまたはScore）・<code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">frustration</code>（Score）の3つのQuestionを設計する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">3つを1つの <code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">questions</code> オブジェクトにまとめ、curl で <code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">POST /v1/systemone</code> へ送信する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">返ってきたJSONの <code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">answers</code> に、指定した3つのキーがそのまま含まれていることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-purple-700 hover:text-purple-800 font-medium">
+                                    解答例を表示
+                                </summary>
+                                <div class="code-block-wrapper my-4">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">解答例（curl）</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># department・urgency・frustration を1回のリクエストで判定する
+curl https://api.typesafe.ai/v1/systemone \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "state": "3日前に注文した商品がまだ発送されず、問い合わせ窓口に2回連絡しましたが返信がありません。至急対応してください。",
+  "model": "jev-latest",
+  "questions": {
+    "department": {"type": "choice", "instructions": "対応すべき部署はどこですか？", "criteria": {"logistics": "配送遅延に関する内容", "support": "一般的な問い合わせ", "sales": "購入前の相談"}},
+    "urgency": {"type": "noul", "instructions": "緊急対応が必要な内容ですか？"},
+    "frustration": {"type": "score", "instructions": "顧客の不満の強さを評価してください。", "criteria": ["不満なし", "やや不満", "強い不満"]}
+  }
+}'</code></pre>
+                                </div>
+                                <p class="text-sm text-purple-900 px-1">3つとも <code class="font-mono text-xs bg-purple-100 text-purple-900 px-1 rounded">type</code> が異なる点に注目してください。Choice・Noul・Score を混在させても、questionsにまとめれば1回のリクエストで並列に評価されます。</p>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. リクエストの <code class="bg-blue-100">questions</code> に指定したキーは、レスポンスのどこに、どのように反映されますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">answers</code> の中に、<strong>同じキー名</strong>でそれぞれの回答が返ります。例えば <code class="bg-blue-200">questions.department</code> と指定すれば、回答は <code class="bg-blue-200">answers.department</code> に入ります。キー名は呼び出し側が自由に決められます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">model</code> に <code class="bg-blue-100">jev-latest</code> ではなく <code class="bg-blue-100">jev-1.13.0</code> のような固定バージョンIDを指定するのは、どんな場面に向いていますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            本番環境で<strong>挙動を固定したい場合</strong>です。エイリアスは新しいバージョンへ自動追従するため出力が変わる可能性がありますが、バージョンを固定すれば、TypeSafe が新モデルを出しても自分で切り替えるまで動作は変わりません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. APIリクエストが <code class="bg-blue-100">429 Too Many Requests</code> を返した場合、アプリケーション側はどう対応するべきですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            公式ドキュメントの指針に従い、<strong>指数バックオフ</strong>で再試行します（529も同様）。待機時間を試行のたびに倍々に増やすことで、サーバー側の負荷が下がるのを待ちます。401や422のような恒久的なエラーは再試行しても解決しないため、区別して扱う必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. レスポンスの <code class="bg-blue-100">usage</code> に含まれる <code class="bg-blue-100">input_tokens</code> と <code class="bg-blue-100">output_tokens</code> のうち、課金対象になるのはどちらですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">input_tokens</code>（入力トークン）だけです。Jev は出力トークンを無料としているため、<code class="bg-blue-200">output_tokens</code> の値はコストに影響しません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jev-learning-material-05.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第5章: 最初のリクエストを送る</span>
+                        </div>
+                    </a>
+                    <a href="jev-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第7章: Python SDKで組み込む</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

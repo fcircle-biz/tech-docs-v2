@@ -82,4 +82,4 @@ Glob で対象を再確認し、検証結果サマリ（合否・違反件数・
 - references/checklist.md — 全検証観点を資料タイプ別に整理（共通観点＋guide/tutorial/practice/assignment/cheatsheet/slide 固有観点、ファイル命名・URL形式表）
 - references/review-procedure.md — 並列検証・集約・修正の手順、Agent 並列起動の出し方、所見スキーマ（JSON）例
 
-共有データは複製せず既存リポジトリファイルを参照する。9分類体系: `tech-knowledge-map.md` / カラー: `astro-system/templates/v1/reference/color-themes.md` / Tailwind: `astro-system/templates/v1/reference/css-styles.md` / Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md` / カードコンポーネント: `astro-system/templates/v1/snippets/components.html`。
+共有データは複製せず既存リポジトリファイルを参照する。分類マスタ: `astro-system/src/data/categories.ts`（技術領域ごとの配置先: `tech-knowledge-map.md`） / カラー: `astro-system/templates/v1/reference/color-themes.md` / Tailwind: `astro-system/templates/v1/reference/css-styles.md` / Mermaid詳細: `astro-system/templates/v1/reference/mermaid-patterns.md` / カードコンポーネント: `astro-system/templates/v1/snippets/components.html`。

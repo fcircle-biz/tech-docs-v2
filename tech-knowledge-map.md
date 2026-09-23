@@ -2,6 +2,32 @@
 
 IT技術、業務知識、資格試験を網羅した包括的な学習ドメインマップ
 
+> サイト上の分類（キー・表示名・並び順）の正典は `astro-system/src/data/categories.ts`（分類マスタ）。本マップは技術領域を網羅し、各領域のガイドをどの分類に置くかの目安を示す。振り分けの判断基準（用途で決める。提供形態・ベンダーでは決めない）は `.claude/skills/docs-guide-creator/references/taxonomy-paths.md` を参照。
+
+## サイト分類との対応
+
+| 本マップの分類 | サイトの分類キー（配置先） |
+|---|---|
+| プログラミング言語 | `programming-languages`（言語ごとのエコシステムをサブグループにする） |
+| Webテクノロジ | `web-technologies` |
+| データベース | `database`（DWH／データ基盤は `data-analytics`） |
+| クラウド／インフラ | `cloud-infrastructure` |
+| ネットワーク | `cloud-infrastructure` |
+| セキュリティ | `security` |
+| OS／デバイス | `cloud-infrastructure`（Android・iOS のアプリ開発は `programming-languages`） |
+| データ／AI | `data-analytics`（Hadoop／Spark・統計学・SAS・BI・可視化）、`ai`（TensorFlow・PyTorch・機械学習） |
+| 生成AI／LLM | `ai`（サブグループ `generative-ai`・`ai-coding`・`ai-apps`） |
+| IoT／エッジ | `cloud-infrastructure`（エッジAIは `ai`） |
+| 開発手法・プロセス | `development-processes` |
+| 設計手法・モデリング | `design-modeling` |
+| テスト／QA | `development-processes`（言語固有のテストツールは `programming-languages`） |
+| PM／ガバナンス | `development-processes` |
+| SaaS／PaaS／アプリケーション | `business-apps` |
+| 業務知識・ドメイン | `business-domain-knowledge` |
+| 資格・認定試験 | `certification` |
+
+## 技術領域マップ
+
 | 分類 | 技術・知識領域 | 中核ツール／サービス／内容（抜粋） | 主な特徴 |
 |--------------|--------------|------------------------------|--------------|
 | **プログラミング言語** | **Python** | PyPI・Django・NumPy／Pandas | Web〜AI まで裾野が広い |
@@ -47,9 +73,11 @@ IT技術、業務知識、資格試験を網羅した包括的な学習ドメイ
 |  | **統計学** | statsmodels・SciPy・Stata | 記述統計・推測統計・仮説検定の基礎 |
 |  | **機械学習** | scikit-learn・XGBoost・LightGBM・CatBoost | 古典的ML手法の実装、勾配ブースティング |
 |  | **SAS** | Viya・SAS Studio・Visual Analytics | 高信頼の統計解析／ML、Python・R 連携 |
+|  | **BI・可視化** | Power BI・Tableau・Apache Superset・Looker | ダッシュボードでデータを可視化・共有 |
 | **生成AI／LLM** | **LLM活用基盤** | OpenAI API・Azure OpenAI・Gemini・Claude | 生成AI活用の中心技術 |
 |  | **RAG／検索** | Vector DB（FAISS・Pinecone・Weaviate） | 企業向けAIの要となる検索技術 |
 |  | **LLMアプリ開発** | LangChain・LlamaIndex・Dify | エージェント／AIアプリ構築 |
+|  | **AIコーディング** | Claude Code・Codex・GitHub Copilot・Cursor | エージェントによるコード生成・編集 |
 |  | **MLOps for LLM** | MLflow・Model registry | 運用・評価の標準化 |
 | **IoT／エッジ** | **IoT基盤技術** | MQTT・CoAP・OPC-UA | デバイス連携の基本 |
 |  | **エッジデバイス** | Raspberry Pi・Arduino | センサー／制御の実装基礎 |
@@ -58,6 +86,7 @@ IT技術、業務知識、資格試験を網羅した包括的な学習ドメイ
 | **開発手法・プロセス** | **アジャイル開発** | Scrum・XP・Kanban・スプリント・レトロスペクティブ | 反復的な開発、変化への迅速な対応 |
 |  | **ウォーターフォール開発** | 要件定義→設計→実装→テスト→運用保守 | 段階的な開発、計画重視の伝統的手法 |
 |  | **DevOps** | CI/CD・Infrastructure as Code・自動化・監視 | 開発と運用の融合、継続的デリバリー |
+|  | **バージョン管理** | Git・GitHub・GitLab | 変更履歴の管理とチーム開発の基盤 |
 |  | **リーンソフトウェア開発** | MVP・継続的改善・ムダの排除・リーンスタートアップ | 価値の最大化、学習重視 |
 |  | **スパイラル開発** | リスク分析・プロトタイピング・反復開発 | リスク駆動型、大規模プロジェクト向け |
 | **設計手法・モデリング** | **UML** | クラス図・シーケンス図・ユースケース図・状態遷移図 | オブジェクト指向設計の標準表記法 |

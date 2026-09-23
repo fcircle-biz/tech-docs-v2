@@ -1,0 +1,653 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">Jev</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間15分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Python SDKで組み込む</h1>
+                    <p class="text-slate-600">前章では <code class="bg-slate-100">curl</code> で Jev の HTTP API を直接呼び出しました。本章では公式 Python SDK <code class="bg-slate-100">typesafe-sdk</code> を使い、同じ処理を Python アプリケーションへ型安全に組み込みます。JSON を手作りする代わりに <code class="bg-slate-100">Choice</code>・<code class="bg-slate-100">Score</code>・<code class="bg-slate-100">Noul</code> という Python クラスで Question を定義し、レスポンスもオブジェクトとして受け取ります。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Python SDK をインストールし、クライアントを初期化できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Choice / Score / Noul を Python オブジェクトとして定義できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>response.answers から判断結果を型付きで取り出せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>問い合わせを判定する Python CLI を自分で書ける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 インストールと前提
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6章では、<code class="bg-slate-100">curl</code> で <code class="bg-slate-100">POST /v1/systemone</code> を直接呼び出し、リクエストとレスポンスの JSON 構造を確認しました。ここからは、その JSON の組み立て・送信・パースを肩代わりしてくれる公式 Python SDK <code class="bg-slate-100">typesafe-sdk</code> を使い、Python アプリケーションへ組み込んでいきます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SDK を使うと、認証ヘッダーの付与・JSON のシリアライズ／デシリアライズ・失敗時の例外化といった定型処理をSDKが肩代わりしてくれます。手で書くのは「どんな Question を送るか」という本質的な部分だけになります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">typesafe-sdk</code> は <strong>Python 3.10 以上</strong>を前提としています。まずバージョンを確認し、プロジェクト専用の仮想環境を作ってからインストールしましょう。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># Python 3.10 以上がインストールされているか確認する
+python3 --version
+
+# プロジェクト用の仮想環境を作成する
+python3 -m venv .venv
+
+# 仮想環境を有効化する（macOS / Linux）
+source .venv/bin/activate
+
+# 仮想環境を有効化する（Windows PowerShellの場合）
+# .venv\Scripts\Activate.ps1
+
+# Jevの公式Python SDKをインストールする
+pip install typesafe-sdk</code></pre>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">uv を使う場合</p>
+                                <p class="text-blue-900 text-sm">高速なパッケージマネージャ <code class="bg-blue-100 text-blue-900">uv</code> を使っているなら、<code class="bg-blue-100 text-blue-900">pip install</code> の代わりに <code class="bg-blue-100 text-blue-900">uv add typesafe-sdk</code> でも同じようにインストールできます。どちらも公式にサポートされています。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <figure class="my-6">
+                        <img src="/tech-docs-v2/guide/ai/ai-apps/jev/images/jev-chapter07-sdk-covers.png"
+                             alt="curl で書く場合は認証ヘッダー・JSONを組み立て・送信・結果を読み解く・Question の5工程すべてを自分で書くのに対し、SDK で書く場合は上の4工程がSDK側になり、Question だけを自分で書けばよいことを塗り分けで示した図。"
+                             class="w-full max-w-3xl mx-auto rounded-lg border border-slate-200 shadow-sm"
+                             loading="lazy" decoding="async" />
+                        <figcaption class="mt-2 text-center text-sm text-slate-600">curl では全工程を自分で書くが、SDK では Question だけを書けばよい</figcaption>
+                    </figure>
+
+                </section>
+
+                <!-- セクション7.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 クライアントの初期化
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6章では <code class="bg-slate-100">curl -H "Authorization: Bearer $TYPESAFE_API_KEY"</code> のように、リクエストのたびに認証ヘッダーを自分で組み立てました。SDK ではこの手順は不要です。<code class="bg-slate-100">TypeSafeClient</code> を作成するだけで、環境変数から API キーを自動的に読み込んでくれます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        API キーは <a href="https://console.typesafe.ai/keys" class="text-primary-600 hover:underline">console.typesafe.ai/keys</a> で発行したものを使います。まずターミナルで環境変数として設定します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># APIキーを環境変数として設定する（console.typesafe.ai/keys で発行）
+export TYPESAFE_API_KEY="ここに発行されたAPIキーを貼り付ける"</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Python 側では、<code class="bg-slate-100">TypeSafeClient()</code> を呼び出すだけで初期化が完了します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">client.py</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from typesafe_sdk import TypeSafeClient
+
+# 環境変数 TYPESAFE_API_KEY から自動的にAPIキーを読み込む
+client = TypeSafeClient()</code></pre>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">APIキーをソースコードに直書きしない</p>
+                                <p class="text-red-900 text-sm"><code class="bg-red-100 text-red-900">TypeSafeClient(api_key="sk-...")</code> のようにキーを引数へ直接渡すことも技術的には可能ですが、そのままGitにコミットするとリポジトリの履歴からキーが漏洩します。第6章と同様に、環境変数 <code class="bg-red-100 text-red-900">TYPESAFE_API_KEY</code> から読み込む方法を徹底しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 Question を Python オブジェクトで定義する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第6章で送ったリクエストの <code class="bg-slate-100">questions</code> は、たとえば次のような JSON でした（<code class="bg-slate-100">department</code> の部分だけ抜粋しています）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">第6章のリクエストJSON（抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "state": "（省略：問い合わせ本文）",
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": "この問い合わせはどの部署が対応すべきか",
+      "criteria": {
+        "technical": "バグや連携不具合に関する問題",
+        "billing": "支払い・請求に関する問題",
+        "sales": "料金やアカウントに関する質問"
+      }
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この <code class="bg-slate-100">questions</code> の中身を、SDK では <code class="bg-slate-100">Choice</code>・<code class="bg-slate-100">Score</code>・<code class="bg-slate-100">Noul</code> という3つの Python クラスでそのまま型付きに表現できます。書く<strong>内容は同じ</strong>で、書き方だけが変わります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">questions.py（Choiceの定義）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from typesafe_sdk import Choice, Score, Noul
+
+# 担当部署をどの3択から選ぶかを定義する
+department = Choice(
+    instructions="この問い合わせはどの部署が対応すべきか",
+    criteria={
+        "technical": "バグや連携不具合に関する問題",
+        "billing": "支払い・請求に関する問題",
+        "sales": "料金やアカウントに関する質問",
+    },
+)</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じ要領で、<code class="bg-slate-100">frustration</code>（不満度の段階評価）と <code class="bg-slate-100">is_urgent</code>（緊急かどうかの真偽判定）も定義します。<code class="bg-slate-100">Score</code> の <code class="bg-slate-100">criteria</code> は選択肢の辞書ではなく、段階を表す<strong>配列</strong>になる点に注目してください。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">questions.py（Score／Noulの定義）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python"># 不満度を3段階のルーブリックで評価する
+frustration = Score(
+    instructions="顧客がどれくらい苛立っているか",
+    criteria=[
+        "落ち着いていて事実を述べているだけ",
+        "苛立っているが礼儀正しい",
+        "非常に怒っており、強い言葉を使っている",
+    ],
+)
+
+# 至急対応が必要かを0〜1の確率で判定する
+is_urgent = Noul(instructions="至急対応が必要な内容か（緊急性があるか）")</code></pre>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm"><code class="bg-emerald-100 text-emerald-900">instructions</code> は「何を判断してほしいか」、<code class="bg-emerald-100 text-emerald-900">criteria</code> は「判断の材料となる選択肢や段階」を表します。JSON を手書きするより、Pythonオブジェクトの方が引数名の打ち間違いにエディタが気づいてくれるという利点もあります。この役割分担は第10章でさらに深く扱います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 結果を取り出す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        3つの Question を辞書にまとめて <code class="bg-slate-100">client.system_one()</code> に渡すと、1回のリクエストでまとめて評価されます（第11章で扱う「並列評価」の入り口です）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.py（結果の取得）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">state_text = "お客様からの問い合わせ本文をここに入れる"
+
+# 3つのQuestionをまとめて送信する
+response = client.system_one(
+    state=state_text,
+    questions={
+        "department": department,
+        "frustration": frustration,
+        "is_urgent": is_urgent,
+    },
+)
+# 型付きの結果を取り出す
+print(response.answers["department"].choice)   # 例: "technical"
+print(response.answers["frustration"].score)   # 例: 1.42（criteria の段階0〜2上の確率加重値）
+print(response.answers["is_urgent"].noul)      # 例: 0.97</code></pre>
+                    </div>
+
+                    <!-- 警告カード: score は数値 -->
+                    <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-amber-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-amber-800 mb-1">注意: <code class="bg-amber-100 text-amber-900">.score</code> は段階のラベル文字列ではなく数値</p>
+                                <p class="text-amber-900 text-sm">第4章で見たとおり、<code class="bg-amber-100 text-amber-900">score</code> は各段階の確率を段階番号で重み付け平均した<strong>確率加重値（数値）</strong>です。上の例のように criteria を3段階で定義した場合、返るのは <code class="bg-amber-100 text-amber-900">1.42</code> のような 0〜2 の小数であり、<code class="bg-amber-100 text-amber-900">"苛立っているが礼儀正しい"</code> という<strong>criteria の文字列そのものは返りません</strong>。人が読むラベルを表示したい場合は、アプリ側で <code class="bg-amber-100 text-amber-900">legend</code> を参照して数値を表示用ラベルへ変換します。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">response.answers</code> は、<code class="bg-slate-100">questions</code> に渡したのと同じキー名を持つ辞書です。第1章で見たレスポンス JSON の <code class="bg-slate-100">answers</code> と対応しており、値の取り出し方は Primitive の種類によって決まります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Primitive</th>
+                                    <th class="px-4 py-3 text-left font-semibold">定義に使うクラス</th>
+                                    <th class="px-4 py-3 text-left font-semibold">結果を読む属性</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Choice</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">Choice(...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">.choice</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Score</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">Score(...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">.score</code>（数値）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Noul</td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">Noul(...)</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100">.noul</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">department</code> のような <code class="bg-slate-100">Choice</code> の結果と、<code class="bg-slate-100">frustration</code> のような <code class="bg-slate-100">Score</code> の結果には <code class="bg-slate-100">confidence</code> や <code class="bg-slate-100">probabilities</code> も付随し、<code class="bg-slate-100">response.answers["department"].confidence</code> のように読み出せます。<strong>Noul にはこれらのフィールドはありません</strong>（<code class="bg-slate-100">noul</code> の値自体が Yes である確率だからです）。これらの数値を使った設計は第9章で詳しく扱います。
+                    </p>
+
+                    <!-- ヒントカード: 型別アクセサ -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">補足: 型別のアクセサもある</p>
+                                <p class="text-blue-900 text-sm">公式ドキュメントには <code class="bg-blue-100 text-blue-900">response.choices["..."]</code>・<code class="bg-blue-100 text-blue-900">response.scores["..."]</code>・<code class="bg-blue-100 text-blue-900">response.nouls["..."]</code> という書き方も登場します。これは<strong>Primitive の種類ごとに絞り込んだ辞書</strong>で、どちらも公式の API です。本教材では、どの Primitive でも同じ書き方で読める <code class="bg-blue-100 text-blue-900">response.answers["..."]</code> に統一します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 CLI を作る
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの内容を1つの CLI スクリプト <code class="bg-slate-100">jev_triage.py</code> にまとめます。コマンドライン引数があればそれを問い合わせ文として使い、無ければ標準入力から読み込みます。処理の流れは次のとおりです。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["CLI起動"] --> B{"引数はあるか"}
+    B -->|あり| C["コマンドライン引数を問い合わせ文にする"]
+    B -->|なし| D["標準入力から問い合わせ文を読み込む"]
+    C --> E["TypeSafeClientを初期化"]
+    D --> E
+    E --> F["3つのQuestionをsystem_oneに送信"]
+    F --> G["department・frustration・is_urgentを表示"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        処理を3つの関数に分けて実装します。まずは問い合わせ文の受け取り部分です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jev_triage.py（1/3: 入力の取得）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">import sys
+from typesafe_sdk import TypeSafeClient, Choice, Score, Noul
+
+def read_inquiry_text() -> str:
+    # 引数があれば使い、無ければ標準入力から読む
+    if len(sys.argv) > 1:
+        return " ".join(sys.argv[1:])
+    print("問い合わせ文を入力してください:")
+    return input().strip()</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次に、3つの Question を定義して <code class="bg-slate-100">system_one</code> を呼び出す部分です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jev_triage.py（2/3: Jevへの問い合わせ）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def judge(text: str):
+    # 3つのQuestionをまとめて送信し、結果を返す
+    client = TypeSafeClient()
+    department = Choice(
+        instructions="この問い合わせはどの部署が対応すべきか",
+        criteria={"technical": "連携不具合", "billing": "支払いの問題", "sales": "料金の質問"},
+    )
+    frustration = Score(
+        instructions="顧客がどれくらい苛立っているか",
+        criteria=["落ち着いている", "やや苛立っている", "非常に怒っている"],
+    )
+    is_urgent = Noul(instructions="至急対応が必要な内容か")
+    questions = {"department": department, "frustration": frustration, "is_urgent": is_urgent}
+    return client.system_one(state=text, questions=questions)</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後に、結果を表示するエントリーポイントです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jev_triage.py（3/3: 結果表示）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">def main():
+    text = read_inquiry_text()
+    response = judge(text)
+    answers = response.answers
+    print(f"担当部署   : {answers['department'].choice}")
+    print(f"不満度     : {answers['frustration'].score:.2f}")  # 0〜2の数値
+    print(f"緊急度     : {answers['is_urgent'].noul:.2f}")
+
+if __name__ == "__main__":
+    main()</code></pre>
+                    </div>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-terminal text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-3 break-words">動作確認: CLIを実行してみる</h3>
+                                <p class="text-emerald-900 mb-4 break-words">引数に問い合わせ文を渡して実行すると、3つの判断がまとめて表示されます。</p>
+                                <div class="code-block-wrapper my-4">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">ターミナル</span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-bash">$ python jev_triage.py "3日前からStripe連携が失敗しており、至急対応してほしい"
+担当部署   : technical
+不満度     : 1.42
+緊急度     : 0.97</code></pre>
+                                </div>
+                                <p class="text-emerald-900 text-sm break-words">出力はすべて Python の値です（<code class="bg-emerald-100 text-emerald-900">choice</code> は文字列、<code class="bg-emerald-100 text-emerald-900">score</code> と <code class="bg-emerald-100 text-emerald-900">noul</code> は浮動小数点数）。<code class="bg-emerald-100 text-emerald-900">if response.answers["is_urgent"].noul &gt; 0.8:</code> や <code class="bg-emerald-100 text-emerald-900">if answers["frustration"].score &gt;= 1.5:</code> のように、そのままコードの条件分岐に使えます。「やや苛立っている」のような表示用ラベルが必要なら、<code class="bg-emerald-100 text-emerald-900">legend</code> を使ってアプリ側で変換します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 エラー処理と他言語SDK
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実運用では、API キーが誤っている・レート制限に達した・ネットワークが不安定といった理由でリクエストが失敗することがあります。SDK はこうした失敗を <code class="bg-slate-100">TypeSafeAPIError</code> という例外にまとめて通知します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jev_triage.py（エラー処理を追加）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-python">from typesafe_sdk import TypeSafeAPIError
+
+try:
+    response = client.system_one(state=text, questions=questions)
+except TypeSafeAPIError as error:
+    # statusにHTTPステータスコードが入る（401=認証エラー、429=レート制限など）
+    print(f"エラーが発生しました: status={error.status} request_id={error.request_id}")</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">error.status</code> には HTTP ステータスコードが入ります。一般的な HTTP API の慣例に従えば、401系は認証情報（API キー）の問題、429はレート制限（送りすぎ）を意味します。<code class="bg-slate-100">error.request_id</code> は、TypeSafe AI のサポートに問い合わせる際の手がかりになる識別子です。再試行そのものの考え方は、第6章で学んだ内容がそのまま活きます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        なお公式は、Python 以外に <strong>JavaScript / TypeScript 向けのクライアント SDK</strong>（<code class="bg-slate-100">npm install @typesafe-ai/sdk</code>）も提供しています。Node.js のサーバーや Next.js の API Route から Jev を呼び出したい場合も、Python と同じように <code class="bg-slate-100">Choice</code>・<code class="bg-slate-100">Score</code>・<code class="bg-slate-100">Noul</code> に相当する型付きの Question を定義できます。使用言語が Python でなくても、本章で学んだ「State と Question を渡し、型付きの <code class="bg-slate-100">answers</code> を受け取る」という設計の考え方はそのまま応用できます。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-1: CLIに自分の業務の判断を追加する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">本章で作った <code class="bg-purple-100 text-purple-900">jev_triage.py</code> を、自分の業務に合わせて拡張してみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">自分の業務やアプリの中にある「Jevに向く判断」を1つ選ぶ（第1章の「やってみよう1-1」で書き出したものでもよい）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">その判断に合う <code class="bg-purple-100 text-purple-900">Choice</code>・<code class="bg-purple-100 text-purple-900">Score</code>・<code class="bg-purple-100 text-purple-900">Noul</code> のいずれかを選び、Pythonオブジェクトとして定義する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-100 text-purple-900">judge()</code> 内の <code class="bg-purple-100 text-purple-900">questions</code> 辞書に追加し、<code class="bg-purple-100 text-purple-900">main()</code> に <code class="bg-purple-100 text-purple-900">response.answers[...]</code> から結果を表示する1行を追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">実際に実行し、意図した通りの結果が返ってくるか確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-sm font-medium text-purple-900 mb-1">進め方のヒント</p>
+                                <p class="text-sm text-purple-900 break-words"><code class="bg-purple-200 text-purple-900">Noul</code> は真偽（0〜1）、<code class="bg-purple-200 text-purple-900">Choice</code> は分類、<code class="bg-purple-200 text-purple-900">Score</code> は段階評価に向きます。判断の内容に応じて Primitive を選びましょう（第4章を復習）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. <code class="bg-blue-100 text-blue-900">pip install typesafe-sdk</code> を実行する前に確認すべき前提条件は何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>Python 3.10 以上</strong>がインストールされていることです。<code class="bg-blue-200 text-blue-900">python3 --version</code> で確認できます。プロジェクトごとに依存関係を分離するため、仮想環境（<code class="bg-blue-200 text-blue-900">venv</code>）の利用も推奨されます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100 text-blue-900">TypeSafeClient()</code> を初期化する際、APIキーはどこから読み込まれるのが推奨されますか。またその理由も答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            環境変数 <code class="bg-blue-200 text-blue-900">TYPESAFE_API_KEY</code> から読み込まれるのが推奨です。<code class="bg-blue-200 text-blue-900">api_key</code> 引数でソースコードに直書きすると、Gitへのコミットなどでキーが漏洩する危険があるためです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100 text-blue-900">Choice</code>・<code class="bg-blue-100 text-blue-900">Score</code>・<code class="bg-blue-100 text-blue-900">Noul</code> のPythonオブジェクトと、第6章で送ったJSONの <code class="bg-blue-100 text-blue-900">questions</code> は、内容としてどのような関係にありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>同じ内容</strong>です。JSONで手書きしていた <code class="bg-blue-200 text-blue-900">type</code>・<code class="bg-blue-200 text-blue-900">instructions</code>・<code class="bg-blue-200 text-blue-900">criteria</code> の組を、SDKが用意した3つのクラスへの引数として型付きに表現したものが <code class="bg-blue-200 text-blue-900">Choice</code>・<code class="bg-blue-200 text-blue-900">Score</code>・<code class="bg-blue-200 text-blue-900">Noul</code> オブジェクトです。SDK内部で同じ形のJSONへ変換されてHTTPリクエストが送られます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. <code class="bg-blue-100 text-blue-900">client.system_one(...)</code> の戻り値から、<code class="bg-blue-100 text-blue-900">is_urgent</code> の判定結果を取り出すコードを1行で書いてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200 text-blue-900">response.answers["is_urgent"].noul</code> です。キー名は <code class="bg-blue-200 text-blue-900">questions</code> 辞書で指定した名前と一致させる必要があります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jev-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: HTTP APIから利用する</span>
+                        </div>
+                    </a>
+                    <a href="jev-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: Atomic Question</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

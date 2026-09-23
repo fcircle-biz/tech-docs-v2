@@ -30,7 +30,7 @@
 - 共通スクリプト（`main.js`・`drawing-tool.js`）・`styles.css` の `<link>`
 - ダークモードボタン（`main.js` が動的生成）・スクロールトップボタン
 
-> 既存の断片例: `astro-system/src/chapters/development-processes/codex/codex-learning-material-01.html` を参照すると、断片の粒度・インデント・先頭（パンくず）から末尾（前後ナビ）までの構造が分かる。
+> 既存の断片例: `astro-system/src/chapters/ai/ai-coding/codex/codex-learning-material-01.html` を参照すると、断片の粒度・インデント・先頭（パンくず）から末尾（前後ナビ）までの構造が分かる。
 
 ## 2. README／カリキュラム分析
 

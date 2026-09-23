@@ -20,29 +20,34 @@ IT・ソフトウェア開発のトピックを扱う、体系化された学習
 
 ### ディレクトリ構成（現状）
 
-- `/astro-system/` - **Astro プロジェクト一式（コンテンツのソース）**。`astro.config.mjs`・`package.json`・`tsconfig.json`・`scripts/` と、`src/`（レイアウト `src/layouts/`、動的ルート `src/pages/`、技術別データ `src/data/guides/`、本文断片 `src/chapters/`）・`public/`（静的アセット）を含む。
-- `/docs/` - **Astro のビルド出力＝GitHub Pages 公開ディレクトリ**（`astro-system/` からのビルドで生成。直接編集しない）。`docs/guide/` に学習ガイドが出力される。**現状は `development-processes/` 配下の以下 2 件のみ**:
-  - `development-processes/claude-code/` - Claude Code 入門学習ガイド（全14章）
-  - `development-processes/codex/` - Codex 入門学習ガイド（全14章）
+- `/astro-system/` - **Astro プロジェクト一式（コンテンツのソース）**。`astro.config.mjs`・`package.json`・`tsconfig.json`・`scripts/` と、`src/`（レイアウト `src/layouts/`、動的ルート `src/pages/`、分類マスタ `src/data/categories.ts`、技術別データ `src/data/guides/`、本文断片 `src/chapters/`）・`public/`（静的アセット）を含む。
+- `/docs/` - **Astro のビルド出力＝GitHub Pages 公開ディレクトリ**（`astro-system/` からのビルドで生成。直接編集しない）。`docs/guide/<分類パス>/<slug>/` に学習ガイドが出力される。存在しないURLには `docs/404.html`（ソースは `src/pages/404.astro`）が表示され、数秒後にトップページへ自動で移動する。
 - `/astro-system/templates/v1/` - デザイン標準の真実源。`reference/`（カラー・Tailwind・Mermaid）と `snippets/`（カードコンポーネント）のみ。共通シェルの実体は Astro（`astro-system/src/layouts/`・`public/guide/_shared/`）に移行済み。
-- `/tech-knowledge-map.md` - 9分類体系（後述）の定義ドキュメント。
+- `/tech-knowledge-map.md` - 技術領域マップ。技術領域ごとの配置先（分類キー）の目安を示す（分類そのものの定義は分類マスタ）。
 - `/.claude/skills/` - コンテンツ自動生成・運用補助用の Claude スキル定義（スラッシュコマンドで呼び出し）。
 
 > **補足**: 旧 `tech_docs`（v1 リポジトリ）に存在した `tutorial/`、`practice/`、`assignment/`、`slide/`、`cheatsheet/`、`specs/`、`work_pdf/` 等のフォルダ、および対応する creator スキルは**本リポジトリには存在しない**。これらを前提にしないこと。
 
-### 9分類体系（tech-knowledge-map.md より）
+### 分類体系（分類マスタ）
 
-ガイドの配置に用いる分類体系。出力は `/docs/guide/[category]/...`、ソースは `astro-system/src/`（`src/data/guides/[category]/` ＋ `src/chapters/[category]/`）にカテゴリ別に配置する（現状は `development-processes` のみ使用）。
+ガイドの配置に用いる分類体系。**正典は `astro-system/src/data/categories.ts`（分類マスタ）**で、分類・サブグループのキー・表示名・アイコン・並び順をここだけで持つ。トップページのセクションとガイドのヘッダーに出る分類ラベルはマスタから導出される（データ定義に分類ラベルを手書きしない）。マスタに無い分類パスを使うとビルドエラーになる。出力は `/docs/guide/[分類パス]/...`、ソースは `astro-system/src/`（`src/data/guides/[分類パス]/` ＋ `src/chapters/[分類パス]/`）に配置する。分類パスは2階層まで。
 
 1. プログラミング言語 (`programming-languages/[ecosystem]/`)
 2. Web技術 (`web-technologies/`)
-3. 開発プロセス (`development-processes/`)
-4. 設計・モデリング (`design-modeling/`)
-5. クラウド・インフラ (`cloud-infrastructure/`)
-6. データ・AI (`data-ai-category/`)
-7. ビジネスSaaS (`business-saas/`)
-8. 資格 (`certification/`)
-9. 業務ドメイン知識 (`business-domain-knowledge/`)
+3. データベース (`database/`)
+4. データ分析・BI (`data-analytics/`)
+5. AI (`ai/generative-ai/`・`ai/ai-coding/`・`ai/ai-apps/`)
+6. 開発プロセス・ツール (`development-processes/`)
+7. 設計・モデリング (`design-modeling/`)
+8. クラウド・インフラ (`cloud-infrastructure/`)
+9. セキュリティ (`security/`)
+10. 業務アプリ・自動化 (`business-apps/`)
+11. 業務ドメイン知識 (`business-domain-knowledge/`)
+12. 資格 (`certification/`)
+
+- **振り分けの原則**: 「その教材で学習者が主に何をするか」（用途）で決める。SaaS か OSS かといった提供形態やベンダーでは決めない（例: Power BI も Superset も「データ分析・BI」）。判断基準と迷いやすい技術の判定例は `.claude/skills/docs-guide-creator/references/taxonomy-paths.md`、技術領域ごとの配置先は `tech-knowledge-map.md` を参照する。
+- **分類・サブグループを増やす場合**: 先に `categories.ts` へ追加する。
+- **ガイドを別の分類へ移す場合**: 旧URLは404になる（リダイレクトページは置かない。404ページからトップページへ自動で移動する）。ほかのガイドの本文・README に書かれた URL と、本文中の画像パス（`/tech-docs-v2/guide/[分類パス]/[slug]/images/...`）を新しいパスへ書き換える。
 
 ### ファイル命名規則
 
@@ -215,7 +220,7 @@ flowchart TD
 ゼブラ縞（`divide-y` の罫線で足りる）、単なる注目行（`font-bold` を優先）には使わない。規約の真実源は `astro-system/templates/v1/reference/css-styles.md`「13. テーブル > 行の色分けルール」。
 
 ### 使い方（学習ガイドの追加 — Astro フロー）
-1. `astro-system/src/data/guides/<分類>/<slug>.ts` に `TechGuide` を定義し（`primary`・`chapters[]`）、`src/data/guides/index.ts` に import 登録する
+1. `astro-system/src/data/guides/<分類>/<slug>.ts` に `TechGuide` を定義し（`category`（分類マスタに登録済みの分類パス）・`primary`・`chapters[]`）、`src/data/guides/index.ts` に import 登録する
 2. `astro-system/src/chapters/<分類>/<slug>/<slug>-learning-material-NN.html` に各章の**本文断片**を置く（共通シェルはレイアウトが供給。テンプレートのコピー・プレースホルダー置換は不要）
 3. （任意）`astro-system/public/guide/<分類>/<slug>/README.md` に概要を置く
 4. `astro-system/` で `npm run build` を実行し `docs/` へ出力する
@@ -234,4 +239,4 @@ flowchart TD
 
 形式: `https://fcircle-biz.github.io/tech-docs-v2/guide/[category-path]/[slug]/[filename].html`（base path は `/tech-docs-v2/`）
 
-例: `https://fcircle-biz.github.io/tech-docs-v2/guide/development-processes/claude-code/claude-code-learning-material-01.html`
+例: `https://fcircle-biz.github.io/tech-docs-v2/guide/ai/ai-coding/claude-code/claude-code-learning-material-01.html`

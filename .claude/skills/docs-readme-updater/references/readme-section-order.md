@@ -57,28 +57,23 @@
 
 ## 技術分野(サブカテゴリ `###`)の表示順序
 
-各セクション内の技術分野サブカテゴリは、リポジトリ直下の **`tech-knowledge-map.md` の分類順序に従う**。
+各セクション内の技術分野サブカテゴリは、**分類マスタ `astro-system/src/data/categories.ts` の順序と表示名に従う**(トップページの分類順と同じ)。
 
-- `tech-knowledge-map.md` を参照し、その表の分類順(プログラミング言語 → Webテクノロジ → … → 資格・認定試験 等)に沿って `###` 見出しを並べる。
-- 値(分類名一覧)を本ファイルに丸写ししない。必ず `tech-knowledge-map.md` を参照すること。
+- `categories.ts` の `categories` 配列の順に `###` 見出し(分類の表示名)を並べ、サブグループがある分類はその `subgroups` 配列の順に `####` 見出しを並べる。
+- 値(分類名一覧)を本ファイルに丸写ししない。必ず `categories.ts` を参照すること。
 - サブカテゴリ見出しは「エコシステム」を除いたシンプルな技術名にする(`references/naming-and-exclusion-rules.md` 参照)。
 - 実際に教材が存在する分野のみ `###` を作る(教材ゼロの分野見出しは作らない)。
 
 ### 補足: フォルダ命名と表示名の対応(代表例の抜粋)
 
-`docs/.../<ecosystem>/` のフォルダ名と、README に出す `###` 表示名の対応は以下のように「エコシステム」相当を外す。正式な分類名・順序は `tech-knowledge-map.md` を真実源とする。
+`docs/guide/<分類>/<サブグループ>/` のフォルダ名と、README に出す見出しの対応は以下のとおり。`###` は分類の表示名、`####` はサブグループの表示名(「エコシステム」相当は外す)。正式な表示名・順序は `categories.ts` を真実源とする。
 
-| フォルダ(ディスク上) | README 表示名(例) |
+| フォルダ(ディスク上) | README 見出し(例) |
 |------------------------|---------------------|
-| `programming-languages/python-ecosystem/` | プログラミング言語 > Python |
-| `programming-languages/java-ecosystem/` | プログラミング言語 > Java |
-| `programming-languages/javascript-ecosystem/` | プログラミング言語 > JavaScript/Node.js |
-| `web-technologies/` | Webテクノロジ |
-| `development-processes/` | 開発手法・プロセス |
-| `design-modeling/` | 設計手法・モデリング |
-| `cloud-infrastructure/` | クラウド/インフラ |
-| `data-ai-category/` | データ/AI |
-| `business-saas/` | SaaS/PaaS/アプリケーション |
-| `certification/` | 資格・認定試験 |
+| `programming-languages/java-ecosystem/` | `### プログラミング言語` > `#### Java` |
+| `programming-languages/javascript-ecosystem/` | `### プログラミング言語` > `#### JavaScript/Node.js` |
+| `web-technologies/` | `### Web技術` |
+| `database/` | `### データベース` |
+| `ai/ai-coding/` | `### AI` > `#### AIコーディング` |
 
-> 上表は代表値の抜粋(参照の便宜)。網羅的な分類名・順序は `tech-knowledge-map.md` を参照すること。
+> 上表は見出しの付け方の例。分類・サブグループの一覧と順序は `categories.ts` を参照すること。

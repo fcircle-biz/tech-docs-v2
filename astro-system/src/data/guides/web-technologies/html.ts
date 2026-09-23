@@ -8,7 +8,6 @@ export const html: TechGuide = {
   icon: 'fa-html5',
   iconStyle: 'fab',
   level: '初級',
-  categoryLabel: 'Web技術',
   totalTime: '約7時間20分',
   splashStop0: '#f97316',
   splashStop1: '#06b6d4',

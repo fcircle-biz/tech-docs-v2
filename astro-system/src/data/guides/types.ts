@@ -11,7 +11,10 @@ export interface Chapter {
 }
 
 export interface TechGuide {
-  /** 分類フォルダ名（例: "development-processes"）。tech-knowledge-map.md の9分類に対応 */
+  /**
+   * 分類パス（例: "database"、"ai/ai-coding"）。src/data/categories.ts に登録済みのキーだけを使う。
+   * ヘッダー等の分類ラベルはここから導出する（categoryLabelOf）。
+   */
   category: string;
   /** 技術フォルダ名／識別子（例: "claude-code"） */
   slug: string;
@@ -27,8 +30,6 @@ export interface TechGuide {
   iconStyle?: string;
   /** 難易度バッジ */
   level: string;
-  /** 分類ラベル（ヘッダー表示用、例: "開発手法・プロセス"） */
-  categoryLabel: string;
   /** 所要時間ラベル */
   totalTime: string;
   /** スプラッシュ SVG グラデーションの開始色（技術色） */

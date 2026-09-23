@@ -8,7 +8,6 @@ export const jsp: TechGuide = {
   techTitle: 'JSP/Servlet学習教材',
   icon: 'fa-globe',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約11時間',
   splashStop0: '#f97316',
   splashStop1: '#06b6d4',

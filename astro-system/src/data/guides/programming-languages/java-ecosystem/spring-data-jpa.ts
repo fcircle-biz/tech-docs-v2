@@ -9,7 +9,6 @@ export const springDataJpa: TechGuide = {
   techTitle: 'Spring Data JPA学習教材',
   icon: 'fa-leaf',
   level: '初級',
-  categoryLabel: 'プログラミング言語',
   totalTime: '約11時間',
   splashStop0: '#10b981',
   splashStop1: '#06b6d4',
