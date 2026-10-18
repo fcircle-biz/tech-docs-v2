@@ -1,0 +1,817 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JMeter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第12章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第12章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">CLIモードで負荷テストを実行する</h1>
+                    <p class="text-slate-600">ここまでは GUI でテスト計画を作り、少人数で動作を確かめてきました。この章では、いよいよ本番の負荷をかけるための <strong>CLI（非 GUI）モード</strong>を学びます。コマンド1つでテストを実行し、結果ファイル（JTL）と HTML レポートを出力するまでの流れと、実行前に確認すべきことを身につけましょう。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>負荷テストを GUI ではなく CLI モードで実行する理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>主要なコマンドラインオプション（-n -t -l -e -o -f -J -q -j）を使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>実行中のコンソール出力（summary +／summary =）と JTL ファイルを読める</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>-J でプロパティを渡し、同じ .jmx を条件を変えて実行できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>実行前チェックリストに沿って、測定を歪める原因を取り除ける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション12.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.1 なぜ CLI モードなのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JMeter の GUI は、テスト計画を<strong>作る・デバッグする</strong>ための道具です。GUI を表示したまま負荷をかけると、画面の描画やリスナー（View Results Tree など）が JMeter 自身のメモリと CPU を消費します。すると、本来測りたい「サーバーの性能」ではなく「JMeter 側が苦しそうな様子」が結果に混ざってしまい、<strong>測定値が歪みます</strong>。最悪の場合、JMeter がメモリ不足で止まります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで本番の負荷実行には、画面を持たない <strong>CLI モード（非 GUI モード）</strong>を使います。結果はファイルに書き出し、集計は終了後（または実行中のコンソール出力）で行います。JMeter を起動したときに「Don't use GUI mode for load testing !」と表示されたのは、まさにこのためでした。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["GUI<br/>テスト計画の作成・デバッグ"] --> B["ch12-load.jmx<br/>を保存"]
+    B --> C["CLI モードで実行<br/>jmeter -n -t ..."]
+    C --> D["結果ファイル<br/>result.jtl"]
+    C --> E["HTMLレポート<br/>report フォルダ"]
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-object-group text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">GUI モードの出番</h3>
+                            <p class="text-sm text-slate-600">テスト計画の作成、1〜数ユーザーでの動作確認、View Results Tree でのデバッグ。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-terminal text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">CLI モードの出番</h3>
+                            <p class="text-sm text-slate-600">本番の負荷実行、長時間の耐久テスト、CI やスクリプトからの自動実行。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.2 基本コマンドとオプション
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CLI モードの基本形は次のとおりです。ターミナル（Windows は PowerShell）を開き、.jmx のあるフォルダ（<code>jmeter-practice</code>）に移動して実行します。以下のコマンド例はフルパスで書いていますが、第2章では JMeter の <code>bin</code> を PATH に追加していないので、毎回フルパスを打つのが面倒なら、次のように PATH を通しておくと <code>jmeter</code> だけで実行できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">PATH の追加（Windows PowerShell）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># このウィンドウだけ JMeter の bin を PATH に追加する
+$env:Path = "C:\tools\apache-jmeter-5.6.3\bin;$env:Path"</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">PATH の追加（macOS / Linux）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># このターミナルだけ JMeter の bin を PATH に追加する
+export PATH="$HOME/tools/apache-jmeter-5.6.3/bin:$PATH"</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        上の設定は、そのウィンドウ（ターミナル）を閉じるまでしか有効ではありません。macOS/Linux で恒久的にしたいときは、同じ <code>export</code> 行を <code>~/.zshrc</code> などに追記します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Windows（PowerShell）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># jmeter-practice フォルダへ移動する
+cd C:\Users\あなた\Documents\jmeter-practice
+
+# CLI モードで実行し、結果(JTL)とHTMLレポートを出力する
+C:\tools\apache-jmeter-5.6.3\bin\jmeter.bat -n -t ch12-load.jmx -l result.jtl -e -o report</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">macOS / Linux</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># jmeter-practice フォルダへ移動する
+cd ~/Documents/jmeter-practice
+
+# CLI モードで実行し、結果(JTL)とHTMLレポートを出力する
+~/tools/apache-jmeter-5.6.3/bin/jmeter -n -t ch12-load.jmx -l result.jtl -e -o report</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        使うオプションを一覧にまとめます。以降、macOS/Linux の <code>jmeter</code> と Windows の <code>jmeter.bat</code> は同じ意味なので、本文では <code>jmeter</code> と書きます。PATH を通したターミナルで、<code>jmeter-practice</code> フォルダに移動して実行します。PATH を通さない場合は、<code>~/tools/apache-jmeter-5.6.3/bin/jmeter</code>（Windows は <code>C:\tools\apache-jmeter-5.6.3\bin\jmeter.bat</code>）のようにフルパスで書きます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">オプション</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">補足</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-n</code></td>
+                                    <td class="px-4 py-3 text-slate-600">非 GUI（CLI）モードで実行する</td>
+                                    <td class="px-4 py-3 text-slate-600">non-GUI の n。これが無いと GUI が起動する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-t ファイル</code></td>
+                                    <td class="px-4 py-3 text-slate-600">実行するテスト計画（.jmx）を指定する</td>
+                                    <td class="px-4 py-3 text-slate-600">相対パスは実行したフォルダが基準</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-l ファイル</code></td>
+                                    <td class="px-4 py-3 text-slate-600">結果（サンプル）を書き出すファイル（JTL）</td>
+                                    <td class="px-4 py-3 text-slate-600">既存ファイルがあると<strong>追記</strong>される（<code>-e</code> を付けた場合は、空でない JTL があるとエラーで止まる）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-e</code></td>
+                                    <td class="px-4 py-3 text-slate-600">テスト終了後に HTML レポートを生成する</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>-l</code> と <code>-o</code> が必要</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-o フォルダ</code></td>
+                                    <td class="px-4 py-3 text-slate-600">HTML レポートの出力先フォルダ</td>
+                                    <td class="px-4 py-3 text-slate-600">存在しないか、<strong>空</strong>でなければならない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-f</code></td>
+                                    <td class="px-4 py-3 text-slate-600">既存の結果ファイルとレポートフォルダを削除して上書きする</td>
+                                    <td class="px-4 py-3 text-slate-600">再実行のたびに付けておくと安全</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-Jname=値</code></td>
+                                    <td class="px-4 py-3 text-slate-600">JMeter プロパティを渡す</td>
+                                    <td class="px-4 py-3 text-slate-600">.jmx の <code>${__P(name,既定値)}</code> で受け取る（12.4）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-q ファイル</code></td>
+                                    <td class="px-4 py-3 text-slate-600">プロパティをまとめた追加ファイルを読み込む</td>
+                                    <td class="px-4 py-3 text-slate-600">条件が多いとき、-J を並べる代わりに使う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>-j ファイル</code></td>
+                                    <td class="px-4 py-3 text-slate-600">JMeter の実行ログ（jmeter.log）の出力先</td>
+                                    <td class="px-4 py-3 text-slate-600">実行ごとにログを分けたいときに指定する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: -o のフォルダが空でないとエラーになる</p>
+                                <p class="text-red-900 text-sm">2回目に同じコマンドを実行すると、<code>report</code> フォルダが既に存在するためエラーで止まります。<code>result.jtl</code> が残っている場合も「Results file … is not empty」で止まります。<code>-e</code> を付けずに実行した場合は JTL に追記され、後で <code>-g</code> でレポートを作ると前回分が混ざります。<code>-f</code> を付けると、開始前に既存の結果ファイルとレポートフォルダを削除します。再実行するときは <strong><code>-f</code> を付ける</strong>か、実行ごとに <code>result-20.jtl</code>・<code>report-20</code> のように名前を変えましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.3 実行中の出力を読む
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CLI モードで実行すると、コンソールに集計行が一定間隔（既定は30秒ごと）で流れます。画面が無くても、これで負荷のかかり具合をリアルタイムに確認できます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">コンソール出力の例（数値は一例）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">Creating summariser &lt;summary&gt;
+Starting standalone test @ 2026-10-18 10:00:00 JST
+summary +    210 in 00:00:30 =    7.0/s Avg:   310 Min:     8 Max:  1080 Err:     0 (0.00%) Active: 10 Started: 10 Finished: 0
+summary +    232 in 00:00:30 =    7.7/s Avg:   295 Min:     7 Max:  1102 Err:     2 (0.86%) Active: 10 Started: 10 Finished: 0
+summary =    442 in 00:01:00 =    7.4/s Avg:   302 Min:     7 Max:  1102 Err:     2 (0.45%)
+Tidying up ...    @ 2026-10-18 10:01:00 JST
+... end of run</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">部分</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>summary +</code></td>
+                                    <td class="px-4 py-3 text-slate-600">前回の出力から<strong>今回までの期間だけ</strong>の集計（差分）。いま何が起きているかを見る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>summary =</code></td>
+                                    <td class="px-4 py-3 text-slate-600">テスト開始から<strong>今回までの累計</strong>の集計。全体の傾向を見る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>210 in 00:00:30 = 7.0/s</code></td>
+                                    <td class="px-4 py-3 text-slate-600">その期間のサンプル件数・経過時間・スループット（件/秒）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>Avg / Min / Max</code></td>
+                                    <td class="px-4 py-3 text-slate-600">応答時間の平均・最小・最大（ミリ秒）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>Err: 2 (0.86%)</code></td>
+                                    <td class="px-4 py-3 text-slate-600">失敗したサンプルの件数とエラー率</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>Active / Started / Finished</code></td>
+                                    <td class="px-4 py-3 text-slate-600">稼働中のスレッド数・起動済みの数・終了した数（<code>summary +</code> 行のみ）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        見るときのコツは、<code>summary +</code> の行で<strong>Avg が上がり続けていないか</strong>、<strong>Err が突然増えていないか</strong>を確認することです。累計の <code>summary =</code> は平均化されるので、途中の悪化に気づきにくくなります。なお、出力間隔は <code>user.properties</code> の <code>summariser.interval</code>（秒）で変更できます。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 実行を途中で止めるには</p>
+                                <p class="text-blue-900 text-sm">途中で止めるときは、別のターミナルで <code>&lt;JMETER_HOME&gt;/bin</code> の <code>shutdown.sh</code>（Windows は <code>shutdown.cmd</code>）を実行すると、実行中のサンプルを終えてから正常に停止し、<code>-e</code> のレポートも作られます（<code>stoptest.sh</code> / <code>stoptest.cmd</code> は即時停止）。<code>Ctrl+C</code> は強制終了なので、レポートが作られないことがあります。その場合は、第13章で学ぶ <code>-g</code> オプションで、残った JTL ファイルからレポートを作り直せます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.4 プロパティで負荷を切り替える
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第8章で学んだ <code>${__P(名前,既定値)}</code> を使うと、.jmx を書き換えずに、コマンドから負荷の条件を渡せます。ユーザー数や実行時間を変えるたびに GUI を開いて保存し直す必要がなくなり、操作ミスも防げます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Thread Group の項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Number of Threads (users)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>${__P(users,5)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">-Jusers で指定。未指定なら5人</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Ramp-up period (seconds)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>${__P(rampup,10)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">-Jrampup で指定。未指定なら10秒</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Loop Count</td>
+                                    <td class="px-4 py-3 text-slate-600">Infinite にチェック</td>
+                                    <td class="px-4 py-3 text-slate-600">Duration（時間）で止める方式にするため</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Specify Thread lifetime → Duration (seconds)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>${__P(duration,60)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">-Jduration で指定。未指定なら60秒</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このように設定した .jmx を、条件違いで実行する例です。<code>-f</code> を付けているので、再実行しても結果フォルダの衝突が起きません。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Windows（PowerShell）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 既定値のまま(5人・60秒)で実行する
+jmeter.bat -n -t ch12-load.jmx -l result.jtl -e -o report -f
+
+# 20人・120秒に変えて実行する(-J で上書き)
+jmeter.bat -n -t ch12-load.jmx -l result.jtl -e -o report -f -Jusers=20 -Jduration=120</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">macOS / Linux</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 既定値のまま(5人・60秒)で実行する
+jmeter -n -t ch12-load.jmx -l result.jtl -e -o report -f
+
+# 20人・120秒に変えて実行する(-J で上書き)
+jmeter -n -t ch12-load.jmx -l result.jtl -e -o report -f -Jusers=20 -Jduration=120</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        条件が増えてきたら、プロパティをファイルにまとめて <code>-q</code> で読み込む方法もあります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">load20.properties</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-ini"># 20人で2分間の条件をファイルにまとめる
+users=20
+rampup=20
+duration=120
+
+# 実行例: jmeter -n -t ch12-load.jmx -q load20.properties -l result.jtl -f</code></pre>
+                    </div>
+                </section>
+
+                <!-- セクション12.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.5 実行前のチェックリスト
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GUI で作った .jmx には、デバッグ用の部品や小さな試験値が残っていることがよくあります。それらを残したまま負荷をかけると、測定が歪んだり、JMeter が止まったりします。実行前に次の項目を確認する習慣をつけましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">確認項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">理由</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">View Results Tree などの重いリスナーを無効化（または削除）した</td>
+                                    <td class="px-4 py-3 text-slate-600">全サンプルの応答本文をメモリに保持するため、負荷中は JMeter のメモリを食いつぶす</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Debug Sampler を無効化した</td>
+                                    <td class="px-4 py-3 text-slate-600">変数の中身を毎回出力するだけのデバッグ用。余計なサンプルとして集計に混ざる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">スレッド数・ループ・Duration がデバッグ用の小さな値のままでない</td>
+                                    <td class="px-4 py-3 text-slate-600">1ユーザーで試した設定のまま本番を実行してしまう事故が多い。<code>${__P()}</code> の既定値も確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">接続先（HTTP Request Defaults）が意図したサーバーになっている</td>
+                                    <td class="px-4 py-3 text-slate-600">本番や他人のサーバーに誤って負荷をかけない（12.7 の警告参照）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">CSV などの外部ファイルが、.jmx から見た相対パスの場所にある</td>
+                                    <td class="px-4 py-3 text-slate-600">相対パスは .jmx の場所が基準。見つからないと全サンプルが失敗する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">ヒープサイズ（メモリ）が足りている</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー数や実行時間が増えると、既定では不足することがある（下記）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JMeter 5.6.3 のヒープサイズ（Java が使えるメモリ）の既定は<strong>1GB</strong>です。変更したいときは、環境変数 <code>HEAP</code> に Java のメモリオプションを入れてから起動します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Windows（PowerShell）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># このターミナルだけヒープを 2GB にする(-Xms 初期値, -Xmx 最大値)
+$env:HEAP="-Xms2g -Xmx2g"
+jmeter.bat -n -t ch12-load.jmx -l result.jtl -e -o report -f</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">macOS / Linux</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># この1回の実行だけヒープを 2GB にする(-Xms 初期値, -Xmx 最大値)
+HEAP="-Xms2g -Xmx2g" jmeter -n -t ch12-load.jmx -l result.jtl -e -o report -f</code></pre>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">リスナーを無効にしても、CLI では <code>-l</code> で指定した JTL ファイルに全サンプルが記録されます。結果の集計は JTL と HTML レポートで行えるので、<strong>負荷中に GUI のリスナーで眺める必要はありません</strong>。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.6 JTL ファイルとは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>-l</code> で指定した <code>result.jtl</code> は、サンプル1件を1行として記録した<strong>CSV 形式の結果ファイル</strong>です。HTML レポートはこのファイルを集計して作られるため、JTL は「生データ」にあたります。テキストエディタや表計算ソフトで開いて、1件ずつ確認することもできます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">result.jtl（先頭の2行を抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1792285200123,312,GET /get,200,OK,Thread Group 1-3,text,true,,612,134,10,10,http://localhost:8080/get?item=7,309,0,2</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">列名</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>timeStamp</code></td>
+                                    <td class="px-4 py-3 text-slate-600">サンプル開始時刻（1970年1月1日からのミリ秒）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>elapsed</code></td>
+                                    <td class="px-4 py-3 text-slate-600">応答時間（ミリ秒）。レポートの Average などの元になる値</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>label</code></td>
+                                    <td class="px-4 py-3 text-slate-600">サンプラー名（または Transaction Controller 名）。集計の単位になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>responseCode</code> / <code>responseMessage</code></td>
+                                    <td class="px-4 py-3 text-slate-600">HTTP ステータスコードとメッセージ（例: 200 / OK）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>threadName</code></td>
+                                    <td class="px-4 py-3 text-slate-600">実行したスレッド（仮想ユーザー）の名前</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>dataType</code></td>
+                                    <td class="px-4 py-3 text-slate-600">応答の種類（text など）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>success</code></td>
+                                    <td class="px-4 py-3 text-slate-600">成功なら <code>true</code>、失敗（アサーション失敗を含む）なら <code>false</code>。Error % の元</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>failureMessage</code></td>
+                                    <td class="px-4 py-3 text-slate-600">失敗したときの理由（アサーションのメッセージなど）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>bytes</code> / <code>sentBytes</code></td>
+                                    <td class="px-4 py-3 text-slate-600">受信・送信したバイト数</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>grpThreads</code> / <code>allThreads</code></td>
+                                    <td class="px-4 py-3 text-slate-600">その時点で稼働していた、当該グループ／全体のスレッド数</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>URL</code></td>
+                                    <td class="px-4 py-3 text-slate-600">リクエスト先の URL</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>Latency</code></td>
+                                    <td class="px-4 py-3 text-slate-600">リクエスト送信から応答の最初のバイトを受け取るまでの時間（ミリ秒）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>IdleTime</code></td>
+                                    <td class="px-4 py-3 text-slate-600">サンプリング以外に費やした時間（ミリ秒）。通常は0で、Transaction Controller でタイマー等の時間を除いたときにその分が入る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold"><code>Connect</code></td>
+                                    <td class="px-4 py-3 text-slate-600">サーバーとの接続確立にかかった時間（ミリ秒）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>elapsed</code> が Latency 以上になるのは、「応答の最初のバイトが届いてから、最後まで受け取り終わるまで」の時間も含むからです（第4章で学んだ Load time と Latency の関係と同じです）。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: JTL は大きくなる</p>
+                                <p class="text-red-900 text-sm">1サンプルにつき1行が書かれるため、長時間の耐久テストでは JTL が数百MB〜数GBになることがあります。ディスクの空き容量を確認してから実行しましょう。また、JTL にはリクエスト先の URL などが含まれるので、共有するときは内容に注意してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション12.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        12.7 負荷をかける側の監視と、大規模テストへの道
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        負荷をかける JMeter 自身も、ふつうの Java プログラムです。ユーザー数が増えると JMeter が動いている PC の CPU やメモリ、ネットワーク帯域を使い切り、<strong>「サーバーが遅い」のではなく「JMeter が遅い」状態</strong>になることがあります。そうなると測定値は信用できません。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["負荷を増やしていく"] --> B{"JMeter側のCPU・メモリは<br/>余裕があるか"}
+    B -->|"余裕あり"| C["測定値は信頼できる"]
+    B -->|"限界に近い"| D["測定値が歪む<br/>（実際より遅く見える）"]
+    D --> E["対策: ヒープ拡大、リスナー削減、<br/>負荷をかけるマシンを増やす"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実行中は、タスクマネージャー（Windows）やアクティビティモニタ（macOS）、<code>top</code> コマンド（Linux）で、JMeter のプロセスが CPU やメモリをどれだけ使っているかを確認しましょう。CPU が常に90%を超えている、ヒープがほぼ満杯でメモリ不足のエラー（<code>OutOfMemoryError</code>）が出る、といった場合は要注意です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        1台の PC でさばき切れないほど大きな負荷が必要なときは、複数台の PC で JMeter を動かして負荷を分担する<strong>分散テスト（リモート実行）</strong>という仕組みがあります。本ガイドの学習範囲では 1 台で十分なので、詳細は扱いません。「大規模になればそういう手段がある」と覚えておけば十分です。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">警告: 実行する前に「実行先 URL」を最終確認する</p>
+                                <p class="text-red-900 text-sm">CLI モードは、Enter キーを押した瞬間から画面確認なしで負荷が始まります。<strong>他人・他社のサーバーに許可なく負荷をかけることは DoS 攻撃と同じ行為</strong>で、法的責任を問われる可能性があります。本ガイドの実習はすべて <code>localhost:8080</code> の go-httpbin に対して行います。実行前に HTTP Request Defaults の Server Name or IP が <code>localhost</code> であることを必ず確認してください。実務では、対象システムの管理者から実施日時と負荷の大きさについて許可を得てから実行します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう 12-1 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-1: CLI で 10 ユーザー・60 秒の負荷テストを実行する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">第10章で作った <code>ch10-scenario.jmx</code> をもとに、CLI 実行用の <code>ch12-load.jmx</code> を作り、レポートまで出力します。go-httpbin が起動していること（<code>docker start httpbin</code>）を先に確認してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">GUI で <code>ch10-scenario.jmx</code> を開き、<strong>File → Save Test Plan as</strong> で <code>ch12-load.jmx</code> として保存する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group を 12.4 の表のとおりに設定する（Threads は <code>${__P(users,5)}</code>、Ramp-up は <code>${__P(rampup,10)}</code>、Loop Count は Infinite、Specify Thread lifetime の Duration は <code>${__P(duration,60)}</code>）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">12.5 のチェックリストに従い、View Results Tree と Debug Sampler を無効化（Ctrl+T）して保存し、GUI を閉じる。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">ターミナルで <code>jmeter-practice</code> に移動し、<code>jmeter -n -t ch12-load.jmx -l result.jtl -e -o report -f -Jusers=10 -Jrampup=10 -Jduration=60</code> を実行する（Windows は <code>jmeter.bat</code>）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words"><code>summary +</code> と <code>summary =</code> の行を観察し、終了後に <code>report/index.html</code> をブラウザで開く。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>確認ポイント:</strong> コンソールの最後に <code>... end of run</code> が出ること。<code>result.jtl</code> に1行目の列名（timeStamp, elapsed, label…）と各サンプルの行があること。<code>report</code> フォルダに <code>index.html</code> ができていること。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう 12-2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 12-2: -J でユーザー数を変えて再実行する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">.jmx を一切変更せず、ユーザー数だけを 20 人に変えて実行し、結果の違いを見てみましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">12-1 のコマンドの <code>-Jusers=10</code> を <code>-Jusers=20</code> に変え、<strong><code>-f</code> を付けたまま</strong>再実行する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">コンソールの <code>Active:</code> が最大 20 になること、<code>summary =</code> のスループットと Avg が 10 人のときからどう変わったかを書き留める。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">試しに <code>-f</code> を外して同じコマンドをもう一度実行し、どんなエラーになるか確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>ヒント:</strong> 練習環境では JMeter と go-httpbin が同じ PC で動いているため、数値は学習用の目安です。本番の性能値ではありません。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 本番の負荷テストを GUI ではなく CLI モードで実行するのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            GUI の描画やリスナーが JMeter 自身の CPU・メモリを消費し、測定値を歪めたり、メモリ不足で止まったりするからです。CLI モードなら画面を持たないため、JMeter の負担が小さく、結果は JTL ファイルと HTML レポートに残せます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 同じ <code>-o report</code> を指定して2回目を実行したらエラーになりました。原因と対策は？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code>-o</code> のフォルダは、存在しないか空でなければならないためです。<code>result.jtl</code> が残っている場合も、<code>-e</code> 付きだと開始前に「Results file … is not empty」で止まります。<code>-f</code> を付けて既存の結果ファイルとレポートフォルダを削除して上書きするか、実行ごとにファイル名・フォルダ名を変えます。なお <code>-e</code> を付けない実行では JTL に追記されるため、後で <code>-g</code> でレポートを作ると前回の結果が混ざる点にも注意が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. コンソールの <code>summary +</code> と <code>summary =</code> の違いは何ですか？ また、<code>-Jusers=20</code> を有効にするには .jmx 側で何を書いておく必要がありますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code>summary +</code> は前回の出力以降の期間だけの集計、<code>summary =</code> はテスト開始からの累計です。<code>-Jusers=20</code> は、Thread Group の Number of Threads に <code>${__P(users,5)}</code> のようにプロパティ関数を書いておくことで受け取れます。書いていなければ -J で渡しても反映されません。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jmeter-learning-material-11.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第11章: Test Script Recorderで操作を記録する</span>
+                        </div>
+                    </a>
+                    <a href="jmeter-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第13章: HTMLレポートで結果を分析する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

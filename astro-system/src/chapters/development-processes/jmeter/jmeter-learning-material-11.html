@@ -1,0 +1,672 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JMeter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第11章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第11章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間20分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">Test Script Recorderで操作を記録する</h1>
+                    <p class="text-slate-600">HTTP リクエストを1つずつ手で作るのは、画面数が多いシステムでは大変です。JMeter には、ブラウザや curl の操作を「中継」しながら HTTP Request として自動で書き出す HTTP(S) Test Script Recorder があります。この章では記録の仕組みと手順を学び、さらに「記録したままでは使えない」理由と、記録後の整理の進め方を身につけます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>プロキシ（中継役）として通信を記録する仕組みを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Recording テンプレートで記録の準備をし、curl で操作を記録できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ブラウザ（Firefox）を使った記録の設定と、localhost 特有の注意点を理解する</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTPS 記録に証明書が必要な理由を理解し、記録後のスクリプトを整理できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション11.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.1 レコーディングの仕組み
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>プロキシ</strong>とは、通信の「中継役」です。ふつう、ブラウザはサーバーへ直接リクエストを送りますが、プロキシを設定すると、いったんプロキシにリクエストを渡し、プロキシがサーバーへ転送して応答をブラウザへ返します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JMeter の <strong>HTTP(S) Test Script Recorder（HTTP(S) テストスクリプトレコーダー）</strong>は、この中継役を JMeter 自身が務める機能です。通信が通り抜けるときに、その内容（URL・メソッド・パラメーター・ヘッダーなど）を読み取って、<strong>HTTP Request としてテスト計画に自動で書き出します</strong>。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    B["ブラウザ または curl"] -->|"1. リクエスト"| P["JMeter プロキシ<br/>ポート 8888"]
+    P -->|"2. 転送"| S["go-httpbin<br/>localhost:8080"]
+    S -->|"3. 応答"| P
+    P -->|"4. 応答を返す"| B
+    P -.->|"記録"| T["テスト計画に<br/>HTTP Request を追加"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        記録で得られるのは、第4章で手作りしたものと同じ HTTP Request サンプラーです。つまり記録は「リクエストを作る作業を省力化する」仕組みであり、<strong>記録しただけで完成するわけではありません</strong>（11.6 で詳しく扱います）。
+                    </p>
+                </section>
+
+                <!-- セクション11.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.2 Recording テンプレートで準備する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        記録に必要な要素を1つずつ配置するのは手間なので、JMeter のテンプレート機能を使います。メニューの <strong>File → Templates...</strong> を開き、プルダウンから <strong>Recording</strong> を選んで <strong>Create</strong> を押すと、記録用のテスト計画が一式作られます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        作られるツリーは、おおむね次のとおりです（バージョンにより細部は異なります）。
+                    </p>
+
+                    <div class="bg-slate-100 rounded-lg p-4 my-6">
+                        <pre class="text-sm text-slate-700 overflow-x-auto">Test Plan
+├─ User Defined Variables
+├─ HTTP Request Defaults        ← 接続先の共通設定
+├─ HTTP Cookie Manager          ← Cookie の自動管理
+├─ Thread Group
+│   └─ Recording Controller     ← 記録結果の入れ物
+└─ HTTP(S) Test Script Recorder ← 今回の主役
+    └─ View Results Tree        ← 記録内容の確認用</pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次に、<strong>HTTP(S) Test Script Recorder</strong> を選び、設定を確認します。本ガイドで使う主な項目は次のとおりです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">Port</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>8888</code>（既定）</td>
+                                    <td class="px-4 py-3 text-slate-600">プロキシが待ち受けるポート番号。ブラウザや curl にはこの番号を指定する。他のソフトと重なる場合は変更する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">Target Controller</td>
+                                    <td class="px-4 py-3 text-slate-600">Test Plan &gt; Thread Group &gt; Recording Controller</td>
+                                    <td class="px-4 py-3 text-slate-600">記録したリクエストの追加先。テンプレートでは Recording Controller が選ばれている</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Grouping</td>
+                                    <td class="px-4 py-3 text-slate-600">Do not group samplers</td>
+                                    <td class="px-4 py-3 text-slate-600">記録をまとめる方法。操作の区切りごとにグループ化する選択肢もある</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">URL Patterns to Exclude</td>
+                                    <td class="px-4 py-3 text-slate-600">画像・CSS・JavaScript などの拡張子（正規表現）</td>
+                                    <td class="px-4 py-3 text-slate-600">記録しない URL の指定。テンプレートには静的ファイルを除外する既定パターンが入っている</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Start / Stop / Restart</td>
+                                    <td class="px-4 py-3 text-slate-600">ボタン</td>
+                                    <td class="px-4 py-3 text-slate-600">プロキシの開始・停止。<strong>Start を押すまで何も記録されない</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        画像・CSS・JavaScript を除外するのは、負荷の本質的な対象が API やページ本体であることが多く、静的ファイルのリクエストが大量に混ざると整理が大変になるからです（静的ファイルも測りたい場合は除外しません）。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つ、テンプレートの <strong>HTTP Request Defaults</strong> を、本ガイドの共通設定に合わせます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Protocol</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>http</code></td>
+                                    <td class="px-4 py-3 text-slate-600">練習用サーバーは HTTP</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Server Name or IP</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>localhost</code></td>
+                                    <td class="px-4 py-3 text-slate-600">テンプレートの初期値（example.com など）から書き換える</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Port Number</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>8080</code></td>
+                                    <td class="px-4 py-3 text-slate-600">go-httpbin のポート。<strong>レコーダーの 8888 とは別物</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 8888 と 8080 を混同しない</p>
+                                <p class="text-blue-900 text-sm">8888 は「JMeter のレコーダーが待ち受ける入口」、8080 は「go-httpbin が待ち受ける入口」です。ブラウザや curl のプロキシ指定には 8888、アクセス先 URL には 8080 を使います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.3 まずは curl で記録してみる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ブラウザの設定は環境により挙動が異なるため、最初は <strong>curl</strong> で記録するのが確実です。curl は <code>-x</code> オプションでプロキシを指定でき、ブラウザのような「localhost はプロキシを通さない」という既定動作もありません。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        手順は、(1) go-httpbin を起動しておく、(2) HTTP(S) Test Script Recorder の <strong>Start</strong> を押す、(3) 別のターミナルから次のコマンドを実行する、の順です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">terminal（macOS / Linux）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 1. クエリ付きの GET を記録
+curl -x http://localhost:8888 "http://localhost:8080/get?name=rec"
+
+# 2. HTML ページを取得する操作を記録
+curl -x http://localhost:8888 "http://localhost:8080/html"
+
+# 3. JSON を POST する操作を記録
+curl -x http://localhost:8888 -X POST "http://localhost:8080/post" \
+     -H "Content-Type: application/json" \
+     -d '{"user":"alice","item":1}'</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">コマンドプロンプト（Windows）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 1. クエリ付きの GET を記録
+curl -x http://localhost:8888 "http://localhost:8080/get?name=rec"
+
+# 2. HTML ページを取得する操作を記録
+curl -x http://localhost:8888 "http://localhost:8080/html"
+
+# 3. JSON を POST する操作を記録（1行で書き、JSON の " を \" にする）
+curl -x http://localhost:8888 -X POST "http://localhost:8080/post" -H "Content-Type: application/json" -d "{\"user\":\"alice\",\"item\":1}"</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">PowerShell（Windows 標準の 5.1）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># 1. クエリ付きの GET を記録（curl ではなく curl.exe と書く）
+curl.exe -x http://localhost:8888 "http://localhost:8080/get?name=rec"
+
+# 2. HTML ページを取得する操作を記録
+curl.exe -x http://localhost:8888 "http://localhost:8080/html"
+
+# 3. JSON を POST する操作を記録（1行で書き、JSON の " を \" にする）
+curl.exe -x http://localhost:8888 -X POST "http://localhost:8080/post" -H "Content-Type: application/json" -d '{\"user\":\"alice\",\"item\":1}'</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Windows では1行で書き、JSON の二重引用符を <code>\"</code> とエスケープします。PowerShell では <code>curl</code> ではなく <code>curl.exe</code> と書きます（PowerShell の <code>curl</code> は別のコマンドの別名です）。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実行後、Recording Controller の下に <code>/get</code>・<code>/html</code>・<code>/post</code> の HTTP Request が追加されます。リクエストの Name は、URL のパスに通し番号が付いた形（例: <code>/get-1</code>）で自動で付きます（番号の付き方は設定やバージョンで変わることがあります）。記録が終わったら、レコーダーの <strong>Stop</strong> を押しましょう。
+                    </p>
+
+                    <!-- 動作確認カード -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200
+                                rounded-xl p-5 my-6 overflow-hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-emerald-500 rounded-lg
+                                        flex items-center justify-center">
+                                <i class="fas fa-circle-check text-white"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-emerald-800 mb-2 break-words">動作確認: 記録できたか</h3>
+                                <ul class="space-y-1 text-emerald-900 text-sm">
+                                    <li class="break-words">curl が JSON などの応答を普通に表示している（プロキシ経由でも応答は届く）。</li>
+                                    <li class="break-words">Recording Controller 配下に3つのリクエストが増えている。</li>
+                                    <li class="break-words">記録された <code>/get</code> で始まる名前のリクエストを選ぶと、Path が <code>/get</code>、Parameters に <code>name = rec</code> が入っている。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">記録されないときのチェック</p>
+                                <p class="text-red-900 text-sm">レコーダーの <strong>Start を押し忘れていない</strong>か、curl のプロキシ指定が <code>http://localhost:8888</code>（8080 ではない）になっているか、<strong>go-httpbin が起動している</strong>かを確認します。Start 時にポート使用中のエラーが出たら、Port を別の番号（例: 8889）に変え、curl 側も合わせます。また、環境変数 <code>NO_PROXY</code>（<code>no_proxy</code>）に <code>localhost</code> が入っている環境では、curl に <code>--noproxy ""</code> を追加して除外設定を無効にします。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション11.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.4 ブラウザで記録する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の画面操作を記録するには、ブラウザのプロキシ設定を JMeter に向けます。公式の手順でも Firefox が使われているため、本ガイドも Firefox で説明します。
+                    </p>
+
+                    <ol class="space-y-3 mb-6">
+                        <li class="flex items-start gap-3 text-slate-600">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                            <span class="flex-1 min-w-0 break-words">Firefox の <strong>設定 → 一般 → ネットワーク設定 → 接続設定...</strong> を開く。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-600">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                            <span class="flex-1 min-w-0 break-words"><strong>手動でプロキシを設定する</strong>を選び、HTTP プロキシに <code>localhost</code>、ポートに <code>8888</code> を入力する。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-600">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                            <span class="flex-1 min-w-0 break-words">「<strong>このプロキシーを HTTPS でも使用する</strong>」にチェックを入れる。</span>
+                        </li>
+                        <li class="flex items-start gap-3 text-slate-600">
+                            <span class="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                            <span class="flex-1 min-w-0 break-words">「プロキシーなしで接続」の欄に <code>localhost</code> と <code>127.0.0.1</code> が入っていれば削除する（次の注意参照）。</span>
+                        </li>
+                    </ol>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">localhost 宛ての通信はプロキシを通らない（最重要）</p>
+                                <p class="text-red-900 text-sm mb-2">ブラウザは既定で、<code>localhost</code> や <code>127.0.0.1</code> 宛ての通信をプロキシに<strong>通さず直接送信</strong>します。そのため、設定が正しくても <code>http://localhost:8080</code> の操作が <strong>1件も記録されません</strong>。</p>
+                                <p class="text-red-900 text-sm">Firefox では、アドレスバーに <code>about:config</code> と入力して警告を承諾し、<code>network.proxy.allow_hijacking_localhost</code> を検索して <strong><code>true</code></strong> に切り替えます。あわせて「プロキシーなしで接続」欄から localhost を外します。Chrome 系ブラウザでは別途、プロキシのバイパス設定の変更が必要です。記録が終わったら、ブラウザ設定を元に戻してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設定後、レコーダーを Start してから、Firefox で <code>http://localhost:8080/forms/post</code> を開き、フォームに適当な値を入力して送信してみましょう。<code>/links/5</code> を開いてリンクをたどる操作も記録できます。JMeter 側には GET と POST のリクエストが並びます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant U as あなた
+    participant F as Firefox
+    participant J as JMeter 8888
+    participant S as go-httpbin 8080
+    U->>F: フォームを入力して送信
+    F->>J: POST /post
+    J->>S: POST /post を転送
+    S-->>J: 応答
+    J-->>F: 応答を返す
+    Note over J: HTTP Request として記録
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ブラウザで記録すると、アドレスバー入力のたびの favicon 取得など、意図しないリクエストも混ざります。不要なものは 11.6 の手順で削除します。
+                    </p>
+                </section>
+
+                <!-- セクション11.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.5 HTTPS サイトの記録と証明書
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        HTTPS の通信は暗号化されているため、中継役の JMeter も、そのままでは中身を読めません。そこで JMeter は、記録時に自分で作った<strong>一時的なルート CA 証明書</strong>で「サーバーのふりをして通信を復号する」仕組みを使います。ブラウザから見ると、これは正体不明の証明書なので、<strong>ブラウザに「この証明書を信頼する」と登録する</strong>必要があります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">証明書ファイル</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>&lt;JMETER_HOME&gt;/bin/ApacheJMeterTemporaryRootCA.crt</code>（レコーダーを Start すると生成される）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">登録先</td>
+                                    <td class="px-4 py-3 text-slate-600">ブラウザの証明書（認証局）設定にインポートして信頼させる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">有効期限</td>
+                                    <td class="px-4 py-3 text-slate-600">既定では7日間有効（プロパティ <code>proxy.cert.validity</code>）。期限が切れて作り直された場合は、ブラウザへインポートし直す必要がある</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">学習後</td>
+                                    <td class="px-4 py-3 text-slate-600">ブラウザから<strong>削除することを推奨</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">警告: 証明書を信頼させたままにしない</p>
+                                <p class="text-red-900 text-sm">この証明書を信頼したブラウザでは、その証明書の秘密鍵を持つ者が HTTPS 通信を盗み見できる状態になります。記録用の専用プロファイルで行い、<strong>作業が終わったら証明書の削除とプロキシ設定の解除</strong>を必ず行ってください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本ガイドの練習先 go-httpbin は <code>http://localhost:8080</code> であり HTTPS ではないため、この章では証明書のインポート手順までは行いません。実務で HTTPS のテスト環境を記録するときは、公式マニュアルの「Installing the JMeter CA certificate for HTTPS recording」を参照してください。
+                    </p>
+                </section>
+
+                <!-- セクション11.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        11.6 記録後の整理
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        記録直後のスクリプトは、あくまで「ある1回の操作の写し」です。そのまま負荷をかけると、固定値や不要なリクエストのせいで<strong>現実と異なる負荷</strong>になります。次の手順で整理します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["記録直後のスクリプト"] --> B["1. 不要なリクエストを削除"]
+    B --> C["2. 名前を分かりやすく付け直す"]
+    C --> D["3. 接続先を HTTP Request Defaults に集約"]
+    D --> E["4. 固定値を変数化（第8章）"]
+    E --> F["5. 動的な値を相関で抽出（第9章）"]
+    F --> G["6. タイマーとアサーションを追加（第6・7章）"]
+    G --> H["使える状態のスクリプト"]
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">整理の内容</th>
+                                    <th class="px-4 py-3 text-left font-semibold">なぜ必要か</th>
+                                    <th class="px-4 py-3 text-left font-semibold">具体例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">不要なリクエストの削除</td>
+                                    <td class="px-4 py-3 text-slate-600">測定対象外の通信が混ざると結果が歪む</td>
+                                    <td class="px-4 py-3 text-slate-600">favicon、広告・解析サービスへの通信</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">名前の付け直し</td>
+                                    <td class="px-4 py-3 text-slate-600">レポートで何の操作か分かるようにする</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>/post</code> → <code>注文を送信</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">接続先の集約</td>
+                                    <td class="px-4 py-3 text-slate-600">環境が変わっても1か所の修正で済む</td>
+                                    <td class="px-4 py-3 text-slate-600">各 Request の Server 欄を空にし、Defaults に集約</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">固定値の変数化</td>
+                                    <td class="px-4 py-3 text-slate-600">全ユーザーが同じ値だと現実と乖離する</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザー名を <code>${user}</code>（CSV）に</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">動的な値の相関</td>
+                                    <td class="px-4 py-3 text-slate-600">記録時のトークンやセッション ID は再実行で無効になる</td>
+                                    <td class="px-4 py-3 text-slate-600">JSON Extractor で取り出し <code>${token}</code> に</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">タイマーの調整</td>
+                                    <td class="px-4 py-3 text-slate-600">記録は待ち時間なしで再生され負荷が過大になる</td>
+                                    <td class="px-4 py-3 text-slate-600">Uniform Random Timer を追加</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 記録したまま使わない</p>
+                                <p class="text-emerald-900 text-sm">記録は「素材集め」です。そのまま実行すると、(1) 毎回同じデータでキャッシュが効いて速く見える、(2) 古いトークンで認証エラーが続出する、(3) 待ち時間なしで過大な負荷になる、といった失敗が起きます。<strong>記録 → 整理 → 小さく試す</strong>までを1セットで考えましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう 11-1 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 11-1: curl で記録して整理する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">curl で3つの操作を記録し、整理した上で <code>ch11-recorded.jmx</code> として保存します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">go-httpbin を起動し、JMeter で File → Templates → Recording → Create を実行する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">HTTP Request Defaults を <code>http</code> / <code>localhost</code> / <code>8080</code> に設定し、HTTP(S) Test Script Recorder の Port が <code>8888</code> であることを確認して Start を押す。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">11.3 の3つの curl コマンドを実行し、Stop を押す。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">記録された3つのリクエストの名前を「GET 検索」「HTML 取得」「JSON 送信」に変更し、Server Name 欄が Defaults と重複していれば空にする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words"><code>ch11-recorded.jmx</code> として保存し、Thread Group に View Results Tree を追加（Add → Listener → View Results Tree）してから、Thread Group を1スレッド・1ループで実行して、その View Results Tree で3件とも成功することを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>ポイント:</strong> 記録した POST には Content-Type ヘッダーが記録された HTTP Header Manager が付く場合があります。付いていることも確認しておきましょう。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう 11-2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 11-2（任意）: Firefox で /forms/post を送信して記録する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">ブラウザ操作の記録を体験します。Firefox が無ければ読み飛ばして構いません。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">Firefox のプロキシを <code>localhost:8888</code> に設定し、<code>about:config</code> で <code>network.proxy.allow_hijacking_localhost</code> を <code>true</code> にする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">レコーダーを Start し、<code>http://localhost:8080/forms/post</code> を開いてフォームを送信する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">GET <code>/forms/post</code> と POST <code>/post</code> が記録されたか、POST の Parameters に入力値が入っているかを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">作業後、Firefox のプロキシ設定と <code>allow_hijacking_localhost</code> を元に戻す。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>うまくいかないとき:</strong> 何も記録されないなら、まず <code>allow_hijacking_localhost</code> が <code>true</code> か、Start を押したかを確認します。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. HTTP(S) Test Script Recorder はどのような仕組みで操作を記録しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            JMeter がプロキシ（中継役）として待ち受け、ブラウザや curl の通信をサーバーへ転送しながら、その内容を HTTP Request としてテスト計画（Target Controller の下）に書き出します。既定のポートは 8888 です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Firefox のプロキシを localhost:8888 に設定したのに、http://localhost:8080 の操作が記録されません。原因と対処は？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ブラウザは既定で localhost 宛ての通信をプロキシに通さないためです。Firefox の about:config で network.proxy.allow_hijacking_localhost を true にし、「プロキシーなしで接続」欄の localhost も外します。レコーダーの Start 忘れも確認します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 記録したスクリプトをそのまま負荷テストに使うと、どんな問題が起きますか？ 整理で行う作業を2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            全ユーザーが同じ固定値を使うため現実と乖離する、記録時のトークンが再実行で無効になる、待ち時間なしで過大な負荷になる、不要なリクエストが混ざる、などの問題が起きます。整理では、固定値の変数化（CSV など）、動的値の相関（JSON Extractor）、タイマーの追加、不要なリクエストの削除、名前の付け直し、接続先の HTTP Request Defaults への集約などを行います。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jmeter-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第10章: ロジックコントローラでシナリオを組み立てる</span>
+                        </div>
+                    </a>
+                    <a href="jmeter-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第12章: CLIモードで負荷テストを実行する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

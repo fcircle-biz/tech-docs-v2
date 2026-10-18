@@ -64,6 +64,7 @@ import { jev } from './ai/ai-apps/jev';
 
 // 開発プロセス・ツール
 import { gitGithub } from './development-processes/git-github';
+import { jmeter } from './development-processes/jmeter';
 
 // クラウド・インフラ
 import { docker } from './cloud-infrastructure/docker';
@@ -121,6 +122,7 @@ const all: TechGuide[] = [
   jev,
   // 開発プロセス・ツール
   gitGithub,
+  jmeter,
   // クラウド・インフラ
   docker,
   linux,

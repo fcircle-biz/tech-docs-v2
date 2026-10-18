@@ -1,0 +1,810 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JMeter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">アサーションで応答を検証する</h1>
+                    <p class="text-slate-600">「速く返ってきた」ことと「正しい中身が返ってきた」ことは別の話です。サーバーが過負荷になると、200 OK のままエラー画面や空のデータを返すことがあります。この章では、アサーション（Assertion）を使って応答の中身・応答時間・サイズを自動でチェックし、「速いが間違っている」応答を失敗として検出する方法を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ステータスコードだけでは成否を判断できない理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Response Assertion・JSON Assertion・Duration Assertion を設定できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>アサーションの失敗を View Results Tree や Summary Report で確認できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>期待どおりのエラー（404 など）を成功扱いにする方法と、アサーションを入れすぎない心得を知る</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 なぜアサーションが必要か
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第4章で見たように、JMeter は既定では<strong>ステータスコードが 4xx / 5xx のとき（や接続エラーのとき）だけ</strong>サンプルを失敗とみなします。つまり、ステータスコードが 200 であれば、中身がどうであっても「成功」と数えてしまいます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ところが現実のシステムでは、次のような「200 OK なのに実は失敗」というケースがよく起こります。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-1 text-slate-600 mb-4">
+                        <li>負荷が高まると、アプリケーションが「ただいま混み合っています」というエラー画面を <strong>200 で</strong>返す</li>
+                        <li>データベースが応答できず、検索結果が<strong>空のリスト</strong>で返ってくる</li>
+                        <li>ログインに失敗しているのに、ログイン画面の HTML が 200 で返ってくる</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これらを見逃すと、結果レポートには「エラー率 0%・応答時間も速い」と表示され、<strong>実際には壊れているのに合格に見える</strong>という危険な状態になります。エラー画面は返すのが速いので、むしろ応答時間が良く見えてしまうことすらあります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで登場するのが<strong>アサーション（Assertion、検証）</strong>です。アサーションは、サンプラーが受け取った応答に対して「この文字列が含まれているか」「この値が入っているか」「この時間以内に返ったか」といった条件を確かめ、満たさなければそのサンプルを<strong>失敗</strong>に変えます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["サンプラーがリクエストを送る"] --> B["応答を受け取る"]
+    B --> C{"ステータスコードは<br/>4xx か 5xx か"}
+    C -->|はい| F["失敗"]
+    C -->|いいえ| D{"アサーションの条件を<br/>すべて満たすか"}
+    D -->|はい| S["成功"]
+    D -->|いいえ| F
+                        </div>
+                    </div>
+
+                    <p class="text-slate-500 text-sm leading-relaxed mb-4">
+                        ※ 4xx/5xx を例外的に成功扱いにする方法（Ignore Status）は 7.7 で学びます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アサーションは第3章で学んだとおり、サンプラーの<strong>実行後</strong>（Post Processor の後）に評価されます。置いた場所のスコープ内にあるサンプラーすべてに効き、サンプラーの子として置けばそのサンプラー1つだけに効きます。
+                    </p>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">性能テストの目的は「速さ」だけでなく「<strong>正しい結果を返しながら</strong>速いこと」を確かめることです。応答時間やスループットの数字を信じる前提として、まずアサーションで「中身が正しい」ことを保証しておきましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 Response Assertion（応答の検証）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もっとも基本で、もっとも使うアサーションが <strong>Response Assertion（レスポンスアサーション）</strong>です。応答のさまざまな部分（本文・ステータスコード・ヘッダーなど）が、指定した文字列やパターンに合うかを確かめます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        追加するには、HTTP Request を右クリックして <strong>Add → Assertions → Response Assertion</strong> を選びます。サンプラーの子として追加すれば、そのサンプラーだけが検証対象になります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">主な設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Apply to</td>
+                                    <td class="px-4 py-3 text-slate-600">Main sample and sub-samples／Main sample only／Sub-samples only／JMeter Variable Name to use</td>
+                                    <td class="px-4 py-3 text-slate-600">どのサンプルを検証するか。通常は <strong>Main sample only</strong>（リダイレクトなどの子サンプルを含む場合に使い分ける）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Field to Test</td>
+                                    <td class="px-4 py-3 text-slate-600">Text Response／Document (text)／URL Sampled／Response Code／Response Message／Response Headers／Request Headers／Request Data</td>
+                                    <td class="px-4 py-3 text-slate-600">応答のどの部分を検証するか。本文の確認は <strong>Text Response</strong>、ステータスは <strong>Response Code</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Ignore Status</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックなし（既定）／あり</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックすると、先に失敗扱いになっていたサンプルも一度「成功」に戻してから検証する（7.7 で使う）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Pattern Matching Rules</td>
+                                    <td class="px-4 py-3 text-slate-600">Contains／Matches／Equals／Substring（＋ Not・Or）</td>
+                                    <td class="px-4 py-3 text-slate-600">パターンの照合方法（下の表を参照）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Patterns to Test</td>
+                                    <td class="px-4 py-3 text-slate-600">Add ボタンで行を追加して入力</td>
+                                    <td class="px-4 py-3 text-slate-600">照合する文字列やパターン。複数行書くと、既定では<strong>すべて</strong>満たす必要がある（Or を選ぶと1つでよい）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Custom failure message</td>
+                                    <td class="px-4 py-3 text-slate-600">任意の文章</td>
+                                    <td class="px-4 py-3 text-slate-600">失敗したときに結果へ表示するメッセージ。原因が一目でわかる文面にしておく</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Pattern Matching Rules の4つの照合方法は、<strong>正規表現を使うか</strong>と<strong>全体一致か部分一致か</strong>で区別します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">ルール</th>
+                                    <th class="px-4 py-3 text-left font-semibold">パターンの扱い</th>
+                                    <th class="px-4 py-3 text-left font-semibold">成功する条件</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">Contains</td>
+                                    <td class="px-4 py-3 text-slate-600">正規表現</td>
+                                    <td class="px-4 py-3 text-slate-600">応答のどこかに、パターンに合う部分がある（もっとも使いやすい）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Matches</td>
+                                    <td class="px-4 py-3 text-slate-600">正規表現</td>
+                                    <td class="px-4 py-3 text-slate-600">応答<strong>全体</strong>がパターンに合う（先頭から末尾まで）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Equals</td>
+                                    <td class="px-4 py-3 text-slate-600">ただの文字列</td>
+                                    <td class="px-4 py-3 text-slate-600">応答<strong>全体</strong>がその文字列と完全に一致する（ステータスコードの確認に便利）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Substring</td>
+                                    <td class="px-4 py-3 text-slate-600">ただの文字列</td>
+                                    <td class="px-4 py-3 text-slate-600">応答のどこかに、その文字列がそのまま含まれる（<code>.</code> や <code>(</code> を含む文字列を正規表現の記号と誤解されずに探せる）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これらに加えて、<strong>Not</strong>（条件に合わないことを成功とする）と <strong>Or</strong>（複数パターンのどれか1つでよい）を組み合わせられます。たとえば「エラー」という文字が含まれて<em>いないこと</em>を確かめたいときは、Contains ＋ Not を選びます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">例: /html の本文に見出しがあることを確認する</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        go-httpbin の <code>/html</code> は、見出し <code>&lt;h1&gt;Herman Melville - Moby-Dick&lt;/h1&gt;</code> を含む HTML ページを返します。本文に <code>Herman Melville</code> が含まれることを確かめる設定は次のとおりです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Name</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>見出しがある</code></td>
+                                    <td class="px-4 py-3 text-slate-600">結果画面に表示される名前。何を確かめるかが伝わる名前にする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Apply to</td>
+                                    <td class="px-4 py-3 text-slate-600">Main sample only</td>
+                                    <td class="px-4 py-3 text-slate-600">リクエスト本体の応答を検証する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Field to Test</td>
+                                    <td class="px-4 py-3 text-slate-600">Text Response</td>
+                                    <td class="px-4 py-3 text-slate-600">応答の本文を対象にする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Pattern Matching Rules</td>
+                                    <td class="px-4 py-3 text-slate-600">Contains</td>
+                                    <td class="px-4 py-3 text-slate-600">本文のどこかに含まれていればよい</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Patterns to Test</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>Herman Melville</code></td>
+                                    <td class="px-4 py-3 text-slate-600">探す文字列</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Custom failure message</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>見出しが見つかりません</code></td>
+                                    <td class="px-4 py-3 text-slate-600">失敗したときに表示される</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ステータスコードを検証するには</p>
+                                <p class="text-blue-900 text-sm">Field to Test を <strong>Response Code</strong>、Pattern Matching Rules を <strong>Equals</strong>、Patterns to Test を <code>200</code> にすると「ステータスコードがちょうど 200 であること」を確かめられます。Contains はパターンを正規表現として扱い、部分一致で判定します。たとえば <code>20</code> と書くと 200・201・204 のどれにも一致してしまうため、ステータスコードは Equals で「ちょうどその値」かを確かめるのが安全です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 JSON Assertion（JSON の検証）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最近の Web API はほとんどが JSON を返します。本文を文字列として探す Response Assertion でも確かめられますが、<strong>JSON Assertion（JSON アサーション）</strong>を使うと、JSON の<strong>構造を理解したうえで</strong>特定の項目の存在や値を確かめられます。項目の場所は <strong>JSON Path</strong>（JSON の中の位置を指す書き方）で指定します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSON Path は、先頭の <code>$</code> がルート（一番外側）を表し、<code>.</code> で階層をたどります。go-httpbin の <code>/json</code> は次のような JSON を返します（途中を省略しています）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">GET /json の応答（抜粋）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "slideshow": {
+    "author": "Yours Truly",
+    "date": "date of publication",
+    "title": "Sample Slide Show",
+    "slides": []
+  }
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この JSON では、<code>$.slideshow.title</code> が <code>"Sample Slide Show"</code>、<code>$.slideshow.author</code> が <code>"Yours Truly"</code> を指します（<code>slides</code> の中身は省略して空にしています）。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        追加は <strong>Add → Assertions → JSON Assertion</strong> です。設定項目は次のとおりです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値（この例）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Assert JSON Path exists</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>$.slideshow.title</code></td>
+                                    <td class="px-4 py-3 text-slate-600">この JSON Path が応答の中に存在することを確かめる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Additionally assert value</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックする</td>
+                                    <td class="px-4 py-3 text-slate-600">存在だけでなく、値も確かめる場合にチェックする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Match as regular expression</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックを外す</td>
+                                    <td class="px-4 py-3 text-slate-600">期待値を正規表現として扱うか。追加直後はチェックが入っている。今回は完全一致で確かめるので外す（入れたままでも、この期待値なら一致する）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Expected Value</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>Sample Slide Show</code></td>
+                                    <td class="px-4 py-3 text-slate-600">期待する値。引用符（<code>"</code>）は付けずに書く</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Expect null</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックしない</td>
+                                    <td class="px-4 py-3 text-slate-600">値が <code>null</code> であることを期待する場合にチェックする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Invert assertion</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックしない</td>
+                                    <td class="px-4 py-3 text-slate-600">結果を反転する。「この項目が存在しないこと」を確かめたいときに使う</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同様に、<code>$.slideshow.author</code> の値が <code>Yours Truly</code> であることも確かめられます。JSON Assertion は1つにつき1つの JSON Path しか検証できないので、複数の項目を確かめたいときは JSON Assertion を複数並べます。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 応答が JSON でないとどうなるか</p>
+                                <p class="text-red-900 text-sm">サーバーがエラー時に JSON ではなく HTML を返した場合、JSON Assertion は「JSON として読めない」という理由で失敗します。これはアサーションが役目を果たしている状態です。失敗メッセージを確認して、原因が条件の書き間違いなのか、サーバーの異常なのかを見分けましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 Duration Assertion（応答時間の検証）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Duration Assertion（デュレーションアサーション）</strong>は、応答が返るまでの時間が指定したミリ秒以内かを確かめます。「このページは1.5秒以内に表示される」といった<strong>性能の合格ライン</strong>を、テストの中に直接書き込めます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値（この例）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Duration in milliseconds</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>1500</code></td>
+                                    <td class="px-4 py-3 text-slate-600">許容する最大の応答時間（ミリ秒）。これを<strong>超える</strong>と失敗</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        動作を確かめるには、go-httpbin の <code>/delay/2</code>（2秒待ってから応答するエンドポイント）を対象にします。2秒かかるので、1500ms の条件には合わず失敗します。失敗時の結果には、次のようなメッセージが表示されます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">失敗メッセージの例</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext"># Assertion result 欄に表示される失敗メッセージ
+# 下の英文は「2秒かかったが、1500ミリ秒を超えてはいけない」という意味
+The operation lasted too long: It took 2,0xx milliseconds,
+but should not have lasted longer than 1,500 milliseconds.</code></pre>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">Duration Assertion の使いどころ</p>
+                                <p class="text-blue-900 text-sm">Duration Assertion で失敗扱いにすると、遅い応答もエラー率に反映されます。便利ですが、「遅いこと」と「壊れていること」が同じ Error % に混ざる点には注意が必要です。応答時間の良し悪しは第13章のレポートのパーセンタイルで分析するのが基本で、Duration Assertion は「この時間を超えたら明らかに許容できない」という絶対的な上限に使うと分かりやすくなります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 Size Assertion とその他のアサーション
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>Size Assertion（サイズアサーション）</strong>は、応答のサイズ（バイト数）が条件を満たすかを確かめます。「応答が空でないこと」や「ダウンロードしたファイルが一定以上の大きさであること」を手軽に確かめられます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値の例</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Response Size Field to Test</td>
+                                    <td class="px-4 py-3 text-slate-600">Full Response／Response Headers／Response Body／Response Code／Response Message</td>
+                                    <td class="px-4 py-3 text-slate-600">どの部分のサイズを測るか。本文なら Response Body</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Size to Assert</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>100</code></td>
+                                    <td class="px-4 py-3 text-slate-600">比較の基準にするバイト数</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Type of Comparison</td>
+                                    <td class="px-4 py-3 text-slate-600">=／!=／&gt;／&lt;／&gt;=／&lt;=</td>
+                                    <td class="px-4 py-3 text-slate-600">比較方法。「100バイトより大きい」なら <code>&gt;</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このほかにも、JMeter には次のようなアサーションがあります。本ガイドでは使いませんが、必要になったときに探せるよう名前だけ紹介します。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-1 text-slate-600 mb-4">
+                        <li><strong>XPath2 Assertion</strong>: XML や HTML の特定の要素を XPath で検証する</li>
+                        <li><strong>XML Assertion</strong>: 応答が正しい XML として読めるかを検証する</li>
+                        <li><strong>MD5Hex Assertion</strong>: 応答の MD5 ハッシュ値が期待どおりかを検証する（ファイルが壊れていないかの確認など）</li>
+                        <li><strong>JSR223 Assertion</strong>: スクリプトで自由に検証ロジックを書く（複雑な条件向け）</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed">
+                        初心者のうちは、<strong>Response Assertion・JSON Assertion・Duration Assertion の3つ</strong>を使いこなせれば、ほとんどの検証をまかなえます。
+                    </p>
+                </section>
+
+                <!-- セクション7.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 アサーションの失敗を確認する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アサーションに失敗したサンプルは、<strong>View Results Tree</strong> で赤いアイコンの「失敗」として表示されます。結果の詳細を見る場所は次のとおりです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">確認する場所</th>
+                                    <th class="px-4 py-3 text-left font-semibold">わかること</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">View Results Tree のツリー</td>
+                                    <td class="px-4 py-3 text-slate-600">赤いサンプルの左の ▶ を開くと、失敗したアサーション名（例: Duration Assertion）が子として並ぶ。選ぶと右側の最初のタブが「Assertion result」になり、Assertion failure message に失敗理由が出る。原因調査の基本</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Assertion Results リスナー</td>
+                                    <td class="px-4 py-3 text-slate-600">サンプルごとの全アサーションの結果を一覧で見られる。<strong>Add → Listener → Assertion Results</strong> で追加する。View Results Tree と同じく、デバッグ専用。負荷実行の前には無効化する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Summary Report の Error %</td>
+                                    <td class="px-4 py-3 text-slate-600">アサーション失敗も<strong>エラーとして集計</strong>される。全体のどれくらいが失敗したかを数値で把握できる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        つまり、アサーションを仕込んでおけば、あとはいつもどおり Summary Report や HTML レポート（第13章）の Error % を見るだけで、「中身が壊れた応答」が混ざっていないかが分かります。失敗の内訳は、アサーションの <strong>Name</strong> と <strong>Custom failure message</strong> が手がかりになるため、7.2 で述べたように具体的な名前とメッセージを付けておきましょう。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["アサーション失敗"] --> B["サンプルが失敗扱いになる"]
+    B --> C["View Results Tree<br/>赤いアイコン＋子ノードの失敗メッセージ"]
+    B --> D["Assertion Results<br/>失敗の一覧"]
+    B --> E["Summary Report と<br/>HTMLレポートの Error %"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 期待するエラーを成功扱いにする
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでは「正しい応答が返ること」を確かめてきました。ところがテストによっては、<strong>わざと異常な操作をして、エラーが返ることを確かめたい</strong>場合があります（ネガティブテストと呼びます）。たとえば「存在しないページにアクセスしたら 404 が返ること」や、「トークン無しなら 401 が返ること」は、システムとして<strong>正しい動作</strong>です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ところが JMeter は 404 や 401 を既定で失敗として数えるため、そのままでは「正しく 404 を返した」のにエラー率が上がってしまいます。このようなときは、Response Assertion の <strong>Ignore Status</strong> を使います。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">対象のサンプラー</td>
+                                    <td class="px-4 py-3 text-slate-600">GET <code>/status/404</code></td>
+                                    <td class="px-4 py-3 text-slate-600">404 を返すエンドポイント。このサンプラーの子としてアサーションを置く</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Field to Test</td>
+                                    <td class="px-4 py-3 text-slate-600">Response Code</td>
+                                    <td class="px-4 py-3 text-slate-600">ステータスコードを検証する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Ignore Status</td>
+                                    <td class="px-4 py-3 text-slate-600"><strong>チェックする</strong></td>
+                                    <td class="px-4 py-3 text-slate-600">404 による「失敗」判定をいったん取り消し、このアサーションの結果で成否を決め直す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Pattern Matching Rules</td>
+                                    <td class="px-4 py-3 text-slate-600">Equals</td>
+                                    <td class="px-4 py-3 text-slate-600">完全一致で確かめる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Patterns to Test</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>404</code></td>
+                                    <td class="px-4 py-3 text-slate-600">404 が返ったら成功。<strong>200 が返ったらむしろ失敗</strong>になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この設定にすると、「404 が返る」ことが成功、「それ以外が返る」ことが失敗となり、期待どおりのエラーがエラー率を汚さなくなります。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: Ignore Status は必ず「期待する値」とセットで</p>
+                                <p class="text-red-900 text-sm">Ignore Status をチェックしただけでは、本物のエラー（想定外の 500 など）まで成功に変えてしまいかねません。<strong>必ず Response Code を Equals で期待値と照合するパターンを書き</strong>、想定外の応答は失敗になるようにしてください。また、サンプラー単位で効かせるために、アサーションはそのサンプラーの子に置きます。なお、Ignore Status はそれより前に評価されたアサーションの失敗も取り消してしまうため、そのサンプラーの子の中で最初に評価されるアサーションにだけ付けます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.8 アサーションを入れすぎない
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        アサーションは便利ですが、<strong>無料ではありません</strong>。応答を1件受け取るたびに、本文の検索や JSON の解析を行うため、JMeter 自身の CPU とメモリを消費します。大量のスレッドを動かす本番の負荷実行で、あらゆるリクエストに重いアサーションを付けると、JMeter 側がボトルネックになって<strong>測定値が不正確</strong>になるおそれがあります。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-circle-check text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">アサーションを付けたい応答</h3>
+                            <ul class="text-sm text-slate-600 list-disc pl-5 space-y-1">
+                                <li>ログイン・注文など、業務上の重要な操作</li>
+                                <li>後続の処理が依存する応答（トークンを取り出す元など）</li>
+                                <li>負荷が高まると壊れやすい、検索などの重い処理</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-ban text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">付けなくてよい応答</h3>
+                            <ul class="text-sm text-slate-600 list-disc pl-5 space-y-1">
+                                <li>画像・CSS・JavaScript などの静的ファイル</li>
+                                <li>どのリクエストにも同じ内容を確かめるだけの検証</li>
+                                <li>応答全体を長大な正規表現で照合する検証</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        指針は3つです。(1) <strong>重要な応答に絞る</strong>、(2) 検証は<strong>軽い方法</strong>を選ぶ（本文全体への複雑な正規表現より、Substring や JSON Path の存在確認など）、(3) アサーションはスコープを意識してサンプラーの子に置き、<strong>全サンプラーに一律で効かせない</strong>。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-1: 3種類のアサーションを設定する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">go-httpbin を起動した状態で、<code>ch07-assertions.jmx</code> を作ります。<code>jmeter-practice</code> フォルダに保存してください。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group（1スレッド・ループ1回）の下に HTTP Request Defaults（http／localhost／8080）と View Results Tree を置く。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">HTTP Request を3つ作る。名前と Path は「HTML」<code>/html</code>、「JSON」<code>/json</code>、「遅い応答」<code>/delay/2</code>。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">「HTML」の子に Response Assertion（Text Response・Contains・<code>Herman Melville</code>）を追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">「JSON」の子に JSON Assertion を追加し、JSON Path <code>$.slideshow.title</code>、Additionally assert value にチェック、Match as regular expression のチェックを外し、Expected Value に <code>Sample Slide Show</code> を設定する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">「遅い応答」の子に Duration Assertion を追加し、<code>3000</code> ミリ秒を設定する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">6</span>
+                                    <span class="flex-1 min-w-0 break-words">Start（緑の三角）で実行し、View Results Tree で3件とも緑のアイコン（成功）になることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>うまくいかないときは:</strong> アサーションが「サンプラーの子」になっているか（ツリーで一段深く表示されているか）を確認します。Thread Group 直下に置くと3つのサンプラー全部に効いてしまい、意図しない失敗になります。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-2: わざと失敗させて結果の見え方を確認する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">アサーションが失敗したとき、結果がどう見えるかを体験します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">Duration Assertion の値を <code>1500</code> に下げて実行する。「遅い応答」が赤いアイコンになる。その ▶ を開いて Duration Assertion を選び、Assertion failure message に所要時間のメッセージが出ることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">Response Assertion のパターンを <code>Jane Austen</code> に書き換え、Custom failure message に「見出しが見つかりません」と入れて実行し、メッセージが表示されることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group に Summary Report を追加して再実行し、TOTAL 行の Error % が 66.67%（3件中2件が失敗）になり、失敗させた2つの行（「HTML」「遅い応答」）は 100%、成功する行（「JSON」）は 0% になることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">（発展）<code>/status/404</code> の HTTP Request を追加し、7.7 の設定（Ignore Status ＋ Response Code Equals <code>404</code>）で成功扱いにする。Ignore Status を外すと失敗に戻ることも確かめる。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>確認後:</strong> 元の値（Duration 3000、パターン <code>Herman Melville</code>）に戻して保存しておくと、後の章の復習で使いやすくなります。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. ステータスコードが 200 なのに、アサーションが必要になるのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            JMeter は既定では 4xx / 5xx のときだけ失敗とみなすため、200 で返ってきたエラー画面や空のデータも「成功」と数えてしまうからです。アサーションで応答の中身を確かめておけば、「速いが間違っている」応答を失敗として検出でき、エラー率や応答時間の数字を信頼できます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. Response Assertion で、応答の本文のどこかに「Herman Melville」が含まれることを確かめるには、Field to Test と Pattern Matching Rules に何を選びますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            Field to Test は「Text Response」、Pattern Matching Rules は「Contains」（または Substring）を選び、Patterns to Test に <code>Herman Melville</code> を入れます。Equals や Matches は応答全体との一致を見るため、「どこかに含まれる」確認には向きません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 存在しないページが 404 を返すことを確かめるテストで、エラー率を上げずに済ませるにはどう設定しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            そのサンプラーの子に Response Assertion を置き、Field to Test を「Response Code」、Pattern Matching Rules を「Equals」、パターンを <code>404</code> にして、<strong>Ignore Status</strong> をチェックします。404 による失敗判定を取り消したうえで、アサーションの結果（404 が返れば成功、それ以外は失敗）で成否が決まります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jmeter-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: タイマーで現実的なアクセスを再現する</span>
+                        </div>
+                    </a>
+                    <a href="jmeter-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: 変数とCSVデータでパラメータ化する</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>

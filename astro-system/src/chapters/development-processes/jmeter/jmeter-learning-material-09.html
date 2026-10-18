@@ -1,0 +1,812 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JMeter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第9章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第9章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間20分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">相関：レスポンスの値を次のリクエストで使う</h1>
+                    <p class="text-slate-600">ログインのたびに発行されるトークンやセッション ID は、毎回違う値です。録画した固定値をそのまま送っても、本物の利用者のようには動きません。この章では、サーバーの応答から値を取り出して変数に入れ、次のリクエストで使い回す「相関（Correlation）」の方法を、JSON Extractor・Regular Expression Extractor・Boundary Extractor・Cookie Manager の4つで学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>相関（Correlation）が必要になる理由と、「抽出 → 変数 → 再利用」の流れを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>JSON Extractor で応答の値を取り出し、次のリクエストのヘッダーに渡せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Regular Expression Extractor と Boundary Extractor の違いを理解し、使い分けられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>HTTP Cookie Manager でセッションを維持し、抽出に失敗したときの調べ方を身につける</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション9.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.1 相関（Correlation）とは
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際の Web システムでは、ログインに成功するとサーバーが<strong>トークン</strong>や<strong>セッション ID</strong>といった「あなたであることを示す札」を発行します。この札は<strong>ログインのたびに違う値</strong>になり、以降のリクエストでは「この札を持っています」と示す必要があります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第11章で学ぶ記録機能で操作を録画すると、そのときに発行された札の値がリクエストに<strong>固定値として書き込まれて</strong>しまいます。しかし、その値はすでに無効です。実行するたびにサーバーが新しい札を発行するため、古い固定値を送ると認証エラーになります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この問題を解決するのが<strong>相関（Correlation）</strong>です。サーバーの応答から動的な値を<strong>抽出</strong>して<strong>変数</strong>に入れ、次のリクエストでその変数を<strong>再利用</strong>します。第8章で学んだ <code>${変数名}</code> の形で参照できます。値の取り出しは<strong>Post Processor（後処理）</strong>に分類される「Extractor（抽出器）」が担当します。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant J as JMeter（仮想ユーザー）
+    participant S as go-httpbin（localhost:8080）
+    J->>S: 1. GET /uuid（トークンの代わりに使う）
+    S-->>J: 応答に uuid の値が入っている
+    Note over J: 2. Extractor が uuid の値を取り出し、token 変数に保存
+    J->>S: 3. GET /bearer（Authorization ヘッダーに token 変数の値を付ける）
+    S-->>J: 200 OK（token に送った値がそのまま返る）
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本物のログイン API の代わりに、練習用サーバーの 2 つのエンドポイントを使います。<code>/uuid</code> は毎回違う値を返すので「トークンの発行」役、<code>/bearer</code> は <code>Authorization: Bearer &lt;トークン&gt;</code> ヘッダーがあれば（値は何でも）200 で、その値を <code>token</code> として返し、無ければ 401 を返すので「トークンが必要な API」役です。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: 変数はスレッドごと</p>
+                                <p class="text-blue-900 text-sm">第8章で学んだとおり、変数は仮想ユーザー（スレッド）ごとに独立しています。抽出した <code>token</code> も、他のスレッドには見えません。100人の仮想ユーザーがそれぞれ別のトークンを取得して使うので、本物の利用者と同じ状況を再現できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.2 JSON Extractor
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        応答が JSON のときにいちばん手軽なのが <strong>JSON Extractor（JSON 抽出器）</strong>です。<code>/uuid</code> の応答は次のような JSON です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">GET /uuid の応答（値は毎回変わる）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "uuid": "6f1c2a3e-8b4d-4e5f-9a0b-1c2d3e4f5a6b"
+}</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        値の場所は <strong>JSON Path</strong> という書き方で指定します。<code>$</code> が JSON 全体（いちばん外側）を表し、<code>.uuid</code> でその中の <code>uuid</code> フィールドを指します。つまり <code>$.uuid</code> です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設定は、<code>/uuid</code> の HTTP Request を右クリックして <strong>Add → Post Processors → JSON Extractor</strong> で追加します。Extractor を<strong>サンプラーの子</strong>に置くと、そのサンプラーの応答だけが対象になります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Names of created variables</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>token</code></td>
+                                    <td class="px-4 py-3 text-slate-600">取り出した値を入れる変数名。以降は <code>${token}</code> で参照する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">JSON Path expressions</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>$.uuid</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値の場所を示す JSON Path</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Match No. (0 for Random)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>1</code></td>
+                                    <td class="px-4 py-3 text-slate-600">複数見つかったときに何番目を使うか。1 で最初、0 でランダム、-1 ですべて</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Compute concatenation var</td>
+                                    <td class="px-4 py-3 text-slate-600">オフのまま</td>
+                                    <td class="px-4 py-3 text-slate-600">複数見つかった値を連結した変数（<code>変数名_ALL</code>）を作るかどうか。今回は使わない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Default Values</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>NOT_FOUND</code></td>
+                                    <td class="px-4 py-3 text-slate-600">見つからなかったときに変数へ入れる値</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: Default Values には必ず目印を入れる</p>
+                                <p class="text-emerald-900 text-sm">Default Values を空のままにすると、抽出に失敗したときに変数が空になったり（JSON Extractor）、作られずに <code>${token}</code> の文字のまま送られたり（Regular Expression Extractor）して、「取れなかった」のか「そもそも動いていない」のかが見分けにくくなります。<code>NOT_FOUND</code> のような目印を入れておけば、Debug Sampler や Request タブで <code>NOT_FOUND</code> が見え、抽出の失敗にすぐ気づけます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.3 抽出した値を使う
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        取り出した <code>token</code> を、<code>/bearer</code> のリクエストに付けます。ヘッダーを付けるのは第4章で使った <strong>HTTP Header Manager</strong> です。<code>/bearer</code> の HTTP Request を右クリックして <strong>Add → Config Element → HTTP Header Manager</strong> で、サンプラーの子として追加します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code>Authorization</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code>Bearer ${token}</code>（<code>Bearer</code> のあとに半角スペースを1つ）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実行時、JMeter は <code>${token}</code> をその場で取得済みの値に置き換えて送信します。実際に送られるリクエストは次のようになります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">/bearer に送られるリクエスト（イメージ）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-http">GET /bearer HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer 6f1c2a3e-8b4d-4e5f-9a0b-1c2d3e4f5a6b</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        成功したかどうかは、第7章で学んだ <strong>JSON Assertion</strong> で確認します。<code>/bearer</code> の HTTP Request の子に追加し、次のように設定します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Assert JSON Path exists</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>$.authenticated</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Additionally assert value</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックを入れる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Expected Value</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>true</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        さらに、<strong>相関が本当に効いていること</strong>を確かめておきましょう。HTTP Header Manager を一時的に無効化（Ctrl+T）して <code>/bearer</code> だけを実行すると、トークンが無いので <strong>401</strong> が返り、赤いアイコンになります。ヘッダーを有効に戻すと 200 になります。この「付ければ通る、外せば落ちる」の対比で、ヘッダーが必要なことは確かめられますが、値が正しく渡ったかは token の中身で確かめます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>/bearer</code> はどんな値でも 200 を返すため、200 や <code>authenticated</code> だけでは値が正しく渡ったとは言えません。2つ目の JSON Assertion を追加し、応答の <code>token</code> が UUID の形をしていることを確認します。<code>NOT_FOUND</code> や <code>${token}</code> のままなら、この Assertion が失敗します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Assert JSON Path exists</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>$.token</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Additionally assert value</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックを入れる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Match as regular expression</td>
+                                    <td class="px-4 py-3 text-slate-600">チェックを入れる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Expected Value</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}</code>（UUID の形）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["Thread Group"] --> B["HTTP Request: /uuid"]
+    B --> B1["JSON Extractor<br/>$.uuid を token 変数へ"]
+    A --> C["HTTP Request: /bearer"]
+    C --> C1["HTTP Header Manager<br/>Authorization: Bearer token変数"]
+    C --> C2["JSON Assertion<br/>authenticated が true"]
+    C --> C3["JSON Assertion<br/>token が UUID の形"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed">
+                        ツリーの順序にも注意してください。Extractor は<strong>サンプラーの実行後</strong>に動くため、<code>/uuid</code> は必ず <code>/bearer</code> より<strong>上</strong>に置きます。順序が逆だと、<code>/bearer</code> の時点で <code>token</code> がまだ存在しません。
+                    </p>
+                </section>
+
+                <!-- セクション9.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.4 Regular Expression Extractor
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        応答が HTML やプレーンテキストのときは JSON Path が使えません。そこで活躍するのが <strong>Regular Expression Extractor（正規表現抽出器）</strong>です。<strong>正規表現</strong>とは、「こういう並びの文字列」という<strong>パターン</strong>を書いて、文字列の中から該当部分を探す記法です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>/uuid</code> の応答から値を取り出す正規表現は、次のとおりです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">Regular Expression 欄に入力する式</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">"uuid":\s*"(.+?)"</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        初心者がまず覚えるべきは、次の記号だけです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">記号</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3"><code>"uuid":</code></td>
+                                    <td class="px-4 py-3 text-slate-600">そのままの文字列として一致させる（目印）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code>\s*</code></td>
+                                    <td class="px-4 py-3 text-slate-600">空白文字（スペースや改行）が0個以上続く。コロンの後ろに空白があってもなくても一致させるため</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code>.+?</code></td>
+                                    <td class="px-4 py-3 text-slate-600">任意の文字が1文字以上。<code>?</code> を付けると「できるだけ短く」一致する（次の <code>"</code> で止まる）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3"><code>( )</code></td>
+                                    <td class="px-4 py-3 text-slate-600">取り出したい部分を囲む。囲んだ中身が1番目のグループ（<code>$1$</code>）になる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>/uuid</code> の HTTP Request を右クリックして <strong>Add → Post Processors → Regular Expression Extractor</strong> で追加し、次のように設定します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Field to check</td>
+                                    <td class="px-4 py-3 text-slate-600">Body</td>
+                                    <td class="px-4 py-3 text-slate-600">どこから探すか。通常は応答ボディ（Body）。ヘッダーや URL も選べる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Name of created variable</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>token2</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値を入れる変数名（JSON Extractor の <code>token</code> と区別するため別名にする）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Regular Expression</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>"uuid":\s*"(.+?)"</code></td>
+                                    <td class="px-4 py-3 text-slate-600">探すパターン</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Template</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>$1$</code></td>
+                                    <td class="px-4 py-3 text-slate-600">変数に入れる形。<code>$1$</code> は1番目のグループ（かっこの中）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Match No. (0 for Random)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>1</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最初に一致したものを使う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Default Value</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>NOT_FOUND</code></td>
+                                    <td class="px-4 py-3 text-slate-600">見つからなかったときの値</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 取り出したい部分だけをかっこで囲む</p>
+                                <p class="text-blue-900 text-sm">かっこ <code>( )</code> の外側は「目印」として一致の判定に使われるだけで、変数には入りません。かっこを付け忘れると <code>$1$</code> の中身が取れず、Default Value のままになります。まずは JSON Extractor のほうが簡単なので、<strong>応答が JSON なら JSON Extractor、そうでなければ正規表現</strong>、と使い分けるのが基本です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.5 Boundary Extractor
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        正規表現はパターンの書き方に慣れが必要です。<strong>Boundary Extractor（境界抽出器）</strong>は、取り出したい値の<strong>左側の文字列</strong>と<strong>右側の文字列</strong>を指定するだけで、その間にある部分を取り出せます。正規表現より設定が簡単で、処理も軽いのが特長です。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>/uuid</code> の応答 <code>"uuid": "6f1c..."</code> から値を取り出す場合、左の境界は <code>"uuid": "</code>、右の境界は <code>"</code> です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Field to check</td>
+                                    <td class="px-4 py-3 text-slate-600">Body</td>
+                                    <td class="px-4 py-3 text-slate-600">探す場所</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Name of created variable</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>token3</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値を入れる変数名</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Left boundary</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>"uuid": "</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値の直前にある文字列</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Right boundary</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>"</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値の直後にある文字列</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Match No. (0 for Random)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>1</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最初に見つかったものを使う</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Default Value</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>NOT_FOUND</code></td>
+                                    <td class="px-4 py-3 text-slate-600">見つからなかったときの値</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 境界の空白も1文字ずつ一致させる</p>
+                                <p class="text-red-900 text-sm">境界文字列は<strong>空白も含めて完全一致</strong>が必要です。go-httpbin の応答はコロンの後ろに空白が入る形式ですが、サーバーによっては空白が無いこともあります。「見つからない」ときは、View Results Tree の Response data で実際の文字列を確かめ、左右の境界をコピーして貼り付けると確実です。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">抽出器</th>
+                                    <th class="px-4 py-3 text-left font-semibold">向いている応答</th>
+                                    <th class="px-4 py-3 text-left font-semibold">特徴</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">JSON Extractor</td>
+                                    <td class="px-4 py-3 text-slate-600">JSON</td>
+                                    <td class="px-4 py-3 text-slate-600">JSON Path で場所を指定。構造が変わらない限り安定</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Boundary Extractor</td>
+                                    <td class="px-4 py-3 text-slate-600">HTML・テキスト・JSON</td>
+                                    <td class="px-4 py-3 text-slate-600">左右の文字列だけで指定でき、簡単で軽い。境界が一意であることが条件</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Regular Expression Extractor</td>
+                                    <td class="px-4 py-3 text-slate-600">HTML・テキスト・JSON</td>
+                                    <td class="px-4 py-3 text-slate-600">もっとも柔軟だが、式の書き方に慣れが必要で、書き方次第で重くなる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション9.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.6 HTTP Cookie Manager
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        Web サイトのセッションの多くは <strong>Cookie</strong> で維持されます。サーバーが応答の <code>Set-Cookie</code> ヘッダーで「この ID を覚えておいて」と伝え、ブラウザは以降のリクエストで <code>Cookie</code> ヘッダーとして自動的に送り返します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>JMeter はブラウザではない</strong>ので、このやり取りを自動ではしてくれません。代わりに <strong>HTTP Cookie Manager</strong> を置くと、JMeter がブラウザと同じように Cookie を保存し、次のリクエストで送り返してくれます。Extractor で抽出する必要はなく、<strong>置くだけ</strong>です。追加は Thread Group を右クリックして <strong>Add → Config Element → HTTP Cookie Manager</strong> です。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant J as JMeter（Cookie Manager あり）
+    participant S as go-httpbin
+    J->>S: GET /cookies/set?session=abc
+    S-->>J: 302 リダイレクト＋Set-Cookie（session=abc）
+    Note over J: Cookie Manager が session を保存
+    J->>S: GET /cookies（保存した Cookie を自動で付ける）
+    S-->>J: 200 OK（応答に abc が含まれる）
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code>/cookies/set?session=abc</code> は Cookie <code>session=abc</code> を設定したうえで <code>/cookies</code> へリダイレクトし、<code>/cookies</code> は受け取った Cookie を返します。リダイレクトはHTTP Request の <strong>Follow Redirects</strong>（既定でオン）により JMeter が自動でたどります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">状態</th>
+                                    <th class="px-4 py-3 text-left font-semibold">最終的な応答（/cookies）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Response Assertion（Contains: abc）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Cookie Manager あり</td>
+                                    <td class="px-4 py-3 text-slate-600">Cookie <code>session=abc</code> が送り返され、応答に表れる</td>
+                                    <td class="px-4 py-3 text-slate-600">成功</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Cookie Manager なし</td>
+                                    <td class="px-4 py-3 text-slate-600">Cookie が保存されず、<code>abc</code> が応答に表れない</td>
+                                    <td class="px-4 py-3 text-slate-600">失敗</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: Cookie はスレッドごとに独立する</p>
+                                <p class="text-blue-900 text-sm">Cookie Manager が保存する Cookie も、スレッド（仮想ユーザー）ごとに別々です。ユーザーAのセッション ID がユーザーBに混ざることはありません。また、イテレーション（繰り返し）のたびに Cookie を消したいときは、Cookie Manager の <strong>Clear cookies each iteration?</strong> にチェックを入れます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション9.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        9.7 抽出がうまくいかないとき
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        相関でいちばん多いトラブルは「値が取れていない」ことです。次の順で調べます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-bug text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Debug Sampler で変数を見る</h3>
+                            <p class="text-sm text-slate-600">第8章で使った <strong>Debug Sampler</strong>（Add → Sampler → Debug Sampler）を Extractor の後ろに置くと、その時点の JMeter Variables に <code>token=...</code> が入っているかを View Results Tree で確認できます。<code>NOT_FOUND</code> なら抽出の失敗です。</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-magnifying-glass text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">View Results Tree のテスターを使う</h3>
+                            <p class="text-sm text-slate-600">View Results Tree の左側（サンプル一覧）の下にある表示形式のプルダウン（既定は Text）を切り替えると、<strong>JSON Path Tester</strong>・<strong>RegExp Tester</strong>・<strong>Boundary Extractor Tester</strong> が選べます。式を入力すると、その場で何が取れるかを試せるので、式を何度も実行し直さずに済みます。</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">症状</th>
+                                    <th class="px-4 py-3 text-left font-semibold">よくある原因</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対処</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">変数が <code>NOT_FOUND</code> のまま</td>
+                                    <td class="px-4 py-3 text-slate-600">JSON Path や境界文字列が実際の応答と合っていない</td>
+                                    <td class="px-4 py-3 text-slate-600">Response data で応答を確認し、テスターで式を試す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600"><code>/bearer</code> が 401 のまま</td>
+                                    <td class="px-4 py-3 text-slate-600">Authorization ヘッダーが送られていない（Header Manager が無効、または <code>/bearer</code> の子になっていない）、<code>Bearer</code> と値の間のスペース抜け、token が空</td>
+                                    <td class="px-4 py-3 text-slate-600">View Results Tree の Request タブで実際に送られたヘッダーを確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">Request タブに <code>${token}</code> の文字が残っている</td>
+                                    <td class="px-4 py-3 text-slate-600">変数が存在しない（抽出元のサンプラーが後ろにある、抽出器の置き場所違い、変数名の綴り違い）。go-httpbin はどんな値でも 200 を返すので、401 にならず気づきにくい</td>
+                                    <td class="px-4 py-3 text-slate-600">Extractor を取得元サンプラーの子に置き、取得元を先に実行させる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-600">1人目は成功するが他のスレッドは失敗</td>
+                                    <td class="px-4 py-3 text-slate-600">取得したはずの値が共有される前提で設計している</td>
+                                    <td class="px-4 py-3 text-slate-600">変数はスレッドごと。各スレッドが自分で取得する流れにする</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- やってみよう 9-1 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-1: /uuid から /bearer への相関を作る
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">go-httpbin を起動した状態で、<code>/uuid</code> で取得した値を <code>/bearer</code> に渡すテスト計画を作ります。保存名は <code>jmeter-practice/ch09-correlation.jmx</code> です。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">Test Plan → Thread Group（1スレッド・ループ1回）を作り、HTTP Request Defaults（http／localhost／8080）、View Results Tree を追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">HTTP Request「uuid」（Path: <code>/uuid</code>）を追加し、その子に JSON Extractor（変数名 <code>token</code>、JSON Path <code>$.uuid</code>、Match No. <code>1</code>、Default Values <code>NOT_FOUND</code>）を置く。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">その下に HTTP Request「bearer」（Path: <code>/bearer</code>）を追加し、子に HTTP Header Manager（<code>Authorization</code> ＝ <code>Bearer ${token}</code>）と JSON Assertion（<code>$.authenticated</code> が <code>true</code>）を置く。さらに2つ目の JSON Assertion を追加し、<code>$.token</code>、Additionally assert value と Match as regular expression にチェック、Expected Value に UUID の形 <code>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}</code> を設定する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">実行し、View Results Tree で「bearer」が 200、応答に <code>"authenticated": true</code> と、uuid と同じ <code>token</code> が入っていることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words">HTTP Header Manager を無効化（Ctrl+T）して再実行し、401 になることを確認してから有効に戻す。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>確認ポイント:</strong> bearer の応答の token が、直前の uuid の応答と同じ値で、<code>NOT_FOUND</code> ではないことを確認できれば相関は成功です（go-httpbin の <code>/bearer</code> はどんな値でも 200 を返すため、200 だけでは判断できません）。2回実行してトークンの値が毎回変わることも確かめましょう。さらに余裕があれば、JSON Extractor を Regular Expression Extractor（<code>token2</code>）や Boundary Extractor（<code>token3</code>）に置き換え、Header Manager の変数名を差し替えても同じ結果になることを試してみましょう。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう 9-2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 9-2: Cookie Manager の有無で比較する
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">同じ <code>ch09-correlation.jmx</code> に Cookie の確認を追加し、Cookie Manager の効果を比べます。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group の直下に HTTP Request「cookie」（Path: <code>/cookies/set</code>、Parameters に <code>session</code> ＝ <code>abc</code>）を追加する。Follow Redirects がオンであることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">その子に Response Assertion（Field to Test: Text Response、Pattern Matching Rules: Contains、Patterns to Test: <code>abc</code>）を追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group の直下に HTTP Cookie Manager を追加して実行し、成功（緑）になることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">Cookie Manager を無効化して再実行し、Response Assertion が失敗する（赤）ことを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>確認ポイント:</strong> Cookie Manager の有無だけで結果が変わることが、「JMeter はブラウザではないので、Cookie の保存も自分で設定する」ことの実例です。確認が終わったら、Cookie Manager を有効に戻して保存しておきましょう。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 録画したままのスクリプトに含まれるセッション ID の固定値が、なぜ実行時に問題になりますか？ 相関ではこれをどう解決しますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            セッション ID はログインのたびにサーバーが新しく発行するため、録画時の固定値は実行時にはすでに無効で、認証エラーなどになります。相関では、サーバーの応答から Extractor で値を取り出して変数に入れ、次のリクエストで <code>${変数名}</code> として使います。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. JSON Extractor の Default Values に <code>NOT_FOUND</code> のような目印を入れておくのは、なぜ良い習慣ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            空のままだと、抽出に失敗したときに変数が空になったり、作られずに <code>${token}</code> の文字のまま送られたりして、「取れなかった」のか「そもそも動いていない」のかが見分けにくくなります。目印を入れておけば、Debug Sampler や Request タブで <code>NOT_FOUND</code> が見え、抽出の失敗にすぐ気づけます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code>/cookies/set?session=abc</code> から <code>/cookies</code> への流れで、HTTP Cookie Manager を置かないと Response Assertion（Contains: <code>abc</code>）が失敗するのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            JMeter はブラウザではないため、Cookie Manager が無いとサーバーから受け取った Cookie（<code>session=abc</code>）を保存も送り返しもしません。そのため <code>/cookies</code> のリクエストに Cookie が付かず、応答に <code>abc</code> が含まれず、Contains のチェックが失敗します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jmeter-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第8章: 変数とCSVデータでパラメータ化する</span>
+                        </div>
+                    </a>
+                    <a href="jmeter-learning-material-10.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第10章: ロジックコントローラでシナリオを組み立てる</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
