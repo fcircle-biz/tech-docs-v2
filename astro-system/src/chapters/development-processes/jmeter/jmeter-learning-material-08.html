@@ -1,0 +1,732 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">JMeter</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第8章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第8章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約1時間20分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">変数とCSVデータでパラメータ化する</h1>
+                    <p class="text-slate-600">これまでのテスト計画は、すべての仮想ユーザーが「同じ値」でリクエストを送っていました。現実の利用者はそれぞれ違うユーザー ID を使い、違う商品を見ます。この章では、変数・関数・プロパティ・CSV ファイルを使ってリクエストの値を差し替える「パラメータ化」を学び、ユーザーごとに異なるデータでテストを実行できるようにします。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>パラメータ化が必要な理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>変数（<code>${変数名}</code>）と関数（<code>${__Random(...)}</code> など）をリクエストに埋め込める</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>CSV Data Set Config で CSV の各行を、スレッドごと・イテレーションごとに読み込める</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>変数とプロパティの違いを理解し、<code>${__P(...)}</code> で外から値を渡す準備ができる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>Debug Sampler で変数の中身を確認できる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション8.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.1 なぜパラメータ化するのか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば 100 人分の仮想ユーザーが、全員同じユーザー ID で、同じ商品ページを何度も開いたとします。サーバーやデータベースは「同じ問い合わせ」を繰り返し受けるため、結果をキャッシュ（一時保存）から返せてしまい、<strong>現実よりも速く見える</strong>ことがあります。逆に、同じユーザーで同時にログインすると「二重ログイン」としてエラーになるシステムもあります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このように、リクエストの中の<strong>固定値を、実行のたびに（またはユーザーごとに）変わる値へ置き換えること</strong>を、<strong>パラメータ化</strong>と呼びます。JMeter では次の 4 つの仕組みを使い分けます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-tag text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">変数（Variable）</h3>
+                            <p class="text-sm text-slate-600">名前を付けた値の入れ物。<code>${user}</code> のように参照する。スレッドごとに独立している。</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-dice text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">関数（Function）</h3>
+                            <p class="text-sm text-slate-600">乱数・現在時刻・連番・UUID などを、その場で計算して返す。<code>${__Random(1,100,)}</code> のように書く。</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-file-csv text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">CSV データ</h3>
+                            <p class="text-sm text-slate-600">ユーザー ID・パスワードなどの一覧をファイルに用意し、1 行ずつ変数として読み込む。</p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-sliders text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">プロパティ（Property）</h3>
+                            <p class="text-sm text-slate-600">JMeter 全体で共有される設定値。コマンドラインから <code>-Jusers=20</code> のように外から渡せる。</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["値の出どころ<br/>変数・関数・CSV・プロパティ"] --> B["リクエストの中の<br/>${...} が実行時に置き換わる"]
+    B --> C["スレッドごとに<br/>異なる値でリクエスト送信"]
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.2 変数の基本
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もっとも簡単な変数は、<strong>User Defined Variables（ユーザー定義変数）</strong>で作ります。Test Plan を選ぶと右側に「User Defined Variables」の表があり、そこに名前と値を書くだけです。専用の要素として追加する場合は、Thread Group を右クリックして <strong>Add → Config Element → User Defined Variables</strong> を選びます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Name</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Value</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>itemId</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code>42</code></td>
+                                    <td class="px-4 py-3 text-slate-600">商品番号の固定値</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>keyword</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code>jmeter</code></td>
+                                    <td class="px-4 py-3 text-slate-600">検索キーワード</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        変数を使うときは、HTTP Request の Path や Parameters、Body Data など、文字を入力できる欄のほとんどに <code>${変数名}</code> と書きます。実行時に JMeter がその部分を変数の値へ置き換えてからリクエストを送ります。たとえば Path に <code>/anything/items/${itemId}</code> と書けば、実際には <code>/anything/items/42</code> へアクセスします。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">変数はスレッドごとに独立している</p>
+                                <p class="text-blue-900 text-sm">JMeter の変数は、<strong>スレッド（仮想ユーザー）ごとに別々の値</strong>を持てます。スレッド 1 が <code>user</code> に alice を入れても、スレッド 2 の <code>user</code> には影響しません。後述の CSV Data Set Config や、第 9 章の相関で取り出した値も、このスレッドごとの変数に入ります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: User Defined Variables は「実行中に値が変わる変数」には向かない</p>
+                                <p class="text-red-900 text-sm">User Defined Variables は、テスト開始時にまとめて設定される「定数」のような使い方に向いています。ユーザーごとに変わる値は CSV Data Set Config や第 9 章の抽出機能で作る変数を使い、固定の共通値だけを User Defined Variables に置くと混乱しません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.3 関数
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <strong>関数</strong>は、実行時に値を計算して返す小さな部品です。<code>${__関数名(引数1,引数2,...)}</code> という形で、変数と同じように入力欄へ書きます。関数名の前には<strong>アンダースコアが 2 つ</strong>付きます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">書き方</th>
+                                    <th class="px-4 py-3 text-left font-semibold">返す値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">使いどころ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>${__Random(1,100,)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">1 以上 100 以下の整数の乱数（第 3 引数は結果を保存する変数名で、省略可）</td>
+                                    <td class="px-4 py-3 text-slate-600">商品番号をばらつかせる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>${__time(yyyyMMddHHmmss,)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">指定した書式の現在日時（例: <code>20261018153045</code>）。第 2 引数は結果を保存する変数名で省略可</td>
+                                    <td class="px-4 py-3 text-slate-600">注文番号や名前を一意にする</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>${__threadNum}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">そのスレッドの番号（1 から始まる）</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーごとに別の値を作る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>${__UUID()}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">ランダムな UUID（毎回違う文字列）</td>
+                                    <td class="px-4 py-3 text-slate-600">重複しない ID を作る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium"><code>${__counter(FALSE,)}</code></td>
+                                    <td class="px-4 py-3 text-slate-600">1 から始まる連番。<code>FALSE</code> は全スレッドで共有、<code>TRUE</code> はスレッドごとに数える。書いた場所ごとに別のカウンターになる</td>
+                                    <td class="px-4 py-3 text-slate-600">その場所が実行された回数を番号にする</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        関数の引数の書き方を忘れても、JMeter のメニュー <strong>Tools → Function Helper Dialog</strong> から確認できます。ダイアログで関数を選んで引数を入力し、<strong>Generate</strong> ボタンを押すと、貼り付け用の文字列（例: <code>${__Random(1,100,)}</code>）が表示されます。<strong>Copy and Paste function string</strong> の欄からコピーして、入力欄に貼り付けましょう。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 末尾のカンマは省略した引数の場所</p>
+                                <p class="text-emerald-900 text-sm"><code>${__Random(1,100)}</code> と書いても動きますが、本ガイドでは Function Helper Dialog が生成する形（末尾カンマ付き）に揃えます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.4 CSV Data Set Config
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ユーザー ID とパスワードの組のように、<strong>決まったデータの一覧</strong>を使いたいときは CSV ファイルを用意します。CSV（Comma-Separated Values）は、値をカンマで区切って 1 行 1 件で書いたテキストファイルです。まず作業フォルダ <code>jmeter-practice</code> に、次の内容で <code>users.csv</code> を作ります。文字コードは <strong>UTF-8</strong> で保存してください。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jmeter-practice/users.csv</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">alice,pass1111
+bob,pass2222
+carol,pass3333
+dave,pass4444
+eve,pass5555</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この例では 1 行目からデータを書いています（見出し行なし）。第14章でも同じ <code>users.csv</code> を使います。次に、Thread Group を右クリックして <strong>Add → Config Element → CSV Data Set Config</strong> を追加し、次のように設定します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Filename</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>users.csv</code></td>
+                                    <td class="px-4 py-3 text-slate-600">CSV ファイルの場所。相対パスで書くと、<strong>.jmx ファイルがあるフォルダ</strong>が基準になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">File encoding</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>UTF-8</code></td>
+                                    <td class="px-4 py-3 text-slate-600">ファイルの文字コード。日本語を含めるなら必ず指定する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Variable Names (comma-delimited)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>user,password</code></td>
+                                    <td class="px-4 py-3 text-slate-600">各列に付ける変数名。左の列から順に割り当てられる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Ignore first line</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>False</code></td>
+                                    <td class="px-4 py-3 text-slate-600">先頭行を読み飛ばすか。見出し行があるファイルでは <code>True</code>（Variable Names を書いたときだけ有効）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Delimiter (use '\t' for tab)</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>,</code></td>
+                                    <td class="px-4 py-3 text-slate-600">列の区切り文字。タブ区切りなら <code>\t</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Allow quoted data?</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>False</code></td>
+                                    <td class="px-4 py-3 text-slate-600">値をダブルクォートで囲む CSV（値の中にカンマを含む）のときだけ <code>True</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Recycle on EOF?</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>True</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最後の行まで読んだら先頭へ戻るか</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Stop thread on EOF?</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>False</code></td>
+                                    <td class="px-4 py-3 text-slate-600">最後の行まで読んだらスレッドを止めるか（Recycle が <code>True</code> のときは無視される）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Sharing mode</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>All threads</code></td>
+                                    <td class="px-4 py-3 text-slate-600">ファイルを誰と共有して読むか（8.5 で説明）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 見出し行付きの CSV</p>
+                                <p class="text-blue-900 text-sm">1 行目に <code>user,password</code> という見出しがある CSV を使うなら、<strong>Ignore first line</strong> を <code>True</code> にします。Variable Names を空欄にすると、1 行目の見出しがそのまま変数名として使われます（この場合 Ignore first line は無効）。本ガイドでは、変数名を画面で見えるように <strong>Variable Names を明示する方式</strong>を使います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.5 CSV の読み込まれ方
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        CSV Data Set Config は、<strong>スレッドがテスト計画を 1 周（1 イテレーション）するたびに、次の 1 行を読み込んで変数に入れます</strong>。「スレッドが起動した瞬間に全行を読む」のではない点に注意してください。たとえば 1 スレッドでループ回数 5 なら、1 周目は alice、2 周目は bob、……と順に変わります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["1周目の開始"] --> B["CSVの1行目を読む<br/>user=alice"]
+    B --> C["リクエスト送信<br/>user=alice"]
+    C --> D["2周目の開始"]
+    D --> E["CSVの2行目を読む<br/>user=bob"]
+    E --> F["リクエスト送信<br/>user=bob"]
+    F --> G["最終行まで来たら<br/>Recycle on EOFなら先頭へ戻る"]
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        複数のスレッドがあるときに、行をどう配るかを決めるのが <strong>Sharing mode</strong> です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Sharing mode</th>
+                                    <th class="px-4 py-3 text-left font-semibold">動き</th>
+                                    <th class="px-4 py-3 text-left font-semibold">向いている場面</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-bold">All threads</td>
+                                    <td class="px-4 py-3 text-slate-600">テスト計画内の全スレッドで 1 つのファイルを共有し、読むたびに次の行へ進む</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーごとに別の行を使いたい（既定値）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Current thread group</td>
+                                    <td class="px-4 py-3 text-slate-600">同じ Thread Group 内のスレッドだけで共有する</td>
+                                    <td class="px-4 py-3 text-slate-600">Thread Group ごとに別のデータを使いたい</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Current thread</td>
+                                    <td class="px-4 py-3 text-slate-600">各スレッドが、自分専用のコピーを先頭から読む</td>
+                                    <td class="px-4 py-3 text-slate-600">全ユーザーが同じ順序でデータを使ってよい</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">任意の識別子（Edit を選んで入力）</td>
+                                    <td class="px-4 py-3 text-slate-600">同じ文字列を入力した CSV Data Set Config どうしでファイルを共有する</td>
+                                    <td class="px-4 py-3 text-slate-600">複数の設定で同じファイルを共有したい</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph ALL["All threads"]
+        F1["users.csv"] -->|"次の行を順番に配る"| T1["スレッド1: alice"]
+        F1 --> T2["スレッド2: bob"]
+        F1 --> T3["スレッド3: carol"]
+    end
+    subgraph CUR["Current thread"]
+        G1["users.csvのコピー"] --> U1["スレッド1: alice, bob, ..."]
+        G2["users.csvのコピー"] --> U2["スレッド2: alice, bob, ..."]
+    end
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: 行数より多く読むと値が繰り返される</p>
+                                <p class="text-red-900 text-sm">データが 5 行しかないのに 10 ユーザーでテストすると、<strong>Recycle on EOF が True なら先頭に戻って同じユーザーが再登場</strong>します。「同じユーザーが同時に使うとエラーになる」システムでは、ユーザー数以上の行数を用意するか、Recycle on EOF を <code>False</code>・Stop thread on EOF を <code>True</code> にして、データが尽きたらスレッドを止めます。複数スレッドで読むときは、どのスレッドがどの行を取るかの順序は<strong>実行のたびに入れ替わりうる</strong>ため、行と順番が一対一で決まるとは限りません。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション8.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.6 プロパティで外から値を渡す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じテスト計画を「10 ユーザー」「20 ユーザー」「50 ユーザー」と条件を変えて実行したいとき、そのたびに .jmx を開いて書き換えるのは面倒でミスのもとです。そこで、<strong>プロパティ</strong>を使います。プロパティは JMeter の起動時に渡せる設定値で、<code>${__P(プロパティ名,既定値)}</code> という関数で読み取ります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえば Thread Group の <strong>Number of Threads (users)</strong> 欄に <code>${__P(users,5)}</code> と書いておくと、「<code>users</code> というプロパティが渡されていればその値、無ければ <code>5</code>」をスレッド数に使います。こう書き換えておけば、次のようにコマンドラインから <code>-Jusers=20</code> を渡してユーザー数を切り替えられます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">terminal（第12章で本格的に使います）</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash"># イメージ（実際に試すのは第12章）。jmeter-practice フォルダで実行する
+# macOS / Linux
+cd ~/Documents/jmeter-practice
+~/tools/apache-jmeter-5.6.3/bin/jmeter -n -t ch08-parameters.jmx -Jusers=20
+# Windows（PowerShell）
+cd $HOME\Documents\jmeter-practice
+C:\tools\apache-jmeter-5.6.3\bin\jmeter.bat -n -t ch08-parameters.jmx -Jusers=20</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        GUI から開いて動かすときは、<code>-J</code> を渡さない限り既定値の <code>5</code> が使われます。この「GUI では既定値、CLI では外から上書き」の形は、第 12 章で本格的に使います。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここで、変数とプロパティの違いを整理しておきましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">比較項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">変数（Variable）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">プロパティ（Property）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">範囲</td>
+                                    <td class="px-4 py-3 text-slate-600">スレッドごと（ユーザーごとに別の値）</td>
+                                    <td class="px-4 py-3 text-slate-600">JMeter 全体で 1 つ（全スレッド共通）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">参照方法</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>${user}</code></td>
+                                    <td class="px-4 py-3 text-slate-600"><code>${__P(users,5)}</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">値の与え方</td>
+                                    <td class="px-4 py-3 text-slate-600">User Defined Variables、CSV、抽出（第 9 章）など</td>
+                                    <td class="px-4 py-3 text-slate-600">起動時の <code>-Jname=value</code>、<code>user.properties</code> など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">主な用途</td>
+                                    <td class="px-4 py-3 text-slate-600">ユーザーごとに違うデータ</td>
+                                    <td class="px-4 py-3 text-slate-600">負荷条件（ユーザー数・時間）や接続先の切り替え</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション8.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        8.7 値の確認（Debug Sampler）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「変数に思った値が入っているか分からない」ときは、<strong>Debug Sampler</strong> を使います。Thread Group を右クリックして <strong>Add → Sampler → Debug Sampler</strong> を追加し、設定は次のとおりにします。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">項目</th>
+                                    <th class="px-4 py-3 text-left font-semibold">設定値</th>
+                                    <th class="px-4 py-3 text-left font-semibold">説明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">JMeter properties</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>False</code></td>
+                                    <td class="px-4 py-3 text-slate-600">プロパティ一覧は出さない（量が多い）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">JMeter variables</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>True</code></td>
+                                    <td class="px-4 py-3 text-slate-600">そのスレッドの変数一覧を応答として出す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">System properties</td>
+                                    <td class="px-4 py-3 text-slate-600"><code>False</code></td>
+                                    <td class="px-4 py-3 text-slate-600">Java のシステムプロパティは出さない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        あとは View Results Tree を置いて実行し、Debug Sampler を選んで <strong>Response data</strong> タブを見ると、<code>user=alice</code>・<code>password=pass1111</code> のように、その時点の変数が一覧で表示されます。ここに変数が出ていなければ、CSV Data Set Config の置き場所（スコープ）や Variable Names の綴りを疑います。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">注意: Debug Sampler は確認が終わったら無効化する</p>
+                                <p class="text-red-900 text-sm">Debug Sampler もサンプルとして記録されるため、残したまま負荷テストをするとレポートの件数や応答時間に混ざってしまいます。確認が終わったら要素を右クリックして <strong>Disable</strong>（または Ctrl+T）で無効にしましょう。第 12 章の実行前チェックリストにも入ります。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう 8-1 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-1: CSV のユーザーを POST のボディに埋め込む
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">go-httpbin を起動した状態で <code>ch08-parameters.jmx</code> を作り、CSV の <code>user</code> 列が実行のたびに変わることを、応答の <code>json.user</code> で確認します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code>jmeter-practice</code> に 8.4 の <code>users.csv</code> を作り、JMeter で新しいテスト計画を作って <code>ch08-parameters.jmx</code> として同じフォルダに保存する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group を追加し、<strong>Number of Threads</strong> を <code>1</code>、<strong>Loop Count</strong> を <code>5</code> にする（1 人が 5 周するので、CSV の 5 行が順に使われる）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">Thread Group に <strong>HTTP Request Defaults</strong>（Protocol <code>http</code>／Server Name <code>localhost</code>／Port <code>8080</code>）と <strong>CSV Data Set Config</strong>（8.4 の表の設定）を追加する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>HTTP Header Manager</strong> を追加し、<code>Content-Type: application/json</code> を設定する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">5</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>HTTP Request</strong> を追加し、Method を <code>POST</code>、Path を <code>/post</code> にして、<strong>Body Data</strong> に下のJSONを書く。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">6</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>View Results Tree</strong> を追加して実行し、5 件のリクエストそれぞれの <strong>Response data</strong> で <code>json</code> の中の <code>user</code> が alice → bob → carol → dave → eve と変わることを確認する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="code-block-wrapper my-4">
+                                <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                    <span class="text-slate-400 text-sm">HTTP Request の Body Data</span>
+                                    <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                            onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <pre class="!mt-0 !rounded-t-none"><code class="language-json">{
+  "user": "${user}",
+  "password": "${password}"
+}</code></pre>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>確認ポイント:</strong> go-httpbin の <code>/post</code> は、送った JSON をそのまま応答の <code>json</code> フィールドに入れて返します。応答の user が <code>&lt;EOF&gt;</code> なら CSV ファイルが見つかっていません（Filename の綴り、.jmx と同じフォルダに保存したか、.jmx を保存済みか）。<code>${user}</code> のまま返ってきたら、Variable Names の綴りと Body Data の変数名が合っているかを確認しましょう（8.7 の Debug Sampler も役立ちます）。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう 8-2 -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 8-2: 乱数で商品番号を変える
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">同じ <code>ch08-parameters.jmx</code> に、関数で毎回違う商品番号を使うリクエストを追加します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ol class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>User Defined Variables</strong> を追加し、Name <code>itemId</code>／Value <code>${__Random(1,100,)}</code> を登録する（実行開始時に 1 回だけ決まる値になる）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">新しい <strong>HTTP Request</strong>（GET）を追加し、Path を <code>/anything/items/${__Random(1,100,)}</code> にする（こちらはリクエストのたびに新しい乱数になる）。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>Debug Sampler</strong> を追加し、JMeter variables だけ <code>True</code> にして実行する。View Results Tree で、アクセス先 URL が毎回違う番号になること、Debug Sampler の出力に <code>itemId</code> が表示されることを確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words">確認できたら Debug Sampler を無効化し、<code>ch08-parameters.jmx</code> を保存する。</span>
+                                </li>
+                            </ol>
+
+                            <div class="bg-purple-100 rounded-lg p-3 text-sm text-purple-900 break-words">
+                                <strong>考えてみよう:</strong> 手順 1 の <code>itemId</code> は何度実行しても 1 回の実行中は同じ値で、手順 2 の Path 直書きはリクエストのたびに変わります。「ユーザーごと・リクエストごとにばらつかせたい」ときは、どちらを選ぶべきでしょうか。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ol class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 変数（<code>${user}</code>）とプロパティ（<code>${__P(users,5)}</code>）の違いを、範囲と主な用途の面から説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            変数はスレッド（仮想ユーザー）ごとに別の値を持てる入れ物で、ユーザーごとに違うデータ（CSV の行など）に使います。プロパティは JMeter 全体で共有される 1 つの設定値で、<code>-Jusers=20</code> のように起動時に外から渡せるため、ユーザー数や実行時間などの負荷条件を切り替える用途に向いています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. CSV Data Set Config の Filename に <code>users.csv</code> とだけ書いたとき、このファイルはどこから探されますか？ また、データが 5 行で 10 ユーザーが実行すると、Recycle on EOF が True の場合どうなりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            相対パスは、テスト計画（.jmx）が保存されているフォルダが基準になります。行数が足りなくなると、Recycle on EOF が True なので先頭の行へ戻り、同じユーザーのデータが再び使われます。同じユーザーの重複を避けたいときは、行数をユーザー数以上に増やすか、Recycle on EOF を False・Stop thread on EOF を True にします。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 1 スレッド・ループ回数 5 のテスト計画に CSV Data Set Config を置くと、CSV の行はいつ読み込まれますか？ 変数の中身を確認するにはどの要素を使いますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            スレッドがテスト計画を 1 周（1 イテレーション）するたびに次の 1 行が読み込まれるため、5 周で 5 行が順に使われます。変数の中身は Debug Sampler で JMeter variables を True にして実行し、View Results Tree の Response data で確認します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="jmeter-learning-material-07.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第7章: アサーションで応答を検証する</span>
+                        </div>
+                    </a>
+                    <a href="jmeter-learning-material-09.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第9章: 相関：レスポンスの値を次のリクエストで使う</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
