@@ -9,7 +9,7 @@ export const jmeter: TechGuide = {
   techTitle: 'JMeter学習教材',
   icon: 'fa-gauge-high',
   level: '初級',
-  totalTime: '約16時間',
+  totalTime: '約17時間',
   splashStop0: '#10b981',
   splashStop1: '#06b6d4',
   splashBg: '#090b11',
