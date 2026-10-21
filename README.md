@@ -55,6 +55,7 @@
 #### COBOL
 
 - [**COBOL入門学習ガイド**](docs/guide/programming-languages/cobol-ecosystem/cobol/README.md) - プログラミング未経験者・初心者向けCOBOL入門14章構成カリキュラム。COBOLが銀行・保険・官公庁の基幹システムで使われ続ける理由とバッチ処理の考え方から、無償のGnuCOBOLによる環境構築と最初のプログラム、4つの部（DIVISION）と固定形式の桁のルール、データ項目とPICTURE句、DISPLAY・ACCEPTと編集項目、四則演算とCOMPUTE（ROUNDED・ON SIZE ERROR）、IF・EVALUATEと条件名（88レベル）、PERFORMによる繰り返しと構造化、集団項目とレベル番号、表（OCCURS）とSEARCH、STRING・UNSTRING・INSPECTによる文字列加工、順ファイルの読み書きとFILE STATUS、CALLとCOPYによる部品化、そしてSORTとコントロールブレイクを使った売上集計バッチの完成まで、文房具店の売上管理を題材に全サンプルを実機で動作確認しながら段階的に学習（全14章・約23時間）
+- [**COBOLバッチ処理入門学習ガイド**](docs/guide/programming-languages/cobol-ecosystem/cobol-batch/README.md) - 新入社員・初学者向けに、メインフレーム（IBM z/OS系）のバッチ処理を支えるCOBOL・SAMファイル・JCL・ジョブネットを「データを読み、処理し、実行し、つなげる」日次売上集計バッチの流れで学ぶ8章構成の研修カリキュラム。オンライン処理とバッチ処理の違い、ジョブ・ジョブステップ・ジョブネットの関係から、固定長・可変長レコードとレコードレイアウトの読み解き（RECFM・LRECL、QSAMとVSAM）、COBOLの基礎（DIVISION・PIC・MOVE・IF・PERFORM）、順次ファイルの入出力とFILE STATUS、JCLの基礎（JOB・EXEC・DD・DISP・戻りコード）、ASSIGNとDD名の対応とジョブログの確認、先行・後続関係と異常時の再実行を含むジョブネットの設計、そして正常系・異常系・再実行まで含めた総合ハンズオンまで、「読む→直す→作る」の3段階の演習で段階的に学習。メインフレームが無い環境でもGnuCOBOLと疑似JCL・疑似ジョブネットで体験可能（全8章・約24時間）
 
 ### Web技術
 
