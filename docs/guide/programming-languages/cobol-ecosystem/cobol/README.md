@@ -61,7 +61,7 @@ FILE-CONTROL と FD でファイルを定義し、OPEN・READ・WRITE・CLOSE �
 連絡節を持つ副プログラムを作って CALL で呼び出し、BY REFERENCE と BY CONTENT の違いを確かめます。COPY 文とコピーブックでレコード定義を共有します。
 
 ### [14. 実践：売上集計バッチを作ろう - 総まとめと次のステップ](https://fcircle-biz.github.io/tech-docs-v2/guide/programming-languages/cobol-ecosystem/cobol/cobol-learning-material-14.html)
-SORT 文で並べ替えた売上データから、コントロールブレイクで商品ごとの小計と総合計を求める帳票作成バッチを完成させます。メインフレーム（JCL・CICS・Db2）など次に学ぶことも紹介します。
+SORT 文で並べ替えた売上データから、コントロールブレイクで商品ごとの小計と総合計を求める帳票作成バッチを完成させます。桁数の上限設計、ファイルやデータの異常の検知、終了コードによる失敗の通知、期待結果を決めたテストまで扱います。メインフレーム（JCL・CICS・Db2）など次に学ぶことも紹介します。
 
 ## 推奨所要時間
 
@@ -72,16 +72,16 @@ SORT 文で並べ替えた売上データから、コントロールブレイク
 | 第3章 | プログラムの骨組み | 1.5時間 |
 | 第4章 | データ項目とPICTURE句 | 1.5時間 |
 | 第5章 | DISPLAY・ACCEPTと編集項目 | 1.5時間 |
-| 第6章 | 四則演算とCOMPUTE | 1.5時間 |
-| 第7章 | IF・EVALUATEと条件名 | 1.5時間 |
-| 第8章 | PERFORMと構造化 | 1.5時間 |
+| 第6章 | 四則演算とCOMPUTE | 1時間40分 |
+| 第7章 | IF・EVALUATEと条件名 | 1時間40分 |
+| 第8章 | PERFORMと構造化 | 1時間40分 |
 | 第9章 | 集団項目とレベル番号 | 1.5時間 |
-| 第10章 | 表（OCCURS）と検索 | 2時間 |
+| 第10章 | 表（OCCURS）と検索 | 2時間15分 |
 | 第11章 | 文字列の加工 | 1.5時間 |
 | 第12章 | 順ファイル処理の基本 | 2時間 |
 | 第13章 | CALLとCOPY | 1.5時間 |
-| 第14章 | 実践：売上集計バッチ | 3時間 |
-| **合計** | | **約23時間** |
+| 第14章 | 実践：売上集計バッチ | 3時間30分 |
+| **合計** | | **約24時間** |
 
 ## 学習目標
 
@@ -92,11 +92,12 @@ SORT 文で並べ替えた売上データから、コントロールブレイク
 - 4つの部と固定形式の桁のルールに従って、読みやすい COBOL プログラムを書ける
 - PICTURE 句・編集項目・集団項目・表（OCCURS）を使って業務データを定義・表示できる
 - IF・EVALUATE・PERFORM を使った構造化されたプログラムを書ける
-- 順ファイルの読み書き、SORT、コントロールブレイクによる集計帳票を作成できる
+- 順ファイルの読み書き、SORT、コントロールブレイクによる集計帳票を作成し、異常時には終了コードで確実に失敗を知らせられる
 - CALL と COPY を使ってプログラムを部品に分け、既存の COBOL プログラムを読み解く土台を持てる
 
 ## 次のステップ
 
 - メインフレーム環境（z/OS・JCL・CICS・Db2 の埋め込み SQL）の学習
+- 実務の補強テーマ: 数値の内部表現（COMP・COMP-3）、バッチ運用（再実行・二重処理の防止）、QSAM・EBCDIC、ファイル設計（ヘッダー・トレーラー、件数・金額の照合）
 - [SQL 入門](https://fcircle-biz.github.io/tech-docs-v2/guide/database/sql/sql-learning-material-01.html) — COBOL から利用するデータベースの基礎
 - [Java 入門](https://fcircle-biz.github.io/tech-docs-v2/guide/programming-languages/java-ecosystem/java/java-learning-material-01.html) — COBOL 資産のモダナイゼーション（移行・連携）先として多い言語

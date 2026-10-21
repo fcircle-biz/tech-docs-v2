@@ -7,7 +7,7 @@ export const cobol: TechGuide = {
   techTitle: 'COBOL学習教材',
   icon: 'fa-server',
   level: '初級',
-  totalTime: '約23時間',
+  totalTime: '約24時間',
   splashStop0: '#6366f1',
   splashStop1: '#06b6d4',
   splashBg: '#090b11',
