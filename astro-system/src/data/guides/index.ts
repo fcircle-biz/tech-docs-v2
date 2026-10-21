@@ -35,6 +35,9 @@ import { python } from './programming-languages/python-ecosystem/python';
 // プログラミング言語 — .NET エコシステム
 import { vbnet } from './programming-languages/dotnet-ecosystem/vbnet';
 
+// プログラミング言語 — COBOL エコシステム
+import { cobol } from './programming-languages/cobol-ecosystem/cobol';
+
 // Web技術
 import { html } from './web-technologies/html';
 import { css } from './web-technologies/css';
@@ -99,6 +102,8 @@ const all: TechGuide[] = [
   python,
   // プログラミング言語 — .NET エコシステム
   vbnet,
+  // プログラミング言語 — COBOL エコシステム
+  cobol,
   // Web技術
   html,
   css,

@@ -34,6 +34,7 @@ export const categories: Category[] = [
       { key: 'javascript-ecosystem', label: 'JavaScript エコシステム' },
       { key: 'python-ecosystem', label: 'Python エコシステム' },
       { key: 'dotnet-ecosystem', label: '.NET エコシステム' },
+      { key: 'cobol-ecosystem', label: 'COBOL エコシステム' },
     ],
   },
   { key: 'web-technologies', label: 'Web技術', icon: 'fa-globe' },

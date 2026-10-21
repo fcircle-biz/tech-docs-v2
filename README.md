@@ -52,6 +52,10 @@
 
 - [**VB.NET入門学習ガイド**](docs/guide/programming-languages/dotnet-ecosystem/vbnet/README.md) - プログラミング未経験者・初心者向けVB.NET（Visual Basic .NET）入門14章構成カリキュラム。Visual Studio 2022 Communityによる開発環境構築とHello World、変数とデータ型、演算子と文字列操作、条件分岐（If / Select Case）、ループ（For / Do / For Each）、配列とコレクション（List / Dictionary）、SubプロシージャとFunctionの基礎から、オブジェクト指向の核心（クラスとオブジェクト、プロパティとカプセル化、継承とポリモーフィズム）、さらに例外処理とデバッグ、ファイル入出力（CSV含む）、Windows Formsによる画面付きアプリ開発、ADO.NETによるデータベース接続とSQLインジェクション対策まで、業務システム開発を見据えて段階的に学習（全14章・約21時間）
 
+#### COBOL
+
+- [**COBOL入門学習ガイド**](docs/guide/programming-languages/cobol-ecosystem/cobol/README.md) - プログラミング未経験者・初心者向けCOBOL入門14章構成カリキュラム。COBOLが銀行・保険・官公庁の基幹システムで使われ続ける理由とバッチ処理の考え方から、無償のGnuCOBOLによる環境構築と最初のプログラム、4つの部（DIVISION）と固定形式の桁のルール、データ項目とPICTURE句、DISPLAY・ACCEPTと編集項目、四則演算とCOMPUTE（ROUNDED・ON SIZE ERROR）、IF・EVALUATEと条件名（88レベル）、PERFORMによる繰り返しと構造化、集団項目とレベル番号、表（OCCURS）とSEARCH、STRING・UNSTRING・INSPECTによる文字列加工、順ファイルの読み書きとFILE STATUS、CALLとCOPYによる部品化、そしてSORTとコントロールブレイクを使った売上集計バッチの完成まで、文房具店の売上管理を題材に全サンプルを実機で動作確認しながら段階的に学習（全14章・約23時間）
+
 ### Web技術
 
 - [**HTML学習ガイド**](docs/guide/web-technologies/html/README.md) - Web制作がまったく初めての方向けHTML入門12章構成カリキュラム。HTMLとは何かという出発点から、エディタの準備と最初のページ作成、HTMLの基本構造とタグのルール、見出しと段落・文字の装飾、リスト、リンク、画像とメディア、表（テーブル）、フォーム、セマンティックHTMLと文書構造、CSSとの連携入門、そして総仕上げとなるプロフィールページ制作まで、実際に手を動かしながら段階的に学習（全12章・約7時間20分）

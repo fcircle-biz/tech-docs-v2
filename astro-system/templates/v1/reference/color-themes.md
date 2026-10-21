@@ -44,6 +44,7 @@ CSS 変数内では数値のみをカンマ区切りで書く（`rgb()` ラッ�
 | React / Next.js | `#67e8f9` | `#22d3ee` | `#06b6d4` | `#0891b2` | `#0e7490` | `6, 182, 212` |
 | .NET / C# | `#c4b5fd` | `#a78bfa` | `#8b5cf6` | `#7c3aed` | `#6d28d9` | `139, 92, 246` |
 | PHP / Laravel | `#a5b4fc` | `#818cf8` | `#6366f1` | `#4f46e5` | `#4338ca` | `99, 102, 241` |
+| COBOL / メインフレーム | `#a5b4fc` | `#818cf8` | `#6366f1` | `#4f46e5` | `#4338ca` | `99, 102, 241` |
 | Oracle Database | `#fca5a5` | `#f87171` | `#ef4444` | `#dc2626` | `#b91c1c` | `239, 68, 68` |
 | PostgreSQL | `#93c5fd` | `#60a5fa` | `#3b82f6` | `#2563eb` | `#1d4ed8` | `59, 130, 246` |
 | SQL / 汎用DB | `#7dd3fc` | `#38bdf8` | `#0ea5e9` | `#0284c7` | `#0369a1` | `14, 165, 233` |
@@ -201,6 +202,11 @@ primary: {
 ```
 - **アイコン**: `fab fa-php`
 - **用途**: PHP, Laravel
+
+#### COBOL / メインフレーム
+PHP / Laravel と同じインディゴのパレットを使う（メインフレームの深い青）。
+- **アイコン**: `fas fa-server`
+- **用途**: COBOL, GnuCOBOL, メインフレーム（JCL・CICS）
 
 ---
 
@@ -637,6 +643,7 @@ primary: {
 | React | `#06b6d4` | cyan-500 | `fab fa-react` | React, Next.js |
 | .NET / C# | `#8b5cf6` | violet-500 | `fab fa-microsoft` | C#, ASP.NET |
 | PHP | `#6366f1` | indigo-500 | `fab fa-php` | PHP, Laravel |
+| COBOL | `#6366f1` | indigo-500 | `fas fa-server` | COBOL, メインフレーム |
 | Oracle | `#ef4444` | red-500 | `fas fa-database` | Oracle, PL/SQL |
 | PostgreSQL | `#3b82f6` | blue-500 | `fas fa-database` | PostgreSQL |
 | SQL | `#0ea5e9` | sky-500 | `fas fa-database` | SQL, MySQL |

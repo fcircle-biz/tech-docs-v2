@@ -1,0 +1,1256 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">COBOL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第14章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第14章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約180分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">実践：売上集計バッチを作ろう - 総まとめと次のステップ</h1>
+                    <p class="text-slate-600">最終章では、これまでの知識を総動員して、順不同の売上データを並べ替え、商品ごとの小計と総合計を帳票にまとめる「売上集計バッチ」を完成させます。仕様 → 設計 → 部品ごとの実装 → 組み立て → 実行 → テストという、現場の開発と同じ流れで進めましょう。最後に、COBOL のさらに先にある学習の道すじも紹介します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>作るものを仕様と入出力の例で整理し、段落構成に分けて設計できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>SORT文（SD・USING・GIVING）でデータを並べ替えられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>コントロールブレイク（キーが変わったら小計を出す）の仕組みを理解し、最後のグループの小計も出せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>編集項目と FILLER で、桁のそろった帳票を出力できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>テストの観点（0件・1件・同じ商品だけ）を持ち、COBOL の次の学習ステップを把握する</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.1 作るもの（仕様）
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        いよいよ最終章です。ここまでの章で学んだ「データ項目」「計算」「判断」「繰り返し」「ファイル処理」を総動員して、文房具店の<strong>売上集計バッチ</strong>を作ります。第1章で見た「入力ファイル → COBOLプログラム → 帳票」という、バッチ処理の基本形そのものです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まず、「何を作るのか」を決めます。プログラムを書き始める前に<strong>入力と出力の例を紙に書く</strong>のは、現場でも使う基本の進め方です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">項目</th><th class="px-4 py-3 text-left font-semibold">内容</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">入力</td><td class="px-4 py-3"><code class="bg-slate-100">sales.txt</code>：売上レコード（第9章・第12章と同じ20バイト）を1行1件で並べたファイル。日付も商品もばらばら（順不同）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">処理</td><td class="px-4 py-3">商品コード順（同じ商品は日付順）に並べ替え、商品ごとの小計と、全体の総合計を求める</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">出力</td><td class="px-4 py-3"><code class="bg-slate-100">report.txt</code>：見出し・明細・小計・総合計を、桁をそろえて並べた帳票</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">画面表示</td><td class="px-4 py-3">読み込んだ件数を1行だけ表示する</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        入力データは次の9件です。商品コード（A001・B002・C003）の3種類が、日付の順番に関係なく混ざっています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">sales.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white">データファイル</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">20261001A00100300120
+20261002C00300500300
+20261001B00200100500
+20261003B00200200500
+20261002A00100200120
+20261004B00200300500
+20261003A00100100120
+20261003C00300200300
+20261004A00100500120</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        1行は「日付8桁 ＋ 商品コード4桁 ＋ 数量3桁 ＋ 単価5桁」です。たとえば1行目 <code class="bg-slate-100">20261001A00100300120</code> は、2026年10月1日に商品A001が数量3、単価120円で売れた、という意味です（第9章の売上レコードそのままです）。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        できあがる帳票のイメージは次のとおりです（14.6 で実際に生成された内容を確認します）。商品ごとにまとまり、グループの最後に小計、最後に総合計が付きます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">report.txt（完成イメージ） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力イメージ</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+A001  20261001    3     120        360
+A001  20261002    2     120        240
+A001  20261003    1     120        120
+A001  20261004    5     120        600
+A001  SUBTOTAL   11              1,320
+B002  20261001    1     500        500
+B002  20261003    2     500      1,000
+B002  20261004    3     500      1,500
+B002  SUBTOTAL    6              3,000
+C003  20261002    5     300      1,500
+C003  20261003    2     300        600
+C003  SUBTOTAL    7              2,100
+--------------------------------------
+TOTAL            24              6,420</code></pre>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["sales.txt<br/>順不同の売上データ"] --> B["SORT<br/>商品コード順に並べ替え"]
+    B --> C["sorted.txt<br/>並べ替え済みデータ"]
+    C --> D["集計処理<br/>キーが変わったら小計"]
+    D --> E["report.txt<br/>帳票"]
+    D --> F["画面<br/>読み込み件数"]
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 入力ファイルを並べ替え、並べ替えたファイルを1件ずつ読んで集計し、帳票に書き出す流れです。</p>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.2 設計：段落に分けて考える
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        大きなプログラムを一度に書こうとすると混乱します。第8章で学んだとおり、<strong>「初期処理 → 主処理（繰り返し）→ 終了処理」</strong>の形にして、段落ごとに役割を決めてから書きましょう。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    M["MAIN-PROC<br/>全体の指揮"] --> S["SORT-PROC<br/>並べ替え"]
+    M --> I["INIT-PROC<br/>ファイルを開く・見出し出力"]
+    M --> R1["READ-PROC<br/>最初の1件を先読み"]
+    M --> L{"ファイルの終わりまで繰り返す"}
+    L --> D["DETAIL-PROC<br/>キー比較・明細行の出力"]
+    D --> B["BREAK-PROC<br/>小計行の出力"]
+    L --> R2["READ-PROC<br/>次の1件を読む"]
+    M --> T["TERM-PROC<br/>最後の小計・総合計・閉じる"]
+    T --> B
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 段落の呼び出し関係です。BREAK-PROC（小計を出す段落）は、途中のキー変化と、最後の終了処理の2か所から呼ばれます。</p>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">段落</th><th class="px-4 py-3 text-left font-semibold">役割</th><th class="px-4 py-3 text-left font-semibold">主に使う知識</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">MAIN-PROC</td><td class="px-4 py-3">各段落を順に呼び出す。プログラム全体の流れ</td><td class="px-4 py-3">第8章 PERFORM</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">SORT-PROC</td><td class="px-4 py-3">入力ファイルを商品コード・日付の順に並べ替える</td><td class="px-4 py-3">14.3 SORT文</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">INIT-PROC</td><td class="px-4 py-3">ファイルを開き、帳票の見出し行を書く</td><td class="px-4 py-3">第12章 OPEN・WRITE</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">READ-PROC</td><td class="px-4 py-3">並べ替え済みファイルから1件読む</td><td class="px-4 py-3">第12章 READ</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">DETAIL-PROC</td><td class="px-4 py-3">キーの変化を調べ、金額を計算して明細行を書く</td><td class="px-4 py-3">第6章 COMPUTE・14.4</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">BREAK-PROC</td><td class="px-4 py-3">小計行を書き、総合計に足し込み、次の準備をする</td><td class="px-4 py-3">14.4・14.5</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">TERM-PROC</td><td class="px-4 py-3">最後のグループの小計と総合計を書き、ファイルを閉じる</td><td class="px-4 py-3">第12章 CLOSE</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        段落名は第8章からの規約どおり <code class="bg-slate-100">-PROC</code> で終わる名前にしています。主プログラムの最後は <code class="bg-slate-100">STOP RUN.</code> です。
+                    </p>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.3 SORT文：データを並べ替える
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        入力データは順不同ですが、商品ごとの集計は「同じ商品が連続して並んでいる」ことが前提です（理由は 14.4 で説明します）。そこで、まず <strong>SORT文</strong>で並べ替えます。COBOL には並べ替えの命令が最初から備わっているので、自分で並べ替えの手順を書く必要はありません。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">SORT文の書き方 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 商品コード→日付の順に並べ替える
+       SORT-PROC.
+           SORT WK-FILE
+               ON ASCENDING KEY WK-ITEM WK-DATE
+               USING IN-FILE
+               GIVING SORTED-FILE.</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SORT文の読み方は、英語の文章そのままです。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 mb-4">
+                        <li><code class="bg-slate-100">SORT WK-FILE</code>：並べ替え作業に使う<strong>ソート用ファイル</strong>（WK-FILE）を指定します。</li>
+                        <li><code class="bg-slate-100">ON ASCENDING KEY WK-ITEM WK-DATE</code>：並べ替えの<strong>キー</strong>（基準）です。ASCENDING は昇順（小さい順）。最初に書いたキー（商品コード）が優先で、同じ商品の中では次のキー（日付）で並べます。</li>
+                        <li><code class="bg-slate-100">USING IN-FILE</code>：並べ替える前のデータを読み込む入力ファイルです。</li>
+                        <li><code class="bg-slate-100">GIVING SORTED-FILE</code>：並べ替えた結果を書き出すファイルです。</li>
+                    </ul>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ソート用ファイルは、データ部のファイル節で <strong>SD</strong>（Sort Description）という見出しで定義します。FD の代わりに SD と書き、キーに使う項目（WK-DATE・WK-ITEM）を含むレコードを定義します。環境部の SELECT には、作業用の名前を書くだけで構いません（行順の指定は不要です）。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1 flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">SORT文で注意すること</p>
+                                <p class="text-red-800 text-sm mt-1 break-words"><code class="bg-red-100 text-red-900">USING</code> と <code class="bg-red-100 text-red-900">GIVING</code> に指定したファイルは、<strong>SORT文が自分で開いて閉じます</strong>。SORT文の前に OPEN してはいけません（規格で禁止されている書き方です。処理系によってはエラーになり、エラーにならない処理系でも結果は保証されません）。また、SD のレコードの長さと並び（項目の位置）は、入力ファイルのレコードと同じにしてください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">メインフレームでは</p>
+                                <p class="text-blue-900 text-sm">メインフレームでも SORT文の基本の書き方は同じです。ファイル名の対応づけ（ASSIGN の先）は JCL（ジョブ制御言語）で行います。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.4 コントロールブレイク：キーが変わったら小計を出す
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この章でいちばん大切な考え方が<strong>コントロールブレイク（キーブレイク）</strong>です。名前は難しそうですが、考え方は単純です。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">コントロールブレイクの考え方</p>
+                                <p class="text-emerald-900 text-sm"><strong>並べ替えたデータを上から順に読み、「キー（ここでは商品コード）が前の行から変わった」ことを見つけたら、直前のグループの小計を出す。</strong>変わらない間は、数量と金額を小計に足し続ける。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        たとえるなら、仕分け済みの伝票の束を1枚ずつめくりながら電卓をたたく作業です。「A001の伝票が続く間は足し続ける。B002の伝票が出てきたら、いったんA001の合計を紙に書き、電卓をクリアしてB002を足し始める」。これをプログラムにするだけです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そのために、<strong>前の行のキーを覚えておく項目</strong>（<code class="bg-slate-100">WS-PREV-ITEM</code>）と、<strong>小計を貯めていく項目</strong>（<code class="bg-slate-100">WS-SUB-QTY</code>・<code class="bg-slate-100">WS-SUB-AMT</code>）を用意します。
+                    </p>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">具体的なデータで1行ずつ追ってみよう</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        並べ替え後の9件を上から読んでいくとき、プログラムは次のように動きます。表の「小計の貯め箱」は、その行を処理し終えた後の WS-SUB-AMT の値です。なお、最初の1件を読んだ直後に、そのキー（A001）を前のキーに入れておくので、1行目ではブレイクが起きません（14.6 の部品6）。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">順</th><th class="px-4 py-3 text-left font-semibold">読んだ行</th><th class="px-4 py-3 text-left font-semibold">前のキー<br/>(WS-PREV-ITEM)</th><th class="px-4 py-3 text-left font-semibold">比較の結果</th><th class="px-4 py-3 text-left font-semibold">することと、処理後の貯め箱</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">1</td><td class="px-4 py-3">A001（金額 360）</td><td class="px-4 py-3">A001</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 360</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">2</td><td class="px-4 py-3">A001（金額 240）</td><td class="px-4 py-3">A001</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 600</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">3</td><td class="px-4 py-3">A001（金額 120）</td><td class="px-4 py-3">A001</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 720</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">4</td><td class="px-4 py-3">A001（金額 600）</td><td class="px-4 py-3">A001</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 1,320</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">5</td><td class="px-4 py-3">B002（金額 500）</td><td class="px-4 py-3">A001</td><td class="px-4 py-3"><strong>違う（ブレイク）</strong></td><td class="px-4 py-3"><strong>A001の小計 1,320 を出力</strong>。貯め箱を0に戻し、前のキーを B002 に更新。明細を出力。貯め箱 = 500</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">6</td><td class="px-4 py-3">B002（金額 1,000）</td><td class="px-4 py-3">B002</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 1,500</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">7</td><td class="px-4 py-3">B002（金額 1,500）</td><td class="px-4 py-3">B002</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 3,000</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">8</td><td class="px-4 py-3">C003（金額 1,500）</td><td class="px-4 py-3">B002</td><td class="px-4 py-3"><strong>違う（ブレイク）</strong></td><td class="px-4 py-3"><strong>B002の小計 3,000 を出力</strong>。貯め箱を0に戻し、前のキーを C003 に更新。明細を出力。貯め箱 = 1,500</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">9</td><td class="px-4 py-3">C003（金額 600）</td><td class="px-4 py-3">C003</td><td class="px-4 py-3">同じ</td><td class="px-4 py-3">明細を出力。貯め箱 = 2,100</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">終</td><td class="px-4 py-3">（もう読む行がない）</td><td class="px-4 py-3">C003</td><td class="px-4 py-3">（比較できない）</td><td class="px-4 py-3"><strong>C003の小計 2,100 を出力</strong>（終了処理で）。総合計 6,420 を出力</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ポイントは、<strong>キーの比較を「明細を出力する前」に行う</strong>ことです。新しい商品の行を読んだ時点では、貯め箱にはまだ前の商品の合計が入っています。先に小計を出してから、新しい行を足し始めます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["1件読んだ"] --> B{"商品コードが<br/>前の行と違う？"}
+    B -->|はい| C["前の商品の小計を出力<br/>貯め箱を0に戻す<br/>前のキーを更新"]
+    B -->|いいえ| D["そのまま次へ"]
+    C --> E["金額を計算して小計に足す<br/>明細行を出力"]
+    D --> E
+    E --> F{"まだ読む行がある？"}
+    F -->|はい| A
+    F -->|いいえ| G["最後の商品の小計を出力<br/>総合計を出力"]
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 1件ごとのキー比較と、最後のグループの小計の出力です。</p>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1 flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">最後のグループの小計を忘れない</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">キーが「変わった」ことをきっかけに小計を出す仕組みなので、<strong>最後のグループの次には「変わる相手」が存在せず、小計が出ません</strong>。ファイルの終わりに達したら、ループの外（終了処理）で最後のグループの小計を必ず出力してください。コントロールブレイクで最も多い間違いです。実際に忘れるとどうなるかは、14.6 で確かめます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">なぜ並べ替えが必要か</p>
+                                <p class="text-blue-900 text-sm">データが A001、B002、A001 のように行き来していると、「キーが変わるたび」に小計が出てしまい、同じ商品の小計が何か所にも分かれてしまいます。「同じキーが連続している」ことがコントロールブレイクの前提なので、先に SORT します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.5 帳票の編集：行の形を設計する
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        帳票は「決まった位置に決まった桁数」で並べるのが基本です。第9章で学んだ <strong>FILLER</strong>（名前のない項目）で項目の間にすき間を作り、第5章の<strong>編集項目</strong>（<code class="bg-slate-100">ZZ9</code>・<code class="bg-slate-100">ZZ,ZZ9</code>・<code class="bg-slate-100">Z,ZZZ,ZZ9</code>）で数値を読みやすく整えます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        見出し行・明細行・小計行・合計行は、<strong>同じ位置に同じ種類の列が来る</strong>ように設計します。1行は38桁で、列は次のように割り当てます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">列</th><th class="px-4 py-3 text-left font-semibold">位置（桁）</th><th class="px-4 py-3 text-left font-semibold">幅</th><th class="px-4 py-3 text-left font-semibold">明細行</th><th class="px-4 py-3 text-left font-semibold">小計行</th><th class="px-4 py-3 text-left font-semibold">合計行</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">商品コード</td><td class="px-4 py-3">1〜4</td><td class="px-4 py-3">4</td><td class="px-4 py-3">DL-ITEM</td><td class="px-4 py-3">SL-ITEM</td><td class="px-4 py-3">（TOTAL の文字）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">日付／ラベル</td><td class="px-4 py-3">7〜14</td><td class="px-4 py-3">8</td><td class="px-4 py-3">DL-DATE</td><td class="px-4 py-3">SUBTOTAL の文字</td><td class="px-4 py-3">（TOTAL の文字）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">数量</td><td class="px-4 py-3">17〜19</td><td class="px-4 py-3">3</td><td class="px-4 py-3">DL-QTY（ZZ9）</td><td class="px-4 py-3">SL-QTY（ZZ9）</td><td class="px-4 py-3">TL-QTY（ZZ9）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">単価</td><td class="px-4 py-3">22〜27</td><td class="px-4 py-3">6</td><td class="px-4 py-3">DL-PRICE（ZZ,ZZ9）</td><td class="px-4 py-3">空白</td><td class="px-4 py-3">空白</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">金額</td><td class="px-4 py-3">30〜38</td><td class="px-4 py-3">9</td><td class="px-4 py-3">DL-AMOUNT（Z,ZZZ,ZZ9）</td><td class="px-4 py-3">SL-AMOUNT</td><td class="px-4 py-3">TL-AMOUNT</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        行の定義は 14.6 のデータ部で見ます。ここで押さえるのは次の2点です。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 mb-4">
+                        <li><strong>各列の開始位置</strong>（上の表の「位置」）がどの行でも同じになるように、FILLER の幅を決めます。結果として、どの行も合計38桁になります。</li>
+                        <li>金額は編集項目 <code class="bg-slate-100">Z,ZZZ,ZZ9</code> で桁区切りします。<code class="bg-slate-100">Z</code> は「先頭のゼロを空白にする」記号なので、360 は <code class="bg-slate-100 whitespace-pre">[      360]</code> のように右寄せで表示されます（[ ] は項目の範囲で、中は9桁です）。</li>
+                    </ul>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">金額の計算は編集項目の前に</p>
+                                <p class="text-blue-900 text-sm">編集項目は計算の材料（足される側・式の右辺）にはできません（第5章）。COMPUTE の結果の受け取り先には指定できますが、本ガイドでは数字項目で計算してから MOVE する形にそろえます。そのため、金額は計算用の項目（WS-AMOUNT など数字だけの項目）で求めてから、書き出す直前に編集項目へ MOVE します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.6 完成プログラム：部品ごとに作って組み立てる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの設計を、環境部・データ部・手続き部の順に、<strong>8つの部品</strong>に分けて実装します。それぞれ<strong>単独では動きません。順につなげて1つのファイルに保存します</strong>。部品1から8までを順番につなげると、完全なプログラム <code class="bg-slate-100">salesrpt.cob</code> になります。組み立てに必要な見出し行（IDENTIFICATION DIVISION.・PROGRAM-ID.・ENVIRONMENT DIVISION.・DATA DIVISION.・WORKING-STORAGE SECTION.・PROCEDURE DIVISION. など）は、すべて部品の中に含まれています（別に書き足す行はありません）。
+                    </p>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品1：見出し部と環境部（ファイルの指定）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        4つのファイルを使います。入力 <code class="bg-slate-100">sales.txt</code>、ソート用の作業ファイル、ソート済みの <code class="bg-slate-100">sorted.txt</code>、帳票 <code class="bg-slate-100">report.txt</code> です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 1/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">見出し部・環境部の抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 売上集計バッチ（ソート・集計・帳票）
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. SALESRPT.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+      * 入力・ソート作業用・ソート済み・帳票
+           SELECT IN-FILE ASSIGN TO "sales.txt"
+               ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT WK-FILE ASSIGN TO "sortwork.tmp".
+           SELECT SORTED-FILE ASSIGN TO "sorted.txt"
+               ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT REPORT-FILE ASSIGN TO "report.txt"
+               ORGANIZATION IS LINE SEQUENTIAL.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品2：データ部（ファイル節）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ソート用ファイルは FD ではなく <strong>SD</strong> で定義します。ソート済みファイルのレコード（SALES-REC）は、第9章・第12章と同じ売上レコードです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 2/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       DATA DIVISION.
+       FILE SECTION.
+       FD  IN-FILE.
+       01  IN-REC              PIC X(20).
+      * SD はソート専用。キー項目を定義する
+       SD  WK-FILE.
+       01  WK-REC.
+           05  WK-DATE         PIC X(8).
+           05  WK-ITEM         PIC X(4).
+           05  WK-QTY          PIC 9(3).
+           05  WK-PRICE        PIC 9(5).
+       FD  SORTED-FILE.
+       01  SALES-REC.
+           05  SR-DATE         PIC X(8).
+           05  SR-ITEM         PIC X(4).
+           05  SR-QTY          PIC 9(3).
+           05  SR-PRICE        PIC 9(5).
+       FD  REPORT-FILE.
+       01  REPORT-REC          PIC X(38).</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品3：データ部（作業場所節の前半 - 集計用の項目）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">WS-PREV-ITEM</code>が「前の行のキー」、<code class="bg-slate-100">WS-SUB-QTY</code>・<code class="bg-slate-100">WS-SUB-AMT</code>が小計の貯め箱、<code class="bg-slate-100">WS-TOT-QTY</code>・<code class="bg-slate-100">WS-TOT-AMT</code>が総合計の貯め箱です。処理系によっては初期値が保証されないので、すべて VALUE 句で初期化します（第4章）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 3/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       WORKING-STORAGE SECTION.
+       01  WS-EOF              PIC X VALUE "N".
+           88  WS-EOF-YES      VALUE "Y".
+       01  WS-PREV-ITEM        PIC X(4) VALUE SPACE.
+       01  WS-COUNT            PIC 9(5) VALUE ZERO.
+       01  WS-AMOUNT           PIC 9(7) VALUE ZERO.
+      * 小計（商品ごと）と総合計の集計用
+       01  WS-SUB-QTY          PIC 9(5) VALUE ZERO.
+       01  WS-SUB-AMT          PIC 9(7) VALUE ZERO.
+       01  WS-TOT-QTY          PIC 9(5) VALUE ZERO.
+       01  WS-TOT-AMT          PIC 9(7) VALUE ZERO.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品4・5：データ部（作業場所節の後半 - 帳票の行）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        見出し行・罫線・明細行・小計行・合計行を、14.5 の表どおりに定義します。FILLER の幅で桁位置をそろえています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 4/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 帳票の行（FILLER で桁をそろえる）
+       01  WS-HEAD-LINE.
+           05  FILLER          PIC X(38) VALUE
+               "ITEM  DATE      QTY   PRICE     AMOUNT".
+       01  WS-RULE-LINE.
+           05  FILLER          PIC X(38) VALUE ALL "-".
+       01  WS-DETAIL-LINE.
+           05  DL-ITEM         PIC X(4).
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  DL-DATE         PIC X(8).
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  DL-QTY          PIC ZZ9.
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  DL-PRICE        PIC ZZ,ZZ9.
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  DL-AMOUNT       PIC Z,ZZZ,ZZ9.</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 5/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 小計行と合計行（列は明細行とそろえる）
+       01  WS-SUB-LINE.
+           05  SL-ITEM         PIC X(4).
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  FILLER          PIC X(8) VALUE "SUBTOTAL".
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  SL-QTY          PIC ZZ9.
+           05  FILLER          PIC X(10) VALUE SPACE.
+           05  SL-AMOUNT       PIC Z,ZZZ,ZZ9.
+       01  WS-TOTAL-LINE.
+           05  FILLER          PIC X(14) VALUE "TOTAL".
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  TL-QTY          PIC ZZ9.
+           05  FILLER          PIC X(10) VALUE SPACE.
+           05  TL-AMOUNT       PIC Z,ZZZ,ZZ9.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品6：手続き部（MAIN-PROC と SORT-PROC）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">MAIN-PROC</code>が全体の流れを指揮します。<strong>先読み</strong>（ループに入る前に最初の1件を読む。第12章）をして、最初のレコードのキーを「前のキー」に入れておきます。こうすると、最初の行でブレイクが起きません。ファイルが空（0件）のときは、キーを設定せずにループも飛ばします。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 6/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       PROCEDURE DIVISION.
+       MAIN-PROC.
+           PERFORM SORT-PROC
+           PERFORM INIT-PROC
+           PERFORM READ-PROC
+           IF NOT WS-EOF-YES
+               MOVE SR-ITEM TO WS-PREV-ITEM
+           END-IF
+           PERFORM UNTIL WS-EOF-YES
+               PERFORM DETAIL-PROC
+               PERFORM READ-PROC
+           END-PERFORM
+           PERFORM TERM-PROC
+           STOP RUN.
+      * 商品コード→日付の順に並べ替える
+       SORT-PROC.
+           SORT WK-FILE
+               ON ASCENDING KEY WK-ITEM WK-DATE
+               USING IN-FILE
+               GIVING SORTED-FILE.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品7：手続き部（INIT-PROC・READ-PROC・DETAIL-PROC）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">DETAIL-PROC</code>が、14.4 の考え方をそのままコードにした段落です。<strong>IF の中でキーを比較して小計を出し、それから金額を足す</strong>順番になっています。本ガイドの規約どおり、IF・READ・インライン PERFORM のように END-xxx（スコープ終了符）で閉じる文は、内側にピリオドを書いていません。単純な命令文は、段落の最後の文にだけピリオドを置いています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 7/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       INIT-PROC.
+           OPEN INPUT SORTED-FILE
+           OPEN OUTPUT REPORT-FILE
+           WRITE REPORT-REC FROM WS-HEAD-LINE
+           WRITE REPORT-REC FROM WS-RULE-LINE.
+       READ-PROC.
+           READ SORTED-FILE
+               AT END SET WS-EOF-YES TO TRUE
+           END-READ.
+       DETAIL-PROC.
+      * キーが変わったら先に小計を出す
+           IF SR-ITEM NOT = WS-PREV-ITEM
+               PERFORM BREAK-PROC
+           END-IF
+           COMPUTE WS-AMOUNT = SR-QTY * SR-PRICE
+           ADD SR-QTY TO WS-SUB-QTY
+           ADD WS-AMOUNT TO WS-SUB-AMT
+           ADD 1 TO WS-COUNT
+           MOVE SR-ITEM TO DL-ITEM
+           MOVE SR-DATE TO DL-DATE
+           MOVE SR-QTY TO DL-QTY
+           MOVE SR-PRICE TO DL-PRICE
+           MOVE WS-AMOUNT TO DL-AMOUNT
+           WRITE REPORT-REC FROM WS-DETAIL-LINE.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">部品8：手続き部（BREAK-PROC・TERM-PROC）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">BREAK-PROC</code>は「小計行を出す」ための段落で、小計を総合計に足し込み、貯め箱を0に戻し、前のキーを新しいキーに更新するまでを担当します。<code class="bg-slate-100">TERM-PROC</code>は、ループが終わったあとに<strong>最後のグループの小計</strong>を出し、総合計を書いてファイルを閉じます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">salesrpt.cob（部品 8/8） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 小計行を出し、次のグループの準備をする
+       BREAK-PROC.
+           MOVE WS-PREV-ITEM TO SL-ITEM
+           MOVE WS-SUB-QTY TO SL-QTY
+           MOVE WS-SUB-AMT TO SL-AMOUNT
+           WRITE REPORT-REC FROM WS-SUB-LINE
+           ADD WS-SUB-QTY TO WS-TOT-QTY
+           ADD WS-SUB-AMT TO WS-TOT-AMT
+           MOVE ZERO TO WS-SUB-QTY
+           MOVE ZERO TO WS-SUB-AMT
+           MOVE SR-ITEM TO WS-PREV-ITEM.
+       TERM-PROC.
+      * 最後のグループの小計はループの外で出す
+           IF WS-COUNT &gt; 0
+               PERFORM BREAK-PROC
+           END-IF
+           MOVE WS-TOT-QTY TO TL-QTY
+           MOVE WS-TOT-AMT TO TL-AMOUNT
+           WRITE REPORT-REC FROM WS-RULE-LINE
+           WRITE REPORT-REC FROM WS-TOTAL-LINE
+           CLOSE SORTED-FILE REPORT-FILE
+           DISPLAY "READ RECORDS: " WS-COUNT.</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">組み立てて実行する</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        部品1から8までを、順番に1つのファイル <code class="bg-slate-100">salesrpt.cob</code> に貼り付けます（エディタで上から順に貼り付けるだけです）。行頭の空白（桁位置）を消さないよう注意してください。入力データ <code class="bg-slate-100">sales.txt</code>（14.1 のもの）を同じフォルダに置いて、コンパイルして実行します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x -Wall salesrpt.cob
+./salesrpt</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（画面） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">READ RECORDS: 00009</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        画面には読み込んだ件数だけが表示されます。集計結果は帳票ファイル <code class="bg-slate-100">report.txt</code> に書かれています。中身を確認しましょう（<code class="bg-slate-100">cat report.txt</code> で表示できます）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cat report.txt</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">report.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">生成された帳票</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+A001  20261001    3     120        360
+A001  20261002    2     120        240
+A001  20261003    1     120        120
+A001  20261004    5     120        600
+A001  SUBTOTAL   11              1,320
+B002  20261001    1     500        500
+B002  20261003    2     500      1,000
+B002  20261004    3     500      1,500
+B002  SUBTOTAL    6              3,000
+C003  20261002    5     300      1,500
+C003  20261003    2     300        600
+C003  SUBTOTAL    7              2,100
+--------------------------------------
+TOTAL            24              6,420</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        見出し・明細・小計・総合計の列（数量・単価・金額）が縦にそろっています。A001 は 360 + 240 + 120 + 600 = 1,320、B002 は 500 + 1,000 + 1,500 = 3,000、C003 は 1,500 + 600 = 2,100、総合計は 1,320 + 3,000 + 2,100 = 6,420 で、手計算とも一致します。並べ替え後の <code class="bg-slate-100">sorted.txt</code> の先頭は次のようになっています（商品コード順、同じ商品の中は日付順です）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">sorted.txt（先頭4行） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">中間ファイルの内容</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">20261001A00100300120
+20261002A00100200120
+20261003A00100100120
+20261004A00100500120</code></pre>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">わざと最後の小計を忘れてみる</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        14.4 の警告を確かめるため、TERM-PROC の「<code class="bg-slate-100">IF WS-COUNT &gt; 0 〜 END-IF</code>」の3行を消して実行してみます。あとで元に戻せるよう、先に <code class="bg-slate-100">salesrpt.cob</code> をコピーして控えを取っておきます。
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cp salesrpt.cob salesrpt_ok.cob
+（エディタで TERM-PROC の IF〜END-IF の3行を消して保存）
+cobc -x salesrpt.cob
+./salesrpt
+tail -5 report.txt</code></pre>
+                    </div>
+
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">report.txt（末尾5行） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">最後の小計を忘れた場合</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">B002  SUBTOTAL    6              3,000
+C003  20261002    5     300      1,500
+C003  20261003    2     300        600
+--------------------------------------
+TOTAL            17              4,320</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        C003 の小計行が無く、総合計も 6,420 ではなく 4,320（A001 と B002 だけの合計）になってしまいました。最後のグループは「キーが変わる」ことがないので、終了処理で小計を出す必要があるのです。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        確かめたら、<code class="bg-slate-100">cp salesrpt_ok.cob salesrpt.cob</code> で消した3行を元に戻し、<code class="bg-slate-100">cobc -x -Wall salesrpt.cob</code> で再コンパイルしておきましょう（戻さないと、このあとの 14.7 のテストが掲載と違う結果になります）。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">コンパイルで警告が出たら</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">-Wall</code> は警告も表示するオプションです。本章のプログラムは警告なしでコンパイルできます。自分で入力したときに警告やエラーが出たら、行番号を手がかりに、桁ずれ（A領域・B領域）や段落名・データ名のつづりを見直しましょう（第2章・第3章）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.7 テストの観点
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        プログラムは「動いた」だけでは完成ではありません。<strong>想定外のデータでも壊れないか</strong>を確かめます。バッチ処理のテストでは、次のような「境目」のデータを必ず試します。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">テストデータ</th><th class="px-4 py-3 text-left font-semibold">確かめたいこと</th><th class="px-4 py-3 text-left font-semibold">期待する結果</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">0件（空のファイル）</td><td class="px-4 py-3">ファイルの終わりを最初に検出しても止まらないか。最初の行を処理する前提が崩れないか</td><td class="px-4 py-3">見出しと総合計 0 だけが出る。小計行は出ない</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">1件だけ</td><td class="px-4 py-3">最初の行が同時に最後の行でも、小計が1回だけ出るか</td><td class="px-4 py-3">明細1行 ＋ 小計1行 ＋ 総合計</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">同じ商品だけ</td><td class="px-4 py-3">ブレイクが一度も起きなくても、最後の小計が出るか</td><td class="px-4 py-3">明細 ＋ 小計1行（最後のグループ）＋ 総合計</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">商品がすべて異なる</td><td class="px-4 py-3">毎回ブレイクして、すべて小計が出るか</td><td class="px-4 py-3">1件ごとに小計行が付く</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">数量の合計が1,000以上</td><td class="px-4 py-3">小計・総合計の数量の表示項目（ZZ9）が3桁しかなく、足りなくならないか</td><td class="px-4 py-3">ZZ9 では上の桁が黙って切り捨てられる（たとえば 1200 が 200 と表示され、エラーも出ない。第4章の桁あふれと同じ現象）。本章の帳票は列幅を変えていないが、実務では合計の最大値に合わせて表示項目の桁数を決める</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最初の3つを実際に試します。まず、本物のデータを退避してから、テスト用データを作ります（<code class="bg-slate-100">cp</code> はファイルのコピー、<code class="bg-slate-100">: > sales.txt</code> はファイルを空にする操作です）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">0件のテスト</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cp sales.txt sales_full.txt
+: &gt; sales.txt
+cobc -x salesrpt.cob
+./salesrpt
+cat report.txt</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">0件のときの実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">0件</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">READ RECORDS: 00000
+ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+--------------------------------------
+TOTAL             0                  0</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        件数 0、小計行なし、総合計 0 と、期待どおりです。次に1件だけのデータ（<code class="bg-slate-100">20261001A00100300120</code> の1行）で試します（実行ファイル salesrpt は、0件のテストでコンパイル済みです）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">1件のテスト</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">echo 20261001A00100300120 &gt; sales.txt
+./salesrpt
+cat report.txt</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">1件のときの report.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">1件</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+A001  20261001    3     120        360
+A001  SUBTOTAL    3                360
+--------------------------------------
+TOTAL             3                360</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        最後に、B002 の3件だけ（日付は順不同）にします。ブレイクが一度も起きなくても、終了処理で小計が出ています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">同じ商品だけのテスト</span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">printf '20261004B00200300500\n20261001B00200100500\n20261003B00200200500\n' &gt; sales.txt
+./salesrpt
+cat report.txt</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">同じ商品だけのときの report.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">同じ商品だけ</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+B002  20261001    1     500        500
+B002  20261003    2     500      1,000
+B002  20261004    3     500      1,500
+B002  SUBTOTAL    6              3,000
+--------------------------------------
+TOTAL             6              3,000</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        テストが終わったら、<code class="bg-slate-100">cp sales_full.txt sales.txt</code> で本物のデータに戻しておきます。
+                    </p>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">テストの心得</p>
+                                <p class="text-emerald-900 text-sm">「正常なデータで動いた」だけでは、現場に出せません。<strong>0件・1件・境目・想定外の値</strong>で確かめる習慣が、保守を任される人の信頼につながります。本章では扱いませんでしたが、数量や単価に数字でない文字が入っていた場合の入力チェック（第7章の IS NUMERIC）も、実務では必ず考えます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        14.8 次のステップ：メインフレームの世界へ
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これで COBOL の基本文法を使って、実際に動くバッチプログラムを作れるようになりました。ここから先は、<strong>実際の現場で使われる環境と技術</strong>を少しずつ知っていくことになります。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["ここまでの到達点<br/>COBOLの基本文法とバッチ処理"] --> B["環境を知る<br/>z/OS・JCL"]
+    A --> C["技術を広げる<br/>データベースとオンライン処理"]
+    A --> D["読む力を磨く<br/>既存プログラムの読解"]
+    B --> E["IBM Z Xplore で体験"]
+    C --> F["Db2・埋め込みSQL・CICS・VSAM"]
+    D --> G["保守・改修の現場へ"]
+    D --> H["モダナイゼーションへ"]
+    E --> G
+    F --> G
+    F --> H
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 本章の先に広がる学習の道すじです。</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-server text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">z/OS と JCL</h3>
+                            <p class="text-sm text-slate-600">z/OS は IBM のメインフレームの基本ソフト（OS）です。そこで COBOL プログラムを動かすには、<strong>JCL（ジョブ制御言語）</strong>で「どのプログラムを、どのファイルを使って実行するか」を書いたジョブを投入します。第12章のコラムで触れたとおり、ASSIGN で指定した名前と実際のファイルは JCL で結びつけられます。現場では、本章のような並べ替えを、COBOL の SORT 文ではなく JCL のソート専用ステップ（DFSORT などのユーティリティ）で行うことも多くあります。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-window-restore text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">CICS（オンライン処理）</h3>
+                            <p class="text-sm text-slate-600">CICS は、メインフレーム上で<strong>オンライン処理</strong>（第1章）を動かすための仕組みです。画面や端末からの操作に応じて、COBOL プログラムがその場で呼び出されます。バッチは「まとめて処理」、CICS は「その場で処理」という使い分けです。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-database text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">Db2 と埋め込み SQL</h3>
+                            <p class="text-sm text-slate-600">本章ではテキストファイルを読み書きしましたが、現場ではデータベース（IBM Db2 など）を使うことも多くあります。COBOL のプログラムの中に <code class="bg-emerald-100 text-emerald-900">EXEC SQL 〜 END-EXEC</code> で SQL を埋め込み、データを検索・更新します。SQL の基礎を学んでおくと入りやすくなります。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-folder-tree text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">VSAM・索引ファイル</h3>
+                            <p class="text-sm text-slate-600">本ガイドで扱った順ファイルは、先頭から順に読むファイルでした。メインフレームでは、キーを指定して目的のレコードを直接読み書きできる索引ファイルも使われます。代表が <strong>VSAM</strong> で、その中のキー順のファイル（KSDS）が索引ファイルにあたります。COBOL では <code class="bg-orange-100 text-orange-900">ORGANIZATION IS INDEXED</code> のように指定し、READ や WRITE にキーを使います。</p>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2 mt-6">学ぶ環境と進め方</h3>
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 mb-4">
+                        <li><strong>IBM Z Xplore</strong>：IBM が提供している、メインフレーム（z/OS）を無償で体験できる学習環境です。自分でメインフレームを用意しなくても、インターネット経由で IBM の z/OS に接続し（VS Code と拡張機能などを使います）、JCL や COBOL の演習を試せます。本ガイドで学んだ基本文法をそのまま活かせます（提供内容や利用条件は変わることがあるので、最新の案内を確認してください）。</li>
+                        <li><strong>既存プログラムを読む力</strong>：現場では、新規開発より<strong>既存プログラムの保守・改修</strong>のほうが多くなります。まず<strong>読む</strong>ことが最重要です。見出し部で目的を確認し、データ部で何を扱うかをつかみ、手続き部の MAIN 段落から呼び出しをたどる、という読み方は、本ガイドで身につけた構造の理解そのものです。自分で書いたプログラムを数日後に読み直すのも良い練習になります。</li>
+                        <li><strong>モダナイゼーション</strong>：長年動いてきた COBOL の資産を、新しい環境や他の言語へ移行したり、新しいシステムと連携させたりする取り組みです（第1章）。移行するにも連携するにも、COBOL プログラムの仕様を正しく読み取れる人が必要です。業務ルールを COBOL から読み解いて、新しいシステムに引き継ぐ役割が求められます。</li>
+                    </ul>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 14-1: 売上集計バッチを発展させよう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">完成した <code class="bg-purple-100 text-purple-900">salesrpt.cob</code> を、別名（<code class="bg-purple-100 text-purple-900">salesavg.cob</code> など）にコピーしてから改造します。改造のたびに実行して、帳票が期待どおりになったか確かめましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">課題</h4>
+                            <ul class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>課題A（平均単価）</strong>：小計行の「PRICE」の列に、その商品の<strong>平均単価</strong>（小計の金額 ÷ 小計の数量。四捨五入して整数）を表示する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>課題B（並び順の変更）</strong>：商品コードを<strong>降順</strong>（C003、B002、A001 の順）に並べて集計する。同じ商品の中は日付の昇順のままにする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><strong>課題C（応用・解答なし）</strong>：<strong>金額の大きい順</strong>に商品の小計を並べる。</span>
+                                </li>
+                            </ul>
+
+                            <div class="bg-purple-100 rounded-lg p-4 mb-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">ヒント</p>
+                                <ul class="space-y-1 text-purple-900 text-sm">
+                                    <li>・課題A：小計行の定義（部品5）の FILLER を、「FILLER 2桁 ＋ 平均単価 ＋ FILLER 2桁」に置き換えます。表示用の項目は単価の列と同じ <code class="bg-purple-100 text-purple-900">ZZ,ZZ9</code> にすると、列がそろいます。計算は第6章の COMPUTE と ROUNDED で、数字項目（<code class="bg-purple-100 text-purple-900">PIC 9(5)</code> など）に求めてから、MOVE で編集項目へ移します。</li>
+                                    <li>・課題B：変えるのは SORT文のキー指定だけです。ASCENDING KEY の反対は DESCENDING KEY です。</li>
+                                    <li>・課題C：商品ごとの金額は、集計が終わるまで分かりません。SORT を<strong>2回</strong>行う（1回目で商品ごとの合計ファイルを作り、2回目でその合計ファイルを金額の降順に並べる）か、表（第10章）に商品ごとの合計をためて並べ替える、といった方法が考えられます。</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">解答例（課題A・B）</p>
+                                <p class="text-purple-900 text-sm mb-2">課題Aは、作業場所節に計算用の数字項目 WS-AVG を足し、小計行の定義（部品5）に SL-AVG を足し、部品8の BREAK-PROC を次のように変えます（それ以外は変更なし）。編集項目 SL-AVG では計算せず、WS-AVG で求めてから MOVE します。</p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">課題A：小計行の定義 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 部品3・5：WS-AVG を足し、小計行に SL-AVG を追加
+       01  WS-AVG              PIC 9(5) VALUE ZERO.
+       01  WS-SUB-LINE.
+           05  SL-ITEM         PIC X(4).
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  FILLER          PIC X(8) VALUE "SUBTOTAL".
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  SL-QTY          PIC ZZ9.
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  SL-AVG          PIC ZZ,ZZ9.
+           05  FILLER          PIC X(2) VALUE SPACE.
+           05  SL-AMOUNT       PIC Z,ZZZ,ZZ9.</code></pre>
+                    </div>
+
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">課題A：BREAK-PROC <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 部品8：平均単価を四捨五入で求める
+       BREAK-PROC.
+           MOVE WS-PREV-ITEM TO SL-ITEM
+           MOVE WS-SUB-QTY TO SL-QTY
+           COMPUTE WS-AVG ROUNDED = WS-SUB-AMT / WS-SUB-QTY
+           MOVE WS-AVG TO SL-AVG
+           MOVE WS-SUB-AMT TO SL-AMOUNT
+           WRITE REPORT-REC FROM WS-SUB-LINE
+           ADD WS-SUB-QTY TO WS-TOT-QTY
+           ADD WS-SUB-AMT TO WS-TOT-AMT
+           MOVE ZERO TO WS-SUB-QTY
+           MOVE ZERO TO WS-SUB-AMT
+           MOVE SR-ITEM TO WS-PREV-ITEM.</code></pre>
+                    </div>
+
+                                <p class="text-purple-900 text-sm mb-2">実行すると、小計行の PRICE の列に平均単価が出ます（この例では各商品の単価が一定なので、平均はその単価と同じ値になります）。</p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">課題A の report.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+A001  20261001    3     120        360
+A001  20261002    2     120        240
+A001  20261003    1     120        120
+A001  20261004    5     120        600
+A001  SUBTOTAL   11     120      1,320
+B002  20261001    1     500        500
+B002  20261003    2     500      1,000
+B002  20261004    3     500      1,500
+B002  SUBTOTAL    6     500      3,000
+C003  20261002    5     300      1,500
+C003  20261003    2     300        600
+C003  SUBTOTAL    7     300      2,100
+--------------------------------------
+TOTAL            24              6,420</code></pre>
+                    </div>
+
+                                <p class="text-purple-900 text-sm mb-2">課題Bは、部品6の SORT文を次のように変えます。</p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">課題B：SORT-PROC <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 部品6：SORT-PROC のキー指定を変更
+           SORT WK-FILE
+               ON DESCENDING KEY WK-ITEM
+               ASCENDING KEY WK-DATE
+               USING IN-FILE
+               GIVING SORTED-FILE.</code></pre>
+                    </div>
+
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">課題B の report.txt <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">ITEM  DATE      QTY   PRICE     AMOUNT
+--------------------------------------
+C003  20261002    5     300      1,500
+C003  20261003    2     300        600
+C003  SUBTOTAL    7              2,100
+B002  20261001    1     500        500
+B002  20261003    2     500      1,000
+B002  20261004    3     500      1,500
+B002  SUBTOTAL    6              3,000
+A001  20261001    3     120        360
+A001  20261002    2     120        240
+A001  20261003    1     120        120
+A001  20261004    5     120        600
+A001  SUBTOTAL   11              1,320
+--------------------------------------
+TOTAL            24              6,420</code></pre>
+                    </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ul class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. コントロールブレイクで小計を出す前に、入力データを SORT しておく必要があるのはなぜですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            同じキー（商品コード）のデータが<strong>連続して並んでいる</strong>ことが、コントロールブレイクの前提だからです。順不同のままだと、同じ商品が離れた場所に何度も現れ、そのたびにキーが「変わった」と判断されて、同じ商品の小計が何か所にも分かれてしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. コントロールブレイクの処理で、「最後のグループの小計」はなぜ特別に扱う必要がありますか？ 本章のプログラムではどこで出力していますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            小計は「キーが変わった」ことをきっかけに出す仕組みですが、<strong>最後のグループの後にはキーが変わる相手の行がない</strong>ため、ループの中では小計が出ません。そこで、ファイルの終わりを検出してループを抜けた後の終了処理（<code class="bg-blue-100 text-blue-900">TERM-PROC</code>）で、BREAK-PROC を呼んで最後の小計を出力しています。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. SORT文の <code class="bg-blue-100 text-blue-900">SORT WK-FILE ON ASCENDING KEY WK-ITEM USING IN-FILE GIVING SORTED-FILE</code> で、WK-FILE・USING・GIVING はそれぞれ何を表していますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-100 text-blue-900">WK-FILE</code> は並べ替えの作業に使う<strong>ソート用ファイル</strong>（データ部で SD として定義）、<code class="bg-blue-100 text-blue-900">USING</code> は並べ替える前のデータを読み込む<strong>入力ファイル</strong>、<code class="bg-blue-100 text-blue-900">GIVING</code> は並べ替えた結果を書き出す<strong>出力ファイル</strong>です。USING・GIVING のファイルは、SORT文が自分で開いて閉じるので、SORT文の前に OPEN してはいけません。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. メインフレームで COBOL のバッチプログラムを実行するとき、「どのプログラムを、どのファイルを使って動かすか」を指定するために書くものは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>JCL（ジョブ制御言語）</strong>です。プログラム内の SELECT 〜 ASSIGN で付けた名前と、実際のデータセット（ファイル）を JCL で結びつけます。本ガイドの GnuCOBOL では、ASSIGN にファイル名を直接書いていましたが、メインフレームではこの部分を JCL が担当します。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- おわりに -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-flag-checkered text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-2">おわりに（ガイドのまとめ）</h3>
+                            <p class="text-slate-600 text-sm leading-relaxed mb-3">全14章、おつかれさまでした。ここまでで、次のことができるようになりました。</p>
+                            <ul class="space-y-1 text-slate-600 text-sm mb-3">
+                                <li class="flex items-start gap-2"><i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i><span>COBOL プログラムの<strong>骨組み（4つの部）と固定形式の桁のルール</strong>を理解して書ける（第2〜3章）</span></li>
+                                <li class="flex items-start gap-2"><i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i><span><strong>データ項目・PICTURE句・編集項目</strong>で、データを定義して見やすく表示できる（第4〜5章）</span></li>
+                                <li class="flex items-start gap-2"><i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i><span><strong>計算・判断・繰り返し</strong>で処理の流れを組み立てられる（第6〜8章）</span></li>
+                                <li class="flex items-start gap-2"><i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i><span><strong>集団項目・表・文字列操作</strong>でデータを扱える（第9〜11章）</span></li>
+                                <li class="flex items-start gap-2"><i class="fas fa-check text-primary-500 mt-1 flex-shrink-0"></i><span><strong>ファイル処理・部品化・ソートと集計</strong>を組み合わせて、実際のバッチプログラムを完成させられる（第12〜14章）</span></li>
+                            </ul>
+                            <p class="text-slate-600 text-sm leading-relaxed">COBOL は、社会の大切な仕組みを支える言語です。書く力以上に、<strong>読んで理解する力</strong>がこれからの現場で求められます。身近なデータで小さなバッチプログラムを作り続けること、そして 14.8 で紹介した環境に少しずつ触れてみることが、次の一歩になります。ここで身につけた土台があれば、きっと現場のプログラムも読み解けるはずです。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="cobol-learning-material-13.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第13章: プログラムを部品に分ける - CALLとCOPY</span>
+                        </div>
+                    </a>
+                    <span class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 opacity-60 cursor-not-allowed">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-500 block">次の章</span>
+                            <span class="text-slate-700 font-medium">最後の章です</span>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                    </span>
+                </nav>

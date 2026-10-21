@@ -1,0 +1,1139 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">COBOL入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第13章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第13章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約90分
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">プログラムを部品に分ける - CALLとCOPY</h1>
+                    <p class="text-slate-600">実際の業務システムは、1本の巨大なプログラムではなく、たくさんの小さなプログラム（部品）の組み合わせでできています。この章では、共通の処理を<strong>副プログラム</strong>として切り出して <code class="bg-slate-100">CALL</code> で呼び出す方法と、データ定義を<strong>コピーブック</strong>にまとめて <code class="bg-slate-100">COPY</code> で共有する方法を学びます。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>処理を部品（副プログラム）に分ける理由を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>連絡節（LINKAGE SECTION）・<code class="bg-amber-100">USING</code>・<code class="bg-amber-100">GOBACK</code> を使って副プログラムを作り、<code class="bg-amber-100">CALL</code> で呼び出せる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>引数が「名前ではなく順番」で対応することと、BY REFERENCE と BY CONTENT の違いを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><code class="bg-amber-100">COPY</code> 文とコピーブックでデータ定義を共有し、<code class="bg-amber-100">-I</code> 付きでコンパイルできる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション13.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.1 なぜプログラムを部品に分けるのか
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの章では、1つのプログラムの中にすべての処理を書いてきました。しかし、プログラムが大きくなると困ったことが起こります。たとえば「消費税を計算する処理」を、売上の集計プログラムにも、請求書の作成プログラムにも、見積書の作成プログラムにも書いていたらどうでしょう。税率が変わったときに、<strong>すべてのプログラムを探して直さなければなりません</strong>。直し忘れがあれば、プログラムごとに金額が食い違ってしまいます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで、よく使う処理を<strong>別のプログラムとして切り出し、必要なときに呼び出す</strong>という方法を使います。切り出した小さなプログラムを<strong>副プログラム（サブプログラム）</strong>、呼び出す側を<strong>主プログラム</strong>と呼びます。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-users-gear text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">専門の係に仕事を頼む</h3>
+                            <p class="text-sm text-slate-600">会社には「経理係」「総務係」のような専門の係があります。副プログラムは、その専門の係です。主プログラムは「この金額の税金を計算してください」と仕事を頼み、結果だけを受け取ります。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-recycle text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">同じ処理を何度も書かない</h3>
+                            <p class="text-sm text-slate-600">税計算は CALCTAX、日付のチェックは CHKDATE のように1か所にまとめます。どのプログラムからでも呼び出せるので、書き間違いも直し忘れも防げます。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-people-group text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">分担して作れる</h3>
+                            <p class="text-sm text-slate-600">部品ごとに担当者を分けて同時に開発できます。部品は単独でテストできるため、不具合の場所も見つけやすくなります。</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    M["主プログラム<br/>MAIN"] -->|CALL| T["副プログラム<br/>CALCTAX 税計算"]
+    M -->|CALL| D["副プログラム<br/>CHKDATE 日付チェック"]
+    M2["別の主プログラム<br/>請求書作成"] -->|CALL| T
+    M2 -->|CALL| D
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 複数の主プログラムが、同じ副プログラム（部品）を共有して使います。部品を直せば、呼び出すすべてのプログラムに反映されます。</p>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つの共有方法が<strong>コピーブック</strong>です。たとえば第12章で使った売上レコード <code class="bg-slate-100">SALES-REC</code> の定義を、読み込みプログラムにも集計プログラムにも同じ内容で書く必要があります。コピーブックは、こうした<strong>データの定義を1つのファイルにまとめ、各プログラムに「コピーして貼り付ける」</strong>仕組みです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">仕組み</th><th class="px-4 py-3 text-left font-semibold">何を共有するか</th><th class="px-4 py-3 text-left font-semibold">使う命令</th><th class="px-4 py-3 text-left font-semibold">たとえるなら</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">副プログラム</td><td class="px-4 py-3">処理（手順）</td><td class="px-4 py-3"><code class="bg-slate-100">CALL</code></td><td class="px-4 py-3">専門の係に仕事を頼む</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">コピーブック</td><td class="px-4 py-3">データの定義（書式）</td><td class="px-4 py-3"><code class="bg-slate-100">COPY</code></td><td class="px-4 py-3">共通の申込用紙の様式をコピーして使う</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- セクション13.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.2 副プログラムの作り方
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まず、消費税を計算する副プログラム <code class="bg-slate-100">CALCTAX</code> を作ってみましょう。税抜金額を受け取り、10%の消費税（四捨五入）を返すだけの小さなプログラムです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">calctax.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム（副プログラム）</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CALCTAX.
+      * 税抜金額から消費税10%を求める副プログラム
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  LK-AMOUNT       PIC 9(7).
+       01  LK-TAX          PIC 9(7).
+       PROCEDURE DIVISION USING LK-AMOUNT LK-TAX.
+       MAIN-PROC.
+           COMPUTE LK-TAX ROUNDED = LK-AMOUNT * 0.1.
+           GOBACK.</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 副プログラムは単独では実行できない</p>
+                                <p class="text-blue-900 text-sm">副プログラムは呼び出される側の部品なので、<code class="bg-blue-100">cobc -x calctax.cob</code> のように単独で実行ファイルにしようとすると <code class="bg-blue-100">executable program requested but PROCEDURE/ENTRY has USING clause</code> というエラーになります。13.3 で、呼び出す側の主プログラムと一緒にコンパイルします。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これまでのプログラムとの違いは、次の3点だけです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">場所</th><th class="px-4 py-3 text-left font-semibold">書くもの</th><th class="px-4 py-3 text-left font-semibold">役割</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">データ部</td><td class="px-4 py-3"><code class="bg-slate-100">LINKAGE SECTION.</code>（連絡節）</td><td class="px-4 py-3">主プログラムから受け取る項目を定義する。作業場所節と違い、<strong>ここで定義した項目は自分の領域を持たず</strong>、呼び出し元のデータを指す</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">手続き部の見出し</td><td class="px-4 py-3"><code class="bg-slate-100">PROCEDURE DIVISION USING LK-AMOUNT LK-TAX.</code></td><td class="px-4 py-3">受け取る項目を、<strong>受け取る順に</strong>並べる</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">最後の文</td><td class="px-4 py-3"><code class="bg-slate-100">GOBACK.</code></td><td class="px-4 py-3">処理を終えて、呼び出し元に戻る</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: 連絡節（LINKAGE SECTION）と引数</p>
+                                <p class="text-blue-900 text-sm">連絡節は、主プログラムとの「連絡用の窓口」です。主プログラムが頼むときに渡す書類（金額の記入用紙）を<strong>引数（ひきすう）</strong>と呼びます。副プログラムは、渡された用紙に書かれた金額を読み、計算結果を別の用紙に書き込んで返します。項目名は規約どおり <code class="bg-blue-100">LK-</code> で始めます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold"></th><th class="px-4 py-3 text-left font-semibold">主プログラム</th><th class="px-4 py-3 text-left font-semibold">副プログラム</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">終わりの文</td><td class="px-4 py-3"><code class="bg-slate-100">STOP RUN.</code>（プログラム全体を終える）</td><td class="px-4 py-3"><code class="bg-slate-100">GOBACK.</code>（呼び出し元へ戻る）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">データの受け取り</td><td class="px-4 py-3">なし</td><td class="px-4 py-3"><code class="bg-slate-100">LINKAGE SECTION</code> ＋ <code class="bg-slate-100">USING</code></td></tr>
+                                <tr><td class="px-4 py-3 font-medium">PROGRAM-ID</td><td class="px-4 py-3">自由（例: MAIN）</td><td class="px-4 py-3">呼び出される名前（例: CALCTAX）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1 flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">副プログラムで STOP RUN を書かない</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">副プログラムの最後に <code>STOP RUN.</code> を書くと、呼び出し元に戻らず<strong>プログラム全体が終了</strong>してしまいます。副プログラムは必ず <code>GOBACK.</code> で終えましょう（主プログラムの最後に <code>GOBACK.</code> を書いても動きますが、本ガイドでは主プログラムは <code>STOP RUN.</code> に統一します）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.3 CALLで副プログラムを呼び出す
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        副プログラムを呼び出すのは <code class="bg-slate-100">CALL</code> 文です。呼び出す側の主プログラム <code class="bg-slate-100">main.cob</code> を書いてみましょう。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * 副プログラム CALCTAX を呼び出す主プログラム
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-AMT          PIC 9(7) VALUE 12345.
+       01  WS-TAX          PIC 9(7) VALUE ZERO.
+       01  WS-AMT-ED       PIC Z,ZZZ,ZZ9.
+       01  WS-TAX-ED       PIC Z,ZZZ,ZZ9.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+           CALL "CALCTAX" USING WS-AMT WS-TAX.
+           MOVE WS-AMT TO WS-AMT-ED.
+           MOVE WS-TAX TO WS-TAX-ED.
+           DISPLAY "税抜金額: " WS-AMT-ED " 円".
+           DISPLAY "消費税: " WS-TAX-ED " 円".
+           STOP RUN.</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">CALL "CALCTAX" USING WS-AMT WS-TAX.</code> は、「CALCTAX という係に、WS-AMT と WS-TAX を渡して仕事を頼む」という意味です。呼ばれた CALCTAX が <code class="bg-slate-100">GOBACK.</code> に達すると、<code class="bg-slate-100">CALL</code> の次の行に戻って処理が続きます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    A["主プログラム MAIN<br/>CALL CALCTAX を実行"] --> B["副プログラム CALCTAX<br/>税額を計算して LK-TAX に入れる"]
+    B --> C["GOBACK で戻る"]
+    C --> D["主プログラム MAIN<br/>CALL の次の行から続きを実行"]
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: CALL で副プログラムに処理を渡し、GOBACK で呼び出し元の次の行に戻ります。</p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">2つのファイルをコンパイルする</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        プログラムが2つのファイルに分かれたので、コンパイルのしかたが変わります。<strong>主プログラム（先頭に書いたファイル）と副プログラムを、1つのコマンドでまとめて</strong>指定します。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            作業フォルダの構成
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code class="language-plaintext">cobol-study/
+├── main.cob        ← 主プログラム（PROGRAM-ID. MAIN）
+└── calctax.cob     ← 副プログラム（PROGRAM-ID. CALCTAX）</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">コマンド</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x main.cob calctax.cob
+./main</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">税抜金額:    12,345 円
+消費税:     1,235 円</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 実行ファイルの名前</p>
+                                <p class="text-blue-900 text-sm"><code class="bg-blue-100">cobc -x</code> は、先頭に書いたファイル名から実行ファイルの名前を決めます（<code class="bg-blue-100">main.cob</code> なら <code class="bg-blue-100">main</code>）。副プログラム <code class="bg-blue-100">calctax.cob</code> は、その実行ファイルの中に一緒に組み込まれます。ファイル名ではなく <code class="bg-blue-100">PROGRAM-ID</code> の名前（<code class="bg-blue-100">CALCTAX</code>）で呼び出す点に注意してください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">引数は「名前」ではなく「順番」で対応する</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">CALL</code> 側の <code class="bg-slate-100">WS-AMT WS-TAX</code> と、副プログラム側の <code class="bg-slate-100">LK-AMOUNT LK-TAX</code> は、<strong>名前がまったく違います</strong>。COBOL は名前で対応づけるのではなく、<strong>書いた順番</strong>で1番目どうし、2番目どうしを結びつけます。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    subgraph caller["主プログラム 呼び出し側"]
+        W1["1番目 WS-AMT 12345"]
+        W2["2番目 WS-TAX 0"]
+    end
+    subgraph callee["副プログラム 受け取り側"]
+        L1["1番目 LK-AMOUNT"]
+        L2["2番目 LK-TAX"]
+    end
+    W1 --- L1
+    W2 --- L2
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 両側の項目は、名前ではなく並んだ順番で結びつきます。しかも「コピーを渡す」のではなく、同じ場所（同じデータ）を共有します。</p>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        順番を間違えると、どうなるでしょうか。わざと <code class="bg-slate-100">WS-TAX</code> と <code class="bg-slate-100">WS-AMT</code> の順に渡してみます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob（順番を間違えた例） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * 引数の並び順をわざと間違えて呼び出す
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-AMT          PIC 9(7) VALUE 12345.
+       01  WS-TAX          PIC 9(7) VALUE ZERO.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+      * 正しくは USING WS-AMT WS-TAX の順
+           CALL "CALCTAX" USING WS-TAX WS-AMT.
+           DISPLAY "WS-AMT = " WS-AMT.
+           DISPLAY "WS-TAX = " WS-TAX.
+           STOP RUN.</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">WS-AMT = 0000000
+WS-TAX = 0000000</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        1番目に渡した <code class="bg-slate-100">WS-TAX</code>（値は0）が <code class="bg-slate-100">LK-AMOUNT</code> に、2番目の <code class="bg-slate-100">WS-AMT</code> が <code class="bg-slate-100">LK-TAX</code> に結びつきました。0の10%は0なので、税金の計算結果 0 が <code class="bg-slate-100">WS-AMT</code> に書き込まれ、元の税抜金額 12345 が<strong>消えてしまいました</strong>。しかもエラーも出ません。
+                    </p>
+
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 my-6 rounded-r-lg overflow-hidden">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-1 flex-shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-900 font-medium break-words">引数の順番と桁数は、自分で確かめる</p>
+                                <p class="text-red-800 text-sm mt-1 break-words">コンパイラは、<code>CALL</code> 側と副プログラム側で引数の順番や型が合っているかを調べてくれません。順番の間違い、個数の違い、<code>PIC</code> の桁数の食い違いは、<strong>エラーにならないまま、おかしな結果になります</strong>。引数を変更するときは、呼び出す側と呼ばれる側の両方を必ず見直しましょう。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">副プログラムが見つからないとき</h3>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コンパイルのときに <code class="bg-slate-100">calctax.cob</code> を指定し忘れると、実行したときに次のエラーで止まります（GnuCOBOL では、副プログラムの有無は<strong>実行時に</strong>初めて調べられます。処理系によっては、組み立ての段階で調べるものもあります）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">libcob: error: module 'CALCTAX' not found</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このようなときのために、<code class="bg-slate-100">CALL</code> には <code class="bg-slate-100">ON EXCEPTION</code>（呼び出しに失敗したとき）を付けて、自分でメッセージを出す書き方もあります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       MAIN-PROC.
+      * 副プログラムが見つからないときの備え
+           CALL "CALCTAX" USING WS-AMT WS-TAX
+               ON EXCEPTION
+                   DISPLAY "CALCTAX が見つかりません"
+           END-CALL.
+           DISPLAY "消費税 = " WS-TAX.</code></pre>
+                    </div>
+
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント</p>
+                                <p class="text-emerald-900 text-sm">副プログラムを使うときの約束は3つです。(1) 副プログラムは <strong>LINKAGE SECTION ＋ PROCEDURE DIVISION USING ＋ GOBACK</strong> で作る。(2) <strong>CALL "プログラム名" USING 引数…</strong> で呼ぶ。(3) 引数は<strong>名前ではなく順番</strong>で対応する。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.4 BY REFERENCEとBY CONTENT - 原本を渡すか、コピーを渡すか
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">CALL</code> で引数を渡すとき、渡し方が2種類あります。違いを、たとえ話から見てみましょう。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-file-signature text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">BY REFERENCE（参照渡し）</h3>
+                            <p class="text-sm text-slate-600">書類の<strong>原本</strong>を渡す方法です。受け取った係が原本に書き込めば、頼んだ側の書類も書き換わります。何も書かなければ、これが<strong>既定</strong>の渡し方です。</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-5">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-3">
+                                <i class="fas fa-copy text-white"></i>
+                            </div>
+                            <h3 class="font-semibold text-slate-800 mb-1">BY CONTENT（内容渡し）</h3>
+                            <p class="text-sm text-slate-600">書類の<strong>コピー</strong>を渡す方法です。受け取った係がコピーに何を書いても、手元の原本は変わりません。「渡したいだけで、書き換えられたくない」ときに使います。</p>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        実際に動かして比べましょう。まず、受け取った数に10を足すだけの副プログラム <code class="bg-slate-100">ADDTEN</code> です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">addten.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム（副プログラム）</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ADDTEN.
+      * 受け取った数に10を足す副プログラム
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  LK-NUM          PIC 9(3).
+       PROCEDURE DIVISION USING LK-NUM.
+       MAIN-PROC.
+           ADD 10 TO LK-NUM.
+           GOBACK.</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次に、同じ初期値 5 の項目を、1つは BY REFERENCE、もう1つは BY CONTENT で渡します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * BY REFERENCE と BY CONTENT の違いを比べる
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-A            PIC 9(3) VALUE 5.
+       01  WS-B            PIC 9(3) VALUE 5.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+           CALL "ADDTEN" USING BY REFERENCE WS-A.
+           CALL "ADDTEN" USING BY CONTENT WS-B.
+           DISPLAY "BY REFERENCE: " WS-A.
+           DISPLAY "BY CONTENT  : " WS-B.
+           STOP RUN.</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">コマンド</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x main.cob addten.cob
+./main</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">BY REFERENCE: 015
+BY CONTENT  : 005</code></pre>
+                    </div>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">渡し方</th><th class="px-4 py-3 text-left font-semibold">副プログラムが値を変えると</th><th class="px-4 py-3 text-left font-semibold">向いている場面</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">BY REFERENCE</code>（既定）</td><td class="px-4 py-3">呼び出し元の値も<strong>変わる</strong>（5 → 15）</td><td class="px-4 py-3">計算結果を受け取りたいとき（CALCTAX の税額など）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium"><code class="bg-slate-100">BY CONTENT</code></td><td class="px-4 py-3">呼び出し元の値は<strong>変わらない</strong>（5 のまま）</td><td class="px-4 py-3">値を渡すだけで、書き換えられたくないとき</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">USING</code> の中では、<code class="bg-slate-100">BY REFERENCE</code> と <code class="bg-slate-100">BY CONTENT</code> を1つの <code class="bg-slate-100">CALL</code> に混ぜて書くこともできます。たとえば「税抜金額は書き換えさせない（コピーを渡す）が、税額は結果を受け取る（原本を渡す）」なら、次のように書きます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 金額はコピー、税額は原本を渡す
+           CALL "CALCTAX" USING BY CONTENT WS-AMT
+               BY REFERENCE WS-TAX.</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">BY CONTENT</code> や <code class="bg-slate-100">BY REFERENCE</code> の指定は、<strong>次の BY が出てくるまで、後ろに並ぶ引数すべてに効きます</strong>。たとえば <code class="bg-slate-100">USING BY CONTENT WS-AMT WS-TAX</code> と書くと、WS-TAX もコピー渡しになり、税額が戻ってきません（実機では WS-TAX が 0000000 のままでした）。<code class="bg-slate-100">BY CONTENT</code> の後ろで原本を渡したい引数には、<code class="bg-slate-100">BY REFERENCE</code> をはっきり書きます。上の書き方なら、WS-AMT は 12345 のまま、WS-TAX には 1235 が戻ります。
+                    </p>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 迷ったときの選び方</p>
+                                <p class="text-blue-900 text-sm">結果を受け取りたい引数は BY REFERENCE（先頭で何も書かなければ既定。BY CONTENT の後ろでは BY REFERENCE と書く）、入力として渡すだけの引数は BY CONTENT、と覚えると失敗しません。13.3 の失敗例のように、うっかり原本を書き換えられる事故を防げます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.5 COPY文とコピーブック - データ定義を共有する
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        もう1つの部品化の仕組みが <strong>COPY 文</strong>です。第12章では売上レコード <code class="bg-slate-100">SALES-REC</code> の定義をプログラムの中に書きました。しかし、売上を読む・集計する・帳票にするなど、複数のプログラムが同じレコードを扱う場合、同じ定義をあちこちに書くと、桁数を変えたときに直し忘れが起きます。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        そこで、データの定義だけを別のファイル（<strong>コピーブック</strong>）に書き、各プログラムは <code class="bg-slate-100">COPY</code> 文でそれを取り込みます。コンパイルのとき、<code class="bg-slate-100">COPY</code> の行がコピーブックの中身に置き換えられる、と考えてください。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    C["コピーブック<br/>SALESREC.cpy<br/>売上レコードの定義"]
+    P1["読み込みプログラム<br/>COPY SALESREC."]
+    P2["集計プログラム<br/>COPY SALESREC."]
+    P3["帳票プログラム<br/>COPY SALESREC."]
+    C -->|コンパイル時に展開| P1
+    C -->|コンパイル時に展開| P2
+    C -->|コンパイル時に展開| P3
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: コピーブックを1つ直せば、COPY しているすべてのプログラムが次のコンパイルで同じ定義になります。</p>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コピーブックは、本ガイドでは <code class="bg-slate-100">copy</code> というフォルダにまとめ、拡張子を <code class="bg-slate-100">.cpy</code> にします。
+                    </p>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            作業フォルダの構成
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code class="language-plaintext">cobol-study/
+├── main.cob              ← 主プログラム（COPY SALESREC. と書く）
+└── copy/
+    └── SALESREC.cpy      ← コピーブック（売上レコードの定義）</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">copy/SALESREC.cpy <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white">コピーブック</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 売上レコード（合計20バイト）
+       01  SALES-REC.
+           05  SR-DATE     PIC X(8).
+           05  SR-ITEM     PIC X(4).
+           05  SR-QTY      PIC 9(3).
+           05  SR-PRICE    PIC 9(5).</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コピーブックの中身は、<strong>データ部に書く内容そのまま</strong>です（<code class="bg-slate-100">01 SALES-REC</code> から始め、桁位置も本体のプログラムと同じ固定形式で書きます）。これを、取り込みたい場所に <code class="bg-slate-100">COPY</code> で呼び出します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * コピーブックの売上レコードを取り込んで使う
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           COPY SALESREC.
+       01  WS-AMOUNT       PIC 9(8).
+       01  WS-AMOUNT-ED    PIC Z,ZZZ,ZZ9.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+           MOVE "20261001A00100300120" TO SALES-REC.
+           COMPUTE WS-AMOUNT = SR-QTY * SR-PRICE.
+           MOVE WS-AMOUNT TO WS-AMOUNT-ED.
+           DISPLAY "日付: " SR-DATE " 商品: " SR-ITEM.
+           DISPLAY "金額: " WS-AMOUNT-ED " 円".
+           STOP RUN.</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">COPY SALESREC.</code> は、名前のとおり <code class="bg-slate-100">SALESREC.cpy</code> を探して、その内容をその場に取り込みます。<strong>文の最後のピリオドを忘れない</strong>ようにしてください。コピーブックを探す場所は <code class="bg-slate-100">-I</code> オプションで教えます。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">コマンド</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x -I copy main.cob
+./main</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">日付: 20261001 商品: A001
+金額:       360 円</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">-I copy</code> は「<code class="bg-slate-100">copy</code> フォルダの中も探してください」という指定です。これを付け忘れると、次のようにコピーブックが見つからないエラーになります。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">main.cob:6: error: SALESREC: No such file or directory
+main.cob: in paragraph 'MAIN-PROC':
+main.cob:11: error: 'SALES-REC' is not defined
+main.cob:12: error: 'SR-QTY' is not defined
+main.cob:12: error: 'SR-PRICE' is not defined
+main.cob:14: error: 'SR-DATE' is not defined
+main.cob:14: error: 'SR-ITEM' is not defined</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        コピーブックが見つからず、そのため <code class="bg-slate-100">SALES-REC</code> の定義が取り込まれなかったので、後ろの行でも「定義されていない」というエラーが続きます。<strong>最初の1行目のエラーを直せば、後ろのエラーは自然に消える</strong>ことが多いので、エラーは上から順に直しましょう。
+                    </p>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ファイル節の <code class="bg-slate-100">FD</code>（第12章）の直下にも、同じように取り込めます。同じコピーブックを2つの FD に取り込むと、レコード名と項目名が二重に定義され、<code class="bg-slate-100">'SR-ITEM' is ambiguous; needs qualification</code> というエラーになります。そのため、取り込むのは入力用の FD だけにします。出力側は第12章と同じく <code class="bg-slate-100">01  OUT-REC  PIC X(20).</code> のような別名のレコードにして、<code class="bg-slate-100">WRITE OUT-REC FROM SALES-REC</code> で書き出します（名前を置き換えて取り込む <code class="bg-slate-100">COPY ... REPLACING</code> もありますが、本ガイドでは扱いません）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ファイル節の部分 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">DATA DIVISIONの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       FILE SECTION.
+       FD  IN-FILE.
+      * FD の直下にもコピーブックを取り込める
+           COPY SALESREC.</code></pre>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">コラム: 現場ではコピーブックが常識</p>
+                                <p class="text-blue-900 text-sm">メインフレームの開発現場では、レコードの定義は<strong>コピーブックにして共通化する</strong>のが当たり前です。ファイルのレイアウト（項目の並びと桁数）は、そのファイルを読み書きするすべてのプログラムで一致していなければならないからです。保守の仕事では「この項目はどのコピーブックで定義されているか」を探す場面がよくあります。また、<code class="bg-blue-100">COPY</code> 文には、取り込むときに一部の文字列を置き換える <code class="bg-blue-100">REPLACING</code> という機能もあります（本ガイドでは扱いません）。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション13.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        13.6 RETURN-CODEと終了コード
+                    </h2>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        副プログラムが仕事を終えたとき、「成功したか・失敗したか」を主プログラムに伝えたい場合があります。COBOL には、そのための特別な項目 <code class="bg-slate-100">RETURN-CODE</code> が最初から用意されています。宣言は不要で、数値を入れて使います。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">chkrc.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム（副プログラム）</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CHKRC.
+      * 数値が100を超えたら RETURN-CODE に8を入れる
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  LK-NUM          PIC 9(3).
+       PROCEDURE DIVISION USING LK-NUM.
+       MAIN-PROC.
+           IF LK-NUM &gt; 100
+               MOVE 8 TO RETURN-CODE
+           ELSE
+               MOVE 0 TO RETURN-CODE
+           END-IF.
+           GOBACK.</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * 副プログラムの終了コードを調べる
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NUM          PIC 9(3) VALUE 150.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+           CALL "CHKRC" USING WS-NUM.
+           DISPLAY "RETURN-CODE = " RETURN-CODE.
+           IF RETURN-CODE NOT = 0
+               DISPLAY "異常です"
+           END-IF.
+           STOP RUN.</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">ターミナル <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">コマンド</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x main.cob chkrc.cob
+./main
+echo $?</code></pre>
+                    </div>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">RETURN-CODE = +000000008
+異常です
+8</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">RETURN-CODE</code> の値は、副プログラムから主プログラムへ伝わり、さらに主プログラムが終わるときには<strong>プログラム全体の終了コード</strong>になります。最後の <code class="bg-slate-100">echo $?</code> が、その終了コード（8）を表示しています。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr><th class="px-4 py-3 text-left font-semibold">値</th><th class="px-4 py-3 text-left font-semibold">慣習的な意味</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr><td class="px-4 py-3 font-medium">0</td><td class="px-4 py-3">正常終了</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">4</td><td class="px-4 py-3">警告（処理は続けられるが、確認が必要）</td></tr>
+                                <tr><td class="px-4 py-3 font-medium">8以上</td><td class="px-4 py-3">異常（エラー）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">ヒント: 終了コードはジョブの流れを決める</p>
+                                <p class="text-blue-900 text-sm">メインフレームでは、複数のプログラムを順に実行する「ジョブ」の中で、前のプログラムの終了コード（リターンコード）を見て、後ろの処理を実行するか止めるかを決めます。「0なら次へ、8以上なら中止して担当者に連絡」のような運用です。そのため、プログラムは正常なら0、異常なら0以外を必ず返すように作ります。GnuCOBOL の <code class="bg-blue-100">DISPLAY</code> では <code class="bg-blue-100">+000000008</code> のように符号と桁数付きで表示されますが、中身は数値の 8 です。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- やってみよう（実習）カード -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 13-1: 日付チェックの副プログラム CHKDATE を作ろう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">日付（YYYYMMDD）が実在する日付かどうかを調べる副プログラムを作り、主プログラムから呼び出して確かめます。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ul class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-200">chkdate.cob</code> を作る。<code class="bg-purple-200">LINKAGE SECTION</code> に、日付 <code class="bg-purple-200">LK-DATE</code>（年4桁・月2桁・日2桁の集団項目）と、結果 <code class="bg-purple-200">LK-RESULT</code>（<code class="bg-purple-200">PIC X</code>）を定義する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">月が1〜12か、日が1〜その月の最終日か、を調べる。最終日は 4・6・9・11 月が30、2月が28（4で割り切れる年は29、簡易判定でよい）、それ以外が31。正しければ結果に <code class="bg-purple-200">"0"</code>、誤りなら <code class="bg-purple-200">"1"</code> を入れて <code class="bg-purple-200">GOBACK.</code> する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-200">main.cob</code> から <code class="bg-purple-200">20261001</code>・<code class="bg-purple-200">20260231</code>・<code class="bg-purple-200">20240229</code> の3つを <code class="bg-purple-200">CALL "CHKDATE"</code> で調べ、「正しい日付です」「誤った日付です」と表示する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">4</span>
+                                    <span class="flex-1 min-w-0 break-words"><code class="bg-purple-200">cobc -x main.cob chkdate.cob</code> でコンパイルして動かす。余裕があれば、<code class="bg-purple-200">20260431</code> や <code class="bg-purple-200">2026AB01</code> も試す。</span>
+                                </li>
+                            </ul>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">解答例</p>
+                                <p class="text-purple-900 text-sm mb-2">副プログラムは、前半（IDENTIFICATION DIVISION から主な処理まで）と後半（月ごとの最終日を決める段落の中身）に分けて示します。それぞれ単独では動きません。順につなげて1つのファイル <code class="bg-purple-200">chkdate.cob</code> に保存してください。前半の最後の <code class="bg-purple-200">MAXDAY-PROC.</code> の行の直後に、後半をそのまま続けます（見出し行の追加は不要です）。なお副プログラムなので、完成した <code class="bg-purple-200">chkdate.cob</code> だけを <code class="bg-purple-200">cobc -x</code> しても実行ファイルにはなりません。</p>
+
+                                <div class="code-block-wrapper my-6">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">chkdate.cob（部品 1/2） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">プログラムの前半</span></span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CHKDATE.
+      * 日付(YYYYMMDD)を調べる。LK-RESULT: 0=正しい 1=誤り
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-MAXDAY       PIC 99.
+       LINKAGE SECTION.
+       01  LK-DATE.
+           05  LK-YEAR     PIC 9(4).
+           05  LK-MONTH    PIC 9(2).
+           05  LK-DAY      PIC 9(2).
+       01  LK-RESULT       PIC X.
+       PROCEDURE DIVISION USING LK-DATE LK-RESULT.
+       MAIN-PROC.
+           MOVE "1" TO LK-RESULT.
+           IF LK-DATE IS NUMERIC
+               IF LK-MONTH &gt;= 1 AND LK-MONTH &lt;= 12
+                   PERFORM MAXDAY-PROC
+                   IF LK-DAY &gt;= 1 AND LK-DAY &lt;= WS-MAXDAY
+                       MOVE "0" TO LK-RESULT
+                   END-IF
+               END-IF
+           END-IF.
+           GOBACK.
+       MAXDAY-PROC.</code></pre>
+                                </div>
+
+                                <div class="code-block-wrapper my-6">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">chkdate.cob（部品 2/2） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">PROCEDURE DIVISIONの抜粋</span></span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">      * 月ごとの最終日を決める。うるう年は簡易判定
+           EVALUATE LK-MONTH
+               WHEN 4 WHEN 6 WHEN 9 WHEN 11
+                   MOVE 30 TO WS-MAXDAY
+               WHEN 2
+                   MOVE 28 TO WS-MAXDAY
+                   IF FUNCTION MOD(LK-YEAR, 4) = 0
+                       MOVE 29 TO WS-MAXDAY
+                   END-IF
+               WHEN OTHER
+                   MOVE 31 TO WS-MAXDAY
+           END-EVALUATE.</code></pre>
+                                </div>
+
+                                <div class="code-block-wrapper my-6">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">main.cob <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">完全なプログラム</span></span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-cobol">       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MAIN.
+      * CHKDATE を3つの日付で試す
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-DATE         PIC X(8).
+       01  WS-RESULT       PIC X.
+       PROCEDURE DIVISION.
+       MAIN-PROC.
+           MOVE "20261001" TO WS-DATE.
+           PERFORM CHECK-PROC.
+           MOVE "20260231" TO WS-DATE.
+           PERFORM CHECK-PROC.
+           MOVE "20240229" TO WS-DATE.
+           PERFORM CHECK-PROC.
+           STOP RUN.
+       CHECK-PROC.
+           CALL "CHKDATE" USING WS-DATE WS-RESULT.
+           IF WS-RESULT = "0"
+               DISPLAY WS-DATE " は正しい日付です"
+           ELSE
+               DISPLAY WS-DATE " は誤った日付です"
+           END-IF.</code></pre>
+                                </div>
+
+                                <div class="code-block-wrapper my-6">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">ターミナル <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">コマンド</span></span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cobc -x main.cob chkdate.cob
+./main</code></pre>
+                                </div>
+
+                                <div class="code-block-wrapper my-6">
+                                    <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                                        <span class="text-slate-400 text-sm">実行結果 <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">出力</span></span>
+                                        <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                                onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">20261001 は正しい日付です
+20260231 は誤った日付です
+20240229 は正しい日付です</code></pre>
+                                </div>
+                                <ul class="space-y-1 text-purple-900 text-sm">
+                                    <li>・<code class="bg-purple-200">MAXDAY-PROC</code> は、副プログラムの中の段落です。<code class="bg-purple-200">GOBACK.</code> より<strong>後ろ</strong>に置くことで、主な処理の流れの外に出しています。</li>
+                                    <li>・<code class="bg-purple-200">LK-DATE IS NUMERIC</code> で、数字以外が混じった日付（<code class="bg-purple-200">2026AB01</code> など）を先にはじいています（第7章のクラス条件）。</li>
+                                    <li>・呼び出し側の <code class="bg-purple-200">WS-DATE</code> は <code class="bg-purple-200">PIC X(8)</code>、受け取り側 <code class="bg-purple-200">LK-DATE</code> は4＋2＋2＝8桁の集団項目なので、<strong>全体の長さが同じ</strong>であり、問題なく対応します。</li>
+                                    <li>・<code class="bg-purple-200">FUNCTION MOD(LK-YEAR, 4)</code> は、年を4で割った余りを返す組み込み関数です（第10章で少し登場。第6章の <code class="bg-purple-200">DIVIDE ... REMAINDER</code> と同じ「余り」）。余りが0なら4で割り切れる＝うるう年です。</li>
+                                    <li>・うるう年は「4で割り切れる年」の簡易判定です。実際には「100で割り切れる年は平年、ただし400で割り切れる年はうるう年」というルールがあり、実務ではそこまで判定します。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ul class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 副プログラムの最後には <code class="bg-blue-100">STOP RUN.</code> と <code class="bg-blue-100">GOBACK.</code> のどちらを書きますか？ 間違えるとどうなりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>GOBACK.</strong> を書きます。副プログラムで <code class="bg-blue-200">STOP RUN.</code> を書くと、呼び出し元に戻らず、<strong>プログラム全体が終了</strong>してしまいます。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. <code class="bg-blue-100">CALL "CALCTAX" USING WS-AMT WS-TAX.</code> で、副プログラム側が <code class="bg-blue-100">USING LK-AMOUNT LK-TAX</code> のとき、<code class="bg-blue-100">WS-TAX</code> に対応するのはどの項目ですか？ また、その対応は何で決まりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <code class="bg-blue-200">LK-TAX</code> です。引数は項目の<strong>名前ではなく、USING に書いた順番</strong>で対応します（1番目どうし、2番目どうし）。順番を間違えてもコンパイルエラーにはならず、おかしな結果になるので注意が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. <code class="bg-blue-100">BY REFERENCE</code> と <code class="bg-blue-100">BY CONTENT</code> の違いを説明してください。何も書かないときはどちらになりますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            <strong>BY REFERENCE</strong> は呼び出し元のデータそのもの（原本）を渡すので、副プログラムが値を変えると呼び出し元の値も変わります。<strong>BY CONTENT</strong> はコピーを渡すので、副プログラムが値を変えても呼び出し元は変わりません。何も書かないときは <strong>BY REFERENCE</strong> です。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. コピーブック <code class="bg-blue-100">SALESREC.cpy</code> を <code class="bg-blue-100">copy</code> フォルダに置いたとき、プログラムに書く文と、コンパイルのコマンドを答えてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            プログラムのデータ部に <code class="bg-blue-200">COPY SALESREC.</code> と書きます。コンパイルは <code class="bg-blue-200">cobc -x -I copy main.cob</code> です。<code class="bg-blue-200">-I copy</code> でコピーブックを探すフォルダを教えます。付け忘れると「SALESREC: No such file or directory」というエラーになります。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章への橋渡し -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-1">次の章では</h3>
+                            <p class="text-slate-600 text-sm leading-relaxed">いよいよ最終章の第14章です。これまでに学んだファイル処理・繰り返し・判断・編集項目などを総動員して、売上データを商品ごとに並べ替えて集計し、帳票を出力する<strong>売上集計バッチ</strong>を完成させます。メインフレームの世界へ進むための次のステップも紹介します。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="cobol-learning-material-12.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+                        <i class="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="font-medium">第12章: ファイルを読み書きする - 順ファイル処理の基本</span>
+                        </div>
+                    </a>
+                    <a href="cobol-learning-material-14.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第14章: 実践：売上集計バッチを作ろう - 総まとめと次のステップ</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
