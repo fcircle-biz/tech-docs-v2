@@ -1,0 +1,42 @@
+import type { TechGuide } from '../../types';
+
+// COBOL 入門学習ガイド（全14章）。技術色 = インディゴ（メインフレームの深い青）。
+export const cobol: TechGuide = {
+  category: 'programming-languages/cobol-ecosystem',
+  slug: 'cobol',
+  techTitle: 'COBOL学習教材',
+  icon: 'fa-server',
+  level: '初級',
+  totalTime: '約23時間',
+  splashStop0: '#6366f1',
+  splashStop1: '#06b6d4',
+  splashBg: '#090b11',
+  primary: {
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
+  },
+  chapters: [
+    { number: 1, name: 'COBOLの世界へようこそ - 業務システムを支える言語', file: 'cobol-learning-material-01.html' },
+    { number: 2, name: '開発環境を準備する - GnuCOBOLで最初のプログラム', file: 'cobol-learning-material-02.html' },
+    { number: 3, name: 'プログラムの骨組み - 4つの部と桁のルール', file: 'cobol-learning-material-03.html' },
+    { number: 4, name: 'データを入れる箱 - データ項目とPICTURE句', file: 'cobol-learning-material-04.html' },
+    { number: 5, name: '表示と入力 - DISPLAY・ACCEPTと編集項目', file: 'cobol-learning-material-05.html' },
+    { number: 6, name: '計算する - 四則演算とCOMPUTE', file: 'cobol-learning-material-06.html' },
+    { number: 7, name: 'プログラムに判断させる - IF・EVALUATEと条件名', file: 'cobol-learning-material-07.html' },
+    { number: 8, name: '同じ処理を繰り返す - PERFORMと構造化', file: 'cobol-learning-material-08.html' },
+    { number: 9, name: 'データをまとめて扱う - 集団項目とレベル番号', file: 'cobol-learning-material-09.html' },
+    { number: 10, name: '同じ形のデータを並べる - 表（OCCURS）と検索', file: 'cobol-learning-material-10.html' },
+    { number: 11, name: '文字列を加工する - STRING・UNSTRING・INSPECT', file: 'cobol-learning-material-11.html' },
+    { number: 12, name: 'ファイルを読み書きする - 順ファイル処理の基本', file: 'cobol-learning-material-12.html' },
+    { number: 13, name: 'プログラムを部品に分ける - CALLとCOPY', file: 'cobol-learning-material-13.html' },
+    { number: 14, name: '実践：売上集計バッチを作ろう - 総まとめと次のステップ', file: 'cobol-learning-material-14.html' },
+  ],
+};

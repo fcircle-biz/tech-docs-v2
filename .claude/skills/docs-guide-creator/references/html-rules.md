@@ -135,6 +135,8 @@ CDN デフォルトビルド（`highlight.min.js`）には約40言語のみ含�
 
 > **重要**: Highlight.js はレイアウト `GuideChapterLayout.astro` の `<head>` が読み込む（全ガイド共通）。デフォルト外の言語を使うガイドを作る場合は、**断片ではなくレイアウトの `<head>` に言語スクリプトを追記**する（例: `<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sas.min.js"></script>`）。これは全ガイドに影響するため、追加はオーケストレーターが判断する。断片側で `<script>` を書かない。
 
+**レイアウトに追加済み**: Dockerfile・HTTP（cdnjs の公式言語パック）、COBOL（`highlightjs-cobol@0.3.3` を jsDelivr から読み込み。固定形式向けの文法で、7桁目の `*` によるコメントは認識するが `*>` の行内コメントは認識しない）。
+
 **デフォルト含有（追加不要）**: JavaScript, TypeScript, Python, Java, C, C++, C#, PHP, Ruby, Go, Rust, Swift, SQL, HTML, CSS, JSON, YAML, Bash, Markdown。不明な場合は [Highlight.js Supported Languages](https://highlightjs.readthedocs.io/en/latest/supported-languages.html) を確認する。
 
 ## 生成物検証チェックリスト

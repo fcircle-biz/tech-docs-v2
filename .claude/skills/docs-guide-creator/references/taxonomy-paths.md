@@ -41,7 +41,7 @@ GitHub Pages URL は `https://fcircle-biz.github.io/tech-docs-v2/guide/[分類�
 
 ### サブグループ
 
-- **プログラミング言語**: エコシステム単位。登録済み: `java-ecosystem`・`javascript-ecosystem`・`python-ecosystem`・`dotnet-ecosystem`。ほかの言語（`php-ecosystem`・`c-cpp-ecosystem`・`cobol-ecosystem`・`dart-ecosystem` 等）は、最初のガイドを作るときにマスタへ追加する。C#・F# は `dotnet-ecosystem` に置く。
+- **プログラミング言語**: エコシステム単位。登録済み: `java-ecosystem`・`javascript-ecosystem`・`python-ecosystem`・`dotnet-ecosystem`・`cobol-ecosystem`。ほかの言語（`php-ecosystem`・`c-cpp-ecosystem`・`dart-ecosystem` 等）は、最初のガイドを作るときにマスタへ追加する。C#・F# は `dotnet-ecosystem` に置く。
 - **AI**: 用途単位。
   - `generative-ai`（生成AI活用）: Claude・ChatGPT・Gemini などを使いこなす
   - `ai-coding`（AIコーディング）: Claude Code・Codex・GitHub Copilot・Cursor と、その拡張（Skills 等）
