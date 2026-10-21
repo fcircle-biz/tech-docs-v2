@@ -324,7 +324,7 @@ flowchart LR
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3 font-medium align-top">8 以上<br>（8・12・16）</td>
-                                    <td class="px-4 py-3 align-top">エラー（集計対象日の誤り、数値項目の不正値、合計の桁あふれ）、重大なエラー（ファイルの OPEN・READ・WRITE の失敗）。16 は SALESSUM では使わない</td>
+                                    <td class="px-4 py-3 align-top">エラー（集計対象日の誤り、数値項目の不正値、合計の桁あふれ）、重大なエラー（ファイルの OPEN・READ・WRITE・CLOSE の失敗）。16 は SALESSUM では使わない</td>
                                     <td class="px-4 py-3 align-top">異常（異常検出終了）</td>
                                     <td class="px-4 py-3 align-top">実行しない</td>
                                     <td class="px-4 py-3 align-top">運用担当へ通知し、原因を調べる</td>
@@ -618,7 +618,7 @@ flowchart TD
                             <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-orange-800 mb-1">止まったあとに残っているデータに注意する</p>
-                                <p class="text-orange-900 text-sm">異常で止まったとき、後ろのデータセットには<strong>前回の結果</strong>が残っていることがあります。たとえば JSALPREP で止まると、売上集計結果は前回のままです（7.8 で確かめます）。集計結果のレコードの先頭8桁は集計対象日なので、日付を見れば「今日の結果ではない」と分かります。止まったジョブより後ろのデータセットを、新しい結果だと思い込んで使わないでください。</p>
+                                <p class="text-orange-900 text-sm">異常で止まったとき、後ろのデータセットには<strong>前回の結果</strong>が残っていることがあります。たとえば JSALPREP で止まると、売上集計結果は前回のままです（7.8 で確かめます）。集計結果のレコードの先頭8桁は集計対象日なので、日付を見れば「今日の結果ではない」と分かります。止まったジョブより後ろのデータセットを、新しい結果だと思い込んで使わないでください。7.8 の疑似ジョブネットでは、確認ジョブ（JSALCHK）がこの日付を業務日付と照らし合わせて、取り違えを自動で見つけます。</p>
                             </div>
                         </div>
                     </div>
@@ -966,7 +966,7 @@ flowchart TD
                             <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
                             <div>
                                 <p class="font-semibold text-orange-800 mb-1">注意: RC=4 を警告として続行する判断</p>
-                                <p class="text-orange-900 text-sm mb-2">この設計では、JSALSUM が RC=4（入力が 0 件）で終わっても、後続を続けます。売上が無い日なら問題ありませんが、受信データが欠けていただけかもしれません。警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。PC の疑似ジョブネットでも、入力が 0 件の日に JSALCHK は「合計金額 0000000000」を表示して RC=0 で終わり、警告は JSALCHK の結果には表れません（第8章の TC02）。</p>
+                                <p class="text-orange-900 text-sm mb-2">この設計では、JSALSUM が RC=4（入力が 0 件）で終わっても、後続を続けます。売上が無い日なら問題ありませんが、受信データが欠けていただけかもしれません。警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。PC の疑似ジョブネットでも、入力が 0 件の日に JSALCHK は「合計金額 0000000000」を表示して RC=0 で終わり、警告は JSALCHK の結果には表れません。そこで 7.8 の疑似ジョブネットでは、JSALSUM の警告を<strong>ジョブネット全体の戻りコード（4）に引き継ぎ</strong>、外から警告が見えるようにします（第8章の TC02）。</p>
                                 <p class="text-orange-900 text-sm">対策は、警告を記録し、<strong>だれが・いつまでに・何を見て</strong>確認するかを、運用の決まりとして定めておくことです。受信データの欠落だったと分かれば、JSALPREP から再実行します。</p>
                             </div>
                         </div>
@@ -1032,24 +1032,41 @@ flowchart TD
                         <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
 # 疑似JCL（入力データ準備ジョブ JSALPREP）: 受信データを集計用の入力にコピーする
 # STEP010: 前回の集計用入力を削除する（IEFBR14 による事前削除の代わり）
-rm -f data/sales.dat
+if ! rm -f data/sales.dat; then
+    echo "JSALPREP STEP010: data/sales.dat を削除できません RC=12"
+    exit 12
+fi
 # STEP020: 受信データをコピーする（IEBGENER の代わり）
 if [ ! -f data/sales-recv.dat ]; then
     echo "JSALPREP STEP020: data/sales-recv.dat が見つかりません"
     echo "JSALPREP RC=12（z/OS では割り当てエラーでステップが実行されないケース）"
     exit 12
 fi
-cp data/sales-recv.dat data/sales.dat
+if ! cp data/sales-recv.dat data/sales.dat; then
+    echo "JSALPREP STEP020: 受信データを複写できません RC=12"
+    exit 12
+fi
 echo "JSALPREP STEP020 RC=0"
 exit 0</code></pre>
                     </div>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        <code class="bg-slate-100">rm -f</code> が STEP010 の事前削除（IEFBR14）、<code class="bg-slate-100">cp</code> が STEP020 の複写（IEBGENER）にあたります。受信データが無いときは RC=12 で終わります。z/OS では、受信データのデータセットが無いと、STEP020 は割り当てエラーで実行されません（第6章 6.4）。その「ステップが実行されずに終わった」状態を、PC では RC=12 で表しています。2つ目は、ジョブ② JSALSUM で、第6章で作ったものと同じです。
+                        <code class="bg-slate-100">rm -f</code> が STEP010 の事前削除（IEFBR14）、<code class="bg-slate-100">cp</code> が STEP020 の複写（IEBGENER）にあたります。<code class="bg-slate-100">if ! コマンド; then</code> は、「コマンドが失敗したら（終了コードが 0 以外なら）、then の中を実行する」という書き方です。削除や複写に失敗したら（書き込みの権限が無い、ディスクがいっぱい、など）、その場で RC=12 で終わります。なお、<code class="bg-slate-100">rm -f</code> は、消すファイルが無いだけなら失敗になりません（IEFBR14 の事前削除と同じです）。受信データが無いときも RC=12 で終わります。z/OS では、受信データのデータセットが無いと、STEP020 は割り当てエラーで実行されません（第6章 6.4）。その「ステップが実行されずに終わった」状態を、PC では RC=12 で表しています。2つ目は、ジョブ② JSALSUM です。第6章で作ったものに、STEP010 の削除の失敗を確かめる <code class="bg-slate-100">if</code> を足しました。
                     </p>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: ジョブは、失敗を必ず戻りコードで返す</p>
+                                <p class="text-emerald-900 text-sm">もし <code class="bg-emerald-100">cp</code> の結果を確かめずに、最後に <code class="bg-emerald-100">exit 0</code> と書いていたら、複写に失敗しても JSALPREP は RC=0（正常）で終わります。ジョブネットは後続の JSALSUM を動かし、売上明細が無いまま集計しようとして、失敗が JSALSUM の側（<code class="bg-emerald-100">SLS901E</code>）に表れます。本当の原因が JSALPREP にあることが、分かりにくくなります。ジョブネットの「戻りコードで後続を決める」仕組みは、<strong>各ジョブが、中の処理の失敗を正しく戻りコードで返して</strong>初めて成り立ちます（第8章の TC09 で確かめます）。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="code-block-wrapper my-6">
                         <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
-                            <span class="text-slate-400 text-sm">jsalsum.sh（疑似JCL：ジョブ② 売上集計。第6章と同じ） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <span class="text-slate-400 text-sm">jsalsum.sh（疑似JCL：ジョブ② 売上集計。第6章のものに削除の確認を追加） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
                             <button class="copy-btn text-slate-400 hover:text-white transition-colors"
                                     onclick="copyCode(this)">
                                 <i class="fas fa-copy"></i>
@@ -1059,7 +1076,10 @@ exit 0</code></pre>
 # 疑似JCL（売上集計ジョブ JSALSUM）: DD 文の代わりに環境変数で割り当てる
 BIZDATE=20261020                 # 集計対象日（//SYSIN DD * の中身にあたる）
 # STEP010: 前回の集計結果を削除する（IEFBR14 による事前削除の代わり）
-rm -f data/summary.dat
+if ! rm -f data/summary.dat; then
+    echo "JSALSUM STEP010: data/summary.dat を削除できません RC=12"
+    exit 12
+fi
 # STEP020: SALESSUM を実行する（//SALESIN DD・//SUMOUT DD の代わり）
 export DD_SALESIN=data/sales.dat
 export DD_SUMOUT=data/summary.dat
@@ -1081,19 +1101,52 @@ exit $rc</code></pre>
                             </button>
                         </div>
                         <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
-# 疑似JCL（集計結果の確認ジョブ JSALCHK）: 集計結果を画面に出して確認する
-if [ ! -s data/summary.dat ]; then
-    echo "JSALCHK: data/summary.dat がないか空です RC=12"
+# 疑似JCL（集計結果の確認ジョブ JSALCHK）: 集計結果を検査してから表示する
+BIZDATE=20261020                 # 確認する集計対象日（jsalsum.sh と同じ値）
+# 検査1: 集計結果のファイルがあるか
+if [ ! -f data/summary.dat ]; then
+    echo "JSALCHK: data/summary.dat がありません RC=12"
     exit 12
 fi
-echo "集計対象日: $(cut -c1-8 data/summary.dat)"
+# 検査2: 18バイト（固定長レコード1件分）ちょうどか
+size=$(wc -c &lt; data/summary.dat)
+if [ "$size" -ne 18 ]; then
+    echo "JSALCHK: 集計結果の長さが不正です（${size}バイト） RC=8"
+    exit 8
+fi
+# 検査3: 18バイトすべてが数字か（集計対象日8桁＋合計金額10桁）
+if ! grep -Eqx '[0-9]{18}' data/summary.dat; then
+    echo "JSALCHK: 集計結果に数字以外の文字があります RC=8"
+    exit 8
+fi
+# 検査4: 集計対象日が、今回の業務日付と同じか（前回の結果との取り違えを防ぐ）
+sumdate=$(cut -c1-8 data/summary.dat)
+if [ "$sumdate" != "$BIZDATE" ]; then
+    echo "JSALCHK: 集計対象日が違います（結果=$sumdate 業務日付=$BIZDATE） RC=8"
+    exit 8
+fi
+echo "集計対象日: $sumdate"
 echo "合計金額  : $(cut -c9-18 data/summary.dat)"
 echo "JSALCHK RC=0"
 exit 0</code></pre>
                     </div>
                     <p class="text-slate-600 leading-relaxed mb-4">
-                        集計結果が無い、または空のときは RC=12 で終わります。あるときは、先頭の8桁（集計対象日）と、9〜18桁目（合計金額）を取り出して表示します。
+                        JSALCHK は、集計結果を表示する前に、4つの検査をします。(1) ファイルがあるか（無ければ RC=12）。(2) 18バイト（固定長レコード1件分）ちょうどか。<code class="bg-slate-100">wc -c</code> はファイルのバイト数を数えます。(3) 18バイトがすべて数字か。<code class="bg-slate-100">grep -Eqx '[0-9]{18}'</code> は「行全体が、数字18個でできているか」を調べ、合っていれば成功を返します。(4) 先頭8桁の集計対象日が、今回の業務日付 <code class="bg-slate-100">BIZDATE</code> と同じか。(2)〜(4) のどれかに合わなければ、データの誤りとして RC=8 で終わります。すべて合っていれば、集計対象日と、9〜18桁目（合計金額）を表示します。
                     </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        「ファイルがあり、空でないか」だけを確かめる作りでは、途中で切れた結果や、前回の結果を、そのまま「確認済み」にしてしまいます。確認ジョブは、結果が<strong>決めたとおりの形をしているか</strong>まで検査して、初めて確認の役目を果たします。<code class="bg-slate-100">BIZDATE</code> は、jsalsum.sh と同じ値を書いています。実務では、ジョブ管理製品などから、2つのジョブに同じ業務日付を渡します。
+                    </p>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: z/OS の JSALCHK は「表示するだけ」</p>
+                                <p class="text-orange-900 text-sm">7.7 の定義表の JSALCHK は、IEBGENER で集計結果を SYSOUT に写すだけです。IEBGENER はデータの中身を検査しないので、長さや日付がおかしい結果でも、エラーにはしません。この形のまま使うなら、SYSOUT を<strong>人が見て確かめる</strong>運用が前提です。確認を自動にするには、jsalchk.sh と同じ検査をする確認用のプログラム（COBOL で作る、など）を用意します。確認ジョブが「表示するだけ」なのか「妥当性を検査する」のかを、設計のときにはっきりさせておきましょう。</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <h3 class="text-lg font-semibold text-slate-800 mb-2">ジョブネットにあたる dailysal.sh</h3>
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -1110,6 +1163,7 @@ exit 0</code></pre>
                         </div>
                         <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
 # 疑似ジョブネット（日次売上 DAILYSAL）: 前のジョブの戻りコードで次を決める
+maxrc=0                          # ジョブネット全体の RC（警告があれば 4 にする）
 ./jsalprep.sh; rc=$?
 if [ "$rc" -ne 0 ]; then
     echo "DAILYSAL: JSALPREP が異常終了（RC=$rc）。後続を実行しません"; exit "$rc"
@@ -1119,17 +1173,58 @@ if [ "$rc" -gt 4 ]; then
     echo "DAILYSAL: JSALSUM が異常終了（RC=$rc）。後続を実行しません"; exit "$rc"
 elif [ "$rc" -eq 4 ]; then
     echo "DAILYSAL: JSALSUM が警告終了（RC=4）。内容を確認してください"
+    maxrc=4                      # 警告を覚えておき、全体の RC に引き継ぐ
 fi
 ./jsalchk.sh; rc=$?
-echo "DAILYSAL: 終了（最後のジョブの RC=$rc）"
-exit "$rc"</code></pre>
+if [ "$rc" -ne 0 ]; then
+    echo "DAILYSAL: JSALCHK が異常終了（RC=$rc）"; exit "$rc"
+fi
+echo "DAILYSAL: 終了（全体の RC=$maxrc）"
+exit "$maxrc"</code></pre>
                     </div>
                     <ol class="list-decimal pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
                         <li><code class="bg-slate-100">./jsalprep.sh; rc=$?</code> は、ジョブを実行し、戻りコードを <code class="bg-slate-100">rc</code> に受け取ります。ジョブ管理製品が、ジョブの戻りコードを受け取ることにあたります。</li>
                         <li>JSALPREP は、<code class="bg-slate-100">rc</code> が 0 以外なら異常終了と判定します。後続を実行せず、<code class="bg-slate-100">exit "$rc"</code> でジョブネットを終えます（後続を止める動きです）。</li>
-                        <li>JSALSUM は、<code class="bg-slate-100">rc</code> が 4 より大きければ（5 以上なら）異常終了と判定して止めます。4 のときは、警告のメッセージを表示して先へ進みます（7.3 の終了判定）。なお、RC=1〜3 は SALESSUM が返さない値なので、この疑似ジョブネットでは区別していません。本物の製品では、しきい値で警告などに振り分けます。</li>
-                        <li>最後に JSALCHK を実行し、その戻りコードを DAILYSAL の戻りコードとして返します。</li>
+                        <li>JSALSUM は、<code class="bg-slate-100">rc</code> が 4 より大きければ（5 以上なら）異常終了と判定して止めます。4 のときは、警告のメッセージを表示して先へ進み、<code class="bg-slate-100">maxrc=4</code> で警告があったことを覚えておきます（7.3 の終了判定）。なお、RC=1〜3 は SALESSUM が返さない値なので、この疑似ジョブネットでは区別していません。本物の製品では、しきい値で警告などに振り分けます。</li>
+                        <li>最後に JSALCHK を実行します。0 以外なら異常終了と判定し、その RC で終えます。0 なら、覚えておいた <code class="bg-slate-100">maxrc</code>（警告が無ければ 0、あれば 4）を、DAILYSAL 全体の戻りコードとして返します。</li>
                     </ol>
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">ステップ・ジョブ・ジョブネットの戻りコードを区別する</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">maxrc</code> が無く、最後のジョブ（JSALCHK）の RC をそのまま返す作りだと、JSALSUM が警告（RC=4）で終わっても、JSALCHK が RC=0 なら DAILYSAL 全体は 0 になり、<strong>警告が消えてしまいます</strong>。夜間の監視ツールがジョブネットの戻りコードだけを見ていたら、入力が 0 件だったことに気づけません。戻りコードには、次の3つの段階があることを区別しておきましょう。右端は、入力が 0 件の日（第8章の TC02）の値です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">段階</th>
+                                    <th class="px-4 py-3 text-left font-semibold">何の結果か</th>
+                                    <th class="px-4 py-3 text-left font-semibold">入力が 0 件の日の値</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">ステップの RC</td>
+                                    <td class="px-4 py-3 align-top">1つのプログラムの結果（JSALSUM の STEP020 で動く SALESSUM）</td>
+                                    <td class="px-4 py-3 align-top">4（<code class="bg-slate-100">SLS101W</code>）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">ジョブの RC</td>
+                                    <td class="px-4 py-3 align-top">1つのジョブの結果（PC では疑似JCL のスクリプト1本の終了コード）</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM は 4、JSALCHK は 0</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">ジョブネット全体の RC</td>
+                                    <td class="px-4 py-3 align-top">ジョブネット（dailysal.sh）の結果。外から監視するときに見る</td>
+                                    <td class="px-4 py-3 align-top">4（JSALSUM の警告を引き継ぐ）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本物のジョブ管理製品では、この役割を、ジョブネットの終了状態（7.3 の「正常終了／警告終了／異常終了」）が受け持ちます。どの状態を監視の対象にして、だれに知らせるかも、設計で決めておきます。
+                    </p>
                     <p class="text-slate-600 leading-relaxed mb-4">
                         このスクリプトは RC=8 や RC=12 に「異常終了」と表示しますが、これは ABEND ではありません。7.3 で説明したとおり、ジョブネットが戻りコードのしきい値で判定した「異常終了扱い」です。
                     </p>
@@ -1170,7 +1265,7 @@ JSALSUM STEP020 RC=0
 集計対象日: 20261020
 合計金額  : 0000001070
 JSALCHK RC=0
-DAILYSAL: 終了（最後のジョブの RC=0）
+DAILYSAL: 終了（全体の RC=0）
 DAILYSAL exit=0</code></pre>
                     </div>
                     <p class="text-slate-600 leading-relaxed mb-4">
@@ -1460,7 +1555,7 @@ data/summary.dat</code></pre>
                                             回答を表示
                                         </summary>
                                         <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
-                                            警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。入力が 0 件だったのが、本当に売上の無い日なのか、受信データの欠落なのかは、確認しないと分かりません。そこで、警告を記録し、だれが・いつまでに・何を見て確認するかを運用の決まりにしておきます。欠落だと分かったら、JSALPREP から再実行します。また、JSALCHK は 0 件でも RC=0 で終わるため、警告は JSALCHK の結果には表れない点にも注意が必要です。
+                                            警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。入力が 0 件だったのが、本当に売上の無い日なのか、受信データの欠落なのかは、確認しないと分かりません。そこで、警告を記録し、だれが・いつまでに・何を見て確認するかを運用の決まりにしておきます。欠落だと分かったら、JSALPREP から再実行します。また、JSALCHK は 0 件でも RC=0 で終わるため、警告は JSALCHK の結果には表れません。ジョブネットの戻りコードを最後のジョブの RC にすると警告が消えてしまうので、7.8 の dailysal.sh のように、警告をジョブネット全体の戻りコードに引き継ぎます。
                                         </p>
                                     </details>
                                 </li>
@@ -1477,7 +1572,7 @@ data/summary.dat</code></pre>
                         </div>
                         <div>
                             <h3 class="font-semibold text-slate-800 mb-1">次の章では</h3>
-                            <p class="text-slate-600 text-sm leading-relaxed">第8章は総合ハンズオンです。この章で設計した日次売上ジョブネットを、実際に動かして確かめます。SALESSUM を完成版にして（集計対象日と数値項目のチェック、合計の桁あふれの検出、入力 0 件の警告）、JCL・疑似JCL・疑似ジョブネットをつなぎ、正常系・異常系・再実行の8つのテストケースを実行します。7.7 の定義表は、そのままテストの設計図になります。</p>
+                            <p class="text-slate-600 text-sm leading-relaxed">第8章は総合ハンズオンです。この章で設計した日次売上ジョブネットを、実際に動かして確かめます。SALESSUM を完成版にして（集計対象日と数値項目のチェック、合計の桁あふれの検出、CLOSE の失敗の検出、入力 0 件の警告）、JCL・疑似JCL・疑似ジョブネットをつなぎ、正常系・異常系・再実行の11のテストケースを実行します。7.7 の定義表は、そのままテストの設計図になります。</p>
                         </div>
                     </div>
                 </div>
