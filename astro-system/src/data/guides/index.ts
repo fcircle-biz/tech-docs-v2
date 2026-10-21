@@ -37,6 +37,7 @@ import { vbnet } from './programming-languages/dotnet-ecosystem/vbnet';
 
 // プログラミング言語 — COBOL エコシステム
 import { cobol } from './programming-languages/cobol-ecosystem/cobol';
+import { cobolBatch } from './programming-languages/cobol-ecosystem/cobol-batch';
 
 // Web技術
 import { html } from './web-technologies/html';
@@ -104,6 +105,7 @@ const all: TechGuide[] = [
   vbnet,
   // プログラミング言語 — COBOL エコシステム
   cobol,
+  cobolBatch,
   // Web技術
   html,
   css,

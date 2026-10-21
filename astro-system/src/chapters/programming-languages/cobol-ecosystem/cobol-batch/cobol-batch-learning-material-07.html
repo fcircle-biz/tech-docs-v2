@@ -1,0 +1,1457 @@
+                <!-- パンくずリスト -->
+                <nav class="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <a href="#" class="hover:text-primary-600 transition-colors">ホーム</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <a href="#" class="hover:text-primary-600 transition-colors">COBOLバッチ処理入門</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-slate-700">第7章</span>
+                </nav>
+
+                <!-- 章ヘッダー -->
+                <header class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                     bg-primary-100 text-primary-700">
+                            第7章
+                        </span>
+                        <span class="text-sm text-slate-500">
+                            <i class="fas fa-clock mr-1"></i>所要時間: 約3時間
+                        </span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">ジョブネット - 先行・後続関係と異常時の再実行を設計する</h1>
+                    <p class="text-slate-600">第6章までで、1つのジョブ（JSALSUM）を JCL で定義し、COBOL と結び付けて動かせるようになりました。ところが夜間のバッチ処理は、入力データ準備・売上集計・集計結果の確認といった複数のジョブを、<strong>決まった順序と条件で、確実に</strong>動かすことで成り立っています。この章では、そのための仕組みである<strong>ジョブネット</strong>を、日次売上処理（DAILYSAL）を題材に設計します。先行・後続関係、戻りコードによる終了判定、スケジュール、異常終了したときの対応、そして<strong>安全にやり直すための再実行の設計</strong>を学び、最後に PC のシェルスクリプトで「前のジョブが失敗したら後ろを止める」動きを体験します。</p>
+                </header>
+
+                <!-- 学習目標カード -->
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200
+                            rounded-xl p-5 mb-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-amber-400 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-lightbulb text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-amber-800 mb-3">この章で学ぶこと</h2>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>ジョブネットとジョブ管理製品の役割を説明し、JCL との違いを比べられる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>先行・後続関係と、戻りコードによる実行条件（終了判定）を設計できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>スケジュールと、異常終了したときの対応の流れを説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>再実行で起きる上書き・二重集計の問題と、その対策を説明できる</span>
+                                </li>
+                                <li class="flex items-start gap-2 text-amber-900">
+                                    <i class="fas fa-check-circle text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span>日次売上ジョブネット（DAILYSAL）の構成図と定義表を作れる</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション7.1 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.1 ジョブネットとジョブ管理製品 - JCL だけでは足りないこと
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        第5・6章では、1つのジョブ（JSALSUM）の中身 ― ステップの並びと、データセットの割り当て ― を JCL で定義しました。しかし、夜間のバッチ処理は1つのジョブでは終わりません。日次売上処理では、<strong>JSALPREP（入力データ準備）→ JSALSUM（売上集計）→ JSALCHK（集計結果の確認）</strong>の3つのジョブを、順番に動かす必要があります。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        これを人の手で運用すると、22時になったらジョブを投入し、終わるのを待ち、戻りコードを見て次のジョブを投入するかどうかを判断し、失敗したら後ろのジョブを止め、休みの日は動かさない、という作業を毎晩続けることになります。見落としや、投入の順番ミスも起きます。そこで、ジョブの実行順序・実行条件・スケジュールをあらかじめ定義して、自動で動かす<strong>ジョブ管理製品</strong>（ジョブスケジューラ）を使います。その定義の単位が<strong>ジョブネット</strong>です。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: ジョブ・ジョブネット・ジョブ管理製品</p>
+                                <p class="text-blue-900 text-sm"><strong>ジョブ</strong>は、業務を構成する最小の単位です（このガイドでは、JCL で定義する JSALPREP・JSALSUM・JSALCHK）。<strong>ジョブネット</strong>は、実行順序を関連づけたジョブの集まりで、実行すると、中のジョブが決められた順序で自動的に実行されます。ジョブネットを定義して動かすソフトウェアが<strong>ジョブ管理製品</strong>です。また、<strong>運用担当</strong>は、夜間バッチの実行状況を見守り、異常のときに対応する人のことです。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+sequenceDiagram
+    participant S as ジョブ管理製品
+    participant J1 as JSALPREP
+    participant J2 as JSALSUM
+    participant J3 as JSALCHK
+    participant O as 運用担当
+    Note over S: 22:00 になったら DAILYSAL を起動
+    S->>J1: ジョブを実行
+    J1-->>S: 終了（RC=0）
+    S->>J2: 先行ジョブが正常終了したので実行
+    J2-->>S: 終了（RC=8）
+    S-xJ3: 異常終了と判定したので実行しない
+    S->>O: 異常を通知
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: ジョブ管理製品が、各ジョブの終了を受け取りながら、次のジョブを実行するかどうかを判断します。この図では JSALSUM が戻りコード 8 で終わったため、ジョブ管理製品が異常終了と判定し、JSALCHK を実行せずに運用担当へ知らせています。</p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">JCL とジョブネットの比較</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JCL が受け持つのは<strong>1つのジョブの中身</strong>で、ジョブネットが受け持つのは<strong>ジョブとジョブの間</strong>です。2つは競合せず、役割を分けて組み合わせます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">比べる点</th>
+                                    <th class="px-4 py-3 text-left font-semibold">JCL（第5・6章）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ジョブネット（ジョブ管理製品）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">定義するもの</td>
+                                    <td class="px-4 py-3 align-top">1つのジョブ（ステップの並び）。どのプログラムを、どのデータセットで動かすか</td>
+                                    <td class="px-4 py-3 align-top">複数のジョブの集まり。ジョブの実行順序・実行条件・スケジュール</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">順序と条件の制御</td>
+                                    <td class="px-4 py-3 align-top">ステップを上から順に実行し、IF/THEN/ELSE/ENDIF や COND で、実行するかどうかを決める</td>
+                                    <td class="px-4 py-3 align-top">先行ジョブ → 後続ジョブの関係と、先行ジョブの終了状態で、後続のジョブを実行するかどうかを決める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">起動のきっかけ</td>
+                                    <td class="px-4 py-3 align-top">ジョブを投入する（SUBMIT）</td>
+                                    <td class="px-4 py-3 align-top">決まった時刻（スケジュール）、ファイルの到着などの事象</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">休業日・遅れの扱い</td>
+                                    <td class="px-4 py-3 align-top">扱わない</td>
+                                    <td class="px-4 py-3 align-top">営業日カレンダー、開始遅延監視・終了遅延監視など</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">異常のとき</td>
+                                    <td class="px-4 py-3 align-top">戻りコードや ABEND をジョブログに記録する。RESTART で、指定したステップからジョブを再開できる</td>
+                                    <td class="px-4 py-3 align-top">後続を止める、運用担当へ通知する、再実行の範囲を選ぶ</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">ジョブを分けて、ジョブネットでつなぐ理由</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        3つの処理を、1つの JCL に3つのステップとして書くこともできそうです。ステップ同士の制御なら、JCL の IF/THEN/ELSE や COND でもできます（第5章）。それでも、ジョブに分けてジョブネットでつなぐ設計には、次のような利点があります。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>再実行の範囲を選べる</strong>: 問題のあったジョブから、必要な範囲だけをやり直せます。</li>
+                        <li><strong>実行条件をジョブごとに決められる</strong>: JSALSUM の RC=4 は後続を続け、RC=8 は止める、といった使い分けができます。</li>
+                        <li><strong>起動のきっかけを選べる</strong>: 時刻で動かす、ファイルの到着で動かす、といった違いを、ジョブネット単位で定義できます（7.3・7.4）。</li>
+                        <li><strong>業務の区切りが名前に表れる</strong>: 「入力データ準備」「売上集計」「集計結果の確認」のように分けておくと、通知を受けたとき、どの業務で失敗したかがすぐ分かります。</li>
+                    </ul>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">代表的なジョブ管理製品</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        代表的なジョブ管理製品には、次のようなものがあります（名称の紹介です）。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-1 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>JP1/AJS3</strong>（JP1/Automatic Job Management System 3。日立）: 「ジョブネット」はこの製品の用語です。このガイドの用語の例は、JP1/AJS3 に合わせています。</li>
+                        <li><strong>Systemwalker Operation Manager</strong>（富士通）</li>
+                        <li><strong>IBM Z Workload Scheduler</strong>（IBM。旧称に Tivoli Workload Scheduler for z/OS などがあります）</li>
+                        <li><strong>CA 7 Workload Automation</strong>（Broadcom）</li>
+                        <li><strong>Control-M</strong>（BMC）</li>
+                        <li><strong>Hinemos</strong>（NTTデータ。オープンソースで、「ジョブネット」の用語があります）</li>
+                    </ul>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">用語の注意: 名称・機能は製品ごとに違います</p>
+                                <p class="text-orange-900 text-sm">この章で出てくる「ルートジョブネット」「先行ジョブ／後続ジョブ」「関連線」「リカバリージョブ」「判定ジョブ」「起動条件」などの用語は、日立の JP1/AJS3 のものを<strong>例として</strong>紹介しています。ほかの製品では、呼び方も、設定する画面や項目も異なります。研修先や現場で使う製品のマニュアルを見て、この章の用語を<strong>その製品の用語に読み替えて</strong>ください。JP1/AJS3 の用語の定義は、日立の<a href="https://itpfdoc.hitachi.co.jp/manuals/3021/30213D2130/AJSF0182.HTM" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:text-primary-700 underline">JP1/AJS3 導入ガイド 付録D 用語解説</a>で確認できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.2 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.2 先行・後続関係 - どのジョブの後に、何を動かすか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブネットの基本は、ジョブとジョブの<strong>先行・後続関係</strong>です。ジョブAが終わってからジョブBを動かしたいとき、AをBの<strong>先行ジョブ</strong>、BをAの<strong>後続ジョブ</strong>と呼びます。JP1/AJS3 では、ジョブとジョブを<strong>関連線</strong>と呼ぶ矢印でつなぎ、実行順序を作ります。通常の後続ジョブは、先行ジョブが<strong>正常終了</strong>したときに実行されます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        先行・後続関係は、<strong>直列・並列・合流</strong>の3つの型を組み合わせて表せます。次の図は、3つの型を説明するための例です（DAILYSAL とは別のジョブネットです）。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart LR
+    ST(["開始"]) --> R["売上データ受信"]
+    ST --> M["商品マスタ更新"]
+    R --> T["売上集計"]
+    M --> T
+    T --> C["集計結果の確認"]
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 開始の後で、売上データ受信と商品マスタ更新が同時に動きます（並列）。売上集計は、この2つが両方とも終わってから動きます（合流）。その後に、集計結果の確認が続きます（直列）。</p>
+                    </div>
+
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>直列</strong>: 前のジョブが終わってから、次のジョブを実行します。売上集計 → 集計結果の確認が当たります。DAILYSAL の JSALPREP → JSALSUM → JSALCHK も、この型です。</li>
+                        <li><strong>並列</strong>: 互いに関係のないジョブを、同時に実行します。売上データ受信と商品マスタ更新が当たります。</li>
+                        <li><strong>合流</strong>: 複数の先行ジョブが、すべて正常終了するのを待ってから、後続のジョブを実行します。片方だけが終わっても動かないので、売上データ受信が異常終了すれば、商品マスタ更新が正常でも売上集計は実行されません。受信できていない売上を除いて集計してしまうことを防ぐためです。</li>
+                    </ul>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">先行・後続関係を決める3つの質問</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブの順序は、思いつきではなく、次の3つの質問で決めます。
+                    </p>
+                    <ol class="list-decimal pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>前のジョブの出力を、このジョブの入力に使うか。</strong>使うなら、前のジョブを先行ジョブにして、直列でつなぎます。</li>
+                        <li><strong>同じデータセットを、同時に書き換えるおそれはないか。</strong>あるなら、並列にしません。直列にするか、同時に動かさない指定（7.3 の排他実行）を使います。</li>
+                        <li><strong>前のジョブが失敗したとき、このジョブを動かしてよいか。</strong>よくないなら、先行ジョブが正常終了したときだけ実行します（既定の動きです）。警告で終わったときも動かしてよいかは、7.3 で決めます。</li>
+                    </ol>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 順序は「データの受け渡し」で決まる</p>
+                                <p class="text-emerald-900 text-sm">日次売上処理では、JSALPREP が作る売上明細（<code class="bg-emerald-100">TRAIN01.SALES.DETAIL</code>）を JSALSUM が読み、JSALSUM が作る売上集計結果（<code class="bg-emerald-100">TRAIN01.SALES.SUMMARY</code>）を JSALCHK が読みます。出力が次のジョブの入力になっているので、この順に直列でつなぎます。順序を入れ替えると、まだ作られていない（または前回の）データを読んでしまいます。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JP1/AJS3 では、関連線で結べるのは同じジョブネットの中のジョブ同士です。異なるジョブネットのジョブ同士は結べないので、どこまでを1つのジョブネットにまとめるかも設計の一部になります。設計の考え方は、日立の<a href="https://itpfdoc.hitachi.co.jp/manuals/3021/30213d2330/AJSG0016.HTM" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:text-primary-700 underline">JP1/AJS3 設計ガイド（業務設計編）2.2 ジョブネットの構築のための検討</a>で確認できます。
+                    </p>
+                </section>
+
+                <!-- セクション7.3 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.3 実行条件と終了判定 - 後続を動かしてよいかを決める
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        先行ジョブが終わったとき、後続を動かしてよいかどうかは、先行ジョブが<strong>どのように終わったか</strong>で決まります。ジョブ管理製品は、ジョブの戻りコード（RC。第5章）を受け取り、あらかじめ決めた<strong>しきい値</strong>（境目の値）と比べて、ジョブの終了状態を判定します。これが<strong>終了判定</strong>です。たとえば「0 は正常、1〜4 は警告、5 以上は異常」と決めます。SALESSUM の戻りコードの規約に当てはめると、JSALSUM の終了判定は次の表のようになります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">RC</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味（SALESSUM の規約）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">終了判定（JP1/AJS3 の呼び名）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">後続の JSALCHK</th>
+                                    <th class="px-4 py-3 text-left font-semibold">運用</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">0</td>
+                                    <td class="px-4 py-3 align-top">正常（1件以上を集計できた）</td>
+                                    <td class="px-4 py-3 align-top">正常（正常終了）</td>
+                                    <td class="px-4 py-3 align-top">実行する</td>
+                                    <td class="px-4 py-3 align-top">なし</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">4</td>
+                                    <td class="px-4 py-3 align-top">警告（入力が 0 件だった）</td>
+                                    <td class="px-4 py-3 align-top">警告（警告検出終了）</td>
+                                    <td class="px-4 py-3 align-top">実行する</td>
+                                    <td class="px-4 py-3 align-top">警告として記録し、運用担当が内容を確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">8 以上<br>（8・12・16）</td>
+                                    <td class="px-4 py-3 align-top">エラー（集計対象日の誤り、数値項目の不正値、合計の桁あふれ）、重大なエラー（ファイルの OPEN・READ・WRITE の失敗）。16 は SALESSUM では使わない</td>
+                                    <td class="px-4 py-3 align-top">異常（異常検出終了）</td>
+                                    <td class="px-4 py-3 align-top">実行しない</td>
+                                    <td class="px-4 py-3 align-top">運用担当へ通知し、原因を調べる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        警告のときに後続を動かすかどうかは、<strong>設計で決めること</strong>です。DAILYSAL では、RC=4（入力が 0 件）でも後続を実行し、運用担当が内容を確認する設計にします。そのとおりに動かすための設定は、使う製品のマニュアルで確認します。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        RC=8 や RC=12 は ABEND ではありません。プログラム自身が異常を見つけ、戻りコードで失敗を伝えて終わっています。それをジョブ管理製品がしきい値で判定し、「異常終了と判定した」状態にするので、このガイドでは<strong>異常終了扱い</strong>と呼びます。
+                    </p>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JP1/AJS3 では、これを「しきい値による判定」で設定します。戻り値に対して<strong>警告終了しきい値</strong>と<strong>異常終了しきい値</strong>を決めるもので、設計ガイドの例では、異常終了しきい値を 4 にすると、戻り値 4 以下は正常終了、5 以上は異常終了になります。「RC が 5 以上なら異常終了と判定する」は異常終了しきい値で、「RC=4 は警告」という区分は警告終了しきい値で表す、という考え方です。終了状態の呼び名は、ジョブが「正常終了／警告検出終了／異常検出終了」、ジョブネットが「正常終了／警告終了／異常終了」です。具体的な設定値、判定の細かな規則、設定画面の項目名は、使う製品とバージョンのマニュアルで確認してください。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">ステップが実行されずに終わる2つの場合</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブの異常は、戻りコードだけで表れるとは限りません。ステップが<strong>実行されずに</strong>終わる場合があります。原因は大きく2つに分けられます。この2つは原因も調べ方も違うので、区別して覚えましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">例</th>
+                                    <th class="px-4 py-3 text-left font-semibold">ステップの動き</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">割り当てエラー<br>（データセットの割り当ての失敗）</td>
+                                    <td class="px-4 py-3 align-top">存在しないデータセットを入力に指定した（IEF212I … DATA SET NOT FOUND）。同名のデータセットが既にあるのに、DISP=NEW で作ろうとした（例: IGD17101I DATA SET … NOT DEFINED BECAUSE DUPLICATE NAME EXISTS IN CATALOG）</td>
+                                    <td class="px-4 py-3 align-top">プログラムが動く前に失敗し、そのステップは実行されない（IEF272I … STEP WAS NOT EXECUTED）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JCL の構文エラー</td>
+                                    <td class="px-4 py-3 align-top">ジョブ名が9文字以上、継続行の前の行末にカンマが無い、など、JCL の書き方のルール（第5章 5.2）に反している</td>
+                                    <td class="px-4 py-3 align-top">JCL を正しく解釈できず、ステップが実行されない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        次のジョブログは、JSALPREP で受信データのデータセットが無かったときの例です（読み方は第6章 6.7）。ジョブログの表示は環境によって異なり、ここでは読み方を学ぶための例として示しています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">JSALPREP のジョブログ（JESYSMSG の抜粋。受信データが無い例） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">ジョブログの例</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">IEF142I JSALPREP STEP010 - STEP WAS EXECUTED - COND CODE 0000
+IEF212I JSALPREP STEP020 SYSUT1 - DATA SET NOT FOUND
+IEF272I JSALPREP STEP020 - STEP WAS NOT EXECUTED</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ログの <code class="bg-slate-100">COND CODE</code>（第5章）が、そのステップの戻りコードです。戻りコードとして表れているのは STEP010 の <code class="bg-slate-100">0000</code> だけで、STEP020 は<strong>実行されていません</strong>。戻りコードの値だけを見ていると、この異常に気づけないことがあります。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">ABEND とステップ未実行は、必ず異常として扱う</p>
+                                <p class="text-red-900 text-sm">次の終わり方は、戻りコードの値にかかわらず、ジョブネットでは<strong>正常終了として扱ってはいけません</strong>。(1) ABEND（S0C7 など）で、ステップが異常終了した。(2) 割り当てエラーや JCL の構文エラーで、ステップが実行されなかった。製品がこうした終わり方をどの終了状態として扱うかは、製品や設定によって異なります。設計のときに製品のマニュアルで確かめ、異常として扱う設定になっていることを確認します。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">後続を動かす条件の種類</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        後続を動かす条件は、先行ジョブの終了状態だけではありません。ジョブネットでは、次のような条件を組み合わせます。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">条件の種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味（JP1/AJS3 の用語の例）</th>
+                                    <th class="px-4 py-3 text-left font-semibold">日次売上処理での使いどころ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">先行ジョブの終了状態</td>
+                                    <td class="px-4 py-3 align-top">先行ジョブがどう終わったかで、後続を実行するかどうかを決める。通常の後続は、先行ジョブが正常終了したときに実行される</td>
+                                    <td class="px-4 py-3 align-top">JSALPREP が正常終了したら、JSALSUM を実行する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">判定ジョブ（条件分岐）</td>
+                                    <td class="px-4 py-3 align-top">戻りコード、またはファイルの有無を判定し、条件が真のときだけ、後続（従属ジョブ）を実行する</td>
+                                    <td class="px-4 py-3 align-top">受信データが届いた日だけ集計する、という設計もできる（DAILYSAL では、受信データが無いことを異常として止める）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">起動条件</td>
+                                    <td class="px-4 py-3 align-top">ファイルの更新などの事象をきっかけに、ジョブネットを動かし始める</td>
+                                    <td class="px-4 py-3 align-top">22:00 の代わりに、受信データの到着で DAILYSAL を始める（やってみよう 7-2）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">排他実行</td>
+                                    <td class="px-4 py-3 align-top">同じ資源を使うジョブを、同時に動かさない（排他実行リソース。同じリソース名を指定したジョブ同士は、同時に実行されない）</td>
+                                    <td class="px-4 py-3 align-top">同じ集計結果を更新する別のジョブがあるとき、JSALSUM と同時に動かさない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">保留</td>
+                                    <td class="px-4 py-3 align-top">あらかじめ、実行しないよう設定しておく。保留を解除すると実行できる</td>
+                                    <td class="px-4 py-3 align-top">システムのメンテナンス中など、動かしたくない日に DAILYSAL を保留にする</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        条件を組み合わせたジョブネットの定義例は、日立の<a href="https://itpfdoc.hitachi.co.jp/manuals/3021/30213d2330/AJSG0026.HTM" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:text-primary-700 underline">JP1/AJS3 設計ガイド（業務設計編）2.4 さまざまなジョブネット定義</a>で確認できます。
+                    </p>
+                </section>
+
+                <!-- セクション7.4 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.4 スケジュール - いつ、どの日に動かすか
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブネットは、順序や条件だけでなく、<strong>いつ動かすか</strong>も定義します。夜間バッチは、決められた時間帯（バッチウィンドウ。第1章）の中で、確実に終わらせなければならないからです。スケジュールでは、主に次のことを決めます。右端は、DAILYSAL に当てはめた例です。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">決めること</th>
+                                    <th class="px-4 py-3 text-left font-semibold">意味</th>
+                                    <th class="px-4 py-3 text-left font-semibold">DAILYSAL の例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">営業日カレンダーと起動時刻</td>
+                                    <td class="px-4 py-3 align-top">どの日が営業日（バッチを動かす日）かを決めたカレンダーと、何時に動かし始めるか</td>
+                                    <td class="px-4 py-3 align-top">会社の営業日カレンダーに従い、毎営業日 22:00 に起動する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">休業日の扱い</td>
+                                    <td class="px-4 py-3 align-top">起動時刻が休業日に当たったとき、動かさないのか、別の日に振り替えるのか</td>
+                                    <td class="px-4 py-3 align-top">休業日は動かさない。振り替える場合は、集計対象日をどうするかも含めて、業務の担当者と取り決める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">バッチウィンドウ</td>
+                                    <td class="px-4 py-3 align-top">バッチ処理を動かせる時間帯。翌朝の業務が始まるまでに終える必要がある</td>
+                                    <td class="px-4 py-3 align-top">22:00 から翌朝 6:00 まで（第1章の例）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">遅延の監視</td>
+                                    <td class="px-4 py-3 align-top">予定の時刻になっても始まっていない（開始遅延）、終わっていない（終了遅延）ことを見つける</td>
+                                    <td class="px-4 py-3 align-top">予定の開始時刻（22:00）を過ぎても始まらない場合と、実行時間を測って決めた終了予定時刻（バッチウィンドウの終わりの 6:00 より前。対処の時間を残す）を過ぎても終わらない場合に、運用担当へ通知する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        遅延の監視は、「失敗したことを確実に知らせる」ための仕組みの一つです。ジョブが異常終了すれば通知が届きますが、<strong>動き続けているのに終わらない</strong>、あるいは<strong>そもそも始まっていない</strong>場合は、異常終了の通知では気づけません。時刻で見張ることで、バッチウィンドウに間に合わなくなる前に、手を打てます。予定の時刻は、本番に近いデータ量で実行時間を測って決めます。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: 実行登録・遅延監視（JP1/AJS3 の例）</p>
+                                <p class="text-blue-900 text-sm">JP1/AJS3 では、ジョブネットを実行するために登録することを<strong>実行登録</strong>と呼び、<strong>計画実行登録</strong>・<strong>確定実行登録</strong>・<strong>即時実行登録</strong>の種類があります。計画実行登録は、スケジュールの定義に従って起動する登録で、毎営業日 22:00 に動く DAILYSAL がこれにあたります。確定実行登録は、登録時に指定した回数または期間の分だけ予定を確定させて実行する登録です。即時実行登録は、登録と同時に1回だけ実行する登録です。予定の時刻までに開始・終了したかを見張る機能は<strong>開始遅延監視</strong>・<strong>終了遅延監視</strong>と呼びます。ほかの製品では呼び名や設定が異なります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">集計対象日と、実行した日は別のもの</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        スケジュールで特に注意したいのが日付の扱いです。DAILYSAL が 10月20日の 22:00 に起動し、10月20日分の売上を集計するなら、<strong>集計対象日</strong>（業務日付）は 20261020 です。ふだんは「実行した日」と同じですが、異常が起きて翌朝に再実行すると、実行した日は 10月21日になります。それでも集計するのは 10月20日分の売上なので、集計対象日は 20261020 のままでなければなりません。このため集計対象日は、プログラムがシステム日付から決めるのではなく、SYSIN などで外から渡します（第6章 6.5。再実行との関係は 7.6）。
+                    </p>
+                </section>
+
+                <!-- セクション7.5 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.5 異常終了したときの対応 - 止めて、知らせて、調べる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        DAILYSAL のどれかのジョブが異常終了と判定されると、ジョブ管理製品は<strong>後続のジョブを実行せず</strong>、運用担当に<strong>通知</strong>します（通知の方法は、製品や運用で決めます）。後続を止めるのは、壊れた結果や、途中までしか作られていない結果を、後ろのジョブが使ってしまうのを防ぐためです。止まる範囲と、そのとき残っているデータセットは、次のようになります。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">異常終了と判定したジョブ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">実行されなくなるジョブ</th>
+                                    <th class="px-4 py-3 text-left font-semibold">残っているデータセットの例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALPREP</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM、JSALCHK</td>
+                                    <td class="px-4 py-3 align-top">売上明細（DETAIL）は無い、または不完全。売上集計結果（SUMMARY）は<strong>前回のまま</strong>残る</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALSUM</td>
+                                    <td class="px-4 py-3 align-top">JSALCHK</td>
+                                    <td class="px-4 py-3 align-top">売上明細は複写済み。集計結果は、RC=8・12 で終わったときは中身が空のままカタログ（CATLG）されて残り（第6章 6.6。SALESSUM は最後に1件だけ書くので、途中まで書かれることは無い）、ABEND のときは DISP の異常終了時の指定（DELETE）で削除される</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALCHK</td>
+                                    <td class="px-4 py-3 align-top">なし（後続のジョブは無い）</td>
+                                    <td class="px-4 py-3 align-top">集計結果は作成済み。確認だけが済んでいない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">通知を受けてからの流れ</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        通知を受けたら、慌ててやり直さず、次の順に進めます。原因を取り除かないまま再実行しても、同じ場所で同じように失敗するだけです。
+                    </p>
+
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    A["通知を受け取る"] --> B["ジョブログを確認する<br/>どのジョブ・どのステップで何が起きたか"]
+    B --> C["原因を切り分ける<br/>データ／プログラム／JCL／環境／運用"]
+    C --> D["対処する<br/>原因を取り除く"]
+    D --> E["再実行の方法を決める<br/>どのジョブから・何を確認してから"]
+    E --> F["再実行する"]
+    F --> G["結果を確認する"]
+    G --> H["報告する"]
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 異常終了の通知から報告までの流れです。「再実行の方法を決める」の部分が、次の 7.6 の内容です。</p>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        原因は、ジョブログのメッセージや入力データの中身を手がかりに、次の5つのどれに当たるかに分けて考えます。担当する人や、直し方が変わるからです。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">区分</th>
+                                    <th class="px-4 py-3 text-left font-semibold">例（このガイドの題材）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">データ</td>
+                                    <td class="px-4 py-3 align-top">受信データが届いていない。数値項目に不正な値がある（SLS906E。チェックが無いプログラムを z/OS で動かすと、S0C7 で異常終了するのが典型で、データによっては誤った値のまま進むこともある）。件数が想定を超えて、合計が桁あふれした（SLS907E）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">プログラム</td>
+                                    <td class="px-4 py-3 align-top">計算や判定の誤り。最近の修正や入れ替えの影響</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JCL</td>
+                                    <td class="px-4 py-3 align-top">DD 名の書き間違い（第6章 やってみよう 6-2）。データセット名の誤り。JCL の構文エラー</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">環境</td>
+                                    <td class="px-4 py-3 align-top">出力先の領域の不足（SB37・SD37・SE37）。プログラム（ロードモジュール）が見つからない（S806）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">運用</td>
+                                    <td class="px-4 py-3 align-top">集計対象日の指定ミス（SLS905E）。同じジョブを二重に起動した。手順の誤り</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">止まったあとに残っているデータに注意する</p>
+                                <p class="text-orange-900 text-sm">異常で止まったとき、後ろのデータセットには<strong>前回の結果</strong>が残っていることがあります。たとえば JSALPREP で止まると、売上集計結果は前回のままです（7.8 で確かめます）。集計結果のレコードの先頭8桁は集計対象日なので、日付を見れば「今日の結果ではない」と分かります。止まったジョブより後ろのデータセットを、新しい結果だと思い込んで使わないでください。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">用語: リカバリージョブ（JP1/AJS3 の例）</p>
+                                <p class="text-blue-900 text-sm">JP1/AJS3 では、先行ジョブが<strong>異常終了したときに実行する</strong>ジョブを<strong>リカバリージョブ</strong>として定義できます。たとえば「運用担当へ異常を通知するジョブ」をリカバリージョブにすれば、異常終了と判定されたときに、自動で通知を出せます（やってみよう 7-2）。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        対処が終わったら、次の 7.6 で「どこから、何を確認して再実行するか」を決めます。報告のしかた（何が起きたか、どこで検出したか、影響範囲、対処、再実行の方法、再発防止）は、第8章 8.7 で練習します。
+                    </p>
+                </section>
+
+                <!-- セクション7.6 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.6 再実行の設計 - 何度やり直しても安全にする
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        異常終了のあとの<strong>再実行</strong>は、夜間や早朝の限られた時間で、確認を急ぎながら行います。このとき手順を間違えると、集計結果が上書きされたり、二重に集計されたりして、<strong>最初の失敗よりも大きな問題</strong>になることがあります。そこで、再実行しても安全なように、ジョブネットとジョブをあらかじめ設計しておきます。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">再実行の種類（JP1/AJS3 の例）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブ管理製品には、異常終了したジョブネットを再実行する機能があり、どこからやり直すかを選べます。JP1/AJS3 では、ルートジョブネット（いちばん上のジョブネット。DAILYSAL にあたります）を再実行するとき、次の5つの種類から選びます。名称や選べる範囲は製品ごとに違うので、研修先の製品の用語に読み替えてください。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">再実行の種類</th>
+                                    <th class="px-4 py-3 text-left font-semibold">やり直す範囲</th>
+                                    <th class="px-4 py-3 text-left font-semibold">DAILYSAL での使いどころ（例）</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">異常終了ジョブから</td>
+                                    <td class="px-4 py-3 align-top">異常終了したジョブから再実行する。直前に正常終了したジョブはやり直さない</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM が RC=8 で止まり、原因が JSALSUM 側（たとえば集計対象日の指定ミス）にあるとき。JSALPREP の結果は正しいので、JSALSUM からやり直す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">異常終了ジョブの次から</td>
+                                    <td class="px-4 py-3 align-top">異常終了したジョブの次のジョブから再実行する</td>
+                                    <td class="px-4 py-3 align-top">異常終了したジョブの処理を、別の方法で済ませたときだけ使う。飛ばしたジョブの結果が本当にそろっているかを、必ず確認する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">異常終了ジョブネットから</td>
+                                    <td class="px-4 py-3 align-top">異常終了したジョブを直下に含むジョブネットから再実行する</td>
+                                    <td class="px-4 py-3 align-top">ジョブネットを入れ子（ネストジョブネット）にしたときに使い分ける。DAILYSAL のように入れ子が無い場合は DAILYSAL 全体が対象になり、「ジョブネットの先頭から」と同じ範囲になる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">ジョブネットの先頭から</td>
+                                    <td class="px-4 py-3 align-top">ルートジョブネットの先頭から再実行する</td>
+                                    <td class="px-4 py-3 align-top">受信データなど、最初のジョブの入力から直したとき（第8章の TC06）。事前削除があるので、全ジョブを最初からやり直しても二重にならない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">警告終了ジョブだけ</td>
+                                    <td class="px-4 py-3 align-top">警告終了したジョブだけを再実行する</td>
+                                    <td class="px-4 py-3 align-top">警告の原因が、そのジョブ自身の中にあるとき。DAILYSAL の RC=4（入力が 0 件）は、原因が JSALSUM の前（受信データや JSALPREP）にあるので、JSALSUM だけをやり直しても同じ結果になる。この場合は、受信データを確かめてから「ジョブネットの先頭から」（JSALPREP から）再実行する</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        再実行の種類は、<strong>原因のある場所</strong>で選びます。原因が JSALSUM にあるのに JSALPREP から全部やり直すと時間がかかり、原因が JSALPREP にあるのに JSALSUM だけをやり直すと、同じ失敗を繰り返します。詳細は、日立の<a href="https://itpfdoc.hitachi.co.jp/manuals/3021/30213D2130/AJSF0082.HTM" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:text-primary-700 underline">JP1/AJS3 導入ガイド 4.5.11 実行が終了したジョブネットやジョブを再実行する</a>で確認できます。
+                    </p>
+
+                    <!-- ヒントカード -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-circle-info text-blue-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-blue-800 mb-1">紹介: JCL の RESTART と GDG</p>
+                                <p class="text-blue-900 text-sm mb-2"><strong>RESTART</strong>: JOB 文に <code class="bg-blue-100">RESTART=ステップ名</code> を指定すると、そのステップからジョブを再開できます。ただし、再開位置より前のステップは実行されません。たとえば JSALSUM を STEP020 から再開すると、STEP010 の事前削除が行われないため、RC=8 や 12 で終わって残った集計結果と同名のデータセットが重複し、割り当てエラーになることがあります。DAILYSAL では、ジョブの先頭からやり直す設計にしています。</p>
+                                <p class="text-blue-900 text-sm"><strong>GDG</strong>（世代データグループ）: 同じ名前のデータセットを、世代で管理する仕組みです。JCL では <code class="bg-blue-100">(+1)</code> が新しく作る世代、<code class="bg-blue-100">(0)</code> が最新の世代、<code class="bg-blue-100">(-1)</code> がその1つ前の世代を表します。失敗した実行で作られた世代を、後続のジョブが「最新」として読んでしまわないよう、扱いを決めておく必要があります。このガイドでは使いません。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">再実行で起きる問題と対策</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        再実行で起きる問題は、パターンが決まっています。次の5つの問題と対策を、DAILYSAL がどう防いでいるかとあわせて覚えておきましょう。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">問題</th>
+                                    <th class="px-4 py-3 text-left font-semibold">何が起きるか</th>
+                                    <th class="px-4 py-3 text-left font-semibold">対策</th>
+                                    <th class="px-4 py-3 text-left font-semibold">DAILYSAL での対応</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">1. DISP=NEW の出力が残っていて割り当てエラー（同名データセットの重複）</td>
+                                    <td class="px-4 py-3 align-top">前回の実行で作られた同名のデータセットが残っていると、DISP=(NEW,CATLG,DELETE) で作ろうとしたときに割り当てエラーになり、そのステップは実行されない</td>
+                                    <td class="px-4 py-3 align-top">事前削除ステップを置く（IEFBR14 と DISP=(MOD,DELETE,DELETE)）。あれば消し、無くてもエラーにしない</td>
+                                    <td class="px-4 py-3 align-top">JSALPREP と JSALSUM の STEP010 が、前回の出力（売上明細・集計結果）を削除する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">2. DISP=MOD・OPEN EXTEND で追記して二重計上</td>
+                                    <td class="px-4 py-3 align-top">出力に追記する作りだと、再実行のたびに同じレコードが末尾に追加され、二重に計上される（下の「対策2」で、PC で2回追記すると同じレコードが2件になることを確かめます）</td>
+                                    <td class="px-4 py-3 align-top">追記せず、毎回作り直す（COBOL は OPEN OUTPUT、JCL は事前削除 ＋ DISP=NEW）</td>
+                                    <td class="px-4 py-3 align-top">SALESSUM は OPEN OUTPUT で書く。集計結果は常に1件（第8章 TC07: JSALSUM を2回続けて実行しても1件）</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">3. 入力を処理後すぐ消して再実行できない</td>
+                                    <td class="px-4 py-3 align-top">処理が済んだ入力を消してしまうと、あとで失敗が分かって再実行したくても、入力が残っていない</td>
+                                    <td class="px-4 py-3 align-top">正常終了まで消さない。受信データは残し、そのコピーを処理に使う</td>
+                                    <td class="px-4 py-3 align-top">JSALPREP は受信データ（RECV）を消さず、コピー（DETAIL）を JSALSUM に渡す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">4. システム日付で結果が変わる</td>
+                                    <td class="px-4 py-3 align-top">プログラムがシステム日付を集計対象日に使うと、翌日に再実行したとき、別の日付で集計される</td>
+                                    <td class="px-4 py-3 align-top">業務日付（集計対象日）を、SYSIN などで外から渡す</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM は SYSIN で 20261020 を受け取る（第6章 6.5）。再実行でも同じ値を渡す</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">5. 途中まで書かれた出力が使われる</td>
+                                    <td class="px-4 py-3 align-top">RC=8 以上や ABEND で終わったジョブの出力（空、または途中まで）が残り、後続のジョブや利用者が、正しい結果だと思って使う</td>
+                                    <td class="px-4 py-3 align-top">異常終了扱いになったジョブ（RC=8 以上・ABEND・ステップが実行されずに終わった）の出力は使わず、後続を止める。RC=4（警告）の出力は、運用担当が内容を確かめてから使う</td>
+                                    <td class="px-4 py-3 align-top">異常終了と判定したら、後続の JSALCHK を実行しない（第8章 TC03: PC では集計結果のファイルが 0 バイトで残る）</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">対策1: 事前削除で、前回の出力を消しておく</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSALSUM の STEP010 と、STEP020 の出力 DD を並べて見ます（第5・6章で読んだ JSALSUM の JCL の一部です）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">JSALSUM の JCL の抜粋（事前削除と出力の DD） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-indigo-600 text-white">z/OS JCLの抜粋</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">//* STEP010: 前回の集計結果を削除（再実行対策）
+//STEP010  EXEC PGM=IEFBR14
+//DEL1     DD DSN=TRAIN01.SALES.SUMMARY,
+//            DISP=(MOD,DELETE,DELETE),UNIT=SYSDA,SPACE=(TRK,0)
+//* STEP020（抜粋）: 集計結果を新しく作る
+//STEP020  EXEC PGM=SALESSUM
+//*（STEPLIB・SALESIN などの DD 文は省略）
+//SUMOUT   DD DSN=TRAIN01.SALES.SUMMARY,
+//            DISP=(NEW,CATLG,DELETE),UNIT=SYSDA,
+//            SPACE=(TRK,(1,1)),DCB=(RECFM=FB,LRECL=18)</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この JCL は読解用の例です。ジョブクラスやユニット名などは、研修先の環境に合わせて調整してください。動きを順に見ます。
+                    </p>
+                    <ol class="list-decimal pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><code class="bg-slate-100">IEFBR14</code> は、何も処理せずにすぐ終わるプログラムです。ここでは、DD 文によるデータセットの割り当てと、DISP による処置だけを行わせるために使います。</li>
+                        <li><code class="bg-slate-100">DISP=(MOD,DELETE,DELETE)</code> の MOD は、データセットが無ければ新しく作るものとして扱われます。そのため、前回の集計結果が<strong>あれば</strong>、ステップの終了時に「正常終了時: DELETE」で削除されます。<strong>無ければ</strong>、新しく作られてすぐ削除されるので、何も残らず、エラーにもなりません。</li>
+                        <li>削除が済んでいるので、STEP020 の <code class="bg-slate-100">DISP=(NEW,CATLG,DELETE)</code> は、同名のデータセットの重複にならずに、集計結果を新しく作れます。</li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        この事前削除は、DISP の規則を利用した方法の一つです。ほかに、既存のデータセットを消すだけなら <code class="bg-slate-100">DISP=(OLD,DELETE,DELETE)</code> も使えますが、データセットが無いと割り当てエラーになります。IDCAMS というユーティリティの DELETE コマンド（NONVSAM を指定）と <code class="bg-slate-100">SET MAXCC=0</code> を組み合わせる方法もあります（紹介のみ）。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">対策2: 追記せず、毎回作り直す - 二重計上を確かめる</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        対策1の事前削除（DEL1）では、<code class="bg-slate-100">MOD</code> は「データセットが無くてもエラーにしない」ための指定で、実際に消しているのは <code class="bg-slate-100">DELETE</code> の部分です。一方、出力のデータセットに <code class="bg-slate-100">DISP=MOD</code> を指定すると、既にあるデータセットの末尾に続けて書く（追記する）指定になります。COBOL の OPEN EXTEND（第4章 4.4）も同じ追記の動きです。追記するとどうなるかを、PC で確かめましょう。PC では、シェルの <code class="bg-slate-100">&gt;&gt;</code> が追記の動きをします。集計結果の1件を用意し、「1回目の実行」と「再実行」で2回追記します（<code class="bg-slate-100">~/cobol-batch</code> で実行します）。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">追記の危険を確かめる（DISP=MOD・OPEN EXTEND に当たる動き） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">printf '%s' 202610200000001070 > data/summary.dat   # 集計結果1件を用意する
+rm -f data/append.dat                              # 追記先を空にしておく
+cat data/summary.dat >> data/append.dat            # 1回目の実行で追記する
+cat data/summary.dat >> data/append.dat            # 再実行で、もう一度追記する
+fold -w 18 data/append.dat                         # 18バイトずつ折り返して見る
+rm -f data/append.dat                              # 確かめたら片付ける</code></pre>
+                    </div>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（同じレコードが2件になる） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">202610200000001070
+202610200000001070</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        同じ18バイトのレコード（集計対象日 20261020、合計金額 1,070円）が2件になりました。これを読んで合計を求めると 2,140円になり、正しい 1,070円の倍になってしまいます。PC での疑似的な再現ですが、追記する設計を再実行すれば、実機でも同じことが起きます。
+                    </p>
+
+                    <!-- 警告カード -->
+                    <div class="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-red-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-red-800 mb-1">追記する設計は、再実行に弱い</p>
+                                <p class="text-red-900 text-sm">追記は、1回だけ正しく実行された場合にしか、正しい結果になりません。異常終了のあとに再実行する設計では、追記を使わず、毎回作り直します。COBOL では <code class="bg-red-100">OPEN OUTPUT</code>（既存の中身を消して書き直す）、JCL では事前削除 ＋ <code class="bg-red-100">DISP=NEW</code> です。SALESSUM は OPEN OUTPUT を使っているので、JSALSUM を何度実行しても、集計結果は1件のままです（第8章の TC07 で確かめます）。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 重要ポイントカード -->
+                    <div class="bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-key text-emerald-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-emerald-800 mb-1">重要ポイント: 「何度実行しても同じ結果になる」ように作る</p>
+                                <p class="text-emerald-900 text-sm">同じ入力と同じ集計対象日で実行すれば、1回目でも、失敗のあとの再実行でも、<strong>結果が変わらない</strong>ように作ります。そのために、(1) 出力は毎回作り直す、(2) 入力は消さずに残す、(3) 日付は外から渡す、の3つを守ります。上の5つの対策は、すべてこの3つのどれかにあたります。なお、同じ操作を何度繰り返しても結果が変わらない性質を、IT の用語で<strong>冪等性</strong>（べきとうせい）と呼ぶことがあります。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">再実行を始める前に確認すること</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        設計が整っていても、再実行の前の確認は欠かせません。次の6点を確かめてから始めます。
+                    </p>
+                    <ol class="list-decimal pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>原因は取り除かれたか</strong>: 取り除かないまま再実行しても、同じ失敗を繰り返します。</li>
+                        <li><strong>どこから再実行するか</strong>: 原因のある場所で、再実行の種類を選びます（前の表）。</li>
+                        <li><strong>残っているデータセットはどれか</strong>: 事前削除で消えるもの、手作業で消すもの、前回の結果のまま残っているものを把握します。</li>
+                        <li><strong>二重処理にならないか</strong>: 追記、二重の登録や送信など、同じ処理を2回行うと困る処理が含まれていないかを確かめます。</li>
+                        <li><strong>集計対象日は元のままか</strong>: 再実行する日ではなく、本来の集計対象日（例: 20261020）を渡します。</li>
+                        <li><strong>途中の結果が、すでに使われていないか</strong>: 後続のジョブや他のシステムが使っていた場合は、そちらの訂正も必要です。</li>
+                    </ol>
+                </section>
+
+                <!-- セクション7.7 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.7 日次売上ジョブネットを設計する - 構成図と定義表にまとめる
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ここまでの内容を使って、日次売上ジョブネット <strong>DAILYSAL</strong> を設計します。設計の結果は、<strong>構成図</strong>と<strong>定義表</strong>の2つにまとめます。この2つがそろえば、ほかの担当者がジョブ管理製品に定義を入力でき、運用担当が異常時に何をすればよいかも分かります。これが修了成果物④です。設計は、次の順に進めます。
+                    </p>
+                    <ol class="list-decimal pl-6 space-y-1 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>ジョブを洗い出す</strong>: 業務を意味のまとまりで分けます（入力データ準備・売上集計・集計結果の確認）。</li>
+                        <li><strong>先行・後続関係を決める</strong>: 出力が次の入力になる順に、つなぎます（7.2）。</li>
+                        <li><strong>各ジョブの終了判定を決める</strong>: 正常とみなす RC、警告、異常を決めます（7.3）。</li>
+                        <li><strong>起動のきっかけとスケジュールを決める</strong>: 起動時刻、休業日、遅延の監視を決めます（7.4）。</li>
+                        <li><strong>異常時の対応と再実行の方法を決める</strong>: 通知、止める範囲、どこから再実行するかを決めます（7.5・7.6）。</li>
+                    </ol>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">DAILYSAL の構成図</h3>
+                    <div class="bg-white rounded-lg p-6 my-6 border border-slate-200">
+                        <div class="mermaid">
+flowchart TD
+    ST(["毎営業日 22:00 に起動<br/>ジョブネット DAILYSAL"]) --> J1["ジョブ① JSALPREP<br/>入力データ準備"]
+    J1 -->|"RC 0"| J2["ジョブ② JSALSUM<br/>売上集計"]
+    J2 -->|"RC 0"| J3["ジョブ③ JSALCHK<br/>集計結果の確認"]
+    J2 -->|"RC 4（警告）"| WN["警告として記録<br/>運用担当が内容を確認"]
+    WN --> J3
+    J3 -->|"RC 0"| FIN(["正常に終了"])
+    J1 -.->|"異常終了と判定"| NG["異常時：運用担当へ通知<br/>後続のジョブは実行しない"]
+    J2 -.->|"異常終了と判定"| NG
+    J3 -.->|"異常終了と判定"| NG
+                        </div>
+                        <p class="text-sm text-slate-500 mt-3">図の説明: 実線が正常の経路、点線が異常終了と判定したときの経路です。JSALSUM が RC=4（警告）で終わったときは、警告として記録したうえで JSALCHK を実行し、運用担当が内容を確認します。どのジョブが異常終了と判定されても、後続のジョブは実行せず、運用担当へ通知します。「異常終了と判定」には、RC が基準を超えた場合のほか、ABEND と、ステップが実行されずに終わった場合（割り当てエラー・JCL の構文エラー）を含みます。</p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">DAILYSAL の定義表</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        構成図の内容を、ジョブごとに表にまとめます。この表が、ジョブ管理製品に定義を入力するときの元になります。表が横に長いときは、横にスクロールして読んでください。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">ジョブ</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">処理内容</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">先行ジョブ</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">実行条件</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">正常とみなす RC</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">異常時の対応</th>
+                                    <th class="px-4 py-3 text-left font-semibold whitespace-nowrap">再実行の方法</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALPREP<br>（ジョブ①）</td>
+                                    <td class="px-4 py-3 align-top">STEP010: 前回の売上明細を削除する（IEFBR14）。STEP020: 受信データ（TRAIN01.SALES.RECV）を売上明細（TRAIN01.SALES.DETAIL）へ複写する（IEBGENER）</td>
+                                    <td class="px-4 py-3 align-top">なし（ジョブネットの先頭）</td>
+                                    <td class="px-4 py-3 align-top">起動時刻（毎営業日 22:00）になったら実行する</td>
+                                    <td class="px-4 py-3 align-top">0</td>
+                                    <td class="px-4 py-3 align-top">RC が 0 以外、ABEND、ステップが実行されずに終わった場合（受信データが無い割り当てエラーなど）は異常終了扱い。後続を実行せず、運用担当へ通知する</td>
+                                    <td class="px-4 py-3 align-top">原因（受信データなど）を取り除き、JSALPREP から再実行する（ジョブネットの先頭から）。事前削除があるので、何度でも実行できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALSUM<br>（ジョブ②）</td>
+                                    <td class="px-4 py-3 align-top">STEP010: 前回の集計結果を削除する（IEFBR14）。STEP020: 売上明細を集計し、売上集計結果（TRAIN01.SALES.SUMMARY）を作る（SALESSUM）</td>
+                                    <td class="px-4 py-3 align-top">JSALPREP</td>
+                                    <td class="px-4 py-3 align-top">JSALPREP が正常終了（RC=0）したら実行する</td>
+                                    <td class="px-4 py-3 align-top">0 は正常。4 は警告で、後続は実行し、運用担当が内容を確認する</td>
+                                    <td class="px-4 py-3 align-top">RC=8 以上、ABEND、ステップが実行されずに終わった場合は異常終了扱い。後続を実行せず、運用担当へ通知する</td>
+                                    <td class="px-4 py-3 align-top">原因を取り除き、JSALSUM から再実行する（異常終了ジョブから）。入力のデータが原因のときは、受信データ（TRAIN01.SALES.RECV）を直してから JSALPREP から（ジョブネットの先頭から）再実行する（売上明細を直接直しても、JSALPREP の事前削除と複写で上書きされる）。集計対象日は元の値（例: 20261020）を SYSIN で渡す。事前削除があるので、何度でも実行できる</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">JSALCHK<br>（ジョブ③）</td>
+                                    <td class="px-4 py-3 align-top">STEP010: 集計結果を SYSOUT に出力して確認する（IEBGENER）</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM</td>
+                                    <td class="px-4 py-3 align-top">JSALSUM が正常終了（RC=0）、または警告（RC=4）で終わったら実行する</td>
+                                    <td class="px-4 py-3 align-top">0</td>
+                                    <td class="px-4 py-3 align-top">RC が 0 以外、ABEND、ステップが実行されずに終わった場合は異常終了扱い。運用担当へ通知する（後続のジョブは無い）</td>
+                                    <td class="px-4 py-3 align-top">JSALCHK から再実行する（異常終了ジョブから）。集計結果を読むだけなので、何度でも実行できる</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        ジョブネット全体の設定は、ジョブネット名が <strong>DAILYSAL</strong>（日次売上ジョブネット）、起動が毎営業日 22:00、集計対象日は SYSIN で JSALSUM に渡す（例: 20261020）、終了遅延の監視は、実行時間を測って決めた終了予定時刻（バッチウィンドウの終わりの翌朝 6:00 より前に、対処と再実行の時間を残して決める）です。設計の判断の理由は、次のとおりです。
+                    </p>
+                    <ul class="list-disc pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><strong>3つのジョブを直列でつなぐ</strong>: JSALPREP の出力（売上明細）を JSALSUM が読み、JSALSUM の出力（集計結果）を JSALCHK が読むからです（7.2）。</li>
+                        <li><strong>JSALPREP と JSALSUM を、事前削除のステップから始める</strong>: どこで失敗しても、再実行したときに同名のデータセットが重複して割り当てエラーにならないようにするためです（7.6）。</li>
+                        <li><strong>異常終了と判定したら、後続を止めて通知する</strong>: 空や途中までの集計結果を、JSALCHK が「確認済みの結果」として扱ってしまうのを防ぐためです。夜間に人が見ていなくても、失敗に気づけるようにするためでもあります（7.5）。</li>
+                        <li><strong>集計対象日を SYSIN で渡す</strong>: 再実行の日が変わっても、同じ集計対象日で、同じ結果になるようにするためです（7.4・7.6）。</li>
+                    </ul>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">注意: RC=4 を警告として続行する判断</p>
+                                <p class="text-orange-900 text-sm mb-2">この設計では、JSALSUM が RC=4（入力が 0 件）で終わっても、後続を続けます。売上が無い日なら問題ありませんが、受信データが欠けていただけかもしれません。警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。PC の疑似ジョブネットでも、入力が 0 件の日に JSALCHK は「合計金額 0000000000」を表示して RC=0 で終わり、警告は JSALCHK の結果には表れません（第8章の TC02）。</p>
+                                <p class="text-orange-900 text-sm">対策は、警告を記録し、<strong>だれが・いつまでに・何を見て</strong>確認するかを、運用の決まりとして定めておくことです。受信データの欠落だったと分かれば、JSALPREP から再実行します。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- セクション7.8 -->
+                <section class="prose prose-slate max-w-none mb-8">
+                    <h2 class="flex items-center gap-3 text-xl font-semibold text-slate-800
+                               border-l-4 border-primary-500 pl-4 mb-4">
+                        7.8 PC で疑似ジョブネットを動かす - 前のジョブが失敗したら後ろを止める
+                    </h2>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        メインフレームやジョブ管理製品が使えない場合でも、PC のシェルスクリプトで、ジョブネットの考え方の一部を体験できます。第6章で作った疑似JCL <code class="bg-slate-100">jsalsum.sh</code> のように、1つのジョブを1つのシェルスクリプトで表し、それらを順に呼び出して、戻りコードで次を決める <code class="bg-slate-100">dailysal.sh</code> を動かします。
+                    </p>
+
+                    <!-- 注意カード -->
+                    <div class="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 my-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-triangle-exclamation text-orange-500 mt-1"></i>
+                            <div>
+                                <p class="font-semibold text-orange-800 mb-1">疑似JCL・疑似ジョブネットは、考え方を体験するための代用です</p>
+                                <p class="text-orange-900 text-sm">ここで使うシェルスクリプトは、JCL やジョブネットそのものではありません。ジョブ管理製品が備えているカレンダー、監視、保留、再実行の管理、通知などは、この代用では体験できません（この節の最後で整理します）。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-6 my-6">
+                        <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-slate-500"></i>
+                            PC の作業フォルダ（疑似ジョブネットで使うもの）
+                        </h3>
+                        <pre class="bg-slate-800 text-slate-100 rounded-lg p-4 text-sm overflow-x-auto"><code>~/cobol-batch/
+├── salessum.cob     ← 第4章で作った SALESSUM（第8章で完成版に修正）
+├── salessum         ← cobc でコンパイルして作る実行ファイル
+├── jsalprep.sh      ← 疑似JCL: ジョブ① 入力データ準備
+├── jsalsum.sh       ← 疑似JCL: ジョブ② 売上集計（第6章で作ったもの）
+├── jsalchk.sh       ← 疑似JCL: ジョブ③ 集計結果の確認
+├── dailysal.sh      ← 疑似ジョブネット DAILYSAL
+└── data/
+    ├── sales-recv.dat   ← 受信データ（前の工程から届いたもの）
+    ├── sales.dat        ← JSALPREP が受信データを複写して作る売上明細
+    └── summary.dat      ← JSALSUM が作る売上集計結果</code></pre>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        SALESSUM は、第4章の基本版でも、第8章の完成版でも構いません。ここで確かめる正常な実行（TC01）の結果は、どちらも同じです。入力が 0 件のときの警告（RC=4）や、不正な値の検出（RC=8）の動きを試すには、完成版が必要です（第8章 8.3 で作ります）。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">ジョブにあたる3つのスクリプト</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        まず、ジョブにあたる3つのスクリプトです。コメントに、z/OS で対応する処理を書いています。1つ目は、ジョブ① JSALPREP です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jsalprep.sh（疑似JCL：ジョブ① 入力データ準備） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# 疑似JCL（入力データ準備ジョブ JSALPREP）: 受信データを集計用の入力にコピーする
+# STEP010: 前回の集計用入力を削除する（IEFBR14 による事前削除の代わり）
+rm -f data/sales.dat
+# STEP020: 受信データをコピーする（IEBGENER の代わり）
+if [ ! -f data/sales-recv.dat ]; then
+    echo "JSALPREP STEP020: data/sales-recv.dat が見つかりません"
+    echo "JSALPREP RC=12（z/OS では割り当てエラーでステップが実行されないケース）"
+    exit 12
+fi
+cp data/sales-recv.dat data/sales.dat
+echo "JSALPREP STEP020 RC=0"
+exit 0</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">rm -f</code> が STEP010 の事前削除（IEFBR14）、<code class="bg-slate-100">cp</code> が STEP020 の複写（IEBGENER）にあたります。受信データが無いときは RC=12 で終わります。z/OS では、受信データのデータセットが無いと、STEP020 は割り当てエラーで実行されません（第6章 6.4）。その「ステップが実行されずに終わった」状態を、PC では RC=12 で表しています。2つ目は、ジョブ② JSALSUM で、第6章で作ったものと同じです。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jsalsum.sh（疑似JCL：ジョブ② 売上集計。第6章と同じ） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# 疑似JCL（売上集計ジョブ JSALSUM）: DD 文の代わりに環境変数で割り当てる
+BIZDATE=20261020                 # 集計対象日（//SYSIN DD * の中身にあたる）
+# STEP010: 前回の集計結果を削除する（IEFBR14 による事前削除の代わり）
+rm -f data/summary.dat
+# STEP020: SALESSUM を実行する（//SALESIN DD・//SUMOUT DD の代わり）
+export DD_SALESIN=data/sales.dat
+export DD_SUMOUT=data/summary.dat
+echo "$BIZDATE" | ./salessum
+rc=$?
+echo "JSALSUM STEP020 RC=$rc"
+exit $rc</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        <code class="bg-slate-100">DD_SALESIN</code> と <code class="bg-slate-100">DD_SUMOUT</code> が、DD 文の代わりに入力と出力のファイルを結び付けます。集計対象日 <code class="bg-slate-100">BIZDATE</code> は、ここでは固定値で書いています（<code class="bg-slate-100">//SYSIN DD *</code> の中身にあたります）。実務では、ジョブ管理製品などから業務日付を渡すことが多いです。3つ目は、ジョブ③ JSALCHK です。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">jsalchk.sh（疑似JCL：ジョブ③ 集計結果の確認） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# 疑似JCL（集計結果の確認ジョブ JSALCHK）: 集計結果を画面に出して確認する
+if [ ! -s data/summary.dat ]; then
+    echo "JSALCHK: data/summary.dat がないか空です RC=12"
+    exit 12
+fi
+echo "集計対象日: $(cut -c1-8 data/summary.dat)"
+echo "合計金額  : $(cut -c9-18 data/summary.dat)"
+echo "JSALCHK RC=0"
+exit 0</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        集計結果が無い、または空のときは RC=12 で終わります。あるときは、先頭の8桁（集計対象日）と、9〜18桁目（合計金額）を取り出して表示します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">ジョブネットにあたる dailysal.sh</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        いよいよジョブネット DAILYSAL にあたるスクリプトです。ジョブを順に呼び出し、戻りコードを見て、次を実行するかどうかを決めています。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">dailysal.sh（疑似ジョブネット：日次売上 DAILYSAL） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">#!/bin/bash
+# 疑似ジョブネット（日次売上 DAILYSAL）: 前のジョブの戻りコードで次を決める
+./jsalprep.sh; rc=$?
+if [ "$rc" -ne 0 ]; then
+    echo "DAILYSAL: JSALPREP が異常終了（RC=$rc）。後続を実行しません"; exit "$rc"
+fi
+./jsalsum.sh; rc=$?
+if [ "$rc" -gt 4 ]; then
+    echo "DAILYSAL: JSALSUM が異常終了（RC=$rc）。後続を実行しません"; exit "$rc"
+elif [ "$rc" -eq 4 ]; then
+    echo "DAILYSAL: JSALSUM が警告終了（RC=4）。内容を確認してください"
+fi
+./jsalchk.sh; rc=$?
+echo "DAILYSAL: 終了（最後のジョブの RC=$rc）"
+exit "$rc"</code></pre>
+                    </div>
+                    <ol class="list-decimal pl-6 space-y-2 text-slate-600 leading-relaxed mb-4">
+                        <li><code class="bg-slate-100">./jsalprep.sh; rc=$?</code> は、ジョブを実行し、戻りコードを <code class="bg-slate-100">rc</code> に受け取ります。ジョブ管理製品が、ジョブの戻りコードを受け取ることにあたります。</li>
+                        <li>JSALPREP は、<code class="bg-slate-100">rc</code> が 0 以外なら異常終了と判定します。後続を実行せず、<code class="bg-slate-100">exit "$rc"</code> でジョブネットを終えます（後続を止める動きです）。</li>
+                        <li>JSALSUM は、<code class="bg-slate-100">rc</code> が 4 より大きければ（5 以上なら）異常終了と判定して止めます。4 のときは、警告のメッセージを表示して先へ進みます（7.3 の終了判定）。なお、RC=1〜3 は SALESSUM が返さない値なので、この疑似ジョブネットでは区別していません。本物の製品では、しきい値で警告などに振り分けます。</li>
+                        <li>最後に JSALCHK を実行し、その戻りコードを DAILYSAL の戻りコードとして返します。</li>
+                    </ol>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        このスクリプトは RC=8 や RC=12 に「異常終了」と表示しますが、これは ABEND ではありません。7.3 で説明したとおり、ジョブネットが戻りコードのしきい値で判定した「異常終了扱い」です。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">実行する - 正常に終わる場合（TC01）</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        受信データ（第2章の3件のテストデータ）を用意して、SALESSUM をコンパイルし、DAILYSAL を実行します。Windows の場合は、WSL2 の Ubuntu で実行します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">疑似ジョブネットを実行する <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">cd ~/cobol-batch
+chmod +x *.sh                            # スクリプトを実行できるようにする
+cobc -x salessum.cob -o salessum         # SALESSUM をコンパイルする
+# 前の工程から届いた受信データ（3件・改行なし）を用意する
+printf '%s' 000100200100 000200300250 000300100120 > data/sales-recv.dat
+./dailysal.sh; echo "DAILYSAL exit=$?"   # 疑似ジョブネットを実行する</code></pre>
+                    </div>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（TC01: 正常） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">JSALPREP STEP020 RC=0
+SLS001I SALESSUM START DATE=20261020
+SLS002I READ=000003 TOTAL=0000001070
+SLS003I SALESSUM END RC=0000
+JSALSUM STEP020 RC=0
+集計対象日: 20261020
+合計金額  : 0000001070
+JSALCHK RC=0
+DAILYSAL: 終了（最後のジョブの RC=0）
+DAILYSAL exit=0</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        3つのジョブが順に動き、DAILYSAL は戻りコード 0 で終わりました。<code class="bg-slate-100">SLS</code> で始まる3行は SALESSUM のメッセージ、<code class="bg-slate-100">集計対象日</code> と <code class="bg-slate-100">合計金額</code> の2行は JSALCHK の確認結果です。合計金額は、第1章で計算した 1,070円になっています。この実行は、第8章でテストケース TC01 として記録します。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">わざと失敗させる - 受信データが届かなかった場合</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        続けて、受信データが届かなかった状況を作ります（第8章のテストケース TC04 にあたります）。上の TC01 の実行が済んだ状態から、受信データのファイルを消して、もう一度 DAILYSAL を実行します。
+                    </p>
+
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">受信データを消して、もう一度実行する <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">PCで実行</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-bash">rm data/sales-recv.dat                   # 受信データが届かなかった状況にする
+./dailysal.sh; echo "DAILYSAL exit=$?"   # 疑似ジョブネットを実行する
+ls data/sales.dat data/summary.dat       # 2つのファイルがあるかを見る</code></pre>
+                    </div>
+                    <div class="code-block-wrapper my-6">
+                        <div class="flex items-center justify-between bg-slate-800 px-4 py-2 rounded-t-lg">
+                            <span class="text-slate-400 text-sm">実行結果（受信データが無い場合） <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-600 text-white">実行結果</span></span>
+                            <button class="copy-btn text-slate-400 hover:text-white transition-colors"
+                                    onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <pre class="!mt-0 !rounded-t-none"><code class="language-plaintext">JSALPREP STEP020: data/sales-recv.dat が見つかりません
+JSALPREP RC=12（z/OS では割り当てエラーでステップが実行されないケース）
+DAILYSAL: JSALPREP が異常終了（RC=12）。後続を実行しません
+DAILYSAL exit=12
+ls: cannot access 'data/sales.dat': No such file or directory
+data/summary.dat</code></pre>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        JSALPREP が RC=12 で終わると、DAILYSAL は後続の JSALSUM と JSALCHK を<strong>実行せず</strong>、RC=12 で終わりました。7.5 で見たとおり、異常終了と判定したら後続を止める動きです。最後の <code class="bg-slate-100">ls</code> の結果にも注目してください。<code class="bg-slate-100">sales.dat</code> は JSALPREP の STEP010 で削除済みなので無く（<code class="bg-slate-100">No such file or directory</code> のエラーになっています）、<code class="bg-slate-100">summary.dat</code> は<strong>前回の実行の結果がそのまま残っています</strong>。止まったジョブより後ろのデータセットは、更新されません。この例では集計対象日をどちらも 20261020 に固定しているので日付では区別できませんが、実際の運用では、前日の結果なら先頭8桁が前日の日付になっています。なお、<code class="bg-slate-100">ls</code> のエラーメッセージは、環境の言語設定によって、日本語など別の言語で表示されることがあります（上は英語表示の例です）。
+                    </p>
+
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">疑似ジョブネットでできないこと</h3>
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        疑似ジョブネットで確かめられるのは、<strong>戻りコードで次のジョブを決める</strong>という考え方です。本物のジョブ管理製品が備えている次の機能は、この代用ではできません。
+                    </p>
+
+                    <div class="overflow-x-auto my-6">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">できないこと</th>
+                                    <th class="px-4 py-3 text-left font-semibold">本物のジョブ管理製品では</th>
+                                    <th class="px-4 py-3 text-left font-semibold">疑似ジョブネットでは</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">カレンダーとスケジュール</td>
+                                    <td class="px-4 py-3 align-top">営業日カレンダーに従って、22:00 に自動で起動する。休業日は動かさない、または振り替える</td>
+                                    <td class="px-4 py-3 align-top">人が <code class="bg-slate-100">./dailysal.sh</code> を実行する。実行する日も時刻も、人が決める</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">監視</td>
+                                    <td class="px-4 py-3 align-top">開始遅延・終了遅延を見張り、遅れたら通知する</td>
+                                    <td class="px-4 py-3 align-top">終わらなくても、だれにも知らせない</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">保留</td>
+                                    <td class="px-4 py-3 align-top">動かしたくない日を、あらかじめ保留にできる</td>
+                                    <td class="px-4 py-3 align-top">実行しなければよいだけで、仕組みとしては無い</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">再実行の管理</td>
+                                    <td class="px-4 py-3 align-top">「異常終了ジョブから」「ジョブネットの先頭から」などを選んで再実行できる</td>
+                                    <td class="px-4 py-3 align-top">どこから再実行するかを人が決め、<code class="bg-slate-100">./jsalsum.sh</code> などを手で実行する</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 font-medium align-top">通知</td>
+                                    <td class="px-4 py-3 align-top">異常終了と判定すると、運用担当へ通知する</td>
+                                    <td class="px-4 py-3 align-top">画面にメッセージを出すだけ。画面を見ている人がいなければ気づけない</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-slate-600 leading-relaxed mb-4">
+                        本物のジョブ管理製品では、dailysal.sh のような判定のプログラムを自分で書く代わりに、先行・後続関係、終了判定、スケジュール、異常時の動きを<strong>定義</strong>として入力します。だからこそ、7.7 の定義表のように、設計を表にまとめておくことが重要です。
+                    </p>
+                </section>
+
+                <!-- やってみよう（実習）カード: 完成形を読む -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-book-open text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-1【読む】: ケース別に、実行されるジョブを判定しよう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">7.7 の構成図と定義表を見ながら、DAILYSAL が3つのケースでどう動くかを読み取ります。PC がある場合は、7.8 の疑似ジョブネットで(c)に近い状況（受信データが無い）を再現して、確かめてもかまいません。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ul class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">7.7 の定義表で、JSALSUM の「正常とみなす RC」と「異常時の対応」を確認する。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">次の3つのケースで、JSALPREP・JSALSUM・JSALCHK が「実行される」か「実行されない」かを、ケースごとに書き出す。<br>(a) JSALSUM が RC=4 で終わった。<br>(b) JSALSUM が RC=8 で終わった。<br>(c) JSALPREP の STEP020 が、受信データが無いために割り当てエラーとなり、実行されなかった。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">ケースごとに、運用担当が最初にすることを1行で書く。</span>
+                                </li>
+                            </ul>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">解答例</p>
+                                <ul class="space-y-2 text-purple-900 text-sm">
+                                    <li>・<strong>(a) RC=4</strong>: 3つのジョブとも<strong>実行されます</strong>。RC=4 は警告で、後続を止めない設計だからです。運用担当は、入力が 0 件になった理由（本当に売上が無い日か、受信データの欠落か）を確認します。</li>
+                                    <li>・<strong>(b) RC=8</strong>: JSALPREP と JSALSUM は実行され、<strong>JSALCHK は実行されません</strong>。RC=8 は異常終了扱いで、後続を実行せず通知します。運用担当は、ジョブログの SLS9xxE のエラーメッセージ（たとえば SLS906E は数値項目の不正値）から原因を調べます。</li>
+                                    <li>・<strong>(c) 割り当てエラー</strong>: JSALPREP は STEP010 まで実行されますが、STEP020 は実行されません。<strong>JSALSUM と JSALCHK も実行されません</strong>。ステップが実行されずに終わったジョブは、戻りコードが小さく見えても、異常終了扱いにするからです。運用担当は、割り当てエラーのメッセージ（IEF212I DATA SET NOT FOUND）から、受信データが届いているかを確認します。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう（実習）カード: 一部を修正する -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-screwdriver-wrench text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-2【直す】: 3つの変更依頼に合わせて、構成図と定義表を直そう
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">DAILYSAL に、次の3つの変更依頼が来ました。7.7 の構成図と定義表の、どこをどう直すかを書き出します。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ul class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">7.7 の構成図と定義表を、紙やメモに写す。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">次の(a)〜(c)の順に、直す箇所を書き込む。定義表のどの列が変わるかも書く。<br>(a) 起動条件を「毎営業日 22:00」から「受信データ（TRAIN01.SALES.RECV）の到着」に変える。<br>(b) 異常時の通知を、ジョブとして定義に加える。<br>(c) 第1章のジョブ④「集計結果の送信」を、JSALCHK の後ろに加える。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">変更によって新しく生まれる心配事がないかを考え、1〜2行で書く。</span>
+                                </li>
+                            </ul>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">解答例</p>
+                                <ul class="space-y-2 text-purple-900 text-sm">
+                                    <li>・<strong>(a) 起動条件の変更</strong>: ジョブネット全体の設定の「起動」を「受信データ（TRAIN01.SALES.RECV）の到着」に変え（JP1/AJS3 では、ファイルの更新などをきっかけにジョブネットを動かす起動条件にあたります）、定義表の JSALPREP の「実行条件」も「受信データが届いて DAILYSAL が起動したら実行する」に直します。心配事は、前の工程が書き終える前の、書きかけのファイルを読んでしまうことです。書き終えたことを何で確認するかを、前の工程と決めます。受信が遅れる日に備えて、遅延監視の時刻とバッチウィンドウも見直します。</li>
+                                    <li>・<strong>(b) 異常通知ジョブの追加</strong>: 新しいジョブ（名前は研修先の規則に従う）を、JSALPREP・JSALSUM・JSALCHK のいずれかが異常終了と判定されたときに実行するジョブとして加えます（リカバリージョブの考え方）。定義表では、先行ジョブ＝その3つ、実行条件＝先行ジョブが異常終了と判定されたとき、正常とみなす RC＝0 です。ただし、複数の先行ジョブにつないだときの動き（どれか1つが異常終了したら実行されるか）は製品の仕様によるので、マニュアルで確かめます。ジョブごとに通知ジョブを置く設計もあります。通知ジョブ自体が失敗すると異常に気づけなくなるので、そのときの連絡手段も決めておきます。</li>
+                                    <li>・<strong>(c) ジョブ④の追加</strong>: 先行ジョブ＝JSALCHK、実行条件＝JSALCHK が正常終了したとき（確認が済んだ結果だけを送る。第1章 やってみよう 1-2 と同じ考え方）です。構成図では JSALCHK の後ろに置き、異常時の通知の線も引きます。心配事は2つあります。1つ目は、JSALSUM が RC=4（入力が 0 件）の日に、合計 0 円の結果を送ってよいかです。業務の担当者と決め、送らない場合はその条件も書きます。2つ目は再実行です。送ったデータは取り消せないことが多いので、再実行の前に送信済みかを確認する手順を「再実行の方法」に書きます（二重送信を防ぐため）。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- やってみよう（実習）カード: 自分で作る -->
+                <div class="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-hammer text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-3 break-words">
+                                やってみよう 7-3【作る】: ジョブネット構成図と定義表を作ろう（成果物④）
+                            </h3>
+                            <p class="text-purple-900 mb-4 break-words">日次売上ジョブネットの構成図と定義表を、自分の手で作ります。<strong>再実行の方法まで</strong>書くところがポイントです。7.7 は見ずに作り、できあがったら見比べましょう。</p>
+
+                            <h4 class="font-medium text-purple-800 mb-2">手順</h4>
+                            <ul class="space-y-3 mb-4">
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">1</span>
+                                    <span class="flex-1 min-w-0 break-words">構成図を描く。3つのジョブ、正常の経路、RC=4 の警告の経路、異常時の通知（後続を実行しない経路）を入れる。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">2</span>
+                                    <span class="flex-1 min-w-0 break-words">定義表を作る。列は「ジョブ・処理内容・先行ジョブ・実行条件・正常とみなす RC・異常時の対応・再実行の方法」の7つにする。</span>
+                                </li>
+                                <li class="flex items-start gap-3 text-purple-900">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-purple-200 rounded-full
+                                                 flex items-center justify-center text-sm font-medium">3</span>
+                                    <span class="flex-1 min-w-0 break-words">次の3つの場面で、「どこから再実行するか」と「再実行の前に確認すること」を書き足す。<br>(1) 受信データに不正な数字が混じっていて、JSALSUM が RC=8 で止まった。<br>(2) 集計対象日の指定を誤って、JSALSUM が RC=8 で止まった。<br>(3) JSALSUM が RC=4（入力が 0 件）で終わり、あとで、受信データが遅れて届いていたと分かった。</span>
+                                </li>
+                            </ul>
+
+                            <div class="bg-purple-100 rounded-lg p-4">
+                                <p class="text-purple-900 text-sm font-medium mb-2">解答例</p>
+                                <ul class="space-y-2 text-purple-900 text-sm">
+                                    <li>・<strong>構成図と定義表</strong>: 7.7 のものが見本です。7つの列がすべて埋まっているか、異常時の線が3つのジョブすべてから引かれているかを確認します。</li>
+                                    <li>・<strong>(1) 不正な数字</strong>: 受信データを直し、<strong>JSALPREP から</strong>（ジョブネットの先頭から）再実行します。入力の売上明細そのものが誤っていたので、JSALSUM だけをやり直しても直りません。確認すること: 直したデータが受信データになっているか。残っている売上明細や空の集計結果は事前削除で消えるので、再実行で重複する心配はない（空の集計結果をだれかが使っていないかは確かめる）。</li>
+                                    <li>・<strong>(2) 集計対象日の誤り</strong>: 集計対象日を正しい値にして、<strong>JSALSUM から</strong>（異常終了ジョブから）再実行します。入力の売上明細は正しいので、JSALPREP からやり直さなくてよい。確認すること: 渡す集計対象日が、本来の集計対象日であること（再実行する日の日付ではない）。</li>
+                                    <li>・<strong>(3) 受信データの遅れ</strong>: <strong>JSALPREP から</strong>（ジョブネットの先頭から）再実行します。「警告終了ジョブだけ」で JSALSUM だけをやり直しても、売上明細が 0 件のままなので同じ結果になります。確認すること: 受信データが全件届いているか。警告のときの合計 0 円の結果を、すでにだれかが使っていないか。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 理解度確認クイズ -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200
+                            rounded-xl p-5 my-6 overflow-hidden">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg
+                                    flex items-center justify-center">
+                            <i class="fas fa-question text-white"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-4 break-words">理解度確認クイズ</h3>
+                            <ul class="space-y-4">
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q1. 「3つの処理のステップを、すべて1つの JCL に書けば、ジョブネットは要らないのではないか」という意見があります。どう答えますか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            ステップ同士の実行制御なら、JCL の IF/THEN/ELSE や COND でもできます。しかし、<strong>ジョブとジョブの間</strong>の制御 ― 実行順序、時刻やファイルの到着による起動、営業日カレンダー、遅延の監視、異常時の通知、再実行の範囲の選択 ― は、ふつうジョブ管理製品（ジョブネット）の役割です。また、1つにまとめると、再実行や判断の単位が大きくなります。RESTART でステップから再開することもできますが、その位置を人が判断して指定する必要があります。業務の区切りごとにジョブを分け、ジョブネットでつなぐほうが、実行条件の細かな設計や、必要な範囲だけの再実行がしやすくなります。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q2. 夜間に「JSALPREP が異常終了と判定された」という通知が届きました。運用担当がジョブログで最初に確認することを、2つ挙げてください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            (1) <strong>どのステップで何が起きたか</strong>です。各ステップの戻りコード、ABEND コード、ステップが実行されなかったことを示すメッセージ（IEF272I など）と、その原因を示すメッセージ（割り当てエラーなら IEF212I など）を確認します。(2) <strong>その時点でデータセットがどうなっているか</strong>です。売上明細（DETAIL）が作られたか（STEP010 で削除されたままか）、前回の集計結果（SUMMARY）が前回のまま残っていること（今回の結果と取り違えないよう、先頭8桁の集計対象日を見る）、後続の JSALSUM・JSALCHK が実行されていないことを確認します。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q3. 集計結果のデータセットに DISP=MOD で追記する設計は、再実行のときになぜ危険ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            再実行のたびに、既にある内容の後ろに同じレコードが追加され、<strong>二重計上</strong>になるからです。7.6 で試したように、2回追記すると同じレコードが2件になり、合計を求めると正しい値の倍になります。対策は、追記せず毎回作り直すことです（COBOL は OPEN OUTPUT、JCL は事前削除 ＋ DISP=NEW）。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q4. 集計対象日を、システム日付ではなく SYSIN で渡す理由を説明してください。</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            システム日付を使うと、日をまたいで再実行したときに、実行した日の日付で集計されてしまうからです。集計対象日（業務日付）は、実行した日とは別のものです。SYSIN で外から渡せば、再実行でも同じ集計対象日（例: 20261020）になり、同じ結果になります。実務では、ジョブ管理製品などから業務日付を渡すことが多いです。
+                                        </p>
+                                    </details>
+                                </li>
+                                <li class="text-blue-900">
+                                    <p class="font-medium mb-2 break-words">Q5. JSALSUM が RC=4（警告）で終わっても、後続の JSALCHK を実行する設計にしました。この判断で、注意すべきことは何ですか？</p>
+                                    <details class="mt-2">
+                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 break-words">
+                                            回答を表示
+                                        </summary>
+                                        <p class="mt-2 pl-4 text-blue-900 bg-blue-100 rounded-lg p-3 break-words">
+                                            警告は後続を止めないので、<strong>だれも気づかないまま、合計 0 円の結果が使われる</strong>おそれがあります。入力が 0 件だったのが、本当に売上の無い日なのか、受信データの欠落なのかは、確認しないと分かりません。そこで、警告を記録し、だれが・いつまでに・何を見て確認するかを運用の決まりにしておきます。欠落だと分かったら、JSALPREP から再実行します。また、JSALCHK は 0 件でも RC=0 で終わるため、警告は JSALCHK の結果には表れない点にも注意が必要です。
+                                        </p>
+                                    </details>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 次章への橋渡し -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-forward text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-1">次の章では</h3>
+                            <p class="text-slate-600 text-sm leading-relaxed">第8章は総合ハンズオンです。この章で設計した日次売上ジョブネットを、実際に動かして確かめます。SALESSUM を完成版にして（集計対象日と数値項目のチェック、合計の桁あふれの検出、入力 0 件の警告）、JCL・疑似JCL・疑似ジョブネットをつなぎ、正常系・異常系・再実行の8つのテストケースを実行します。7.7 の定義表は、そのままテストの設計図になります。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 章間ナビゲーション -->
+                <nav class="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+                    <a href="cobol-batch-learning-material-06.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-slate-100 hover:bg-slate-200 transition-colors">
+                        <i class="fas fa-arrow-left text-slate-400 group-hover:text-slate-600 transition-transform group-hover:-translate-x-1"></i>
+                        <div>
+                            <span class="text-xs text-slate-500 block">前の章</span>
+                            <span class="text-slate-700 font-medium">第6章: COBOLとJCLの連携 - ASSIGNとDD名・実行結果の確認</span>
+                        </div>
+                    </a>
+                    <a href="cobol-batch-learning-material-08.html"
+                       class="group flex items-center gap-3 px-4 py-3 rounded-xl
+                              bg-primary-500 hover:bg-primary-600 text-white transition-colors">
+                        <div class="text-right">
+                            <span class="text-xs text-primary-100 block">次の章</span>
+                            <span class="font-medium">第8章: 総合ハンズオン - 日次売上集計バッチを設計・実行・テストする</span>
+                        </div>
+                        <i class="fas fa-arrow-right transition-transform group-hover:translate-x-1"></i>
+                    </a>
+                </nav>
